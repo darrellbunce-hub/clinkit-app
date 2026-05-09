@@ -1,3 +1,4 @@
+import Link from "next/link";
 export default function Home() {
   return (
     <main className="min-h-screen bg-slate-100">
@@ -8,9 +9,12 @@ export default function Home() {
           ClinkIt
         </h1>
 
-        <button className="bg-slate-900 text-white px-4 py-2 rounded-lg">
-          Login
-        </button>
+        <Link
+  href="/login"
+  className="bg-slate-900 text-white px-4 py-2 rounded-lg"
+>
+  Login
+</Link>
       </header>
 
       {/* Hero Section */}
@@ -24,9 +28,12 @@ export default function Home() {
           confidence indicators and progress tracking.
         </p>
 
-        <button className="mt-8 bg-slate-900 text-white px-8 py-4 rounded-xl text-lg hover:bg-slate-700 transition">
-          Get Started
-        </button>
+        <Link
+  href="/dashboard"
+  className="inline-block mt-8 bg-slate-900 text-white px-8 py-4 rounded-xl text-lg hover:bg-slate-700 transition"
+>
+  Get Started
+</Link>
       </section>
 
       {/* Features */}
