@@ -1,14 +1,204 @@
+"use client";
+
+import { useParams } from "next/navigation";
 import Navbar from "@/components/Navbar";
+import { useChain } from "@/context/ChainContext";
 
-type PropertyPageProps = {
-  params: {
-    propertyId: string;
-  };
-};
+const stageOptions = [
 
-export default function PropertyPage({
-  params,
-}: PropertyPageProps) {
+  {
+    value: "viewing_properties",
+    label: "Viewing Properties",
+  },
+
+  {
+    value: "offer_submitted",
+    label: "Offer Submitted",
+  },
+
+  {
+    value: "offer_accepted",
+    label: "Offer Accepted",
+  },
+
+  {
+    value: "cash_buyer",
+    label: "Cash Buyer",
+  },
+
+  {
+    value: "mortgage_in_principle",
+    label: "Mortgage in Principle",
+  },
+
+  {
+    value: "solicitor_instructed",
+    label: "Solicitor Instructed",
+  },
+
+  {
+    value: "mortgage_applied",
+    label: "Mortgage Applied",
+  },
+
+  {
+    value: "mortgage_valuation_booked",
+    label: "Mortgage Valuation Booked",
+  },
+
+  {
+    value: "mortgage_valuation_complete",
+    label: "Mortgage Valuation Complete",
+  },
+
+  {
+    value: "mortgage_offer_received",
+    label: "Mortgage Offer Received",
+  },
+
+  {
+    value: "survey_booked",
+    label: "Survey Booked",
+  },
+
+  {
+    value: "survey_complete",
+    label: "Survey Complete",
+  },
+
+  {
+    value: "survey_issues_found",
+    label: "Survey Issues Found",
+  },
+
+  {
+    value: "survey_issues_resolved",
+    label: "Survey Issues Resolved",
+  },
+
+  {
+    value: "searches_started",
+    label: "Searches Started",
+  },
+
+  {
+    value: "searches_returned",
+    label: "Searches Returned",
+  },
+
+  {
+    value: "enquiries_raised",
+    label: "Enquiries Raised",
+  },
+
+  {
+    value: "enquiries_resolved",
+    label: "Enquiries Resolved",
+  },
+
+  {
+    value: "contracts_received",
+    label: "Contracts Received",
+  },
+
+  {
+    value: "ready_to_exchange",
+    label: "Ready to Exchange",
+  },
+
+  {
+    value: "exchange_pending",
+    label: "Exchange Pending",
+  },
+
+  {
+    value: "contracts_exchanged",
+    label: "Contracts Exchanged",
+  },
+
+  {
+    value: "completion_date_set",
+    label: "Completion Date Set",
+  },
+
+  {
+    value: "completed",
+    label: "Completed",
+  },
+
+  {
+    value: "awaiting_documents",
+    label: "Awaiting Documents",
+  },
+
+  {
+    value: "awaiting_searches",
+    label: "Awaiting Searches",
+  },
+
+  {
+    value: "awaiting_mortgage",
+    label: "Awaiting Mortgage",
+  },
+
+  {
+    value: "chain_delay",
+    label: "Chain Delay",
+  },
+
+  {
+    value: "issue_under_review",
+    label: "Issue Under Review",
+  },
+
+  {
+    value: "sale_fallen_through",
+    label: "Sale Fallen Through",
+  },
+
+];
+
+const activityTimeline = [
+  {
+    date: "Today",
+    update: "Survey Booked",
+  },
+
+  {
+    date: "3 days ago",
+    update: "Mortgage Applied",
+  },
+
+  {
+    date: "7 days ago",
+    update: "Offer Accepted",
+  },
+];
+
+export default function PropertyPage() {
+
+  const params = useParams();
+
+  const propertyId =
+    Number(params.propertyId);
+
+  const {
+    properties,
+    updatePropertyStage,
+  } = useChain();
+
+  const currentProperty = properties.find(
+    (property) => property.id === propertyId
+  );
+
+  if (!currentProperty) {
+    return (
+      <div className="p-10 text-2xl">
+        Property not found
+      </div>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-slate-100">
 
@@ -19,118 +209,93 @@ export default function PropertyPage({
         {/* Header */}
         <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
 
-          <div className="flex items-center justify-between">
+          <h1 className="text-5xl font-bold text-slate-900">
+            Property {currentProperty.id}
+          </h1>
 
-            <div>
-
-              <h1 className="text-5xl font-bold text-slate-900">
-                Property {params.propertyId}
-              </h1>
-
-              <p className="text-slate-600 mt-3 text-lg">
-                Chain position #{params.propertyId}
-              </p>
-
-            </div>
-
-            <div className="bg-blue-100 text-blue-700 px-5 py-3 rounded-full text-sm font-semibold">
-              Active
-            </div>
-
-          </div>
+          <p className="text-slate-600 mt-3 text-lg">
+            Chain position #{currentProperty.id}
+          </p>
 
         </div>
 
-        {/* Status Card */}
+        {/* Current Status */}
         <div className="mt-8 bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
 
           <h2 className="text-3xl font-bold text-slate-900">
             Current Status
           </h2>
 
-          <div className="mt-6 flex items-center gap-4">
-
-            <div className="w-5 h-5 rounded-full bg-green-500"></div>
-
-            <p className="text-xl font-medium text-slate-900">
-              Mortgage Approved
-            </p>
-
-          </div>
-
-          <p className="mt-4 text-slate-600">
-            Latest update received 2 hours ago.
+          <p className="mt-6 text-xl font-medium text-slate-900">
+            {currentProperty.stage}
           </p>
 
         </div>
 
-        {/* Confidence */}
+        {/* Update Status */}
         <div className="mt-8 bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
 
           <h2 className="text-3xl font-bold text-slate-900">
-            Confidence Indicator
+            Update Status
           </h2>
 
-          <div className="mt-6">
+          <select
+            value={currentProperty.stage}
+            onChange={(event) =>
+              updatePropertyStage(
+                currentProperty.id,
+                event.target.value
+              )
+            }
+            className="mt-6 w-full border border-slate-300 rounded-xl px-4 py-4 text-lg"
+          >
 
-            <div className="w-full h-5 bg-slate-200 rounded-full overflow-hidden">
+{stageOptions.map((stage) => (
+  <option
+    key={stage.value}
+    value={stage.value}
+  >
+    {stage.label}
+  </option>
+))}
 
-              <div className="w-[78%] h-full bg-green-500 rounded-full"></div>
-
-            </div>
-
-            <p className="mt-4 text-lg font-semibold text-green-700">
-              High Confidence — 78%
-            </p>
-
-          </div>
+          </select>
 
         </div>
 
-        {/* Activity */}
+        {/* Timeline */}
         <div className="mt-8 bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
 
           <h2 className="text-3xl font-bold text-slate-900">
-            Recent Activity
+            Activity Timeline
           </h2>
 
           <div className="mt-8 space-y-6">
 
-            <div className="border-b border-slate-100 pb-4">
+            {activityTimeline.map((activity) => (
 
-              <p className="font-semibold text-slate-900">
-                Mortgage Approved
-              </p>
+              <div
+                key={activity.date}
+                className="flex items-start gap-4"
+              >
 
-              <p className="text-slate-500 mt-1">
-                Updated 2 hours ago
-              </p>
+                <div className="w-4 h-4 rounded-full bg-blue-500 mt-2"></div>
 
-            </div>
+                <div>
 
-            <div className="border-b border-slate-100 pb-4">
+                  <p className="font-semibold text-slate-900">
+                    {activity.update}
+                  </p>
 
-              <p className="font-semibold text-slate-900">
-                Searches Started
-              </p>
+                  <p className="text-sm text-slate-500 mt-1">
+                    {activity.date}
+                  </p>
 
-              <p className="text-slate-500 mt-1">
-                Updated 4 days ago
-              </p>
+                </div>
 
-            </div>
+              </div>
 
-            <div>
-
-              <p className="font-semibold text-slate-900">
-                Offer Accepted
-              </p>
-
-              <p className="text-slate-500 mt-1">
-                Updated 12 days ago
-              </p>
-
-            </div>
+            ))}
 
           </div>
 
@@ -139,6 +304,6 @@ export default function PropertyPage({
       </div>
 
     </main>
-    
+
   );
 }

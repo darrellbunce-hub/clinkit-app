@@ -1,8 +1,11 @@
+"use client";
+
 import Navbar from "@/components/Navbar";
 import Link from "next/link";
+import { useChain } from "@/context/ChainContext";
 
-/* Stage Configuration */
 const STAGES = {
+
   searches_started: {
     label: "Searches Started",
     colour: "bg-slate-100 border-slate-300",
@@ -10,8 +13,8 @@ const STAGES = {
     progress: 30,
   },
 
-  mortgage_approved: {
-    label: "Mortgage Approved",
+  mortgage_offer_received: {
+    label: "Mortgage Offer Received",
     colour: "bg-green-100 border-green-500",
     text: "text-green-700",
     progress: 55,
@@ -30,71 +33,69 @@ const STAGES = {
     text: "text-amber-700",
     progress: 20,
   },
+
 };
 
-/* Property Data */
-const properties = [
-  {
-    id: 1,
-    stage: "searches_started",
-    isCurrentUser: false,
-    lastUpdatedDays: 2,
-  },
-
-  {
-    id: 2,
-    stage: "mortgage_approved",
-    isCurrentUser: false,
-    lastUpdatedDays: 1,
-  },
-
-  {
-    id: 3,
-    stage: "survey_booked",
-    isCurrentUser: true,
-    lastUpdatedDays: 3,
-  },
-
-  {
-    id: 4,
-    stage: "awaiting_searches",
-    isCurrentUser: false,
-    lastUpdatedDays: 18,
-  },
-];
-
-/* Progress Calculation */
-const totalProgress = properties.reduce((total, property) => {
-  const stage =
-    STAGES[property.stage as keyof typeof STAGES];
-
-  return total + stage.progress;
-}, 0);
-
-const averageProgress =
-  Math.round(totalProgress / properties.length);
-
-/* Stale Detection */
-const staleProperties = properties.filter(
-  (property) => property.lastUpdatedDays > 14
-);
-
-/* Confidence Logic */
-let confidenceLabel = "Low";
-let confidenceColour = "text-red-600";
-let confidenceBg = "bg-red-100";
-
-if (averageProgress > 60) {
-  confidenceLabel = "Healthy";
-  confidenceColour = "text-green-700";
-  confidenceBg = "bg-green-100";
-} else if (averageProgress > 30) {
-  confidenceLabel = "Moderate";
-  confidenceColour = "text-amber-700";
-  confidenceBg = "bg-amber-100";
-}
-
 export default function ChainPage() {
+
+  const { properties } = useChain();
+
+  const totalProgress = properties.reduce(
+    (total, property) => {
+
+      const stage =
+        STAGES[property.stage as keyof typeof STAGES];
+
+      if (!stage) {
+        return total;
+      }
+
+      return total + stage.progress;
+
+    },
+    0
+  );
+
+  const averageProgress =
+    Math.round(totalProgress / properties.length);
+
+  const staleProperties = properties.filter(
+    (property) => property.lastUpdatedDays > 14
+  );
+
+  const blockedCount = properties.filter(
+    (property) => property.status === "blocked"
+  ).length;
+
+  const delayedCount = properties.filter(
+    (property) => property.status === "delayed"
+  ).length;
+
+  let confidenceScore = averageProgress;
+
+  confidenceScore -= blockedCount * 25;
+  confidenceScore -= delayedCount * 10;
+  confidenceScore -= staleProperties.length * 5;
+
+  if (confidenceScore < 0) {
+    confidenceScore = 0;
+  }
+
+  let confidenceLabel = "High Risk";
+  let confidenceColour = "text-red-700";
+  let confidenceBg = "bg-red-100";
+
+  if (confidenceScore >= 70) {
+    confidenceLabel = "Healthy";
+    confidenceColour = "text-green-700";
+    confidenceBg = "bg-green-100";
+  }
+  else if (confidenceScore >= 40) {
+    confidenceLabel = "Moderate";
+    confidenceColour = "text-amber-700";
+    confidenceBg = "bg-amber-100";
+  }
+
   return (
     <main className="min-h-screen bg-slate-100">
 
@@ -102,7 +103,6 @@ export default function ChainPage() {
 
       <div className="max-w-6xl mx-auto px-6 py-12">
 
-        {/* Header */}
         <div>
 
           <h1 className="text-5xl font-bold text-slate-900">
@@ -115,7 +115,7 @@ export default function ChainPage() {
 
         </div>
 
-        {/* Progress Section */}
+        {/* Progress */}
         <div className="mt-10 bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
 
           <div className="flex items-center justify-between">
@@ -138,19 +138,20 @@ export default function ChainPage() {
 
           </div>
 
-          {/* Progress Bar */}
           <div className="mt-8 w-full h-6 bg-slate-200 rounded-full overflow-hidden">
 
             <div
-              className="h-full bg-green-500 rounded-full transition-all"
-              style={{ width: `${averageProgress}%` }}
+              className="h-full bg-green-500 rounded-full"
+              style={{
+                width: `${averageProgress}%`,
+              }}
             ></div>
 
           </div>
 
         </div>
 
-        {/* Confidence Section */}
+        {/* Confidence */}
         <div className="mt-10 bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
 
           <div className="flex items-center justify-between">
@@ -160,10 +161,6 @@ export default function ChainPage() {
               <h2 className="text-3xl font-bold text-slate-900">
                 Chain Confidence
               </h2>
-
-              <p className="text-slate-600 mt-2">
-                Estimated likelihood of successful completion
-              </p>
 
             </div>
 
@@ -175,10 +172,10 @@ export default function ChainPage() {
             >
 
               <p className={`text-3xl font-bold ${confidenceColour}`}>
-                {averageProgress}%
+                {confidenceScore}%
               </p>
 
-              <p className={`text-sm font-medium mt-1 ${confidenceColour}`}>
+              <p className={`text-sm mt-1 ${confidenceColour}`}>
                 {confidenceLabel}
               </p>
 
@@ -188,37 +185,21 @@ export default function ChainPage() {
 
         </div>
 
-        {/* Stale Warning */}
+        {/* Warning */}
         {staleProperties.length > 0 && (
 
           <div className="mt-10 bg-amber-100 border border-amber-300 rounded-3xl p-6">
 
-            <div className="flex items-start gap-4">
-
-              <div className="text-3xl">
-                ⚠️
-              </div>
-
-              <div>
-
-                <h2 className="text-2xl font-bold text-amber-800">
-                  Chain Activity Warning
-                </h2>
-
-                <p className="mt-2 text-amber-700 text-lg">
-                  Property {staleProperties[0].id} has not updated for{" "}
-                  {staleProperties[0].lastUpdatedDays} days.
-                </p>
-
-              </div>
-
-            </div>
+            <p className="text-amber-700 font-semibold">
+              Property {staleProperties[0].id} has not updated for{" "}
+              {staleProperties[0].lastUpdatedDays} days.
+            </p>
 
           </div>
 
         )}
 
-        {/* Chain Visual */}
+        {/* Chain */}
         <div className="mt-12 bg-white rounded-3xl shadow-sm border border-slate-200 p-8 overflow-x-auto">
 
           <div className="flex items-center min-w-max">
@@ -227,6 +208,10 @@ export default function ChainPage() {
 
               const stage =
                 STAGES[property.stage as keyof typeof STAGES];
+
+              if (!stage) {
+                return null;
+              }
 
               return (
                 <div
@@ -241,21 +226,28 @@ export default function ChainPage() {
 
                     <div
                       className={`
-                        ${property.isCurrentUser
-                          ? "w-28 h-28 rounded-3xl border-4 text-6xl"
-                          : "w-24 h-24 rounded-2xl border-2 text-5xl"}
-                        ${stage.colour}
-                        flex items-center justify-center relative
+                        relative
+                        flex
+                        items-center
+                        justify-center
+
+                        ${
+                          property.isCurrentUser
+                            ? "w-28 h-28 rounded-3xl border-4 text-6xl"
+                            : "w-24 h-24 rounded-2xl border-2 text-5xl"
+                        }
+
+                        ${
+                          property.status === "healthy"
+                            ? "bg-green-100 border-green-500"
+                            : property.status === "delayed"
+                            ? "bg-amber-100 border-amber-500"
+                            : "bg-red-100 border-red-500"
+                        }
                       `}
                     >
 
                       🏠
-
-                      {property.isCurrentUser && (
-                        <div className="absolute -top-3 bg-blue-500 text-white text-xs px-3 py-1 rounded-full">
-                          YOU
-                        </div>
-                      )}
 
                     </div>
 
@@ -269,9 +261,25 @@ export default function ChainPage() {
 
                   </Link>
 
-                  {/* Connector */}
                   {index < properties.length - 1 && (
-                    <div className="w-24 border-t-4 border-dashed border-slate-300 mx-4"></div>
+
+                    <div
+                      className={`
+                        w-24
+                        border-t-4
+                        border-dashed
+                        mx-4
+
+                        ${
+                          property.status === "healthy"
+                            ? "border-green-400"
+                            : property.status === "delayed"
+                            ? "border-amber-400"
+                            : "border-red-400"
+                        }
+                      `}
+                    ></div>
+
                   )}
 
                 </div>
