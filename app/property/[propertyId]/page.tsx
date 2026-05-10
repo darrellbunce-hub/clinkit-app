@@ -4,45 +4,7 @@ import { useParams } from "next/navigation";
 
 import Navbar from "@/components/Navbar";
 import { useChain } from "@/context/ChainContext";
-
-const stageOptions = [
-
-  {
-    value: "viewing_properties",
-    label: "Viewing Properties",
-  },
-
-  {
-    value: "offer_submitted",
-    label: "Offer Submitted",
-  },
-
-  {
-    value: "offer_accepted",
-    label: "Offer Accepted",
-  },
-
-  {
-    value: "mortgage_offer_received",
-    label: "Mortgage Offer Received",
-  },
-
-  {
-    value: "survey_booked",
-    label: "Survey Booked",
-  },
-
-  {
-    value: "searches_started",
-    label: "Searches Started",
-  },
-
-  {
-    value: "awaiting_searches",
-    label: "Awaiting Searches",
-  },
-
-];
+import { STAGES } from "@/data/stages";
 
 export default function PropertyPage() {
 
@@ -99,7 +61,12 @@ export default function PropertyPage() {
           </h2>
 
           <p className="mt-6 text-xl font-medium text-slate-900">
-            {currentProperty.stage}
+          {
+  STAGES.find(
+    (stage) =>
+      stage.value === currentProperty.stage
+  )?.label
+}
           </p>
 
         </div>
@@ -122,7 +89,7 @@ export default function PropertyPage() {
             className="mt-6 w-full border border-slate-300 rounded-xl px-4 py-4 text-lg"
           >
 
-            {stageOptions.map((stage) => (
+{STAGES.map((stage) => (
               <option
                 key={stage.value}
                 value={stage.value}
@@ -161,7 +128,16 @@ export default function PropertyPage() {
                   </p>
 
                   <p className="text-sm text-slate-500 mt-1">
-                    {activity.date}
+                  {
+  new Date(activity.timestamp)
+    .toLocaleString("en-GB", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+}
                   </p>
 
                 </div>

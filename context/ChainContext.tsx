@@ -4,12 +4,13 @@ import {
   createContext,
   useContext,
   useState,
+useEffect,
   ReactNode,
 } from "react";
-
+import { supabase } from "@/lib/supabase";
 type Activity = {
   id: number;
-  date: string;
+  timestamp: string;
   update: string;
 };
 
@@ -40,111 +41,122 @@ export function ChainProvider({
   children: ReactNode;
 }) {
 
-  const [properties, setProperties] = useState<Property[]>([
-    {
-      id: 1,
-      stage: "searches_started",
-      status: "healthy",
-      isCurrentUser: false,
-      lastUpdatedDays: 2,
+  const [properties, setProperties] =
+  useState<Property[]>([]);
 
-      activities: [
-        {
-          id: 1,
-          date: "Today",
-          update: "Searches Started",
-        },
-      ],
-    },
+useEffect(() => {
 
-    {
-      id: 2,
-      stage: "mortgage_offer_received",
-      status: "healthy",
-      isCurrentUser: false,
-      lastUpdatedDays: 1,
+  async function fetchProperties() {
 
-      activities: [
-        {
-          id: 1,
-          date: "Today",
-          update: "Mortgage Offer Received",
-        },
-      ],
-    },
+    const { data, error } =
+  await supabase
+    .from("properties")
+    .select(`
+      *,
+      activities (
+        id,
+        timestamp,
+        update
+      )
+    `);
 
-    {
-      id: 3,
-      stage: "survey_booked",
-      status: "delayed",
-      isCurrentUser: true,
-      lastUpdatedDays: 7,
+    if (error) {
+      console.error(error);
+      return;
+    }
 
-      activities: [
-        {
-          id: 1,
-          date: "Today",
-          update: "Survey Booked",
-        },
-      ],
-    },
+    const formattedProperties =
+      data.map((property) => ({
 
-    {
-      id: 4,
-      stage: "awaiting_searches",
-      status: "blocked",
-      isCurrentUser: false,
-      lastUpdatedDays: 18,
+        id: property.id,
 
-      activities: [
-        {
-          id: 1,
-          date: "Today",
-          update: "Awaiting Searches",
-        },
-      ],
-    },
-  ]);
+        stage: property.stage,
 
-  function updatePropertyStage(
+        status: property.status,
+
+        isCurrentUser:
+          property.is_current_user,
+
+        lastUpdatedDays:
+          property.last_updated_days,
+
+          activities:
+  property.activities || [],
+
+      }));
+
+    setProperties(formattedProperties);
+
+  }
+
+  fetchProperties();
+
+}, []);
+
+async function updatePropertyStage(
     propertyId: number,
     newStage: string
   ) {
 
-    setProperties((previousProperties) =>
-      previousProperties.map((property) => {
-
-        if (property.id === propertyId) {
-
-          return {
-            ...property,
-
-            stage: newStage,
-
-            lastUpdatedDays: 0,
-
-            activities: [
-              {
-                id: Date.now(),
-
-                date: "Just now",
-
-                update: newStage
-                  .replaceAll("_", " ")
-                  .replace(/\b\w/g, (letter) =>
-                    letter.toUpperCase()
-                  ),
-              },
-
-              ...property.activities,
-            ],
-          };
-        }
-
-        return property;
-
+    const { error } =
+    await supabase
+      .from("properties")
+      .update({
+        stage: newStage,
+        last_updated_days: 0,
       })
-    );
+      .eq("id", propertyId);
+  
+  if (error) {
+    console.error(error);
+    return;
+  }
+  await supabase
+  .from("activities")
+  .insert({
+    property_id: propertyId,
+
+    update: newStage
+      .replaceAll("_", " ")
+      .replace(/\b\w/g, (letter) =>
+        letter.toUpperCase()
+      ),
+  });
+  setProperties((previousProperties) =>
+    previousProperties.map((property) => {
+  
+      if (property.id === propertyId) {
+  
+        return {
+          ...property,
+  
+          stage: newStage,
+  
+          lastUpdatedDays: 0,
+  
+          activities: [
+            {
+              id: Date.now(),
+  
+              timestamp:
+                new Date().toISOString(),
+  
+              update: newStage
+                .replaceAll("_", " ")
+                .replace(/\b\w/g, (letter) =>
+                  letter.toUpperCase()
+                ),
+            },
+  
+            ...property.activities,
+          ],
+        };
+      }
+  
+      return property;
+  
+    })
+  );
   }
 
   return (

@@ -3,54 +3,22 @@
 import Navbar from "@/components/Navbar";
 import Link from "next/link";
 import { useChain } from "@/context/ChainContext";
-
-const STAGES = {
-
-  searches_started: {
-    label: "Searches Started",
-    colour: "bg-slate-100 border-slate-300",
-    text: "text-slate-500",
-    progress: 30,
-  },
-
-  mortgage_offer_received: {
-    label: "Mortgage Offer Received",
-    colour: "bg-green-100 border-green-500",
-    text: "text-green-700",
-    progress: 55,
-  },
-
-  survey_booked: {
-    label: "Survey Booked",
-    colour: "bg-blue-100 border-blue-500",
-    text: "text-blue-600",
-    progress: 45,
-  },
-
-  awaiting_searches: {
-    label: "Awaiting Searches",
-    colour: "bg-amber-100 border-amber-500",
-    text: "text-amber-700",
-    progress: 20,
-  },
-
-};
-
+import { STAGES } from "@/data/stages";
 export default function ChainPage() {
 
   const { properties } = useChain();
 
   const totalProgress = properties.reduce(
     (total, property) => {
-
-      const stage =
-        STAGES[property.stage as keyof typeof STAGES];
+      const stage = STAGES.find(
+        (stage) => stage.value === property.stage
+      );
 
       if (!stage) {
         return total;
       }
 
-      return total + stage.progress;
+      return total + (stage?.progress || 0);
 
     },
     0
@@ -205,9 +173,9 @@ export default function ChainPage() {
           <div className="flex items-center min-w-max">
 
             {properties.map((property, index) => {
-
-              const stage =
-                STAGES[property.stage as keyof typeof STAGES];
+const stage = STAGES.find(
+  (stage) => stage.value === property.stage
+);
 
               if (!stage) {
                 return null;
@@ -255,7 +223,7 @@ export default function ChainPage() {
                       Property {property.id}
                     </p>
 
-                    <p className={`text-sm mt-1 ${stage.text}`}>
+                    <p className="text-sm mt-1 text-slate-600">
                       {stage.label}
                     </p>
 
