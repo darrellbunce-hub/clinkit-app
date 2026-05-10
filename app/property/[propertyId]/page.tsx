@@ -1,6 +1,7 @@
 "use client";
 
 import { useParams } from "next/navigation";
+
 import Navbar from "@/components/Navbar";
 import { useChain } from "@/context/ChainContext";
 
@@ -22,36 +23,6 @@ const stageOptions = [
   },
 
   {
-    value: "cash_buyer",
-    label: "Cash Buyer",
-  },
-
-  {
-    value: "mortgage_in_principle",
-    label: "Mortgage in Principle",
-  },
-
-  {
-    value: "solicitor_instructed",
-    label: "Solicitor Instructed",
-  },
-
-  {
-    value: "mortgage_applied",
-    label: "Mortgage Applied",
-  },
-
-  {
-    value: "mortgage_valuation_booked",
-    label: "Mortgage Valuation Booked",
-  },
-
-  {
-    value: "mortgage_valuation_complete",
-    label: "Mortgage Valuation Complete",
-  },
-
-  {
     value: "mortgage_offer_received",
     label: "Mortgage Offer Received",
   },
@@ -62,73 +33,8 @@ const stageOptions = [
   },
 
   {
-    value: "survey_complete",
-    label: "Survey Complete",
-  },
-
-  {
-    value: "survey_issues_found",
-    label: "Survey Issues Found",
-  },
-
-  {
-    value: "survey_issues_resolved",
-    label: "Survey Issues Resolved",
-  },
-
-  {
     value: "searches_started",
     label: "Searches Started",
-  },
-
-  {
-    value: "searches_returned",
-    label: "Searches Returned",
-  },
-
-  {
-    value: "enquiries_raised",
-    label: "Enquiries Raised",
-  },
-
-  {
-    value: "enquiries_resolved",
-    label: "Enquiries Resolved",
-  },
-
-  {
-    value: "contracts_received",
-    label: "Contracts Received",
-  },
-
-  {
-    value: "ready_to_exchange",
-    label: "Ready to Exchange",
-  },
-
-  {
-    value: "exchange_pending",
-    label: "Exchange Pending",
-  },
-
-  {
-    value: "contracts_exchanged",
-    label: "Contracts Exchanged",
-  },
-
-  {
-    value: "completion_date_set",
-    label: "Completion Date Set",
-  },
-
-  {
-    value: "completed",
-    label: "Completed",
-  },
-
-  {
-    value: "awaiting_documents",
-    label: "Awaiting Documents",
   },
 
   {
@@ -136,51 +42,17 @@ const stageOptions = [
     label: "Awaiting Searches",
   },
 
-  {
-    value: "awaiting_mortgage",
-    label: "Awaiting Mortgage",
-  },
-
-  {
-    value: "chain_delay",
-    label: "Chain Delay",
-  },
-
-  {
-    value: "issue_under_review",
-    label: "Issue Under Review",
-  },
-
-  {
-    value: "sale_fallen_through",
-    label: "Sale Fallen Through",
-  },
-
-];
-
-const activityTimeline = [
-  {
-    date: "Today",
-    update: "Survey Booked",
-  },
-
-  {
-    date: "3 days ago",
-    update: "Mortgage Applied",
-  },
-
-  {
-    date: "7 days ago",
-    update: "Offer Accepted",
-  },
 ];
 
 export default function PropertyPage() {
 
   const params = useParams();
 
-  const propertyId =
-    Number(params.propertyId);
+  const propertyId = Number(
+    Array.isArray(params.propertyId)
+      ? params.propertyId[0]
+      : params.propertyId
+  );
 
   const {
     properties,
@@ -250,32 +122,33 @@ export default function PropertyPage() {
             className="mt-6 w-full border border-slate-300 rounded-xl px-4 py-4 text-lg"
           >
 
-{stageOptions.map((stage) => (
-  <option
-    key={stage.value}
-    value={stage.value}
-  >
-    {stage.label}
-  </option>
-))}
+            {stageOptions.map((stage) => (
+              <option
+                key={stage.value}
+                value={stage.value}
+              >
+                {stage.label}
+              </option>
+            ))}
 
           </select>
 
         </div>
 
-        {/* Timeline */}
+        {/* Activity Timeline */}
         <div className="mt-8 bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
 
           <h2 className="text-3xl font-bold text-slate-900">
             Activity Timeline
           </h2>
 
-          <div className="mt-8 space-y-6">
+          {/* Timeline */}
+          <div className="space-y-6">
 
-            {activityTimeline.map((activity) => (
+            {currentProperty.activities.map((activity) => (
 
               <div
-                key={activity.date}
+                key={activity.id}
                 className="flex items-start gap-4"
               >
 
@@ -304,6 +177,5 @@ export default function PropertyPage() {
       </div>
 
     </main>
-
   );
 }

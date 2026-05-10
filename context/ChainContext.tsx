@@ -7,12 +7,19 @@ import {
   ReactNode,
 } from "react";
 
+type Activity = {
+  id: number;
+  date: string;
+  update: string;
+};
+
 type Property = {
   id: number;
   stage: string;
   status: string;
   isCurrentUser: boolean;
   lastUpdatedDays: number;
+  activities: Activity[];
 };
 
 type ChainContextType = {
@@ -33,13 +40,21 @@ export function ChainProvider({
   children: ReactNode;
 }) {
 
-  const [properties, setProperties] = useState([
+  const [properties, setProperties] = useState<Property[]>([
     {
       id: 1,
       stage: "searches_started",
       status: "healthy",
       isCurrentUser: false,
       lastUpdatedDays: 2,
+
+      activities: [
+        {
+          id: 1,
+          date: "Today",
+          update: "Searches Started",
+        },
+      ],
     },
 
     {
@@ -48,6 +63,14 @@ export function ChainProvider({
       status: "healthy",
       isCurrentUser: false,
       lastUpdatedDays: 1,
+
+      activities: [
+        {
+          id: 1,
+          date: "Today",
+          update: "Mortgage Offer Received",
+        },
+      ],
     },
 
     {
@@ -56,6 +79,14 @@ export function ChainProvider({
       status: "delayed",
       isCurrentUser: true,
       lastUpdatedDays: 7,
+
+      activities: [
+        {
+          id: 1,
+          date: "Today",
+          update: "Survey Booked",
+        },
+      ],
     },
 
     {
@@ -64,6 +95,14 @@ export function ChainProvider({
       status: "blocked",
       isCurrentUser: false,
       lastUpdatedDays: 18,
+
+      activities: [
+        {
+          id: 1,
+          date: "Today",
+          update: "Awaiting Searches",
+        },
+      ],
     },
   ]);
 
@@ -76,10 +115,29 @@ export function ChainProvider({
       previousProperties.map((property) => {
 
         if (property.id === propertyId) {
+
           return {
             ...property,
+
             stage: newStage,
+
             lastUpdatedDays: 0,
+
+            activities: [
+              {
+                id: Date.now(),
+
+                date: "Just now",
+
+                update: newStage
+                  .replaceAll("_", " ")
+                  .replace(/\b\w/g, (letter) =>
+                    letter.toUpperCase()
+                  ),
+              },
+
+              ...property.activities,
+            ],
           };
         }
 
