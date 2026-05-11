@@ -1,14 +1,31 @@
 "use client";
 
 import Navbar from "@/components/Navbar";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useChain } from "@/context/ChainContext";
 import { STAGES } from "@/data/stages";
 export default function ChainPage() {
+  const params = useParams();
 
-  const { properties } = useChain();
+  const chainId =
+    Number(params.chainId);
+    const { properties } = useChain();
 
-  const totalProgress = properties.reduce(
+    const chainProperties =
+  properties
+    .filter(
+      (property) =>
+        property.chainId === chainId
+    )
+    .sort(
+      (a, b) =>
+        a.chainPosition -
+        b.chainPosition
+    );
+    
+
+  const totalProgress = chainProperties.reduce(
     (total, property) => {
       const stage = STAGES.find(
         (stage) => stage.value === property.stage
@@ -25,17 +42,17 @@ export default function ChainPage() {
   );
 
   const averageProgress =
-    Math.round(totalProgress / properties.length);
+    Math.round(totalProgress / chainProperties.length);
 
-  const staleProperties = properties.filter(
+  const staleProperties = chainProperties.filter(
     (property) => property.lastUpdatedDays > 14
   );
 
-  const blockedCount = properties.filter(
+  const blockedCount = chainProperties.filter(
     (property) => property.status === "blocked"
   ).length;
 
-  const delayedCount = properties.filter(
+  const delayedCount = chainProperties.filter(
     (property) => property.status === "delayed"
   ).length;
 
@@ -74,7 +91,7 @@ export default function ChainPage() {
         <div>
 
           <h1 className="text-5xl font-bold text-slate-900">
-            Chain #CLK-102
+          Chain #{chainId}
           </h1>
 
           <p className="text-slate-600 mt-3 text-lg">
@@ -172,7 +189,7 @@ export default function ChainPage() {
 
           <div className="flex items-center min-w-max">
 
-            {properties.map((property, index) => {
+            {chainProperties.map((property, index) => {
 const stage = STAGES.find(
   (stage) => stage.value === property.stage
 );
@@ -220,8 +237,9 @@ const stage = STAGES.find(
                     </div>
 
                     <p className="mt-4 font-semibold text-slate-900">
-                      Property {property.id}
-                    </p>
+  Property {property.chainPosition}
+</p>
+                  
 
                     <p className="text-sm mt-1 text-slate-600">
                       {stage.label}
@@ -229,7 +247,7 @@ const stage = STAGES.find(
 
                   </Link>
 
-                  {index < properties.length - 1 && (
+                  {index < chainProperties.length - 1 && (
 
                     <div
                       className={`

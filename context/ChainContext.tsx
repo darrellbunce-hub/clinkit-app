@@ -16,11 +16,13 @@ type Activity = {
 
 type Property = {
   id: number;
+  chainId: number;
   stage: string;
   status: string;
   isCurrentUser: boolean;
   lastUpdatedDays: number;
   activities: Activity[];
+  chainPosition: number;
 };
 
 type ChainContextType = {
@@ -43,9 +45,19 @@ export function ChainProvider({
 
   const [properties, setProperties] =
   useState<Property[]>([]);
-
+  const [currentUserId, setCurrentUserId] =
+  useState<string | null>(null);
 useEffect(() => {
+  async function fetchUser() {
 
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+  
+    if (user) {
+      setCurrentUserId(user.id);
+    }
+  }
   async function fetchProperties() {
 
     const { data, error } =
@@ -70,6 +82,12 @@ useEffect(() => {
 
         id: property.id,
 
+        chainId:
+          property.chain_id,
+        
+        chainPosition:
+          property.chain_position,
+        
         stage: property.stage,
 
         status: property.status,
@@ -88,7 +106,7 @@ useEffect(() => {
     setProperties(formattedProperties);
 
   }
-
+  fetchUser();
   fetchProperties();
 
 }, []);

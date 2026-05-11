@@ -12,15 +12,16 @@ export default function Navbar() {
           className="flex items-center gap-3"
         >
 
-          <Image
-            src="/logo.png"
-            alt="ClinkIt Logo"
-            width={50}
-            height={50}
-          />
+<Image
+  src="/logo.png"
+  alt="ClinkIt Logo"
+  width={120}
+  height={120}
+  style={{ width: "auto", height: "40px" }}
+/>
 
           <span className="text-3xl font-bold text-slate-900">
-            ClinkIt
+          Keynetic
           </span>
 
         </Link>

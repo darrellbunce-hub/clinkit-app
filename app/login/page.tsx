@@ -1,51 +1,111 @@
+"use client";
+
+import { useState } from "react";
+import { supabase } from "@/lib/supabase";
+
 export default function LoginPage() {
+
+  const [email, setEmail] =
+    useState("");
+
+  const [password, setPassword] =
+    useState("");
+
+  async function handleLogin() {
+
+    const { error } =
+      await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    window.location.href =
+      "/chain/clk-102";
+  }
+
+  async function handleSignup() {
+
+    const { error } =
+      await supabase.auth.signUp({
+        email,
+        password,
+      });
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    alert(
+      "Account created successfully"
+    );
+  }
+
   return (
-    <main className="min-h-screen flex items-center justify-center bg-slate-100 p-6">
+    <main className="min-h-screen bg-slate-100 flex items-center justify-center px-6">
 
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-8">
+      <div className="w-full max-w-md bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
 
-        <h1 className="text-3xl font-bold text-slate-900 text-center">
-          Welcome Back
+        <h1 className="text-4xl font-bold text-slate-900">
+          Login
         </h1>
 
-        <p className="mt-2 text-center text-slate-600">
-          Sign in to access your property chains.
+        <p className="mt-2 text-slate-600">
+          Access your property chain
         </p>
 
-        <form className="mt-8 space-y-4">
+        <div className="mt-8">
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700">
-              Email
-            </label>
+          <label className="block text-sm font-medium text-slate-700">
+            Email
+          </label>
 
-            <input
-              type="email"
-              placeholder="you@example.com"
-              className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-slate-900"
-            />
-          </div>
+          <input
+            type="email"
+            value={email}
+            onChange={(event) =>
+              setEmail(event.target.value)
+            }
+            className="mt-2 w-full border border-slate-300 rounded-2xl px-4 py-3"
+          />
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700">
-              Password
-            </label>
+        </div>
 
-            <input
-              type="password"
-              placeholder="Enter password"
-              className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-slate-900"
-            />
-          </div>
+        <div className="mt-6">
 
-          <button
-            type="submit"
-            className="w-full bg-slate-900 text-white py-3 rounded-xl hover:bg-slate-700 transition"
-          >
-            Sign In
-          </button>
+          <label className="block text-sm font-medium text-slate-700">
+            Password
+          </label>
 
-        </form>
+          <input
+            type="password"
+            value={password}
+            onChange={(event) =>
+              setPassword(event.target.value)
+            }
+            className="mt-2 w-full border border-slate-300 rounded-2xl px-4 py-3"
+          />
+
+        </div>
+
+        <button
+          onClick={handleLogin}
+          className="mt-8 w-full bg-slate-900 text-white rounded-2xl py-4 font-semibold"
+        >
+          Login
+        </button>
+
+        <button
+          onClick={handleSignup}
+          className="mt-4 w-full border border-slate-300 rounded-2xl py-4 font-semibold"
+        >
+          Create Account
+        </button>
 
       </div>
 
