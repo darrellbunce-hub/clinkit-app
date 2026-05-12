@@ -11,121 +11,186 @@ export default function StartMovePage() {
 
   const [notBuying, setNotBuying] =
     useState(false);
-    const [sellingAddress, setSellingAddress] =
+
+  const [sellingAddress, setSellingAddress] =
     useState("");
-  
+
+  const [sellingPostcode, setSellingPostcode] =
+    useState("");
+
   const [buyingAddress, setBuyingAddress] =
     useState("");
-    async function handleStartMove() {
 
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-      
-        if (!user) {
-          alert("Please login first");
-          return;
+  const [buyingPostcode, setBuyingPostcode] =
+    useState("");
+    function generateAccessCode() {
+
+      const characters =
+        "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    
+      let result = "KN-";
+    
+      for (let i = 0; i < 7; i++) {
+    
+        if (i === 3) {
+          result += "-";
         }
-      
-        const { data: chainData, error: chainError } =
-          await supabase
-            .from("chains")
-            .insert({
-              name:
-                `CHAIN-${Date.now()}`,
-            })
-            .select()
-            .single();
-      
-        if (chainError || !chainData) {
-          console.error(chainError);
-          return;
-        }
-      
-        const createdProperties = [];
-      
-        if (!notSelling && sellingAddress) {
-      
-            const {
-                data: sellingProperty,
-                error: sellingError,
-              } = await supabase
-            .from("properties")
-            .insert({
-              chain_id: chainData.id,
-              chain_position: 1,
-              stage: "property_listed",
-              status: "healthy",
-              is_current_user: true,
-              last_updated_days: 0,
-            })
-            .select()
-            .single();
-            alert(
-                JSON.stringify(sellingError)
-              );
-          if (sellingProperty) {
-      
-            createdProperties.push(
-              sellingProperty.id
-            );
-      
-            await supabase
-              .from("property_members")
-              .insert({
-                property_id:
-                  sellingProperty.id,
-      
-                user_id: user.id,
-      
-                role: "seller",
-              });
-          }
-        }
-      
-        if (!notBuying && buyingAddress) {
-      
-            const {
-                data: buyingProperty,
-                error: buyingError,
-              } = await supabase
-            .from("properties")
-            .insert({
-              chain_id: chainData.id,
-              chain_position: 2,
-              stage: "offer_accepted",
-              status: "healthy",
-              is_current_user: true,
-              last_updated_days: 0,
-            })
-            .select()
-            .single();
-            alert(
-            
-                    JSON.stringify(buyingError)
-                  );
-          if (buyingProperty) {
-      
-            createdProperties.push(
-              buyingProperty.id
-            );
-      
-            await supabase
-              .from("property_members")
-              .insert({
-                property_id:
-                  buyingProperty.id,
-      
-                user_id: user.id,
-      
-                role: "buyer",
-              });
-          }
-        }
-      
-        window.location.href =
-  `/chain/${chainData.id}?refresh=${Date.now()}`;
+    
+        result += characters.charAt(
+          Math.floor(
+            Math.random() *
+            characters.length
+          )
+        );
       }
+    
+      return result;
+    }
+  async function handleStartMove() {
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      alert("Please login first");
+      return;
+    }
+    const accessCode =
+    generateAccessCode();
+    const {
+      data: chainData,
+      error: chainError,
+    } = await supabase
+      .from("chains")
+      .insert({
+        name: `CHAIN-${Date.now()}`,
+
+access_code:
+  accessCode,
+      })
+      .select()
+      .single();
+
+    if (chainError || !chainData) {
+      console.error(chainError);
+      return;
+    }
+
+    if (!notSelling && sellingAddress) {
+      const {
+        data: existingSellingProperty,
+      } = await supabase
+        .from("properties")
+        .select("*")
+        .eq("address", sellingAddress)
+        .eq("postcode", sellingPostcode)
+        .single();
+      
+      if (existingSellingProperty) {
+      
+        alert(
+          "This selling property is already part of an active chain."
+        );
+      
+        return;
+      }
+      const {
+        data: sellingProperty,
+        error: sellingError,
+      } = await supabase
+        .from("properties")
+        .insert({
+          chain_id: chainData.id,
+          chain_position: 1,
+          address: sellingAddress,
+          postcode: sellingPostcode,
+          stage: "property_listed",
+          status: "healthy",
+          is_current_user: true,
+          last_updated_days: 0,
+        })
+        .select()
+        .single();
+
+      if (sellingError) {
+        console.error(sellingError);
+      }
+
+      if (sellingProperty) {
+
+        await supabase
+          .from("property_members")
+          .insert({
+            property_id:
+              sellingProperty.id,
+
+            user_id: user.id,
+
+            role: "seller",
+          });
+      }
+    }
+
+    if (!notBuying && buyingAddress) {
+      const {
+        data: existingBuyingProperty,
+      } = await supabase
+        .from("properties")
+        .select("*")
+        .eq("address", buyingAddress)
+        .eq("postcode", buyingPostcode)
+        .single();
+      
+      if (existingBuyingProperty) {
+      
+        alert(
+          "This buying property is already part of an active chain."
+        );
+      
+        return;
+      }
+      const {
+        data: buyingProperty,
+        error: buyingError,
+      } = await supabase
+        .from("properties")
+        .insert({
+          chain_id: chainData.id,
+          chain_position: 2,
+          address: buyingAddress,
+          postcode: buyingPostcode,
+          stage: "offer_accepted",
+          status: "healthy",
+          is_current_user: true,
+          last_updated_days: 0,
+        })
+        .select()
+        .single();
+
+      if (buyingError) {
+        console.error(buyingError);
+      }
+
+      if (buyingProperty) {
+
+        await supabase
+          .from("property_members")
+          .insert({
+            property_id:
+              buyingProperty.id,
+
+            user_id: user.id,
+
+            role: "buyer",
+          });
+      }
+    }
+
+    window.location.href =
+      `/chain/${chainData.id}?refresh=${Date.now()}`;
+  }
+
   return (
     <main className="min-h-screen bg-slate-100">
 
@@ -180,16 +245,28 @@ export default function StartMovePage() {
 
             <div className="mt-8">
 
-<input
-  type="text"
-  value={sellingAddress}
-  onChange={(event) =>
-    setSellingAddress(
-      event.target.value
-    )
-  }
-  placeholder="Selling property address"
+              <input
+                type="text"
+                value={sellingAddress}
+                onChange={(event) =>
+                  setSellingAddress(
+                    event.target.value
+                  )
+                }
+                placeholder="Selling property address"
                 className="w-full border border-slate-300 rounded-2xl px-4 py-4"
+              />
+
+              <input
+                type="text"
+                value={sellingPostcode}
+                onChange={(event) =>
+                  setSellingPostcode(
+                    event.target.value
+                  )
+                }
+                placeholder="Selling postcode"
+                className="mt-4 w-full border border-slate-300 rounded-2xl px-4 py-4"
               />
 
             </div>
@@ -237,16 +314,28 @@ export default function StartMovePage() {
 
             <div className="mt-8">
 
-<input
-  type="text"
-  value={buyingAddress}
-  onChange={(event) =>
-    setBuyingAddress(
-      event.target.value
-    )
-  }
-  placeholder="Buying property address"
+              <input
+                type="text"
+                value={buyingAddress}
+                onChange={(event) =>
+                  setBuyingAddress(
+                    event.target.value
+                  )
+                }
+                placeholder="Buying property address"
                 className="w-full border border-slate-300 rounded-2xl px-4 py-4"
+              />
+
+              <input
+                type="text"
+                value={buyingPostcode}
+                onChange={(event) =>
+                  setBuyingPostcode(
+                    event.target.value
+                  )
+                }
+                placeholder="Buying postcode"
+                className="mt-4 w-full border border-slate-300 rounded-2xl px-4 py-4"
               />
 
             </div>
@@ -256,8 +345,8 @@ export default function StartMovePage() {
         </div>
 
         <button
-  onClick={handleStartMove}
-  className="mt-10 w-full bg-slate-900 text-white rounded-2xl py-5 text-lg font-semibold"
+          onClick={handleStartMove}
+          className="mt-10 w-full bg-slate-900 text-white rounded-2xl py-5 text-lg font-semibold"
         >
           Continue
         </button>

@@ -23,11 +23,16 @@ type Property = {
   lastUpdatedDays: number;
   activities: Activity[];
   chainPosition: number;
+  address: string;
+postcode: string;
 };
-
+type Chain = {
+  id: number;
+  accessCode: string;
+};
 type ChainContextType = {
   properties: Property[];
-
+  chains: Chain[];
   updatePropertyStage: (
     propertyId: number,
     newStage: string
@@ -45,6 +50,9 @@ export function ChainProvider({
 
   const [properties, setProperties] =
   useState<Property[]>([]);
+
+const [chains, setChains] =
+  useState<Chain[]>([]);
   const [currentUserId, setCurrentUserId] =
   useState<string | null>(null);
 useEffect(() => {
@@ -87,7 +95,11 @@ useEffect(() => {
         
         chainPosition:
           property.chain_position,
+          address:
+          property.address,
         
+        postcode:
+          property.postcode,
         stage: property.stage,
 
         status: property.status,
@@ -104,7 +116,26 @@ useEffect(() => {
       }));
 
     setProperties(formattedProperties);
-
+    const {
+      data: chainsData,
+    } = await supabase
+      .from("chains")
+      .select("*");
+    
+    if (chainsData) {
+    
+      const formattedChains =
+        chainsData.map((chain) => ({
+    
+          id: chain.id,
+    
+          accessCode:
+            chain.access_code,
+    
+        }));
+    
+      setChains(formattedChains);
+    }
   }
   fetchUser();
   fetchProperties();
@@ -181,6 +212,7 @@ async function updatePropertyStage(
     <ChainContext.Provider
       value={{
         properties,
+        chains,
         updatePropertyStage,
       }}
     >

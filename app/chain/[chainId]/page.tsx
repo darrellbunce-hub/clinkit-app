@@ -9,8 +9,13 @@ export default function ChainPage() {
   const params = useParams();
 
   const chainId =
-    Number(params.chainId);
-    const { properties } = useChain();
+  parseInt(
+    params.chainId as string
+  );
+    const {
+      properties,
+      chains,
+    } = useChain();
 
     const chainProperties =
   properties
@@ -23,7 +28,12 @@ export default function ChainPage() {
         a.chainPosition -
         b.chainPosition
     );
-    
+    const currentChain =
+    chains.find(
+      (chain) =>
+        Number(chain.id) ===
+        Number(chainId)
+    );
 
   const totalProgress = chainProperties.reduce(
     (total, property) => {
@@ -42,7 +52,12 @@ export default function ChainPage() {
   );
 
   const averageProgress =
-    Math.round(totalProgress / chainProperties.length);
+  chainProperties.length > 0
+    ? Math.round(
+        totalProgress /
+        chainProperties.length
+      )
+    : 0;
 
   const staleProperties = chainProperties.filter(
     (property) => property.lastUpdatedDays > 14
@@ -96,6 +111,9 @@ export default function ChainPage() {
 
           <p className="text-slate-600 mt-3 text-lg">
             Live property chain progress tracking
+            <p className="mt-2 text-sm text-slate-500">
+            Access Code: {currentChain?.accessCode || "Loading..."}
+</p>
           </p>
 
         </div>
@@ -233,7 +251,54 @@ const stage = STAGES.find(
                     >
 
                       🏠
+                      {chainProperties.length === 1 && (
 
+<div className="flex items-center">
+
+  <div
+    className="
+      w-24
+      border-t-4
+      border-dashed
+      border-slate-300
+      mx-4
+    "
+  ></div>
+
+  <div className="flex flex-col items-center text-center">
+
+    <div
+      className="
+        w-24
+        h-24
+        rounded-2xl
+        border-2
+        border-slate-300
+        bg-slate-100
+        flex
+        items-center
+        justify-center
+        text-5xl
+      "
+    >
+
+      🔍
+
+    </div>
+
+    <p className="mt-4 font-semibold text-slate-700">
+      Searching
+    </p>
+
+    <p className="text-sm mt-1 text-slate-500">
+      Searching for forever home
+    </p>
+
+  </div>
+
+</div>
+
+)}
                     </div>
 
                     <p className="mt-4 font-semibold text-slate-900">
@@ -241,9 +306,17 @@ const stage = STAGES.find(
 </p>
                   
 
-                    <p className="text-sm mt-1 text-slate-600">
-                      {stage.label}
-                    </p>
+<p className="text-sm mt-1 text-slate-600">
+  {stage.label}
+</p>
+
+<p className="text-xs mt-1 text-slate-500">
+  {property.address}
+</p>
+
+<p className="text-xs text-slate-400">
+  {property.postcode}
+</p>
 
                   </Link>
 
