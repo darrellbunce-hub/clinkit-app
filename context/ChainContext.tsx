@@ -29,6 +29,7 @@ postcode: string;
 type Chain = {
   id: number;
   accessCode: string;
+  state: string;
 };
 type ChainContextType = {
   properties: Property[];
@@ -122,20 +123,45 @@ useEffect(() => {
       .from("chains")
       .select("*");
     
-    if (chainsData) {
-    
-      const formattedChains =
-        chainsData.map((chain) => ({
-    
-          id: chain.id,
-    
-          accessCode:
-            chain.access_code,
-    
-        }));
-    
-      setChains(formattedChains);
-    }
+      if (chainsData) {
+
+        const formattedChains =
+          chainsData.map((chain) => {
+      
+            const chainProperties =
+              formattedProperties.filter(
+                (property) =>
+                  property.chainId === chain.id
+              );
+      
+            const hasPendingConnection =
+              chainProperties.some(
+                (property) =>
+                  property.status ===
+                  "pending_connection"
+              );
+      
+            const isIncomplete =
+              chainProperties.length === 1 ||
+              hasPendingConnection;
+      
+            return {
+      
+              id: chain.id,
+      
+              accessCode:
+                chain.access_code,
+      
+              state:
+                isIncomplete
+                  ? "active_incomplete"
+                  : "active_connected",
+      
+            };
+          });
+      
+        setChains(formattedChains);
+      }
   }
   fetchUser();
   fetchProperties();

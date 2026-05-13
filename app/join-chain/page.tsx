@@ -48,6 +48,7 @@ export default function JoinChainPage() {
       .select("*")
       .eq("chain_id", chain.id)
       .eq("address", address)
+.eq("status", "pending_connection")
       .eq("postcode", postcode)
       .single();
 
@@ -59,7 +60,12 @@ export default function JoinChainPage() {
 
       return;
     }
-
+    await supabase
+    .from("properties")
+    .update({
+      status: "healthy",
+    })
+    .eq("id", property.id);
     await supabase
       .from("property_members")
       .insert({

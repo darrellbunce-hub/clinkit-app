@@ -1,5 +1,15 @@
 export const STAGES = [
-
+  {
+    value: "property_listed",
+    label: "Property Listed",
+    progress: 10,
+  },
+  
+  {
+    value: "offer_accepted",
+    label: "Offer Accepted",
+    progress: 25,
+  },
     {
       value: "viewing_properties",
       label: "Viewing Properties",

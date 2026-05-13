@@ -24,7 +24,43 @@ export default function PropertyPage() {
   const currentProperty = properties.find(
     (property) => property.id === propertyId
   );
-
+  function formatTimeAgo(
+    timestamp: string
+  ) {
+  
+    const now =
+      new Date();
+  
+    const activityTime =
+      new Date(timestamp);
+  
+    const diffMs =
+      now.getTime() -
+      activityTime.getTime();
+  
+    const minutes =
+      Math.floor(diffMs / 60000);
+  
+    const hours =
+      Math.floor(minutes / 60);
+  
+    const days =
+      Math.floor(hours / 24);
+  
+    if (minutes < 1) {
+      return "Just now";
+    }
+  
+    if (minutes < 60) {
+      return `${minutes} mins ago`;
+    }
+  
+    if (hours < 24) {
+      return `${hours} hours ago`;
+    }
+  
+    return `${days} days ago`;
+  }
   if (!currentProperty) {
     return (
       <div className="p-10 text-2xl">
@@ -114,10 +150,10 @@ export default function PropertyPage() {
 
             {currentProperty.activities.map((activity) => (
 
-              <div
-                key={activity.id}
-                className="flex items-start gap-4"
-              >
+<div
+key={activity.id}
+className="bg-slate-50 rounded-2xl p-5 flex items-start gap-4"
+>
 
                 <div className="w-4 h-4 rounded-full bg-blue-500 mt-2"></div>
 
@@ -128,16 +164,8 @@ export default function PropertyPage() {
                   </p>
 
                   <p className="text-sm text-slate-500 mt-1">
-                  {
-  new Date(activity.timestamp)
-    .toLocaleString("en-GB", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    })
-}
+  {formatTimeAgo(activity.timestamp)}
+
                   </p>
 
                 </div>

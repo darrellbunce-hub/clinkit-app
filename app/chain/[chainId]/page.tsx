@@ -1,77 +1,99 @@
 "use client";
 
+import { useState } from "react";
 import Navbar from "@/components/Navbar";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useChain } from "@/context/ChainContext";
+import { supabase } from "@/lib/supabase";
 import { STAGES } from "@/data/stages";
+
 export default function ChainPage() {
+
   const params = useParams();
 
   const chainId =
-  parseInt(
-    params.chainId as string
-  );
-    const {
-      properties,
-      chains,
-    } = useChain();
-
-    const chainProperties =
-  properties
-    .filter(
-      (property) =>
-        property.chainId === chainId
-    )
-    .sort(
-      (a, b) =>
-        a.chainPosition -
-        b.chainPosition
+    parseInt(
+      params.chainId as string
     );
-    const currentChain =
+
+  const {
+    properties,
+    chains,
+  } = useChain();
+
+  const chainProperties =
+    properties
+      .filter(
+        (property) =>
+          property.chainId === chainId
+      )
+      .sort(
+        (a, b) =>
+          a.chainPosition -
+          b.chainPosition
+      );
+
+  const currentChain =
     chains.find(
       (chain) =>
         Number(chain.id) ===
         Number(chainId)
     );
 
-  const totalProgress = chainProperties.reduce(
-    (total, property) => {
-      const stage = STAGES.find(
-        (stage) => stage.value === property.stage
-      );
+  const [newAddress, setNewAddress] =
+    useState("");
 
-      if (!stage) {
-        return total;
-      }
+  const [newPostcode, setNewPostcode] =
+    useState("");
 
-      return total + (stage?.progress || 0);
+  const totalProgress =
+    chainProperties.reduce(
+      (total, property) => {
 
-    },
-    0
-  );
+        const stage = STAGES.find(
+          (stage) =>
+            stage.value === property.stage
+        );
+
+        if (!stage) {
+          return total;
+        }
+
+        return total + (stage.progress || 0);
+
+      },
+      0
+    );
 
   const averageProgress =
-  chainProperties.length > 0
-    ? Math.round(
-        totalProgress /
-        chainProperties.length
-      )
-    : 0;
+    chainProperties.length > 0
+      ? Math.round(
+          totalProgress /
+          chainProperties.length
+        )
+      : 0;
 
-  const staleProperties = chainProperties.filter(
-    (property) => property.lastUpdatedDays > 14
-  );
+  const staleProperties =
+    chainProperties.filter(
+      (property) =>
+        property.lastUpdatedDays > 14
+    );
 
-  const blockedCount = chainProperties.filter(
-    (property) => property.status === "blocked"
-  ).length;
+  const blockedCount =
+    chainProperties.filter(
+      (property) =>
+        property.status === "blocked"
+    ).length;
 
-  const delayedCount = chainProperties.filter(
-    (property) => property.status === "delayed"
-  ).length;
+  const delayedCount =
+    chainProperties.filter(
+      (property) =>
+        property.status === "delayed"
+    ).length;
 
-  let confidenceScore = averageProgress;
+  let confidenceScore =
+    averageProgress;
 
   confidenceScore -= blockedCount * 25;
   confidenceScore -= delayedCount * 10;
@@ -81,19 +103,90 @@ export default function ChainPage() {
     confidenceScore = 0;
   }
 
-  let confidenceLabel = "High Risk";
-  let confidenceColour = "text-red-700";
-  let confidenceBg = "bg-red-100";
+  let confidenceLabel =
+    "High Risk";
+
+  let confidenceColour =
+    "text-red-700";
+
+  let confidenceBg =
+    "bg-red-100";
 
   if (confidenceScore >= 70) {
+
     confidenceLabel = "Healthy";
     confidenceColour = "text-green-700";
     confidenceBg = "bg-green-100";
+
   }
   else if (confidenceScore >= 40) {
+
     confidenceLabel = "Moderate";
     confidenceColour = "text-amber-700";
     confidenceBg = "bg-amber-100";
+
+  }
+
+  async function handleAddProperty() {
+
+    if (!newAddress || !newPostcode) {
+
+      alert("Please complete fields");
+
+      return;
+    }
+
+    const nextPosition =
+      chainProperties.length + 1;
+
+      const {
+        data: propertyData,
+        error,
+      } =
+      await supabase
+        .from("properties")
+        .insert({
+
+          chain_id: chainId,
+
+          chain_position:
+            nextPosition,
+
+          address: newAddress,
+
+          postcode: newPostcode,
+
+          stage: "property_listed",
+
+          status:
+            "pending_connection",
+
+          is_current_user: true,
+
+          last_updated_days: 0,
+
+        })
+        .select()
+        .single();
+
+    if (error) {
+
+      alert(error.message);
+
+      return;
+    }
+    await supabase
+    .from("activities")
+    .insert({
+  
+      property_id:
+        propertyData.id,
+  
+      update:
+        "Onward purchase added",
+  
+    });
+    window.location.reload();
   }
 
   return (
@@ -106,14 +199,28 @@ export default function ChainPage() {
         <div>
 
           <h1 className="text-5xl font-bold text-slate-900">
-          Chain #{chainId}
+            Chain #{chainId}
           </h1>
 
           <p className="text-slate-600 mt-3 text-lg">
             Live property chain progress tracking
-            <p className="mt-2 text-sm text-slate-500">
-            Access Code: {currentChain?.accessCode || "Loading..."}
-</p>
+          </p>
+
+          <p className="mt-2 text-sm text-slate-500">
+            Access Code:{" "}
+            {currentChain?.accessCode || "Loading..."}
+          </p>
+
+          <p className="mt-2 text-slate-600">
+
+            Status:{" "}
+
+            {currentChain?.state
+              ?.replaceAll("_", " ")
+              .replace(/\b\w/g, (letter) =>
+                letter.toUpperCase()
+              )}
+
           </p>
 
         </div>
@@ -208,15 +315,18 @@ export default function ChainPage() {
           <div className="flex items-center min-w-max">
 
             {chainProperties.map((property, index) => {
-const stage = STAGES.find(
-  (stage) => stage.value === property.stage
-);
+
+              const stage = STAGES.find(
+                (stage) =>
+                  stage.value === property.stage
+              );
 
               if (!stage) {
                 return null;
               }
 
               return (
+
                 <div
                   key={property.id}
                   className="flex items-center"
@@ -243,15 +353,87 @@ const stage = STAGES.find(
                         ${
                           property.status === "healthy"
                             ? "bg-green-100 border-green-500"
+
+                            : property.status === "pending_connection"
+                            ? "bg-slate-100 border-slate-400"
+
                             : property.status === "delayed"
                             ? "bg-amber-100 border-amber-500"
+
                             : "bg-red-100 border-red-500"
                         }
                       `}
                     >
 
-                      🏠
-                      {chainProperties.length === 1 && (
+                      {
+                        property.status ===
+                        "pending_connection"
+
+                          ? "🔗"
+
+                          : "🏠"
+                      }
+
+                    </div>
+
+                    <p className="mt-4 font-semibold text-slate-900">
+                      Property {property.chainPosition}
+                    </p>
+
+                    <p className="text-sm mt-1 text-slate-600">
+
+                      {
+                        property.status ===
+                        "pending_connection"
+
+                          ? "Awaiting seller connection"
+
+                          : stage.label
+                      }
+
+                    </p>
+
+                    <p className="text-xs mt-1 text-slate-500">
+                      {property.address}
+                    </p>
+
+                    <p className="text-xs text-slate-400">
+                      {property.postcode}
+                    </p>
+
+                  </Link>
+
+                  {index < chainProperties.length - 1 && (
+
+                    <div
+                      className={`
+                        w-24
+                        border-t-4
+                        border-dashed
+                        mx-4
+
+                        ${
+                          property.status === "healthy"
+                            ? "border-green-400"
+
+                            : property.status === "pending_connection"
+                            ? "border-slate-400"
+
+                            : property.status === "delayed"
+                            ? "border-amber-400"
+
+                            : "border-red-400"
+                        }
+                      `}
+                    ></div>
+
+                  )}
+
+                </div>
+
+              );
+            })}
+{chainProperties.length === 1 && (
 
 <div className="flex items-center">
 
@@ -299,53 +481,53 @@ const stage = STAGES.find(
 </div>
 
 )}
-                    </div>
-
-                    <p className="mt-4 font-semibold text-slate-900">
-  Property {property.chainPosition}
-</p>
-                  
-
-<p className="text-sm mt-1 text-slate-600">
-  {stage.label}
-</p>
-
-<p className="text-xs mt-1 text-slate-500">
-  {property.address}
-</p>
-
-<p className="text-xs text-slate-400">
-  {property.postcode}
-</p>
-
-                  </Link>
-
-                  {index < chainProperties.length - 1 && (
-
-                    <div
-                      className={`
-                        w-24
-                        border-t-4
-                        border-dashed
-                        mx-4
-
-                        ${
-                          property.status === "healthy"
-                            ? "border-green-400"
-                            : property.status === "delayed"
-                            ? "border-amber-400"
-                            : "border-red-400"
-                        }
-                      `}
-                    ></div>
-
-                  )}
-
-                </div>
-              );
-            })}
-
           </div>
+
+          
+
+        </div>
+
+        {/* Add Property */}
+        <div className="mt-10 bg-white rounded-3xl border border-slate-200 p-8">
+
+          <h2 className="text-2xl font-bold text-slate-900">
+            Add Onward Purchase
+          </h2>
+
+          <p className="mt-2 text-slate-600">
+            Continue building your property chain
+          </p>
+
+          <input
+            type="text"
+            value={newAddress}
+            onChange={(event) =>
+              setNewAddress(
+                event.target.value
+              )
+            }
+            placeholder="Property address"
+            className="mt-6 w-full border border-slate-300 rounded-2xl px-4 py-4"
+          />
+
+          <input
+            type="text"
+            value={newPostcode}
+            onChange={(event) =>
+              setNewPostcode(
+                event.target.value
+              )
+            }
+            placeholder="Postcode"
+            className="mt-4 w-full border border-slate-300 rounded-2xl px-4 py-4"
+          />
+
+          <button
+            onClick={handleAddProperty}
+            className="mt-6 bg-slate-900 text-white px-6 py-4 rounded-2xl font-semibold"
+          >
+            Add Property
+          </button>
 
         </div>
 
