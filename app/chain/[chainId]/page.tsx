@@ -394,8 +394,22 @@ export default function ChainPage() {
                           ? "Awaiting seller connection"
 
                           : stage.label
+                          
                       }
+<div className="mt-3 w-32 h-2 bg-slate-200 rounded-full overflow-hidden">
 
+<div
+  className="h-full bg-green-500 rounded-full"
+  style={{
+    width: `${stage.progress}%`,
+  }}
+></div>
+
+</div>
+
+<p className="text-xs mt-1 text-slate-500">
+{stage.progress}% complete
+</p>
                     </p>
 
                     <p className="text-xs mt-1 text-slate-500">

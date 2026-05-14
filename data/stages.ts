@@ -1,109 +1,75 @@
 export const STAGES = [
+
   {
     value: "property_listed",
     label: "Property Listed",
-    progress: 10,
+    progress: 5,
+    nextStep: "Offer Accepted",
+    expectedTimeframe: "1–12 weeks",
   },
-  
+
   {
     value: "offer_accepted",
     label: "Offer Accepted",
-    progress: 25,
+    progress: 15,
+    nextStep: "Solicitors Instructed",
+    expectedTimeframe: "1–7 days",
   },
-    {
-      value: "viewing_properties",
-      label: "Viewing Properties",
-      progress: 5,
-    },
-  
-    {
-      value: "offer_submitted",
-      label: "Offer Submitted",
-      progress: 10,
-    },
-  
-    {
-      value: "offer_accepted",
-      label: "Offer Accepted",
-      progress: 20,
-    },
-  
-    {
-      value: "mortgage_applied",
-      label: "Mortgage Applied",
-      progress: 30,
-    },
-  
-    {
-      value: "mortgage_offer_received",
-      label: "Mortgage Offer Received",
-      progress: 40,
-    },
-  
-    {
-      value: "survey_booked",
-      label: "Survey Booked",
-      progress: 45,
-    },
-  
-    {
-      value: "survey_completed",
-      label: "Survey Completed",
-      progress: 50,
-    },
-  
-    {
-      value: "searches_started",
-      label: "Searches Started",
-      progress: 55,
-    },
-  
-    {
-      value: "awaiting_searches",
-      label: "Awaiting Searches",
-      progress: 60,
-    },
-  
-    {
-      value: "searches_returned",
-      label: "Searches Returned",
-      progress: 70,
-    },
-  
-    {
-      value: "enquiries_raised",
-      label: "Enquiries Raised",
-      progress: 72,
-    },
-  
-    {
-      value: "enquiries_resolved",
-      label: "Enquiries Resolved",
-      progress: 78,
-    },
-  
-    {
-      value: "contracts_received",
-      label: "Contracts Received",
-      progress: 82,
-    },
-  
-    {
-      value: "contracts_signed",
-      label: "Contracts Signed",
-      progress: 88,
-    },
-  
-    {
-      value: "exchange_of_contracts",
-      label: "Exchange Of Contracts",
-      progress: 95,
-    },
-  
-    {
-      value: "completion",
-      label: "Completion",
-      progress: 100,
-    },
-  
-  ];
+
+  {
+    value: "solicitors_instructed",
+    label: "Solicitors Instructed",
+    progress: 25,
+    nextStep: "Searches Ordered",
+    expectedTimeframe: "1–2 weeks",
+  },
+
+  {
+    value: "searches_ordered",
+    label: "Searches Ordered",
+    progress: 40,
+    nextStep: "Searches Returned",
+    expectedTimeframe: "1–3 weeks",
+  },
+
+  {
+    value: "searches_returned",
+    label: "Searches Returned",
+    progress: 55,
+    nextStep: "Mortgage Offer Received",
+    expectedTimeframe: "1–2 weeks",
+  },
+
+  {
+    value: "mortgage_offer_received",
+    label: "Mortgage Offer Received",
+    progress: 65,
+    nextStep: "Contracts Issued",
+    expectedTimeframe: "1–2 weeks",
+  },
+
+  {
+    value: "contracts_issued",
+    label: "Contracts Issued",
+    progress: 75,
+    nextStep: "Exchange Contracts",
+    expectedTimeframe: "1–3 weeks",
+  },
+
+  {
+    value: "exchange_contracts",
+    label: "Exchange Contracts",
+    progress: 90,
+    nextStep: "Completion",
+    expectedTimeframe: "1–4 weeks",
+  },
+
+  {
+    value: "completed",
+    label: "Completed",
+    progress: 100,
+    nextStep: "Move In",
+    expectedTimeframe: "Complete",
+  },
+
+];
