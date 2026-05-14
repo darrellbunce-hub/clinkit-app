@@ -1,5 +1,5 @@
 import Navbar from "@/components/Navbar";
-
+import Link from "next/link";
 export default function DashboardPage() {
   return (
     <main className="min-h-screen bg-slate-100">
@@ -63,9 +63,12 @@ export default function DashboardPage() {
 
             </div>
 
-            <button className="mt-8 w-full border border-slate-300 py-4 rounded-xl hover:bg-slate-50 transition">
-              View Chain
-            </button>
+            <Link
+  href="/chain/17"
+  className="block mt-8 w-full border border-slate-300 py-4 rounded-xl hover:bg-slate-50 transition text-center"
+>
+  View Chain
+</Link>
 
           </div>
 
@@ -102,9 +105,12 @@ export default function DashboardPage() {
 
             </div>
 
-            <button className="mt-8 w-full border border-slate-300 py-4 rounded-xl hover:bg-slate-50 transition">
-              View Chain
-            </button>
+            <Link
+  href="/chain/1"
+  className="block mt-8 w-full border border-slate-300 py-4 rounded-xl hover:bg-slate-50 transition text-center"
+>
+  View Chain
+</Link>
 
           </div>
 

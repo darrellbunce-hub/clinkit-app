@@ -12,6 +12,7 @@ type Activity = {
   id: number;
   timestamp: string;
   update: string;
+  updated_by?: string;
 };
 
 type Property = {
@@ -74,11 +75,12 @@ useEffect(() => {
     .from("properties")
     .select(`
       *,
-      activities (
-        id,
-        timestamp,
-        update
-      )
+     activities (
+  id,
+  timestamp,
+  update,
+  updated_by
+)
     `);
 
     if (error) {
@@ -108,14 +110,39 @@ useEffect(() => {
         isCurrentUser:
           property.is_current_user,
 
-        lastUpdatedDays:
-          property.last_updated_days,
+          lastUpdatedDays: (() => {
 
+            if (
+              !property.activities ||
+              property.activities.length === 0
+            ) {
+              return 0;
+            }
+          
+            const latestActivity =
+              property.activities[0];
+          
+            const updatedDate =
+              new Date(
+                latestActivity.timestamp
+              );
+          
+            const now = new Date();
+          
+            const difference =
+              now.getTime() -
+              updatedDate.getTime();
+          
+            return Math.floor(
+              difference /
+              (1000 * 60 * 60 * 24)
+            );
+          
+          })(),
           activities:
-  property.activities || [],
-
-      }));
-
+          property.activities || [],
+        
+        }));
     setProperties(formattedProperties);
     const {
       data: chainsData,
@@ -189,6 +216,7 @@ async function updatePropertyStage(
   await supabase
   .from("activities")
   .insert({
+
     property_id: propertyId,
 
     update: newStage
@@ -196,6 +224,9 @@ async function updatePropertyStage(
       .replace(/\b\w/g, (letter) =>
         letter.toUpperCase()
       ),
+
+    updated_by: "homeowner",
+
   });
   setProperties((previousProperties) =>
     previousProperties.map((property) => {
@@ -212,17 +243,20 @@ async function updatePropertyStage(
           activities: [
             {
               id: Date.now(),
-  
+          
               timestamp:
                 new Date().toISOString(),
-  
+          
               update: newStage
                 .replaceAll("_", " ")
                 .replace(/\b\w/g, (letter) =>
                   letter.toUpperCase()
                 ),
+          
+              updated_by: "homeowner",
+          
             },
-  
+          
             ...property.activities,
           ],
         };

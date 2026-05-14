@@ -288,7 +288,12 @@ export default function ChainPage() {
               <p className={`text-sm mt-1 ${confidenceColour}`}>
                 {confidenceLabel}
               </p>
-
+              <p className="text-xs text-slate-500 mt-4 max-w-xs">
+  Confidence is calculated using
+  chain progress, recent activity,
+  delayed updates and blocked
+  transactions.
+</p>
             </div>
 
           </div>
@@ -400,7 +405,22 @@ export default function ChainPage() {
                     <p className="text-xs text-slate-400">
                       {property.postcode}
                     </p>
+                    <p
+  className={`
+    text-xs mt-2 font-medium
 
+    ${
+      property.lastUpdatedDays > 14
+        ? "text-red-500"
+        : property.lastUpdatedDays > 7
+        ? "text-amber-500"
+        : "text-slate-400"
+    }
+  `}
+>
+  Updated {property.lastUpdatedDays} day
+  {property.lastUpdatedDays !== 1 && "s"} ago
+</p>
                   </Link>
 
                   {index < chainProperties.length - 1 && (

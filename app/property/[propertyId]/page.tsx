@@ -164,9 +164,12 @@ className="bg-slate-50 rounded-2xl p-5 flex items-start gap-4"
                   </p>
 
                   <p className="text-sm text-slate-500 mt-1">
-  {formatTimeAgo(activity.timestamp)}
+  Updated by {activity.updated_by}
+</p>
 
-                  </p>
+<p className="text-sm text-slate-400 mt-1">
+  {formatTimeAgo(activity.timestamp)}
+</p>
 
                 </div>
 
