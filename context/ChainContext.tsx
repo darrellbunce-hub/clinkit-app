@@ -35,10 +35,22 @@ type Chain = {
 type ChainContextType = {
   properties: Property[];
   chains: Chain[];
+
   updatePropertyStage: (
     propertyId: number,
     newStage: string
+  ) => Promise<void>;
+
+  addStructuredUpdate: (
+    propertyId: number,
+    updateMessage: string
+  ) => Promise<void>;
+  
+  breakChainConnection: (
+    propertyId: number,
+    breakReason: string
   ) => void;
+
 };
 
 const ChainContext =
@@ -196,84 +208,213 @@ useEffect(() => {
 }, []);
 
 async function updatePropertyStage(
-    propertyId: number,
-    newStage: string
-  ) {
+  propertyId: number,
+  newStage: string
+) {
 
-    const { error } =
+  const { error } =
     await supabase
       .from("properties")
       .update({
         stage: newStage,
-        last_updated_days: 0,
       })
       .eq("id", propertyId);
-  
+
   if (error) {
     console.error(error);
     return;
   }
-  await supabase
-  .from("activities")
-  .insert({
 
-    property_id: propertyId,
-
-    update: newStage
+  const formattedUpdate =
+    newStage
       .replaceAll("_", " ")
       .replace(/\b\w/g, (letter) =>
         letter.toUpperCase()
-      ),
+      );
 
-    updated_by: "homeowner",
+  await supabase
+    .from("activities")
+    .insert({
 
-  });
+      property_id: propertyId,
+
+      update: formattedUpdate,
+
+      updated_by: "homeowner",
+
+    });
+
   setProperties((previousProperties) =>
     previousProperties.map((property) => {
-  
+
       if (property.id === propertyId) {
-  
+
         return {
+
           ...property,
-  
+
           stage: newStage,
-  
-          lastUpdatedDays: 0,
-  
+
           activities: [
+
             {
               id: Date.now(),
-          
+
               timestamp:
                 new Date().toISOString(),
-          
-              update: newStage
-                .replaceAll("_", " ")
-                .replace(/\b\w/g, (letter) =>
-                  letter.toUpperCase()
-                ),
-          
+
+              update: formattedUpdate,
+
               updated_by: "homeowner",
-          
+
             },
-          
+
             ...property.activities,
+
           ],
+
         };
       }
-  
+
       return property;
-  
+
     })
   );
-  }
+}
 
-  return (
-    <ChainContext.Provider
+async function addStructuredUpdate(
+  propertyId: number,
+  updateMessage: string
+) {
+
+  await supabase
+    .from("activities")
+    .insert({
+
+      property_id: propertyId,
+
+      update: updateMessage,
+
+      updated_by: "homeowner",
+
+    });
+
+  setProperties((previousProperties) =>
+    previousProperties.map((property) => {
+
+      if (property.id === propertyId) {
+
+        return {
+
+          ...property,
+
+          activities: [
+
+            {
+              id: Date.now(),
+
+              timestamp:
+                new Date().toISOString(),
+
+              update: updateMessage,
+
+              updated_by: "homeowner",
+
+            },
+
+            ...property.activities,
+
+          ],
+
+        };
+      }
+
+      return property;
+
+    })
+  );
+}
+
+async function breakChainConnection(
+  propertyId: number,
+  breakReason: string
+) {
+
+  const updateMessage =
+    breakReason === "buyer_side"
+      ? "Chain Connection Broken - Buyer Side"
+      : "Chain Connection Broken - Seller Side";
+
+  await supabase
+    .from("properties")
+    .update({
+
+      status:
+        "broken_connection",
+
+    })
+    .eq("id", propertyId);
+
+  await supabase
+    .from("activities")
+    .insert({
+
+      property_id: propertyId,
+
+      update: updateMessage,
+
+      updated_by: "homeowner",
+
+    });
+
+  setProperties((previousProperties) =>
+    previousProperties.map((property) => {
+
+      if (property.id === propertyId) {
+
+        return {
+
+          ...property,
+
+          status:
+            "broken_connection",
+
+          activities: [
+
+            {
+              id: Date.now(),
+
+              timestamp:
+                new Date().toISOString(),
+
+              update: updateMessage,
+
+              updated_by:
+                "homeowner",
+
+            },
+
+            ...property.activities,
+
+          ],
+
+        };
+      }
+
+      return property;
+
+    })
+  );
+}
+
+return (
+  <ChainContext.Provider
       value={{
         properties,
         chains,
         updatePropertyStage,
+        addStructuredUpdate,
+        breakChainConnection,
       }}
     >
       {children}

@@ -30,7 +30,10 @@ export default function LoginPage() {
 
   async function handleSignup() {
 
-    const { error } =
+    const {
+      data,
+      error,
+    } =
       await supabase.auth.signUp({
         email,
         password,
@@ -40,7 +43,18 @@ export default function LoginPage() {
       alert(error.message);
       return;
     }
+    if (data.user) {
 
+      await supabase
+        .from("profiles")
+        .insert({
+    
+          id: data.user.id,
+    
+          role: "homeowner",
+    
+        });
+    }
     alert(
       "Account created successfully"
     );

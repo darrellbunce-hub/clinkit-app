@@ -14,7 +14,8 @@ export default function PropertyPage() {
 
   const [delayReason, setDelayReason] =
     useState("");
-
+    const [breakReason, setBreakReason] =
+    useState("");
   const params = useParams();
 
   const propertyId = Number(
@@ -26,6 +27,8 @@ export default function PropertyPage() {
   const {
     properties,
     updatePropertyStage,
+    addStructuredUpdate,
+    breakChainConnection,
   } = useChain();
 
   const currentProperty = properties.find(
@@ -79,11 +82,168 @@ export default function PropertyPage() {
   }
 
   const currentStage =
-    STAGES.find(
-      (stage) =>
-        stage.value === currentProperty.stage
-    );
+  STAGES.find(
+    (stage) =>
+      stage.value === currentProperty.stage
+  );
 
+const latestDelay =
+  currentProperty.activities.find(
+    (activity) =>
+      activity.update.includes(
+        "Delay Reported"
+      )
+  );
+
+let actionTitle =
+  "No Immediate Actions";
+
+let actionMessage =
+  "Your transaction appears to be progressing normally.";
+
+let actionColour =
+  "bg-green-100 text-green-700";
+
+if (latestDelay) {
+
+  actionTitle =
+    "Delay Reported";
+
+  actionMessage =
+    latestDelay.update;
+
+  actionColour =
+    "bg-amber-100 text-amber-700";
+}
+
+if (
+  currentProperty.lastUpdatedDays > 14
+) {
+
+  actionTitle =
+    "Update Recommended";
+
+  actionMessage =
+    `No updates have been added for ${currentProperty.lastUpdatedDays} days. Consider checking progress with your estate agent or conveyancer.`;
+
+  actionColour =
+    "bg-red-100 text-red-700";
+}
+
+const currentStageIndex =
+  STAGES.findIndex(
+    (stage) =>
+      stage.value === currentProperty.stage
+  );
+
+const completedStages =
+  STAGES.slice(
+    0,
+    currentStageIndex
+  );
+ 
+
+let estimatedCompletion =
+  "16–20 weeks remaining";
+
+const progress =
+  currentStage?.progress || 0;
+
+if (progress >= 20) {
+  estimatedCompletion =
+    "12–16 weeks remaining";
+}
+
+if (progress >= 40) {
+  estimatedCompletion =
+    "8–12 weeks remaining";
+}
+
+if (progress >= 60) {
+  estimatedCompletion =
+    "4–8 weeks remaining";
+}
+
+if (progress >= 80) {
+  estimatedCompletion =
+    "1–3 weeks remaining";
+}
+
+if (latestDelay) {
+
+  estimatedCompletion =
+    `${estimatedCompletion} (delay detected)`;
+}
+
+if (
+  currentProperty.lastUpdatedDays > 14
+) {
+
+  estimatedCompletion =
+    `${estimatedCompletion} (stale activity)`;
+}
+async function handleStructuredUpdate() {
+      if (!updateType) {
+        return;
+      }
+    
+      let updateMessage =
+        "General Update";
+    
+      if (
+        updateType === "delay" &&
+        delayReason
+      ) {
+    
+        updateMessage =
+          `Delay Reported: ${delayReason}`;
+    
+      }
+      else if (
+        updateType === "documents"
+      ) {
+    
+        updateMessage =
+          "Awaiting Documents";
+    
+      }
+      else if (
+        updateType === "survey"
+      ) {
+    
+        updateMessage =
+          "Survey Update Added";
+    
+      }
+      else if (
+        updateType === "mortgage"
+      ) {
+    
+        updateMessage =
+          "Mortgage Update Added";
+    
+      }
+      else if (
+        updateType === "milestone"
+      ) {
+    
+        updateMessage =
+          "Milestone Reached";
+    
+      }
+    
+      if (!currentProperty) {
+        return;
+      }
+      
+      await addStructuredUpdate(
+        currentProperty.id,
+        updateMessage
+      );
+    
+      setUpdateType("");
+      setDelayReason("");
+    }
   return (
     <main className="min-h-screen bg-slate-100">
 
@@ -105,38 +265,182 @@ export default function PropertyPage() {
         </div>
 
         {/* Current Status */}
-        <div className="mt-8 bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
+<div className="mt-8 bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
 
-          <h2 className="text-3xl font-bold text-slate-900">
-            Current Status
-          </h2>
+<div className="flex items-start justify-between gap-6">
 
-          <p className="mt-6 text-xl font-medium text-slate-900">
-            {currentStage?.label}
-          </p>
+  <div>
 
-          <div className="mt-8 bg-slate-50 rounded-2xl p-6">
+    <p className="text-sm font-medium text-slate-500">
+      Current Status
+    </p>
 
-            <p className="text-sm text-slate-500">
-              Expected Next Step
-            </p>
+    <h2 className="mt-3 text-4xl font-bold text-slate-900">
+      {currentStage?.label}
+    </h2>
 
-            <p className="text-lg font-semibold text-slate-900 mt-1">
-              {currentStage?.nextStep}
-            </p>
+    <p className="mt-4 text-slate-600 max-w-2xl">
+      Your property transaction is currently progressing through this stage of the chain process.
+    </p>
 
-            <p className="text-sm text-slate-500 mt-5">
-              Typical Timeframe
-            </p>
+  </div>
 
-            <p className="text-lg font-semibold text-slate-900 mt-1">
-              {currentStage?.expectedTimeframe}
-            </p>
+  <div className="bg-green-100 text-green-700 px-5 py-3 rounded-2xl text-lg font-semibold">
 
-          </div>
+    {currentStage?.progress}% Complete
+
+  </div>
+
+</div>
+
+{/* Progress Bar */}
+<div className="mt-10">
+
+  <div className="w-full h-5 bg-slate-200 rounded-full overflow-hidden">
+
+    <div
+      className="h-full bg-green-500 rounded-full"
+      style={{
+        width: `${currentStage?.progress || 0}%`,
+      }}
+    ></div>
+
+  </div>
+
+</div>
+{/* Completed Milestones */}
+<div className="mt-10">
+
+  <p className="text-sm font-medium text-slate-500">
+    Completed Milestones
+  </p>
+
+  <div className="mt-5 grid gap-4">
+
+    {completedStages.map((stage) => (
+
+      <div
+        key={stage.value}
+        className="
+          flex items-center gap-4
+          bg-slate-50 rounded-2xl
+          px-5 py-4
+        "
+      >
+
+        <div
+          className="
+            w-8 h-8 rounded-full
+            bg-green-100
+            flex items-center justify-center
+            text-green-700 font-bold
+          "
+        >
+
+          ✓
 
         </div>
 
+        <p className="font-medium text-slate-900">
+          {stage.label}
+        </p>
+
+      </div>
+
+    ))}
+
+  </div>
+
+</div>
+{/* Estimated Completion */}
+<div className="mt-10 bg-blue-50 border border-blue-200 rounded-3xl p-6">
+
+  <p className="text-sm font-medium text-blue-700">
+    Estimated Completion Window
+  </p>
+
+  <h3 className="mt-3 text-3xl font-bold text-slate-900">
+    {estimatedCompletion}
+  </h3>
+
+  <p className="mt-3 text-slate-600">
+    Estimated timelines are based on current transaction stage, reported delays and recent chain activity.
+  </p>
+
+</div>
+{/* Operational Info */}
+<div className="grid md:grid-cols-2 gap-8 mt-10">
+
+  <div className="bg-slate-50 rounded-2xl p-6">
+
+    <p className="text-sm text-slate-500">
+      Expected Next Step
+    </p>
+
+    <p className="mt-3 text-2xl font-bold text-slate-900">
+      {currentStage?.nextStep}
+    </p>
+
+    <p className="mt-3 text-slate-600">
+      This is typically the next operational milestone in the property transaction.
+    </p>
+
+  </div>
+
+  <div className="bg-slate-50 rounded-2xl p-6">
+
+    <p className="text-sm text-slate-500">
+      Typical Timeframe
+    </p>
+
+    <p className="mt-3 text-2xl font-bold text-slate-900">
+      {currentStage?.expectedTimeframe}
+    </p>
+
+    <p className="mt-3 text-slate-600">
+      Timeframes vary depending on chain complexity and third-party response times.
+    </p>
+
+  </div>
+
+</div>
+
+</div>
+{/* Action Required */}
+<div className="mt-8 bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
+
+  <div className="flex items-start justify-between gap-6">
+
+    <div>
+
+      <p className="text-sm font-medium text-slate-500">
+        Action Required
+      </p>
+
+      <h2 className="mt-3 text-3xl font-bold text-slate-900">
+        {actionTitle}
+      </h2>
+
+      <p className="mt-4 text-slate-600 max-w-2xl">
+        {actionMessage}
+      </p>
+
+    </div>
+
+    <div
+      className={`
+        ${actionColour}
+        px-5 py-3 rounded-2xl text-sm font-semibold
+      `}
+    >
+
+      Operational Alert
+
+    </div>
+
+  </div>
+
+</div>
         {/* Update Status */}
         <div className="mt-8 bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
 
@@ -256,14 +560,69 @@ export default function PropertyPage() {
 
           )}
 
-          <button
+<button
+  onClick={handleStructuredUpdate}
             className="mt-6 bg-slate-900 text-white px-6 py-4 rounded-2xl font-semibold hover:bg-slate-700 transition"
           >
             Add Update
           </button>
 
         </div>
+{/* Break Chain Connection */}
+<div className="mt-8 bg-white rounded-3xl shadow-sm border border-red-200 p-8">
 
+  <h2 className="text-3xl font-bold text-slate-900">
+    Break Chain Connection
+  </h2>
+
+  <p className="mt-4 text-slate-600 max-w-2xl">
+    This should only be used after discussions with estate agents or solicitors. Breaking a chain connection may impact confidence scoring and overall chain progression.
+  </p>
+
+  <select
+    value={breakReason}
+    onChange={(event) =>
+      setBreakReason(
+        event.target.value
+      )
+    }
+    className="mt-6 w-full border border-slate-300 rounded-2xl px-4 py-4"
+  >
+
+    <option value="">
+      Select break reason
+    </option>
+
+    <option value="buyer_side">
+  My buyer’s transaction ended
+</option>
+
+<option value="seller_side">
+  My purchase transaction ended
+</option>
+
+  </select>
+
+  <button
+    onClick={() => {
+
+      if (!breakReason) {
+        return;
+      }
+
+      breakChainConnection(
+        currentProperty.id,
+        breakReason
+      );
+    }}
+    className="mt-6 bg-red-600 hover:bg-red-700 text-white px-6 py-4 rounded-2xl font-semibold transition"
+  >
+
+    Break Chain Connection
+
+  </button>
+
+</div>
         {/* Activity Timeline */}
         <div className="mt-8 bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
 
@@ -271,40 +630,101 @@ export default function PropertyPage() {
             Activity Timeline
           </h2>
 
-          <div className="mt-6 space-y-6">
+          <div className="mt-6">
 
-            {currentProperty.activities.map((activity) => (
+  {currentProperty.activities.map((activity, index) => (
 
-              <div
-                key={activity.id}
-                className="bg-slate-50 rounded-2xl p-5 flex items-start gap-4"
-              >
+    <div
+      key={activity.id}
+      className="relative pl-10 pb-10"
+    >
 
-                <div className="w-4 h-4 rounded-full bg-blue-500 mt-2"></div>
+      {/* Vertical Line */}
+      {index !==
+        currentProperty.activities.length - 1 && (
 
-                <div>
+        <div
+          className="
+            absolute
+            left-[7px]
+            top-4
+            w-[2px]
+            h-full
+            bg-slate-200
+          "
+        ></div>
 
-                  <p className="font-semibold text-slate-900">
-                    {activity.update}
-                  </p>
+      )}
 
-                  <p className="text-sm text-slate-500 mt-1">
-                    Updated by {
-                      activity.updated_by || "system"
-                    }
-                  </p>
+      {/* Timeline Dot */}
+      <div
+        className="
+          absolute
+          left-0
+          top-1
+          w-4
+          h-4
+          rounded-full
+          bg-blue-500
+        "
+      ></div>
 
-                  <p className="text-sm text-slate-400 mt-1">
-                    {formatTimeAgo(activity.timestamp)}
-                  </p>
+      {/* Content */}
+      <div>
 
-                </div>
+        <p className="text-xl font-semibold text-slate-900">
+          {activity.update}
+        </p>
 
-              </div>
+        <div className="mt-3">
 
-            ))}
+          <span
+            className={`
+              inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold
 
-          </div>
+              ${
+                activity.updated_by === "estate_agent"
+                  ? "bg-purple-100 text-purple-700"
+
+                : activity.updated_by === "solicitor"
+                  ? "bg-emerald-100 text-emerald-700"
+
+                : activity.updated_by === "system"
+                  ? "bg-slate-200 text-slate-700"
+
+                : "bg-blue-100 text-blue-700"
+              }
+            `}
+          >
+
+            {
+              activity.updated_by === "estate_agent"
+                ? "Estate Agent"
+
+              : activity.updated_by === "solicitor"
+                ? "Solicitor"
+
+              : activity.updated_by === "system"
+                ? "System"
+
+              : "Homeowner"
+            }
+
+          </span>
+
+        </div>
+
+        <p className="text-sm text-slate-400 mt-3">
+          {formatTimeAgo(activity.timestamp)}
+        </p>
+
+      </div>
+
+    </div>
+
+  ))}
+
+</div>
 
         </div>
 
