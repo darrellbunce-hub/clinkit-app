@@ -1,12 +1,18 @@
 "use client";
 
-import { useParams } from "next/navigation";
-import { useState } from "react";
-
+import {
+  useParams,
+  useRouter,
+} from "next/navigation";
+import {
+  useState,
+  useEffect,
+} from "react";
+import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import { useChain } from "@/context/ChainContext";
 import { STAGES } from "@/data/stages";
-
+import { supabase } from "@/lib/supabase";
 export default function PropertyPage() {
 
   const [updateType, setUpdateType] =
@@ -17,7 +23,7 @@ export default function PropertyPage() {
     const [breakReason, setBreakReason] =
     useState("");
   const params = useParams();
-
+  const router = useRouter();
   const propertyId = Number(
     Array.isArray(params.propertyId)
       ? params.propertyId[0]
@@ -31,7 +37,23 @@ export default function PropertyPage() {
     breakChainConnection,
     currentUserId,
   } = useChain();
+  useEffect(() => {
 
+    async function checkAuth() {
+  
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+  
+      if (!user) {
+  
+        router.push("/login");
+      }
+    }
+  
+    checkAuth();
+  
+  }, []);
   const currentProperty = properties.find(
     (property) => property.id === propertyId
   );
@@ -255,7 +277,29 @@ async function handleStructuredUpdate() {
       <Navbar />
 
       <div className="max-w-4xl mx-auto px-6 py-12">
+      <div className="flex items-center gap-4 mb-6">
 
+<Link
+  href={`/chain/${currentProperty.chainId}`}
+  className="
+    inline-flex items-center
+    text-slate-600 hover:text-slate-900
+  "
+>
+  ← Back to Chain
+</Link>
+
+<Link
+  href="/dashboard"
+  className="
+    inline-flex items-center
+    text-slate-600 hover:text-slate-900
+  "
+>
+  Dashboard
+</Link>
+
+</div>
         {/* Header */}
         <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
 
@@ -411,6 +455,8 @@ async function handleStructuredUpdate() {
 </div>
 
 </div>
+
+
 {/* Action Required */}
 <div className="mt-8 bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
 

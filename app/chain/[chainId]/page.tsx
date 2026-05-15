@@ -1,8 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Navbar from "@/components/Navbar";
-import { useParams } from "next/navigation";
+import {
+  useParams,
+  useRouter,
+} from "next/navigation";
 import Link from "next/link";
 import { useChain } from "@/context/ChainContext";
 import { supabase } from "@/lib/supabase";
@@ -11,7 +14,7 @@ import { STAGES } from "@/data/stages";
 export default function ChainPage() {
 
   const params = useParams();
-
+  const router = useRouter();
   const chainId =
     parseInt(
       params.chainId as string
@@ -22,6 +25,24 @@ export default function ChainPage() {
       chains,
       currentUserId,
     } = useChain();
+
+    useEffect(() => {
+
+      async function checkAuth() {
+    
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+    
+        if (!user) {
+    
+          router.push("/login");
+        }
+      }
+    
+      checkAuth();
+    
+    }, []);
 
   const chainProperties =
   
@@ -662,7 +683,7 @@ else {
 
       : stage.label
   }
-                          
+    </p>                      
                   
 <div className="mt-3 w-32 h-2 bg-slate-200 rounded-full overflow-hidden">
 
@@ -678,7 +699,7 @@ else {
 <p className="text-xs mt-1 text-slate-500">
 {stage.progress}% complete
 </p>
-                    </p>
+                    
 
                     <p className="text-xs mt-1 text-slate-500">
                       {property.address}
