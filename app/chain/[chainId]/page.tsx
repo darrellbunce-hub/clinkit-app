@@ -17,10 +17,11 @@ export default function ChainPage() {
       params.chainId as string
     );
 
-  const {
-    properties,
-    chains,
-  } = useChain();
+    const {
+      properties,
+      chains,
+      currentUserId,
+    } = useChain();
 
   const chainProperties =
   
@@ -312,7 +313,8 @@ else {
             "pending_connection",
 
           is_current_user: true,
-
+          owner_user_id:
+          currentUserId,
           last_updated_days: 0,
 
         })

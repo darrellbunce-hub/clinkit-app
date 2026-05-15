@@ -26,6 +26,10 @@ type Property = {
   chainPosition: number;
   address: string;
 postcode: string;
+members: {
+  user_id: string;
+  role: string;
+}[];
 };
 type Chain = {
   id: number;
@@ -35,6 +39,7 @@ type Chain = {
 type ChainContextType = {
   properties: Property[];
   chains: Chain[];
+  currentUserId: string | null;
 
   updatePropertyStage: (
     propertyId: number,
@@ -87,13 +92,17 @@ useEffect(() => {
     .from("properties")
     .select(`
       *,
-     activities (
-  id,
-  timestamp,
-  update,
-  updated_by
-)
-    `);
+      activities (
+        id,
+        timestamp,
+        update,
+        updated_by
+      ),
+      property_members (
+        user_id,
+        role
+      )
+    `)
 
     if (error) {
       console.error(error);
@@ -115,6 +124,8 @@ useEffect(() => {
         
         postcode:
           property.postcode,
+          members:
+  property.property_members || [],
         stage: property.stage,
 
         status: property.status,
@@ -180,9 +191,16 @@ useEffect(() => {
                   "pending_connection"
               );
       
+              const hasUnclaimedProperties =
+  chainProperties.some(
+    (property) =>
+      property.members.length === 0
+  );
+            
             const isIncomplete =
               chainProperties.length === 1 ||
-              hasPendingConnection;
+              hasPendingConnection ||
+              hasUnclaimedProperties;
       
             return {
       
@@ -211,7 +229,26 @@ async function updatePropertyStage(
   propertyId: number,
   newStage: string
 ) {
+  const property =
+  properties.find(
+    (property) =>
+      property.id === propertyId
+  );
 
+const canEdit =
+  property?.members?.some(
+    (member) =>
+      member.user_id === currentUserId
+  );
+
+if (!canEdit) {
+
+  alert(
+    "You do not have permission to update this property"
+  );
+
+  return;
+}
   const { error } =
     await supabase
       .from("properties")
@@ -286,7 +323,26 @@ async function addStructuredUpdate(
   propertyId: number,
   updateMessage: string
 ) {
+  const property =
+  properties.find(
+    (property) =>
+      property.id === propertyId
+  );
 
+const canEdit =
+  property?.members?.some(
+    (member) =>
+      member.user_id === currentUserId
+  );
+
+if (!canEdit) {
+
+  alert(
+    "You do not have permission to update this property"
+  );
+
+  return;
+}
   await supabase
     .from("activities")
     .insert({
@@ -339,7 +395,26 @@ async function breakChainConnection(
   propertyId: number,
   breakReason: string
 ) {
+  const property =
+  properties.find(
+    (property) =>
+      property.id === propertyId
+  );
 
+const canEdit =
+  property?.members?.some(
+    (member) =>
+      member.user_id === currentUserId
+  );
+
+if (!canEdit) {
+
+  alert(
+    "You do not have permission to update this property"
+  );
+
+  return;
+}
   const updateMessage =
     breakReason === "buyer_side"
       ? "Chain Connection Broken - Buyer Side"
@@ -412,6 +487,7 @@ return (
       value={{
         properties,
         chains,
+        currentUserId,
         updatePropertyStage,
         addStructuredUpdate,
         breakChainConnection,

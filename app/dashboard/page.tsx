@@ -21,9 +21,12 @@ export default function DashboardPage() {
             </p>
           </div>
 
-          <button className="bg-slate-900 text-white px-6 py-4 rounded-xl hover:bg-slate-700 transition">
-            + Create Chain
-          </button>
+          <Link
+  href="/start-move"
+  className="bg-slate-900 text-white px-6 py-4 rounded-xl hover:bg-slate-700 transition"
+>
+  + Create Chain
+</Link>
 
         </div>
 

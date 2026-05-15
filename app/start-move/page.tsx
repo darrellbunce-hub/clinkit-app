@@ -89,11 +89,20 @@ access_code:
       
       if (existingSellingProperty) {
       
-        alert(
-          "This selling property is already part of an active chain."
-        );
-      
-        return;
+        const shouldJoinExisting =
+  window.confirm(
+    "This property already exists within an active chain.\n\nWould you like to connect to the existing transaction?"
+  );
+
+if (shouldJoinExisting) {
+
+  window.location.href =
+  `/join-chain?property=${existingSellingProperty.id}`;
+
+  return;
+}
+
+return;
       }
       const {
         data: sellingProperty,
@@ -144,11 +153,20 @@ access_code:
       
       if (existingBuyingProperty) {
       
-        alert(
-          "This buying property is already part of an active chain."
-        );
-      
-        return;
+        const shouldJoinExisting =
+  window.confirm(
+    "This property already exists within an active chain.\n\nWould you like to connect to the existing transaction?"
+  );
+
+if (shouldJoinExisting) {
+
+  window.location.href =
+  `/join-chain?property=${existingBuyingProperty.id}`;
+
+  return;
+}
+
+return;
       }
       const {
         data: buyingProperty,
@@ -172,19 +190,21 @@ access_code:
         console.error(buyingError);
       }
 
-      if (buyingProperty) {
+      /*
+if (buyingProperty) {
 
-        await supabase
-          .from("property_members")
-          .insert({
-            property_id:
-              buyingProperty.id,
+  await supabase
+    .from("property_members")
+    .insert({
+      property_id:
+        buyingProperty.id,
 
-            user_id: user.id,
+      user_id: user.id,
 
-            role: "buyer",
-          });
-      }
+      role: "buyer",
+    });
+}
+*/
     }
 
     window.location.href =

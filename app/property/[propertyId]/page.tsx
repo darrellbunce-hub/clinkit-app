@@ -29,6 +29,7 @@ export default function PropertyPage() {
     updatePropertyStage,
     addStructuredUpdate,
     breakChainConnection,
+    currentUserId,
   } = useChain();
 
   const currentProperty = properties.find(
@@ -80,7 +81,11 @@ export default function PropertyPage() {
       </div>
     );
   }
-
+  const canEdit =
+  currentProperty.members?.some(
+    (member) =>
+      member.user_id === currentUserId
+  );
   const currentStage =
   STAGES.find(
     (stage) =>
@@ -441,6 +446,17 @@ async function handleStructuredUpdate() {
   </div>
 
 </div>
+{!canEdit && (
+
+<div className="mt-8 bg-amber-50 border border-amber-200 rounded-3xl p-6">
+
+  <p className="text-amber-700 font-semibold">
+    You can view this property but only the property owner can make operational updates.
+  </p>
+
+</div>
+
+)}
         {/* Update Status */}
         <div className="mt-8 bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
 
@@ -449,6 +465,7 @@ async function handleStructuredUpdate() {
           </h2>
 
           <select
+          disabled={!canEdit}
             value={currentProperty.stage}
             onChange={(event) =>
               updatePropertyStage(
@@ -487,6 +504,7 @@ async function handleStructuredUpdate() {
           </p>
 
           <select
+          disabled={!canEdit}
             value={updateType}
             onChange={(event) =>
               setUpdateType(event.target.value)
@@ -523,6 +541,7 @@ async function handleStructuredUpdate() {
           {updateType === "delay" && (
 
             <select
+            disabled={!canEdit}
               value={delayReason}
               onChange={(event) =>
                 setDelayReason(
@@ -580,6 +599,7 @@ async function handleStructuredUpdate() {
   </p>
 
   <select
+  disabled={!canEdit}
     value={breakReason}
     onChange={(event) =>
       setBreakReason(

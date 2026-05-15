@@ -48,7 +48,7 @@ export default function JoinChainPage() {
       .select("*")
       .eq("chain_id", chain.id)
       .eq("address", address)
-.eq("status", "pending_connection")
+
       .eq("postcode", postcode)
       .single();
 
