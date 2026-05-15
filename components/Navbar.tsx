@@ -1,8 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 
 export default function Navbar() {
+
+  const [mobileMenuOpen, setMobileMenuOpen] =
+    useState(false);
 
   return (
 
@@ -102,6 +106,7 @@ export default function Navbar() {
                 font-medium
                 text-slate-400
                 tracking-[0.18em]
+                hidden sm:block
               "
             >
               MOVING MADE CLEAR
@@ -111,8 +116,8 @@ export default function Navbar() {
 
         </Link>
 
-        {/* Navigation */}
-        <nav className="flex items-center gap-3">
+        {/* Desktop Nav */}
+        <nav className="hidden md:flex items-center gap-3">
 
           <Link
             href="/dashboard"
@@ -160,7 +165,94 @@ export default function Navbar() {
 
         </nav>
 
+        {/* Mobile Button */}
+        <button
+          onClick={() =>
+            setMobileMenuOpen(
+              !mobileMenuOpen
+            )
+          }
+          className="
+            md:hidden
+            text-white
+            text-3xl
+          "
+        >
+          {mobileMenuOpen ? "✕" : "☰"}
+        </button>
+
       </div>
+
+      {/* Mobile Menu */}
+      {mobileMenuOpen && (
+
+        <div
+          className="
+            md:hidden
+            border-t
+            border-white/10
+            bg-slate-950/95
+            backdrop-blur-xl
+          "
+        >
+
+          <div className="px-6 py-6 flex flex-col gap-4">
+
+            <Link
+              href="/dashboard"
+              className="
+                text-slate-300
+                hover:text-white
+                transition
+                py-3
+              "
+              onClick={() =>
+                setMobileMenuOpen(false)
+              }
+            >
+              Dashboard
+            </Link>
+
+            <Link
+              href="/join-chain"
+              className="
+                text-slate-300
+                hover:text-white
+                transition
+                py-3
+              "
+              onClick={() =>
+                setMobileMenuOpen(false)
+              }
+            >
+              Join Chain
+            </Link>
+
+            <Link
+              href="/start-move"
+              className="
+                bg-blue-600
+                hover:bg-blue-500
+                text-white
+                px-5
+                py-4
+                rounded-xl
+                font-semibold
+                text-center
+                transition
+              "
+              onClick={() =>
+                setMobileMenuOpen(false)
+              }
+            >
+              Start Move
+            </Link>
+
+          </div>
+
+        </div>
+
+      )}
 
     </header>
 
