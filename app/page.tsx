@@ -1,7 +1,5 @@
 "use client";
-
 import { motion } from "framer-motion";
-
 import {
   Home,
   Search,
@@ -12,14 +10,30 @@ import {
   Smartphone,
   Zap,
 } from "lucide-react";
-
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
+
+const steps = [
+  {
+    number: 1,
+    title: "Create Your Chain",
+    text: "Start your move and add your onward purchase or sale.",
+  },
+  {
+    number: 2,
+    title: "Invite Participants",
+    text: "Securely connect buyers, sellers and future homeowners.",
+  },
+  {
+    number: 3,
+    title: "Track Progress Together",
+    text: "See updates, bottlenecks and milestones in real time.",
+  },
+];
 
 export default function HomePage() {
   return (
     <main className="min-h-screen bg-slate-100">
-
       <Navbar />
 
       {/* HERO */}
@@ -28,12 +42,27 @@ export default function HomePage() {
         {/* Background */}
         <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950"></div>
 
+        <div className="absolute inset-0 opacity-20">
+          <svg
+            className="w-full h-full"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <line x1="10%" y1="20%" x2="40%" y2="35%" stroke="#3382F6" strokeWidth="1" />
+            <line x1="40%" y1="35%" x2="70%" y2="15%" stroke="#3382F6" strokeWidth="1" />
+            <line x1="70%" y1="15%" x2="90%" y2="30%" stroke="#3382F6" strokeWidth="1" />
+
+            <circle cx="10%" cy="20%" r="3" fill="#38B2F6" />
+            <circle cx="40%" cy="35%" r="3" fill="#38B2F6" />
+            <circle cx="70%" cy="15%" r="3" fill="#38B2F6" />
+            <circle cx="90%" cy="30%" r="3" fill="#38B2F6" />
+          </svg>
+        </div>
+
         <div className="absolute top-[-200px] right-[-100px] w-[500px] h-[500px] bg-blue-500/20 rounded-full blur-3xl"></div>
 
         <div className="absolute bottom-[-200px] left-[-100px] w-[400px] h-[400px] bg-cyan-400/10 rounded-full blur-3xl"></div>
 
         <div className="relative max-w-6xl mx-auto px-6 py-28">
-
           <div className="grid lg:grid-cols-2 gap-16 items-center">
 
             {/* LEFT */}
@@ -42,12 +71,11 @@ export default function HomePage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.7 }}
             >
-
               <div className="inline-flex items-center bg-blue-500/20 text-blue-200 border border-blue-400/30 px-4 py-2 rounded-full text-sm font-semibold">
                 Live Property Chain Tracking
               </div>
 
-              <h1 className="mt-8 text-5xl md:text-6xl font-bold text-white leading-tight">
+              <h1 className="mt-8 text-6xl font-bold text-white leading-tight">
                 Track Your Property Chain In Real Time
               </h1>
 
@@ -56,78 +84,31 @@ export default function HomePage() {
               </p>
 
               <div className="mt-10 flex flex-col sm:flex-row gap-4">
-
                 <Link
                   href="/start-move"
-                  className="
-                    bg-blue-600
-                    hover:bg-blue-500
-                    hover:shadow-blue-500/50
-                    hover:scale-[1.02]
-                    shadow-lg
-                    shadow-blue-500/30
-                    transition-all
-                    duration-300
-                    text-white
-                    px-8
-                    py-5
-                    rounded-2xl
-                    font-semibold
-                    text-lg
-                    text-center
-                  "
+                  className="bg-blue-600 hover:bg-blue-500 hover:scale-[1.02] shadow-lg shadow-blue-500/30 text-white px-8 py-5 rounded-2xl font-semibold text-lg transition-all text-center"
                 >
                   Start Your Move
                 </Link>
 
                 <Link
                   href="/join-chain"
-                  className="
-                    border
-                    border-white/20
-                    bg-white/10
-                    backdrop-blur-xl
-                    text-white
-                    px-8
-                    py-5
-                    rounded-2xl
-                    font-semibold
-                    text-lg
-                    hover:bg-white/20
-                    transition-all
-                    duration-300
-                    text-center
-                  "
+                  className="border border-white/20 bg-white/10 backdrop-blur-xl text-white px-8 py-5 rounded-2xl font-semibold text-lg hover:bg-white/20 transition text-center"
                 >
                   Join Existing Chain
                 </Link>
-
               </div>
-
             </motion.div>
 
             {/* RIGHT */}
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              transition={{
-                duration: 0.6,
-                delay: 0.2,
-              }}
-              className="
-                bg-white/10
-                backdrop-blur-xl
-                rounded-3xl
-                border
-                border-white/10
-                p-10
-              "
+              transition={{ duration: 0.6, delay: 0.2 }}
+              className="bg-white/10 backdrop-blur-xl rounded-3xl border border-white/10 p-10"
             >
-
               <div className="flex items-center justify-between">
-
                 <div>
-
                   <p className="text-sm text-slate-300">
                     Chain Health
                   </p>
@@ -135,19 +116,16 @@ export default function HomePage() {
                   <h2 className="mt-2 text-4xl font-bold text-white">
                     Healthy
                   </h2>
-
                 </div>
 
                 <div className="bg-green-100 text-green-700 px-4 py-2 rounded-full font-semibold">
                   82%
                 </div>
-
               </div>
 
               <div className="mt-10 space-y-6">
 
                 <div className="flex items-center gap-4">
-
                   <div className="w-14 h-14 rounded-2xl bg-green-100 border-2 border-green-500 flex items-center justify-center">
                     <Home className="w-7 h-7 text-green-700" />
                   </div>
@@ -157,11 +135,9 @@ export default function HomePage() {
                   <div className="w-14 h-14 rounded-2xl bg-green-100 border-2 border-green-500 flex items-center justify-center">
                     <Home className="w-7 h-7 text-green-700" />
                   </div>
-
                 </div>
 
                 <div className="flex items-center gap-4">
-
                   <div className="w-14 h-14 rounded-2xl bg-green-100 border-2 border-green-500 flex items-center justify-center">
                     <Home className="w-7 h-7 text-green-700" />
                   </div>
@@ -171,11 +147,9 @@ export default function HomePage() {
                   <div className="w-14 h-14 rounded-2xl bg-amber-100 border-2 border-amber-500 flex items-center justify-center">
                     <Clock3 className="w-7 h-7 text-amber-700" />
                   </div>
-
                 </div>
 
                 <div className="flex items-center gap-4">
-
                   <div className="w-14 h-14 rounded-2xl bg-slate-100 border-2 border-slate-300 flex items-center justify-center">
                     <Clock3 className="w-7 h-7 text-slate-500" />
                   </div>
@@ -185,17 +159,11 @@ export default function HomePage() {
                   <div className="w-14 h-14 rounded-2xl bg-slate-100 border-2 border-slate-300 flex items-center justify-center">
                     <Search className="w-7 h-7 text-slate-500" />
                   </div>
-
                 </div>
-
               </div>
-
             </motion.div>
-
           </div>
-
         </div>
-
       </section>
 
       {/* HOW IT WORKS */}
@@ -206,7 +174,6 @@ export default function HomePage() {
         <div className="max-w-6xl mx-auto px-6 py-24">
 
           <div className="text-center">
-
             <h2 className="text-5xl font-bold text-slate-900">
               How Keynetic Works
             </h2>
@@ -214,41 +181,17 @@ export default function HomePage() {
             <p className="mt-6 text-xl text-slate-600 max-w-3xl mx-auto">
               Shared operational visibility for everyone involved in the property chain.
             </p>
-
           </div>
 
           <div className="grid md:grid-cols-3 gap-8 mt-16">
-
-            {[
-              {
-                number: "1",
-                title: "Create Your Chain",
-                text: "Start your move and add your onward purchase or sale.",
-              },
-              {
-                number: "2",
-                title: "Invite Participants",
-                text: "Securely connect buyers, sellers and future homeowners.",
-              },
-              {
-                number: "3",
-                title: "Track Progress Together",
-                text: "See updates, bottlenecks and milestones in real time.",
-              },
-            ].map((item) => (
-              <div
+            {steps.map((item) => (
+              <motion.div
                 key={item.number}
-                className="
-                  bg-slate-50
-                  rounded-3xl
-                  p-8
-                  hover:-translate-y-2
-                  hover:shadow-2xl
-                  hover:shadow-blue-100
-                  transition-all
-                  duration-300
-                "
+                whileHover={{ y: -8 }}
+                transition={{ duration: 0.2 }}
+                className="relative overflow-hidden bg-slate-50 rounded-3xl p-8 border border-slate-200 hover:shadow-2xl hover:shadow-blue-100 transition-all duration-300"
               >
+                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-cyan-400"></div>
 
                 <div className="w-16 h-16 rounded-2xl bg-blue-100 text-blue-700 flex items-center justify-center text-3xl font-bold">
                   {item.number}
@@ -261,217 +204,149 @@ export default function HomePage() {
                 <p className="mt-4 text-slate-600 leading-relaxed">
                   {item.text}
                 </p>
-
-              </div>
+              </motion.div>
             ))}
-
           </div>
-
         </div>
-
       </section>
 
       {/* FEATURES */}
-<section className="max-w-6xl mx-auto px-6 py-24">
+      <section className="max-w-6xl mx-auto px-6 py-24">
 
-<div className="text-center">
+        <div className="text-center">
+          <h2 className="text-5xl font-bold text-slate-900">
+            Built For Modern Property Chains
+          </h2>
 
-  <h2 className="text-5xl font-bold text-slate-900">
-    Built For Modern Property Chains
-  </h2>
+          <p className="mt-6 text-xl text-slate-600 max-w-3xl mx-auto">
+            Operational visibility and structured updates for everyone involved in the move.
+          </p>
+        </div>
 
-  <p className="mt-6 text-xl text-slate-600 max-w-3xl mx-auto">
-    Operational visibility and structured updates for everyone involved in the move.
-  </p>
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 mt-16">
 
-</div>
+          <div className="bg-white rounded-3xl border border-slate-200 p-8 hover:-translate-y-2 hover:shadow-2xl hover:shadow-blue-100 transition-all duration-300">
+            <TrendingUp className="w-12 h-12 text-blue-600" />
 
-<div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 mt-16">
+            <h3 className="mt-6 text-2xl font-bold text-slate-900">
+              Live Chain Progress
+            </h3>
 
-  {[
-    {
-      icon: <TrendingUp className="w-12 h-12 text-blue-600" />,
-      title: "Live Chain Progress",
-      text: "Understand exactly where every property sits within the chain.",
-    },
-    {
-      icon: <AlertTriangle className="w-12 h-12 text-amber-500" />,
-      title: "Bottleneck Detection",
-      text: "Identify delays and stalled transactions before they impact completion.",
-    },
-    {
-      icon: <ShieldCheck className="w-12 h-12 text-emerald-600" />,
-      title: "Permission Controlled",
-      text: "Participants can only update properties they are authorised to manage.",
-    },
-    {
-      icon: <Home className="w-12 h-12 text-green-700" />,
-      title: "Shared Visibility",
-      text: "Buyers and sellers see a shared operational view of the move.",
-    },
-    {
-      icon: <Zap className="w-12 h-12 text-yellow-500" />,
-      title: "Faster Decisions",
-      text: "Reduce uncertainty with structured milestones and real-time updates.",
-    },
-    {
-      icon: <Smartphone className="w-12 h-12 text-slate-700" />,
-      title: "Mobile Friendly",
-      text: "Designed for homeowners tracking their move on any device.",
-    },
-  ].map((feature, index) => (
-    <div
-      key={index}
-      className="
-        bg-white
-        rounded-3xl
-        border
-        border-slate-200
-        p-8
-        hover:-translate-y-2
-        hover:shadow-2xl
-        hover:shadow-blue-100
-        transition-all
-        duration-300
-      "
-    >
+            <p className="mt-4 text-slate-600 leading-relaxed">
+              Understand exactly where every property sits within the chain.
+            </p>
+          </div>
 
-      <div>{feature.icon}</div>
+          <div className="bg-white rounded-3xl border border-slate-200 p-8 hover:-translate-y-2 hover:shadow-2xl hover:shadow-blue-100 transition-all duration-300">
+            <AlertTriangle className="w-12 h-12 text-amber-500" />
 
-      <h3 className="mt-6 text-2xl font-bold text-slate-900">
-        {feature.title}
-      </h3>
+            <h3 className="mt-6 text-2xl font-bold text-slate-900">
+              Bottleneck Detection
+            </h3>
 
-      <p className="mt-4 text-slate-600 leading-relaxed">
-        {feature.text}
-      </p>
+            <p className="mt-4 text-slate-600 leading-relaxed">
+              Identify delays and stalled transactions before they impact completion.
+            </p>
+          </div>
 
-    </div>
-  ))}
+          <div className="bg-white rounded-3xl border border-slate-200 p-8 hover:-translate-y-2 hover:shadow-2xl hover:shadow-blue-100 transition-all duration-300">
+            <ShieldCheck className="w-12 h-12 text-emerald-600" />
 
-</div>
+            <h3 className="mt-6 text-2xl font-bold text-slate-900">
+              Permission Controlled
+            </h3>
 
-</section>
-      {/* Metrics */}
-<section className="bg-white border-t border-slate-200">
+            <p className="mt-4 text-slate-600 leading-relaxed">
+              Participants can only update properties they are authorised to manage.
+            </p>
+          </div>
 
-<div className="max-w-6xl mx-auto px-6 py-20">
+          <div className="bg-white rounded-3xl border border-slate-200 p-8 hover:-translate-y-2 hover:shadow-2xl hover:shadow-blue-100 transition-all duration-300">
+            <Home className="w-12 h-12 text-green-700" />
 
-  <div className="grid md:grid-cols-4 gap-8">
+            <h3 className="mt-6 text-2xl font-bold text-slate-900">
+              Shared Visibility
+            </h3>
 
-    {/* Metric 1 */}
-    <div
-      className="
-        bg-slate-50
-        border
-        border-slate-200
-        rounded-3xl
-        p-8
-        text-center
-        hover:-translate-y-2
-        hover:shadow-2xl
-        hover:shadow-blue-100
-        transition-all
-        duration-300
-      "
-    >
+            <p className="mt-4 text-slate-600 leading-relaxed">
+              Buyers and sellers see a shared operational view of the move.
+            </p>
+          </div>
 
-      <h3 className="text-5xl font-black text-slate-900">
-        24/7
-      </h3>
+          <div className="bg-white rounded-3xl border border-slate-200 p-8 hover:-translate-y-2 hover:shadow-2xl hover:shadow-blue-100 transition-all duration-300">
+            <Zap className="w-12 h-12 text-yellow-500" />
 
-      <p className="mt-4 text-slate-600 text-lg">
-        Live chain visibility
-      </p>
+            <h3 className="mt-6 text-2xl font-bold text-slate-900">
+              Faster Decisions
+            </h3>
 
-    </div>
+            <p className="mt-4 text-slate-600 leading-relaxed">
+              Reduce uncertainty with structured milestones and real-time updates.
+            </p>
+          </div>
 
-    {/* Metric 2 */}
-    <div
-      className="
-        bg-slate-50
-        border
-        border-slate-200
-        rounded-3xl
-        p-8
-        text-center
-        hover:-translate-y-2
-        hover:shadow-2xl
-        hover:shadow-blue-100
-        transition-all
-        duration-300
-      "
-    >
+          <div className="bg-white rounded-3xl border border-slate-200 p-8 hover:-translate-y-2 hover:shadow-2xl hover:shadow-blue-100 transition-all duration-300">
+            <Smartphone className="w-12 h-12 text-slate-700" />
 
-      <h3 className="text-5xl font-black text-slate-900">
-        Real-Time
-      </h3>
+            <h3 className="mt-6 text-2xl font-bold text-slate-900">
+              Mobile Friendly
+            </h3>
 
-      <p className="mt-4 text-slate-600 text-lg">
-        Shared transaction updates
-      </p>
+            <p className="mt-4 text-slate-600 leading-relaxed">
+              Designed for homeowners tracking their move on any device.
+            </p>
+          </div>
+        </div>
+      </section>
 
-    </div>
+      {/* METRICS */}
+      <section className="bg-white border-t border-slate-200">
 
-    {/* Metric 3 */}
-    <div
-      className="
-        bg-slate-50
-        border
-        border-slate-200
-        rounded-3xl
-        p-8
-        text-center
-        hover:-translate-y-2
-        hover:shadow-2xl
-        hover:shadow-blue-100
-        transition-all
-        duration-300
-      "
-    >
+        <div className="max-w-6xl mx-auto px-6 py-14">
+          <div className="grid md:grid-cols-4 gap-8 text-center">
 
-      <h3 className="text-5xl font-black text-slate-900">
-        Secure
-      </h3>
+            <div className="bg-slate-50 rounded-3xl p-8 border border-slate-200">
+              <h3 className="text-5xl font-bold text-slate-900">
+                24/7
+              </h3>
 
-      <p className="mt-4 text-slate-600 text-lg">
-        Permission controlled access
-      </p>
+              <p className="mt-3 text-slate-600">
+                Live chain visibility
+              </p>
+            </div>
 
-    </div>
+            <div className="bg-slate-50 rounded-3xl p-8 border border-slate-200">
+              <h3 className="text-5xl font-bold text-slate-900">
+                Real-Time
+              </h3>
 
-    {/* Metric 4 */}
-    <div
-      className="
-        bg-slate-50
-        border
-        border-slate-200
-        rounded-3xl
-        p-8
-        text-center
-        hover:-translate-y-2
-        hover:shadow-2xl
-        hover:shadow-blue-100
-        transition-all
-        duration-300
-      "
-    >
+              <p className="mt-3 text-slate-600">
+                Shared transaction updates
+              </p>
+            </div>
 
-      <h3 className="text-5xl font-black text-slate-900">
-        Chain-Wide
-      </h3>
+            <div className="bg-slate-50 rounded-3xl p-8 border border-slate-200">
+              <h3 className="text-5xl font-bold text-slate-900">
+                Secure
+              </h3>
 
-      <p className="mt-4 text-slate-600 text-lg">
-        Visibility across transactions
-      </p>
+              <p className="mt-3 text-slate-600">
+                Permission controlled access
+              </p>
+            </div>
 
-    </div>
+            <div className="bg-slate-50 rounded-3xl p-8 border border-slate-200">
+              <h3 className="text-5xl font-bold text-slate-900">
+                Chain-Wide
+              </h3>
 
-  </div>
-
-</div>
-
-</section>
+              <p className="mt-3 text-slate-600">
+                Visibility across transactions
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* FAQ */}
       <section className="bg-slate-50 border-t border-slate-200">
@@ -479,7 +354,6 @@ export default function HomePage() {
         <div className="max-w-5xl mx-auto px-6 py-24">
 
           <div className="text-center">
-
             <h2 className="text-5xl font-bold text-slate-900">
               Frequently Asked Questions
             </h2>
@@ -487,64 +361,50 @@ export default function HomePage() {
             <p className="mt-6 text-xl text-slate-600">
               Common questions about Keynetic and property chain tracking.
             </p>
-            <div className="mt-16 space-y-6">
-
-{[
-  {
-    title: "What is Keynetic?",
-    text: "Keynetic is a shared property chain tracking platform designed to improve visibility, communication and operational awareness during residential property transactions.",
-  },
-  {
-    title: "Who can use Keynetic?",
-    text: "Homeowners, buyers, sellers and eventually estate agents and conveyancers can participate within connected property chains.",
-  },
-  {
-    title: "Can other users edit my property?",
-    text: "No. Users can only manage and update properties they are authorised to access within the chain.",
-  },
-  {
-    title: "How are chains connected?",
-    text: "Chains are connected through secure access codes and matching property details provided by transaction participants.",
-  },
-  {
-    title: "Is Keynetic available on mobile devices?",
-    text: "Yes. Keynetic is designed to work across desktop, tablet and mobile devices.",
-  },
-].map((faq, index) => (
-  <div
-    key={index}
-    className="
-      bg-white
-      rounded-3xl
-      border
-      border-slate-200
-      p-8
-      hover:-translate-y-1
-      hover:shadow-xl
-      transition-all
-      duration-300
-    "
-  >
-
-    <h3 className="text-2xl font-bold text-slate-900">
-      {faq.title}
-    </h3>
-
-    <p className="mt-4 text-slate-600 leading-relaxed">
-      {faq.text}
-    </p>
-
-  </div>
-))}
-
-</div>
           </div>
 
-        </div>
+          <div className="mt-16 space-y-6">
 
+            {[
+              {
+                title: "What is Keynetic?",
+                text: "Keynetic is a shared property chain tracking platform designed to improve visibility, communication and operational awareness during residential property transactions.",
+              },
+              {
+                title: "Who can use Keynetic?",
+                text: "Homeowners, buyers, sellers and eventually estate agents and conveyancers can participate within connected property chains.",
+              },
+              {
+                title: "Can other users edit my property?",
+                text: "No. Users can only manage and update properties they are authorised to access within the chain.",
+              },
+              {
+                title: "How are chains connected?",
+                text: "Chains are connected through secure access codes and matching property details provided by transaction participants.",
+              },
+              {
+                title: "Is Keynetic available on mobile devices?",
+                text: "Yes. Keynetic is designed to work across desktop, tablet and mobile devices.",
+              },
+            ].map((faq) => (
+              <div
+                key={faq.title}
+                className="bg-white rounded-3xl border border-slate-200 p-8 hover:-translate-y-1 hover:shadow-xl transition-all duration-300"
+              >
+                <h3 className="text-2xl font-bold text-slate-900">
+                  {faq.title}
+                </h3>
+
+                <p className="mt-4 text-slate-600 leading-relaxed">
+                  {faq.text}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
       </section>
 
-      {/* CTA */}
+      {/* FINAL CTA */}
       <section className="bg-white border-t border-slate-200">
 
         <div className="max-w-5xl mx-auto px-6 py-24 text-center">
@@ -556,50 +416,24 @@ export default function HomePage() {
           <p className="mt-8 text-xl text-slate-600 leading-relaxed max-w-3xl mx-auto">
             Join a smarter, more transparent way to manage property transactions and chain progression.
           </p>
+
           <div className="mt-12 flex flex-col sm:flex-row justify-center gap-4">
 
-<Link
-  href="/start-move"
-  className="
-    bg-slate-900
-    hover:bg-slate-800
-    hover:scale-[1.02]
-    transition-all
-    duration-300
-    text-white
-    px-8
-    py-5
-    rounded-2xl
-    font-semibold
-    text-lg
-  "
->
-  Start Your Move
-</Link>
+            <Link
+              href="/start-move"
+              className="bg-slate-900 hover:bg-slate-800 hover:scale-[1.02] transition-all duration-300 text-white px-8 py-5 rounded-2xl font-semibold text-lg"
+            >
+              Start Your Move
+            </Link>
 
-<Link
-  href="/join-chain"
-  className="
-    border
-    border-slate-300
-    bg-white
-    text-slate-900
-    px-8
-    py-5
-    rounded-2xl
-    font-semibold
-    text-lg
-    hover:bg-slate-50
-    transition-all
-    duration-300
-  "
->
-  Join Existing Chain
-</Link>
-
-</div>
+            <Link
+              href="/join-chain"
+              className="border border-slate-300 bg-white text-slate-900 px-8 py-5 rounded-2xl font-semibold text-lg hover:bg-slate-50 transition"
+            >
+              Join Existing Chain
+            </Link>
+          </div>
         </div>
-
       </section>
 
       {/* FOOTER */}
@@ -607,82 +441,58 @@ export default function HomePage() {
 
         <div className="max-w-6xl mx-auto px-6 py-12">
 
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-8">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-8">
 
-<div>
+            <div>
+              <div className="flex items-center gap-4">
 
-  <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center shadow-lg shadow-blue-500/30">
+                  <span className="text-white text-2xl">
+                    🔗
+                  </span>
+                </div>
 
-    <div
-      className="
-        w-12
-        h-12
-        rounded-2xl
-        bg-gradient-to-br
-        from-blue-500
-        to-cyan-400
-        flex
-        items-center
-        justify-center
-        shadow-lg
-        shadow-blue-500/30
-      "
-    >
-      <span className="text-white text-2xl">
-        🔗
-      </span>
-    </div>
+                <div>
+                  <h3 className="text-3xl font-bold text-white">
+                    Keynetic
+                  </h3>
 
-    <div>
+                  <p className="text-slate-500 text-sm">
+                    Property Chain Intelligence
+                  </p>
+                </div>
+              </div>
 
-      <h3 className="text-3xl font-bold text-white">
-        Keynetic
-      </h3>
+              <p className="mt-3 text-slate-400 max-w-md">
+                Shared operational visibility for modern residential property chains.
+              </p>
+            </div>
 
-      <p className="text-slate-500 text-sm">
-        Property Chain Intelligence
-      </p>
+            <div className="flex flex-wrap gap-6 text-slate-400">
+              <Link href="/" className="hover:text-white transition">
+                Home
+              </Link>
 
-    </div>
+              <Link href="/dashboard" className="hover:text-white transition">
+                Dashboard
+              </Link>
 
-  </div>
+              <Link href="/start-move" className="hover:text-white transition">
+                Start Move
+              </Link>
 
-  <p className="mt-3 text-slate-400 max-w-md">
-    Shared operational visibility for modern residential property chains.
-  </p>
-
-</div>
-
-<div className="flex flex-wrap gap-6 text-slate-400">
-
-  <Link href="/" className="hover:text-white transition">
-    Home
-  </Link>
-
-  <Link href="/dashboard" className="hover:text-white transition">
-    Dashboard
-  </Link>
-
-  <Link href="/start-move" className="hover:text-white transition">
-    Start Move
-  </Link>
-
-  <Link href="/join-chain" className="hover:text-white transition">
-    Join Chain
-  </Link>
-
-</div>
-
-</div>
-
-<div className="mt-10 pt-8 border-t border-slate-800 text-slate-500 text-sm">
-            © 2026 Keynetic. All rights reserved.
+              <Link href="/join-chain" className="hover:text-white transition">
+                Join Chain
+              </Link>
+            </div>
           </div>
 
+          <div className="mt-10 pt-8 border-t border-slate-800 text-slate-500 text-sm">
+            © 2026 Keynetic. All rights reserved.
+          </div>
         </div>
-
       </footer>
-
     </main>
   );
 }
+
