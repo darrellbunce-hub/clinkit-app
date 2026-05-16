@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
-
+import Logo from "@/components/Logo";
 const steps = [
   {
     number: 1,
@@ -437,61 +437,65 @@ export default function HomePage() {
       </section>
 
       {/* FOOTER */}
-      <footer className="bg-slate-950">
+<footer className="bg-slate-950">
 
-        <div className="max-w-6xl mx-auto px-6 py-12">
+<div className="max-w-6xl mx-auto px-6 py-12">
 
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-8">
+  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-8">
 
-            <div>
-              <div className="flex items-center gap-4">
+    <div>
 
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center shadow-lg shadow-blue-500/30">
-                  <span className="text-white text-2xl">
-                    🔗
-                  </span>
-                </div>
+      <Logo />
 
-                <div>
-                  <h3 className="text-3xl font-bold text-white">
-                    Keynetic
-                  </h3>
+      <p className="mt-3 text-slate-400 max-w-md">
+        Shared operational visibility for modern residential property chains.
+      </p>
 
-                  <p className="text-slate-500 text-sm">
-                    Property Chain Intelligence
-                  </p>
-                </div>
-              </div>
+    </div>
 
-              <p className="mt-3 text-slate-400 max-w-md">
-                Shared operational visibility for modern residential property chains.
-              </p>
-            </div>
+    <div className="flex flex-wrap gap-6 text-slate-400">
 
-            <div className="flex flex-wrap gap-6 text-slate-400">
-              <Link href="/" className="hover:text-white transition">
-                Home
-              </Link>
+      <Link
+        href="/"
+        className="hover:text-white transition"
+      >
+        Home
+      </Link>
 
-              <Link href="/dashboard" className="hover:text-white transition">
-                Dashboard
-              </Link>
+      <Link
+        href="/dashboard"
+        className="hover:text-white transition"
+      >
+        Dashboard
+      </Link>
 
-              <Link href="/start-move" className="hover:text-white transition">
-                Start Move
-              </Link>
+      <Link
+        href="/start-move"
+        className="hover:text-white transition"
+      >
+        Start Move
+      </Link>
 
-              <Link href="/join-chain" className="hover:text-white transition">
-                Join Chain
-              </Link>
-            </div>
-          </div>
+      <Link
+        href="/join-chain"
+        className="hover:text-white transition"
+      >
+        Join Chain
+      </Link>
 
-          <div className="mt-10 pt-8 border-t border-slate-800 text-slate-500 text-sm">
-            © 2026 Keynetic. All rights reserved.
-          </div>
-        </div>
-      </footer>
+    </div>
+
+  </div>
+
+  <div className="mt-10 pt-8 border-t border-slate-800 text-slate-500 text-sm">
+
+    © 2026 Keynetic. All rights reserved.
+
+  </div>
+
+</div>
+
+</footer>
     </main>
   );
 }

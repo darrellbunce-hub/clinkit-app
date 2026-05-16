@@ -25,7 +25,7 @@ export default function LoginPage() {
     }
 
     window.location.href =
-      "/chain/clk-102";
+  "/dashboard";
   }
 
   async function handleSignup() {
@@ -55,9 +55,8 @@ export default function LoginPage() {
     
         });
     }
-    alert(
-      "Account created successfully"
-    );
+    window.location.href =
+  "/verify-email";
   }
 
   return (

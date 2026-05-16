@@ -1,13 +1,31 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
+import Logo from "@/components/Logo";
 export default function Navbar() {
 
   const [mobileMenuOpen, setMobileMenuOpen] =
     useState(false);
+    const [user, setUser] =
+    useState<any>(null);
+    useEffect(() => {
 
+      async function getUser() {
+    
+        const {
+          data,
+        } =
+          await supabase.auth.getUser();
+    
+        setUser(data.user);
+    
+      }
+    
+      getUser();
+    
+    }, []);
   return (
 
     <header
@@ -27,143 +45,95 @@ export default function Navbar() {
           max-w-6xl
           mx-auto
           px-6
-          py-4
+          py-5
           flex
           items-center
           justify-between
         "
       >
-
-        {/* Logo */}
-        <Link
-          href="/"
-          className="flex items-center gap-4 group"
-        >
-
-          {/* Icons */}
-          <div className="flex items-center gap-3">
-
-            {/* Chain Icon */}
-            <div
-              className="
-                w-12
-                h-12
-                rounded-2xl
-                bg-gradient-to-br
-                from-cyan-400
-                to-blue-600
-                flex
-                items-center
-                justify-center
-                shadow-lg
-                shadow-blue-500/30
-              "
-            >
-              <span className="text-white text-2xl">
-                🔗
-              </span>
-            </div>
-
-            {/* K Icon */}
-            <div
-              className="
-                w-11
-                h-11
-                rounded-2xl
-                bg-slate-950
-                border-2
-                border-cyan-400
-                flex
-                items-center
-                justify-center
-                shadow-lg
-              "
-            >
-              <span className="text-white font-black text-lg">
-                K
-              </span>
-            </div>
-
-          </div>
-
-          {/* Text */}
-          <div className="leading-tight">
-
-            <h1
-              className="
-                text-3xl
-                font-black
-                tracking-tight
-                text-white
-              "
-            >
-              Keynetic
-            </h1>
-
-            <p
-              className="
-                text-sm
-                font-medium
-                text-slate-400
-                tracking-[0.18em]
-                hidden sm:block
-              "
-            >
-              MOVING MADE CLEAR
-            </p>
-
-          </div>
-
-        </Link>
-
+<Logo />
+        
         {/* Desktop Nav */}
-        <nav className="hidden md:flex items-center gap-3">
+<nav className="hidden md:flex items-center gap-3">
 
-          <Link
-            href="/dashboard"
-            className="
-              text-slate-300
-              hover:text-white
-              transition
-              px-4
-              py-2
-            "
-          >
-            Dashboard
-          </Link>
+{user ? (
 
-          <Link
-            href="/join-chain"
-            className="
-              text-slate-300
-              hover:text-white
-              transition
-              px-4
-              py-2
-            "
-          >
-            Join Chain
-          </Link>
+  <>
 
-          <Link
-            href="/start-move"
-            className="
-              bg-blue-600
-              hover:bg-blue-500
-              text-white
-              px-5
-              py-3
-              rounded-xl
-              font-semibold
-              transition
-              shadow-lg
-              shadow-blue-500/20
-            "
-          >
-            Start Move
-          </Link>
+    <Link
+      href="/dashboard"
+      className="
+        text-slate-300
+        hover:text-white
+        transition
+        px-4
+        py-2
+      "
+    >
+      Dashboard
+    </Link>
 
-        </nav>
+    <button
+      onClick={async () => {
+
+        await supabase.auth.signOut();
+
+        window.location.href = "/";
+
+      }}
+      className="
+        text-slate-300
+        hover:text-white
+        transition
+        px-4
+        py-2
+      "
+    >
+      Logout
+    </button>
+
+  </>
+
+) : (
+
+  <>
+
+    <Link
+      href="/login"
+      className="
+        text-slate-300
+        hover:text-white
+        transition
+        px-4
+        py-2
+      "
+    >
+      Login
+    </Link>
+
+    <Link
+      href="/login"
+      className="
+        bg-blue-600
+        hover:bg-blue-500
+        text-white
+        px-5
+        py-3
+        rounded-xl
+        font-semibold
+        transition
+        shadow-lg
+        shadow-blue-500/20
+      "
+    >
+      Create Account
+    </Link>
+
+  </>
+
+)}
+
+</nav>
 
         {/* Mobile Button */}
         <button
@@ -235,7 +205,7 @@ export default function Navbar() {
                 hover:bg-blue-500
                 text-white
                 px-5
-                py-4
+                py-5
                 rounded-xl
                 font-semibold
                 text-center
