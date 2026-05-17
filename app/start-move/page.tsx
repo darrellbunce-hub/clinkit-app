@@ -364,7 +364,12 @@ if (buyingProperty) {
 
         </div>
         
-
+        <button
+  onClick={handleStartMove}
+  className="mt-10 w-full bg-slate-900 text-white rounded-2xl py-5 text-lg font-semibold hover:bg-slate-800 transition"
+>
+  Create Chain
+</button>
 
       </div>
 

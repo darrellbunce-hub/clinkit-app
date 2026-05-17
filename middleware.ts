@@ -49,10 +49,7 @@ export async function middleware(
   } =
     await supabase.auth.getUser();
 
-    const protectedRoutes = [
-      "/start-move",
-      "/join-chain",
-    ];
+    const protectedRoutes: string[] = [];
 
   const isProtectedRoute =
     protectedRoutes.some((route) =>

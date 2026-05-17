@@ -56,6 +56,33 @@ export default function ChainPage() {
           a.chainPosition -
           b.chainPosition
       );
+      const recentActivities =
+
+  chainProperties
+    .flatMap((property) =>
+
+      property.activities.map(
+        (activity) => ({
+
+          ...activity,
+
+
+        })
+      )
+    )
+    .sort(
+      (a, b) =>
+
+        new Date(
+          b.timestamp || 0
+        ).getTime()
+
+        -
+
+        new Date(
+          a.timestamp || 0
+        ).getTime()
+    );
       const staleProperties =
       chainProperties.filter(
         (property) =>
@@ -111,7 +138,7 @@ export default function ChainPage() {
 
   const [newAddress, setNewAddress] =
     useState("");
-
+    
   const [newPostcode, setNewPostcode] =
     useState("");
 
@@ -556,7 +583,7 @@ else {
       <div className="mt-6 space-y-2">
 
         <p className="text-slate-900 font-medium">
-          {bottleneckProperty.address}
+        
         </p>
 
         <p className="text-slate-500">
@@ -702,11 +729,11 @@ else {
                     
 
                     <p className="text-xs mt-1 text-slate-500">
-                      {property.address}
+                      
                     </p>
 
                     <p className="text-xs text-slate-400">
-                      {property.postcode}
+                      
                     </p>
                     <p
   className={`
@@ -812,7 +839,64 @@ else {
           
 
         </div>
+{/* Recent Activity Feed */}
 
+<div className="mt-10 bg-white border border-slate-200 rounded-3xl p-8">
+
+  <h2 className="text-2xl font-bold text-slate-900">
+    Recent Chain Activity
+  </h2>
+
+  <div className="mt-6 space-y-4">
+
+    {recentActivities.length === 0 && (
+
+      <p className="text-slate-500">
+        No recent activity yet.
+      </p>
+
+    )}
+
+    {recentActivities.map((activity, index) => (
+
+      <div
+        key={`${activity.id}-${index}`}
+        className="border border-slate-200 rounded-2xl p-5"
+      >
+
+        <div className="flex items-start justify-between gap-4">
+
+          <div>
+
+            <p className="font-semibold text-slate-900">
+              {activity.update}
+            </p>
+
+      
+
+            <p className="text-xs text-slate-400 mt-2">
+            Updated by {activity.updated_by || "homeowner"}
+            </p>
+
+          </div>
+
+          <div className="text-xs text-slate-400 whitespace-nowrap">
+
+            {new Date(
+              activity.timestamp
+            ).toLocaleDateString()}
+
+          </div>
+
+        </div>
+
+      </div>
+
+    ))}
+
+  </div>
+
+</div>
         {/* Add Property */}
         <div className="mt-10 bg-white rounded-3xl border border-slate-200 p-8">
 
