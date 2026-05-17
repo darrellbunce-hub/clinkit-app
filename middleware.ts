@@ -21,15 +21,15 @@ export function middleware(
       request.nextUrl.pathname.startsWith(route)
     );
 
-  if (
-    isProtectedRoute &&
-    !token
-  ) {
+  // if (
+//   isProtectedRoute &&
+//   !token
+// ) {
 
-    return NextResponse.redirect(
-      new URL("/login", request.url)
-    );
-  }
+//   return NextResponse.redirect(
+//     new URL("/login", request.url)
+//   );
+// }
 
   return NextResponse.next();
 }

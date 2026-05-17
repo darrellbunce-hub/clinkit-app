@@ -86,7 +86,7 @@ useEffect(() => {
     }
   }
   async function fetchProperties() {
-
+   
     const { data, error } =
   await supabase
     .from("properties")
@@ -102,15 +102,11 @@ useEffect(() => {
         user_id,
         role
       )
-    `)
-
-    if (error) {
-      console.error(error);
-      return;
-    }
+    `);
+    
 
     const formattedProperties =
-      data.map((property) => ({
+  (data || []).map((property) => ({
 
         id: property.id,
 

@@ -1,5 +1,4 @@
 "use client";
-
 import { useEffect, useState } from "react";
 import Navbar from "@/components/Navbar";
 import Link from "next/link";
@@ -12,9 +11,36 @@ type Chain = {
 
 export default function DashboardPage() {
 
+  const [properties, setProperties] =
+  useState<any[]>([]);
+  
   const [chains, setChains] =
     useState<Chain[]>([]);
     const router = useRouter();
+    useEffect(() => {
+
+      async function loadProperties() {
+    
+        const {
+          data,
+          error,
+        } = await supabase
+          .from("properties")
+          .select("*")
+          .order("chain_position");
+    
+        if (error) {
+          console.error(error);
+          return;
+        }
+    
+        setProperties(data || []);
+    
+      }
+    
+      loadProperties();
+    
+    }, []);
   useEffect(() => {
 
     async function loadChains() {
@@ -24,9 +50,6 @@ export default function DashboardPage() {
       } = await supabase.auth.getUser();
 
       if (!user) {
-
-        router.push("/login");
-      
         return;
       }
 
@@ -47,10 +70,15 @@ export default function DashboardPage() {
       }
 
       const chainIds =
-        memberships.map(
-          (membership: any) =>
-            membership.properties.chain_id
-        );
+  memberships
+    .filter(
+      (membership: any) =>
+        membership.properties
+    )
+    .map(
+      (membership: any) =>
+        membership.properties.chain_id
+    );
 
       const uniqueChainIds =
         [...new Set(chainIds)];
@@ -74,7 +102,7 @@ export default function DashboardPage() {
   return (
     <main className="min-h-screen bg-slate-100">
 
-      <Navbar />
+<Navbar />
 
       <div className="max-w-6xl mx-auto px-6 py-12">
 
@@ -125,7 +153,63 @@ export default function DashboardPage() {
                     {" "}
                     {chain.access_code}
                   </p>
+                  <div className="mt-6 space-y-4">
 
+{properties
+  .filter(
+    (property: any) =>
+      property.chain_id === chain.id
+  )
+  .map((property: any) => (
+
+    <div
+      key={property.id}
+      className="
+        border
+        border-slate-200
+        rounded-2xl
+        p-4
+        bg-slate-50
+      "
+    >
+
+      <div className="flex items-center justify-between">
+
+        <div>
+
+          <h3 className="font-semibold text-slate-900">
+            {property.address}
+          </h3>
+
+          <p className="text-sm text-slate-500 mt-1">
+            Position #{property.chain_position}
+          </p>
+
+        </div>
+
+        <div
+          className="
+            bg-blue-100
+            text-blue-700
+            px-3
+            py-1
+            rounded-full
+            text-sm
+            font-medium
+          "
+        >
+
+          {property.status || "Active"}
+
+        </div>
+
+      </div>
+
+    </div>
+
+  ))}
+
+</div>
                 </div>
 
                 <div className="bg-green-100 text-green-700 px-4 py-2 rounded-full text-sm font-medium">

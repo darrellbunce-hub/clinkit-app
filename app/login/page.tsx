@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
-
+import { useRouter } from "next/navigation";
 export default function LoginPage() {
 
   const [email, setEmail] =
@@ -10,23 +10,23 @@ export default function LoginPage() {
 
   const [password, setPassword] =
     useState("");
+    const router = useRouter();
+    async function handleLogin() {
 
-  async function handleLogin() {
-
-    const { error } =
-      await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-    if (error) {
-      alert(error.message);
-      return;
+      const result =
+        await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+    
+      if (result.error) {
+        alert(result.error.message);
+        return;
+      }
+    
+      router.push("/dashboard");
+    
     }
-
-    window.location.href =
-  "/dashboard";
-  }
 
   async function handleSignup() {
 
@@ -55,8 +55,7 @@ export default function LoginPage() {
     
         });
     }
-    window.location.href =
-  "/verify-email";
+    router.push("/dashboard");
   }
 
   return (
@@ -107,18 +106,23 @@ export default function LoginPage() {
         </div>
 
         <button
-          onClick={handleLogin}
-          className="mt-8 w-full bg-slate-900 text-white rounded-2xl py-4 font-semibold"
-        >
-          Login
-        </button>
+  type="button"
+  onClick={handleLogin}
+  className="mt-8 w-full bg-slate-900 text-white rounded-2xl py-4 font-semibold"
+>
+  Login
+</button>
 
-        <button
-          onClick={handleSignup}
-          className="mt-4 w-full border border-slate-300 rounded-2xl py-4 font-semibold"
-        >
-          Create Account
-        </button>
+<button
+  type="button"
+  onClick={(event) => {
+    event.preventDefault();
+    handleSignup();
+  }}
+  className="mt-4 w-full border border-slate-300 rounded-2xl py-4 font-semibold"
+>
+  Create Account
+</button>
 
       </div>
 

@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabase";
 import Navbar from "@/components/Navbar";
 
 export default function StartMovePage() {
-
+ 
   const [notSelling, setNotSelling] =
     useState(false);
 
@@ -24,7 +24,7 @@ export default function StartMovePage() {
   const [buyingPostcode, setBuyingPostcode] =
     useState("");
     function generateAccessCode() {
-
+      
       const characters =
         "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     
@@ -363,13 +363,8 @@ if (buyingProperty) {
           )}
 
         </div>
+        
 
-        <button
-          onClick={handleStartMove}
-          className="mt-10 w-full bg-slate-900 text-white rounded-2xl py-5 text-lg font-semibold"
-        >
-          Continue
-        </button>
 
       </div>
 
