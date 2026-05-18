@@ -8,6 +8,8 @@ type ChainNodeProps = {
   
     updatedDaysAgo: number;
   
+    currentUserRole: string | null;
+  
   };
   
   export default function ChainNode({
@@ -15,6 +17,7 @@ type ChainNodeProps = {
     stageLabel,
     progress,
     updatedDaysAgo,
+    currentUserRole,
   }: ChainNodeProps) {
   
     return (
@@ -35,8 +38,18 @@ type ChainNodeProps = {
         </div>
   
         <h3 className="mt-4 text-lg font-bold text-slate-900">
-          Property {propertyNumber}
-        </h3>
+
+  {
+    currentUserRole === "seller"
+      ? "Your Sale"
+
+      : currentUserRole === "buyer"
+      ? "Your Purchase"
+
+      : `Property ${propertyNumber}`
+  }
+
+</h3>
   
         <p className="text-sm text-slate-600">
           {stageLabel}

@@ -44,8 +44,8 @@ export default function ChainPage() {
     
     }, []);
 
-  const chainProperties =
-  
+    const chainProperties =
+
     properties
       .filter(
         (property) =>
@@ -55,7 +55,8 @@ export default function ChainPage() {
         (a, b) =>
           a.chainPosition -
           b.chainPosition
-      );
+      )
+      
       const recentActivities =
 
   chainProperties
@@ -638,6 +639,7 @@ else {
     }
     progress={stage.progress}
     updatedDaysAgo={property.lastUpdatedDays}
+    currentUserRole={property.currentUserRole}
   />
 
 </Link>

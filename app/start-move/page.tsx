@@ -186,11 +186,19 @@ return;
         .select()
         .single();
 
-      if (buyingError) {
-        console.error(buyingError);
-      }
+        if (buyingError) {
 
-      /*
+          console.error(
+            "BUYING PROPERTY ERROR:",
+            buyingError
+          );
+        
+          alert(
+            JSON.stringify(buyingError)
+          );
+        }
+
+      
 if (buyingProperty) {
 
   await supabase
@@ -204,7 +212,7 @@ if (buyingProperty) {
       role: "buyer",
     });
 }
-*/
+
     }
 
     window.location.href =

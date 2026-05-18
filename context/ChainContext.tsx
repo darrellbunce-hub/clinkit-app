@@ -20,7 +20,7 @@ type Property = {
   chainId: number;
   stage: string;
   status: string;
-  isCurrentUser: boolean;
+  currentUserRole: string | null;
   lastUpdatedDays: number;
   activities: Activity[];
   chainPosition: number;
@@ -86,7 +86,9 @@ useEffect(() => {
     }
   }
   async function fetchProperties() {
-   
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     const { data, error } =
   await supabase
     .from("properties")
@@ -126,8 +128,14 @@ useEffect(() => {
 
         status: property.status,
 
-        isCurrentUser:
-          property.is_current_user,
+        currentUserRole:
+  property.property_members?.find(
+    (member: {
+      user_id: string;
+      role: string;
+    }) =>
+      member.user_id === user?.id
+  )?.role || null,
 
           lastUpdatedDays: (() => {
 

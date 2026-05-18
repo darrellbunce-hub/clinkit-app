@@ -301,17 +301,37 @@ async function handleStructuredUpdate() {
 
 </div>
         {/* Header */}
-        <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
+<div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
 
-          <h1 className="text-5xl font-bold text-slate-900">
-            Property {currentProperty.id}
-          </h1>
+<h1 className="text-5xl font-bold text-slate-900">
 
-          <p className="text-slate-600 mt-3 text-lg">
-            Chain position #{currentProperty.id}
-          </p>
+  {
+    currentProperty.currentUserRole === "seller"
+      ? "Your Sale"
 
-        </div>
+      : currentProperty.currentUserRole === "buyer"
+      ? "Your Purchase"
+
+      : `Property ${currentProperty.chainPosition}`
+  }
+
+</h1>
+
+<p className="text-slate-600 mt-3 text-lg">
+
+  {
+    currentProperty.currentUserRole === "seller"
+      ? "Property you are selling"
+
+      : currentProperty.currentUserRole === "buyer"
+      ? "Property you are purchasing"
+
+      : `Chain position #${currentProperty.chainPosition}`
+  }
+
+</p>
+
+</div>
 
         {/* Current Status */}
 <div className="mt-8 bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
