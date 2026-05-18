@@ -366,7 +366,23 @@ async function handleStructuredUpdate() {
 
   <div className="mt-5 grid gap-4">
 
-    {completedStages.map((stage) => (
+  {completedStages.length === 0 && (
+
+    <div
+      className="
+        bg-slate-50 rounded-2xl
+        px-5 py-5
+        text-slate-500
+      "
+    >
+
+      Milestones completed during your move will appear here as your transaction progresses.
+
+    </div>
+
+  )}
+
+  {completedStages.map((stage) => (
 
       <div
         key={stage.value}

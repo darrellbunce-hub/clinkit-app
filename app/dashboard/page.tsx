@@ -239,7 +239,10 @@ export default function DashboardPage() {
           <div className="mt-12 bg-white rounded-3xl border border-slate-200 p-12 text-center">
 
             <h2 className="text-3xl font-bold text-slate-900">
-              No Active Chains
+            No Active Moves Yet
+            <p className="mt-2 text-slate-500">
+  Start a move to begin tracking your property chain progress.
+</p>
             </h2>
 
             <p className="mt-4 text-slate-600">

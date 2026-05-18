@@ -1,5 +1,5 @@
 "use client";
-
+import ChainNode from "@/components/ChainNode";
 import { useState, useEffect } from "react";
 import Navbar from "@/components/Navbar";
 import {
@@ -183,8 +183,8 @@ export default function ChainPage() {
         property.status === "delayed"
     ).length;
 
-  let confidenceScore =
-    averageProgress;
+    let confidenceScore =
+    85;
 
   confidenceScore -= blockedCount * 25;
   confidenceScore -= delayedCount * 10;
@@ -195,28 +195,28 @@ export default function ChainPage() {
   }
 
   let confidenceLabel =
-    "High Risk";
+  "Needs Attention";
 
-  let confidenceColour =
-    "text-red-700";
+let confidenceColour =
+  "text-amber-700";
 
-  let confidenceBg =
-    "bg-red-100";
+let confidenceBg =
+  "bg-amber-100";
 
-  if (confidenceScore >= 70) {
+if (confidenceScore >= 70) {
 
-    confidenceLabel = "Healthy";
-    confidenceColour = "text-green-700";
-    confidenceBg = "bg-green-100";
+  confidenceLabel = "Healthy";
+  confidenceColour = "text-green-700";
+  confidenceBg = "bg-green-100";
 
-  }
-  else if (confidenceScore >= 40) {
+}
+else if (confidenceScore >= 40) {
 
-    confidenceLabel = "Moderate";
-    confidenceColour = "text-amber-700";
-    confidenceBg = "bg-amber-100";
+  confidenceLabel = "Progress Slowing";
+  confidenceColour = "text-amber-700";
+  confidenceBg = "bg-amber-100";
 
-  }
+}
   let estimatedChainCompletion =
   "16–20 weeks";
 
@@ -304,27 +304,7 @@ else if (staleProperty) {
 else {
 
   bottleneckProperty =
-    [...chainProperties].sort(
-      (a, b) => {
-
-        const stageA =
-          STAGES.find(
-            (stage) =>
-              stage.value === a.stage
-          );
-
-        const stageB =
-          STAGES.find(
-            (stage) =>
-              stage.value === b.stage
-          );
-
-        return (
-          (stageA?.progress || 0) -
-          (stageB?.progress || 0)
-        );
-      }
-    )[0];
+    null;
 }
   async function handleAddProperty() {
 
@@ -642,143 +622,53 @@ else {
                   className="flex items-center"
                 >
 
-                  <Link
-                    href={`/property/${property.id}`}
-                    className="flex flex-col items-center text-center hover:scale-105 transition"
-                  >
-
-                    <div
-                      className={`
-                        relative
-                        flex
-                        items-center
-                        justify-center
-
-                        ${
-                          property.isCurrentUser
-                            ? "w-28 h-28 rounded-3xl border-4 text-6xl"
-                            : "w-24 h-24 rounded-2xl border-2 text-5xl"
-                        }
-
-                        ${
-                          property.status === "healthy"
-                            ? "bg-green-100 border-green-500"
-
-                            : property.status === "pending_connection"
-                            ? "bg-slate-100 border-slate-400"
-
-                            : property.status === "delayed"
-                            ? "bg-amber-100 border-amber-500"
-
-                            : "bg-red-100 border-red-500"
-                        }
-                      `}
-                    >
-
-{
-  property.status ===
-  "pending_connection"
-
-    ? "🔗"
-
-  : property.status ===
-    "broken_connection"
-
-    ? "⛓️"
-
-    : "🏠"
-}
-
-                    </div>
-
-                    <p className="mt-4 font-semibold text-slate-900">
-                      Property {property.chainPosition}
-                    </p>
-
-                    <p className="text-sm mt-1 text-slate-600">
-
-  {
-    property.status ===
-    "pending_connection"
-
-      ? "Awaiting seller connection"
-
-    : property.status ===
-      "broken_connection"
-
-      ? "Reconnect required"
-
-      : stage.label
-  }
-    </p>                      
-                  
-<div className="mt-3 w-32 h-2 bg-slate-200 rounded-full overflow-hidden">
-
-<div
-  className="h-full bg-green-500 rounded-full"
-  style={{
-    width: `${stage.progress}%`,
-  }}
-></div>
-
-</div>
-
-<p className="text-xs mt-1 text-slate-500">
-{stage.progress}% complete
-</p>
-                    
-
-                    <p className="text-xs mt-1 text-slate-500">
-                      
-                    </p>
-
-                    <p className="text-xs text-slate-400">
-                      
-                    </p>
-                    <p
-  className={`
-    text-xs mt-2 font-medium
-
-    ${
-      property.lastUpdatedDays > 14
-        ? "text-red-500"
-        : property.lastUpdatedDays > 7
-        ? "text-amber-500"
-        : "text-slate-400"
-    }
-  `}
+<Link
+  href={`/property/${property.id}`}
+  className="hover:scale-105 transition"
 >
-  Updated {property.lastUpdatedDays} day
-  {property.lastUpdatedDays !== 1 && "s"} ago
-</p>
-                  </Link>
+
+  <ChainNode
+    propertyNumber={property.chainPosition}
+    stageLabel={
+      property.status === "pending_connection"
+        ? "Awaiting seller connection"
+        : property.status === "broken_connection"
+        ? "Reconnect required"
+        : stage.label
+    }
+    progress={stage.progress}
+    updatedDaysAgo={property.lastUpdatedDays}
+  />
+
+</Link>
 
                   {index < chainProperties.length - 1 && (
 
-                    <div
-                      className={`
-                        w-24
-                        border-t-4
-                        border-dashed
-                        mx-4
+<div className="flex items-center mx-5">
 
-                        ${
-                          property.status === "healthy"
-                            ? "border-green-400"
-                        
-                            : property.status === "pending_connection"
-                            ? "border-slate-400"
-                        
-                            : property.status === "broken_connection"
-                            ? "border-red-500"
-                        
-                            : property.status === "delayed"
-                            ? "border-amber-400"
-                        
-                            : "border-red-400"
-                        }
-                      `}
-                    ></div>
+<div
+  className={`
+    w-24 h-1 rounded-full
+
+    ${
+      property.status === "healthy"
+        ? "bg-green-400"
+
+        : property.status === "pending_connection"
+        ? "bg-slate-300"
+
+        : property.status === "broken_connection"
+        ? "bg-red-400"
+
+        : property.status === "delayed"
+        ? "bg-amber-400"
+
+        : "bg-slate-300"
+    }
+  `}
+/>
+
+</div>
 
                   )}
 
@@ -852,7 +742,7 @@ else {
     {recentActivities.length === 0 && (
 
       <p className="text-slate-500">
-        No recent activity yet.
+        Updates from chain participants will appear here as progress is made.
       </p>
 
     )}
