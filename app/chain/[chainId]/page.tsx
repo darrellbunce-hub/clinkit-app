@@ -604,6 +604,55 @@ else {
         <div className="mt-12 bg-white rounded-3xl shadow-sm border border-slate-200 p-8 overflow-x-auto">
 
           <div className="flex items-center min-w-max">
+          {chainProperties[0]?.status ===
+  "awaiting_buyer" && (
+
+  <div className="flex items-center">
+
+    <div className="flex flex-col items-center text-center">
+
+      <div
+        className="
+          w-24
+          h-24
+          rounded-2xl
+          border-2
+          border-blue-300
+          bg-blue-50
+          flex
+          items-center
+          justify-center
+          text-5xl
+        "
+      >
+
+        🧍
+
+      </div>
+
+      <p className="mt-4 font-semibold text-slate-700">
+        Awaiting Buyer
+      </p>
+
+      <p className="text-sm mt-1 text-slate-500">
+        Waiting for buyer connection
+      </p>
+
+    </div>
+
+    <div
+      className="
+        w-24
+        border-t-4
+        border-dashed
+        border-blue-300
+        mx-4
+      "
+    ></div>
+
+  </div>
+
+)}
 
             {chainProperties.map((property, index) => {
 
@@ -640,6 +689,7 @@ else {
     progress={stage.progress}
     updatedDaysAgo={property.lastUpdatedDays}
     currentUserRole={property.currentUserRole}
+    status={property.status}
   />
 
 </Link>

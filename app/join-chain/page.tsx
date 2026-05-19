@@ -67,13 +67,35 @@ export default function JoinChainPage() {
     })
     .eq("id", property.id);
     await supabase
-      .from("property_members")
-      .insert({
-        property_id: property.id,
-        user_id: user.id,
-        role: "participant",
-      });
+  .from("property_members")
+  .insert({
+    property_id: property.id,
+    user_id: user.id,
+    role: "participant",
+  });
 
+const {
+  data: members,
+} = await supabase
+  .from("property_members")
+  .select("*")
+  .eq("property_id", property.id);
+
+if (members && members.length >= 2) {
+
+  await supabase
+    .from("properties")
+    .update({
+      status: "healthy",
+    })
+    .eq("id", property.id);
+}
+      await supabase
+      .from("properties")
+      .update({
+        status: "healthy",
+      })
+      .eq("id", property.id);
     window.location.href =
       `/chain/${chain.id}`;
   }

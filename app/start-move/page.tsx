@@ -11,7 +11,10 @@ export default function StartMovePage() {
 
   const [notBuying, setNotBuying] =
     useState(false);
-
+    const [
+      searchingForProperty,
+      setSearchingForProperty,
+    ] = useState(false);
   const [sellingAddress, setSellingAddress] =
     useState("");
 
@@ -115,7 +118,10 @@ return;
           address: sellingAddress,
           postcode: sellingPostcode,
           stage: "property_listed",
-          status: "healthy",
+          status:
+  notBuying
+    ? "awaiting_buyer"
+    : "healthy",
           is_current_user: true,
           last_updated_days: 0,
         })
@@ -179,7 +185,7 @@ return;
           address: buyingAddress,
           postcode: buyingPostcode,
           stage: "offer_accepted",
-          status: "healthy",
+          status: "pending_connection",
           is_current_user: true,
           last_updated_days: 0,
         })
@@ -235,143 +241,174 @@ if (buyingProperty) {
         </p>
 
         {/* Selling */}
-        <div className="mt-12 bg-white rounded-3xl border border-slate-200 p-8">
+<div className="mt-12 bg-white rounded-3xl border border-slate-200 p-8">
 
-          <div className="flex items-center justify-between">
+<div className="flex items-start justify-between gap-6">
 
-            <div>
+  <div>
 
-              <h2 className="text-3xl font-bold text-slate-900">
-                Property You Are Selling
-              </h2>
+    <h2 className="text-3xl font-bold text-slate-900">
+      Property You Are Selling
+    </h2>
 
-              <p className="mt-2 text-slate-600">
-                Add the property you are selling
-              </p>
+    <p className="mt-2 text-slate-600">
+      Only add a selling property once you have accepted an offer
+    </p>
 
-            </div>
+  </div>
 
-            <label className="flex items-center gap-3">
+  <label className="flex items-center gap-3 shrink-0 mt-1">
 
-              <input
-                type="checkbox"
-                checked={notSelling}
-                onChange={() =>
-                  setNotSelling(!notSelling)
-                }
-              />
+    <input
+      type="checkbox"
+      checked={notSelling}
+      onChange={() =>
+        setNotSelling(!notSelling)
+      }
+    />
 
-              <span className="text-slate-700">
-                I am not selling
-              </span>
+    <span className="text-slate-700 whitespace-nowrap">
+      I am not selling
+    </span>
 
-            </label>
+  </label>
 
-          </div>
+</div>
 
-          {!notSelling && (
+{!notSelling && (
 
-            <div className="mt-8">
+  <div className="mt-8">
 
-              <input
-                type="text"
-                value={sellingAddress}
-                onChange={(event) =>
-                  setSellingAddress(
-                    event.target.value
-                  )
-                }
-                placeholder="Selling property address"
-                className="w-full border border-slate-300 rounded-2xl px-4 py-4"
-              />
+    <input
+      type="text"
+      value={sellingAddress}
+      onChange={(event) =>
+        setSellingAddress(
+          event.target.value
+        )
+      }
+      placeholder="Selling property address"
+      className="w-full border border-slate-300 rounded-2xl px-4 py-4"
+    />
 
-              <input
-                type="text"
-                value={sellingPostcode}
-                onChange={(event) =>
-                  setSellingPostcode(
-                    event.target.value
-                  )
-                }
-                placeholder="Selling postcode"
-                className="mt-4 w-full border border-slate-300 rounded-2xl px-4 py-4"
-              />
+    <input
+      type="text"
+      value={sellingPostcode}
+      onChange={(event) =>
+        setSellingPostcode(
+          event.target.value
+        )
+      }
+      placeholder="Selling postcode"
+      className="mt-4 w-full border border-slate-300 rounded-2xl px-4 py-4"
+    />
 
-            </div>
+  </div>
 
-          )}
+)}
 
-        </div>
+</div>
 
-        {/* Buying */}
-        <div className="mt-10 bg-white rounded-3xl border border-slate-200 p-8">
+{/* Buying */}
+<div className="mt-10 bg-white rounded-3xl border border-slate-200 p-8">
 
-          <div className="flex items-center justify-between">
+<div className="flex items-start justify-between gap-6">
 
-            <div>
+  <div>
 
-              <h2 className="text-3xl font-bold text-slate-900">
-                Property You Are Buying
-              </h2>
+    <h2 className="text-3xl font-bold text-slate-900">
+      Property You Are Buying
+    </h2>
 
-              <p className="mt-2 text-slate-600">
-                Add the property you are buying
-              </p>
+    <p className="mt-2 text-slate-600">
+      Only add a buying property once your offer has been accepted
+    </p>
 
-            </div>
+  </div>
 
-            <label className="flex items-center gap-3">
+  <div className="flex flex-col gap-4 shrink-0 mt-1">
 
-              <input
-                type="checkbox"
-                checked={notBuying}
-                onChange={() =>
-                  setNotBuying(!notBuying)
-                }
-              />
+    <label className="flex items-center gap-3">
 
-              <span className="text-slate-700">
-                I am not buying
-              </span>
+      <input
+        type="checkbox"
+        checked={searchingForProperty}
+        onChange={() => {
 
-            </label>
+          setSearchingForProperty(
+            !searchingForProperty
+          );
 
-          </div>
+          if (!searchingForProperty) {
+            setNotBuying(false);
+          }
+        }}
+      />
 
-          {!notBuying && (
+      <span className="text-slate-700 whitespace-nowrap">
+        I am searching for my next property
+      </span>
 
-            <div className="mt-8">
+    </label>
 
-              <input
-                type="text"
-                value={buyingAddress}
-                onChange={(event) =>
-                  setBuyingAddress(
-                    event.target.value
-                  )
-                }
-                placeholder="Buying property address"
-                className="w-full border border-slate-300 rounded-2xl px-4 py-4"
-              />
+    <label className="flex items-center gap-3">
 
-              <input
-                type="text"
-                value={buyingPostcode}
-                onChange={(event) =>
-                  setBuyingPostcode(
-                    event.target.value
-                  )
-                }
-                placeholder="Buying postcode"
-                className="mt-4 w-full border border-slate-300 rounded-2xl px-4 py-4"
-              />
+      <input
+        type="checkbox"
+        checked={notBuying}
+        onChange={() => {
 
-            </div>
+          setNotBuying(!notBuying);
 
-          )}
+          if (!notBuying) {
+            setSearchingForProperty(false);
+          }
+        }}
+      />
 
-        </div>
-        
+      <span className="text-slate-700 whitespace-nowrap">
+        I am not buying another property
+      </span>
+
+    </label>
+
+  </div>
+
+</div>
+
+{!notBuying && !searchingForProperty && (
+
+  <div className="mt-8">
+
+    <input
+      type="text"
+      value={buyingAddress}
+      onChange={(event) =>
+        setBuyingAddress(
+          event.target.value
+        )
+      }
+      placeholder="Buying property address"
+      className="w-full border border-slate-300 rounded-2xl px-4 py-4"
+    />
+
+    <input
+      type="text"
+      value={buyingPostcode}
+      onChange={(event) =>
+        setBuyingPostcode(
+          event.target.value
+        )
+      }
+      placeholder="Buying postcode"
+      className="mt-4 w-full border border-slate-300 rounded-2xl px-4 py-4"
+    />
+
+  </div>
+
+)}
+
+</div>
         <button
   onClick={handleStartMove}
   className="mt-10 w-full bg-slate-900 text-white rounded-2xl py-5 text-lg font-semibold hover:bg-slate-800 transition"
