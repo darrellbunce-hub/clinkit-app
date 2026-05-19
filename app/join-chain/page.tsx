@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 
+import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import { supabase } from "@/lib/supabase";
 
-export default function JoinChainPage() {
+function JoinChainContent() {
   const searchParams =
   useSearchParams();
 
@@ -184,5 +185,14 @@ if (sourceChainId) {
       </div>
 
     </main>
+  );
+}
+
+export default function JoinChainPage() {
+
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <JoinChainContent />
+    </Suspense>
   );
 }
