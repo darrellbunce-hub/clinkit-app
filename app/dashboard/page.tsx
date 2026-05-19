@@ -177,9 +177,19 @@ export default function DashboardPage() {
 
         <div>
 
-          <h3 className="font-semibold text-slate-900">
-            {property.address}
-          </h3>
+        <h3 className="font-semibold text-slate-900">
+
+{
+  property.currentUserRole === "seller"
+    ? "Your Sale"
+
+    : property.currentUserRole === "buyer"
+    ? "Your Purchase"
+
+    : `Property ${property.chain_position}`
+}
+
+</h3>
 
           <p className="text-sm text-slate-500 mt-1">
             Position #{property.chain_position}

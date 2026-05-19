@@ -1,11 +1,20 @@
 "use client";
 
 import { useState } from "react";
+
+import { useSearchParams } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import { supabase } from "@/lib/supabase";
 
 export default function JoinChainPage() {
+  const searchParams =
+  useSearchParams();
 
+const sourceChainId =
+  searchParams.get("sourceChain");
+
+const propertyId =
+  searchParams.get("property");
   const [accessCode, setAccessCode] =
     useState("");
 
@@ -90,14 +99,24 @@ if (members && members.length >= 2) {
     })
     .eq("id", property.id);
 }
+if (sourceChainId) {
+
+  await supabase
+    .from("properties")
+    .update({
+      chain_id: chain.id,
+    })
+    .eq("chain_id", sourceChainId);
+
+}
       await supabase
       .from("properties")
       .update({
         status: "healthy",
       })
       .eq("id", property.id);
-    window.location.href =
-      `/chain/${chain.id}`;
+      window.location.href =
+      `/dashboard?refresh=${Date.now()}`;
   }
 
   return (

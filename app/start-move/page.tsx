@@ -100,7 +100,7 @@ access_code:
 if (shouldJoinExisting) {
 
   window.location.href =
-  `/join-chain?property=${existingSellingProperty.id}`;
+  `/join-chain?property=${existingSellingProperty.id}&sourceChain=${chainData.id}`;
 
   return;
 }
@@ -167,7 +167,7 @@ return;
 if (shouldJoinExisting) {
 
   window.location.href =
-  `/join-chain?property=${existingBuyingProperty.id}`;
+  `/join-chain?property=${existingBuyingProperty.id}&sourceChain=${chainData.id}`;
 
   return;
 }

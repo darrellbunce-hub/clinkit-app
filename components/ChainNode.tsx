@@ -77,19 +77,24 @@ export default function ChainNode({
 
       <h3 className="mt-4 text-lg font-bold text-slate-900">
 
-      {
+      
+ {
   status === "pending_connection" &&
   currentUserRole === "buyer"
     ? "Your Purchase"
 
     : status === "pending_connection"
-    ? "Awaiting Buyer Connection"
+    ? "Awaiting Buyer"
 
     : currentUserRole === "seller"
     ? "Your Sale"
 
     : currentUserRole === "buyer"
-    ? "Buyer Ready"
+    ? "Your Purchase"
+
+    : status === "healthy" &&
+  currentUserRole === null
+? "Your Buyer"
 
     : `Property ${propertyNumber}`
 }
