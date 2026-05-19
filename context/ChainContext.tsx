@@ -16,6 +16,7 @@ type Activity = {
 };
 
 type Property = {
+  
   id: number;
   chainId: number;
   stage: string;
@@ -26,6 +27,15 @@ type Property = {
   chainPosition: number;
   address: string;
 postcode: string;
+awaiting_buyer: boolean;
+
+is_searching: boolean;
+
+relationship_type: string | null;
+
+created_by_user_id: string | null;
+
+linked_property_id: number | null;
 members: {
   user_id: string;
   role: string;
@@ -122,6 +132,20 @@ useEffect(() => {
         
         postcode:
           property.postcode,
+          awaiting_buyer:
+  property.awaiting_buyer ?? false,
+
+is_searching:
+  property.is_searching ?? false,
+
+relationship_type:
+  property.relationship_type ?? null,
+
+created_by_user_id:
+  property.created_by_user_id ?? null,
+
+linked_property_id:
+  property.linked_property_id ?? null,
           members:
   property.property_members || [],
         stage: property.stage,
@@ -170,6 +194,12 @@ useEffect(() => {
           property.activities || [],
         
         }));
+        console.log("RAW DATA", data);
+
+console.log(
+  "FORMATTED",
+  formattedProperties
+);
     setProperties(formattedProperties);
     const {
       data: chainsData,
@@ -181,11 +211,11 @@ useEffect(() => {
 
         const formattedChains =
           chainsData.map((chain) => {
-      
+            
             const chainProperties =
               formattedProperties.filter(
                 (property) =>
-                  property.chainId === chain.id
+                  Number(property.chainId) === Number(chain.id)
               );
       
             const hasPendingConnection =
@@ -194,7 +224,11 @@ useEffect(() => {
                   property.status ===
                   "pending_connection"
               );
-      
+              return {
+                id: chain.id,
+                accessCode: chain.access_code,
+                state: chain.state,
+              };
               const hasUnclaimedProperties =
   chainProperties.some(
     (property) =>

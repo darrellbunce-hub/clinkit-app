@@ -117,12 +117,24 @@ return;
           chain_position: 1,
           address: sellingAddress,
           postcode: sellingPostcode,
+        
           stage: "property_listed",
+        
           status:
-  notBuying
-    ? "awaiting_buyer"
-    : "healthy",
+            notBuying
+              ? "awaiting_buyer"
+              : "healthy",
+        
+          relationship_type: "sale",
+        
+          created_by_user_id: user.id,
+        
+          awaiting_buyer: notBuying,
+        
+          is_searching: false,
+        
           is_current_user: true,
+        
           last_updated_days: 0,
         })
         .select()
@@ -181,12 +193,27 @@ return;
         .from("properties")
         .insert({
           chain_id: chainData.id,
+        
           chain_position: 2,
+        
           address: buyingAddress,
+        
           postcode: buyingPostcode,
+        
           stage: "offer_accepted",
+        
           status: "pending_connection",
+        
+          relationship_type: "purchase",
+        
+          created_by_user_id: user.id,
+        
+          awaiting_buyer: false,
+        
+          is_searching: searchingForProperty,
+        
           is_current_user: true,
+        
           last_updated_days: 0,
         })
         .select()

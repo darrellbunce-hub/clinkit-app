@@ -43,7 +43,15 @@ export default function ChainPage() {
       checkAuth();
     
     }, []);
+    console.log("CHAIN ID", chainId);
 
+    console.log(
+      "PROPERTY CHAIN IDS",
+      properties.map(
+        (property) => property.chainId
+      )
+    );
+    
     const chainProperties =
 
     properties
@@ -55,7 +63,7 @@ export default function ChainPage() {
         (a, b) =>
           a.chainPosition -
           b.chainPosition
-      )
+      );
       
       const recentActivities =
 
@@ -342,8 +350,8 @@ else {
             "pending_connection",
 
           is_current_user: true,
-          owner_user_id:
-          currentUserId,
+          created_by_user_id:
+  currentUserId,
           last_updated_days: 0,
 
         })
@@ -653,16 +661,31 @@ else {
   </div>
 
 )}
-
+<p className="text-red-500">
+  
+</p>
             {chainProperties.map((property, index) => {
 
               const stage = STAGES.find(
                 (stage) =>
                   stage.value === property.stage
               );
-
-              if (!stage) {
+              const displayStage =
+              stage?.label ||
+            
+              (property.is_searching
+                ? "Searching for property"
+            
+                : property.awaiting_buyer
+                ? "Awaiting buyer"
+            
+                : "In progress");
+              if (
+                !stage &&
+                property.relationship_type !== "searching"
+              ) {
                 return null;
+          
               }
 
               return (
@@ -684,16 +707,81 @@ else {
         ? "Awaiting seller connection"
         : property.status === "broken_connection"
         ? "Reconnect required"
-        : stage.label
+        : displayStage
     }
-    progress={stage.progress}
+    progress={stage?.progress || 0}
     updatedDaysAgo={property.lastUpdatedDays}
     currentUserRole={property.currentUserRole}
     status={property.status}
   />
 
 </Link>
+{property.awaiting_buyer && (
 
+<div className="flex items-center mx-5">
+
+  <div className="flex flex-col items-center">
+
+    <div
+      className="
+        w-20 h-20 rounded-3xl
+        border-[3px]
+        border-blue-400
+        flex items-center justify-center
+        text-5xl bg-white
+      "
+    >
+
+      🧍
+
+    </div>
+
+    <h3 className="mt-4 text-lg font-bold text-slate-900">
+      Awaiting Buyer
+    </h3>
+
+    <p className="text-sm text-slate-500">
+      Waiting for buyer
+    </p>
+
+  </div>
+
+</div>
+
+)}
+{property.is_searching && (
+
+<div className="flex items-center mx-5">
+
+  <div className="flex flex-col items-center">
+
+    <div
+      className="
+        w-20 h-20 rounded-3xl
+        border-[3px]
+        border-amber-400
+        flex items-center justify-center
+        text-5xl bg-white
+      "
+    >
+
+      🔎
+
+    </div>
+
+    <h3 className="mt-4 text-lg font-bold text-slate-900">
+      Searching
+    </h3>
+
+    <p className="text-sm text-slate-500">
+      Looking for next property
+    </p>
+
+  </div>
+
+</div>
+
+)}
                   {index < chainProperties.length - 1 && (
 
 <div className="flex items-center mx-5">

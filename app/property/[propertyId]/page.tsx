@@ -104,10 +104,8 @@ export default function PropertyPage() {
     );
   }
   const canEdit =
-  currentProperty.members?.some(
-    (member) =>
-      member.user_id === currentUserId
-  );
+  currentProperty.created_by_user_id === currentUserId;
+
   const currentStage =
   STAGES.find(
     (stage) =>

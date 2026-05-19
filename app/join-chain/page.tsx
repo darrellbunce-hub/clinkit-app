@@ -104,9 +104,7 @@ if (sourceChainId) {
 
   await supabase
     .from("properties")
-    .update({
-      chain_id: chain.id,
-    })
+    .delete()
     .eq("chain_id", sourceChainId);
 
 }
