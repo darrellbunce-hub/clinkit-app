@@ -11,7 +11,9 @@ type ChainNodeProps = {
   currentUserRole: string | null;
 
   status: string;
+  buyer_connected: boolean;
 
+  seller_connected: boolean;
 };
 
 export default function ChainNode({
@@ -27,7 +29,9 @@ export default function ChainNode({
   currentUserRole,
 
   status,
+  buyer_connected,
 
+  seller_connected,
 }: ChainNodeProps) {
 
   return (
@@ -78,23 +82,16 @@ export default function ChainNode({
       <h3 className="mt-4 text-lg font-bold text-slate-900">
 
       
- {
-  status === "pending_connection" &&
-  currentUserRole === "buyer"
-    ? "Your Purchase"
-
-    : status === "pending_connection"
-    ? "Awaiting Buyer"
-
-    : currentUserRole === "seller"
-    ? "Your Sale"
+      {
+  currentUserRole === "seller"
+    ? buyer_connected
+      ? "Your Sale"
+      : "Awaiting Buyer"
 
     : currentUserRole === "buyer"
-    ? "Your Purchase"
-
-    : status === "healthy" &&
-  currentUserRole === null
-? "Your Buyer"
+    ? seller_connected
+      ? "Your Purchase"
+      : "Awaiting Seller"
 
     : `Property ${propertyNumber}`
 }

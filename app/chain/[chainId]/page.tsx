@@ -108,7 +108,8 @@ export default function ChainPage() {
               )
           )
       );
-    
+      const transactionNodes = chainProperties;
+
     let chainHealth =
       "Stable";
     
@@ -664,8 +665,7 @@ else {
 <p className="text-red-500">
   
 </p>
-            {chainProperties.map((property, index) => {
-
+{transactionNodes.map((property, index) => {
               const stage = STAGES.find(
                 (stage) =>
                   stage.value === property.stage
@@ -691,7 +691,7 @@ else {
               return (
 
                 <div
-                  key={property.id}
+                key={property.id}
                   className="flex items-center"
                 >
 
@@ -713,42 +713,16 @@ else {
     updatedDaysAgo={property.lastUpdatedDays}
     currentUserRole={property.currentUserRole}
     status={property.status}
-  />
+    buyer_connected={
+      property.buyer_connected
+    }
+    
+    seller_connected={
+      property.seller_connected
+    }
+    />
 
 </Link>
-{property.awaiting_buyer && (
-
-<div className="flex items-center mx-5">
-
-  <div className="flex flex-col items-center">
-
-    <div
-      className="
-        w-20 h-20 rounded-3xl
-        border-[3px]
-        border-blue-400
-        flex items-center justify-center
-        text-5xl bg-white
-      "
-    >
-
-      🧍
-
-    </div>
-
-    <h3 className="mt-4 text-lg font-bold text-slate-900">
-      Awaiting Buyer
-    </h3>
-
-    <p className="text-sm text-slate-500">
-      Waiting for buyer
-    </p>
-
-  </div>
-
-</div>
-
-)}
 {property.is_searching && (
 
 <div className="flex items-center mx-5">

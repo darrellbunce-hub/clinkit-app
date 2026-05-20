@@ -71,17 +71,32 @@ const propertyId =
       return;
     }
     await supabase
-    .from("properties")
-    .update({
-      status: "healthy",
-    })
-    .eq("id", property.id);
-    await supabase
+  .from("properties")
+  .update({
+    status: "healthy",
+
+    buyer_connected:
+      property.relationship_type === "sale"
+        ? true
+        : property.buyer_connected,
+
+    seller_connected:
+      property.relationship_type === "purchase"
+        ? true
+        : property.seller_connected,
+  })
+  .eq("id", property.id);
+    const joiningRole =
+  property.relationship_type === "sale"
+    ? "buyer"
+    : "seller";
+
+await supabase
   .from("property_members")
   .insert({
     property_id: property.id,
     user_id: user.id,
-    role: "participant",
+    role: joiningRole,
   });
 
 const {

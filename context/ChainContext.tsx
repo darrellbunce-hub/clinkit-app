@@ -30,7 +30,9 @@ postcode: string;
 awaiting_buyer: boolean;
 
 is_searching: boolean;
+buyer_connected: boolean;
 
+seller_connected: boolean;
 relationship_type: string | null;
 
 created_by_user_id: string | null;
@@ -137,7 +139,11 @@ useEffect(() => {
 
 is_searching:
   property.is_searching ?? false,
+  buyer_connected:
+  property.buyer_connected ?? false,
 
+seller_connected:
+  property.seller_connected ?? false,
 relationship_type:
   property.relationship_type ?? null,
 

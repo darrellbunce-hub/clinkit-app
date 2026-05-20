@@ -130,7 +130,8 @@ return;
           created_by_user_id: user.id,
         
           awaiting_buyer: notBuying,
-        
+          buyer_connected: false,
+          seller_connected: true,
           is_searching: false,
         
           is_current_user: true,
@@ -209,7 +210,8 @@ return;
           created_by_user_id: user.id,
         
           awaiting_buyer: false,
-        
+          buyer_connected: true,
+          seller_connected: false,
           is_searching: searchingForProperty,
         
           is_current_user: true,
