@@ -1,7 +1,7 @@
 type ChainNodeProps = {
 
   propertyNumber: number;
-
+  displayTitle: string;
   stageLabel: string;
 
   progress: number;
@@ -21,7 +21,7 @@ export default function ChainNode({
   propertyNumber,
 
   stageLabel,
-
+  displayTitle,
   progress,
 
   updatedDaysAgo,
@@ -82,19 +82,7 @@ export default function ChainNode({
       <h3 className="mt-4 text-lg font-bold text-slate-900">
 
       
-      {
-  currentUserRole === "seller"
-    ? buyer_connected
-      ? "Your Sale"
-      : "Awaiting Buyer"
-
-    : currentUserRole === "buyer"
-    ? seller_connected
-      ? "Your Purchase"
-      : "Awaiting Seller"
-
-    : `Property ${propertyNumber}`
-}
+      {displayTitle}
 
       </h3>
 

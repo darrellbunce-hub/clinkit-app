@@ -108,7 +108,39 @@ export default function ChainPage() {
               )
           )
       );
-      const transactionNodes = chainProperties;
+  
+      const rootProperties =
+  chainProperties.filter(
+    (property) =>
+      !property.linked_property_id
+  );
+      
+      const transactionNodes = [];
+      
+      for (const root of rootProperties) {
+      
+        transactionNodes.push(root);
+      
+        let currentId = root.id;
+      
+        while (true) {
+      
+          const nextProperty =
+            chainProperties.find(
+              (candidate) =>
+                candidate.linked_property_id ===
+                currentId
+            );
+      
+          if (!nextProperty) {
+            break;
+          }
+      
+          transactionNodes.push(nextProperty);
+      
+          currentId = nextProperty.id;
+        }
+      }
 
     let chainHealth =
       "Stable";
@@ -670,16 +702,62 @@ else {
                 (stage) =>
                   stage.value === property.stage
               );
-              const displayStage =
-              stage?.label ||
-            
-              (property.is_searching
-                ? "Searching for property"
-            
-                : property.awaiting_buyer
-                ? "Awaiting buyer"
-            
-                : "In progress");
+              const isCurrentUserProperty =
+  (property as any).is_current_user;
+
+const isSearchingNode =
+  property.is_searching;
+
+const isPurchase =
+  property.relationship_type === "purchase";
+
+const isSale =
+  property.relationship_type === "sale";
+  let displayStage = "In progress";
+
+  if (isSearchingNode) {
+  
+    displayStage =
+      "Searching for forever home";
+  
+  } else if (property.awaiting_buyer) {
+  
+    displayStage =
+      "Awaiting buyer";
+  
+  } else if (stage?.label) {
+  
+    displayStage =
+      stage.label;
+  
+  }
+  let displayTitle = "Property";
+
+if (isCurrentUserProperty) {
+
+  if (isSale) {
+
+    displayTitle = "{displayTitle}";
+
+  } else if (isPurchase) {
+
+    displayTitle = "Your Purchase";
+
+  }
+
+} else {
+
+  if (isSale) {
+
+    displayTitle = "Property Sale";
+
+  } else if (isPurchase) {
+
+    displayTitle = "Property Purchase";
+
+  }
+
+}
               if (
                 !stage &&
                 property.relationship_type !== "searching"

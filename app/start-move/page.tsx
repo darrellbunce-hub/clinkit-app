@@ -120,10 +120,7 @@ return;
         
           stage: "property_listed",
         
-          status:
-            notBuying
-              ? "awaiting_buyer"
-              : "healthy",
+          status: "pending_connection",
         
           relationship_type: "sale",
         
@@ -140,7 +137,13 @@ return;
         })
         .select()
         .single();
-
+        await supabase
+        .from("property_members")
+        .insert({
+          property_id: sellingProperty.id,
+          user_id: user.id,
+          role: "seller",
+        });
       if (sellingError) {
         console.error(sellingError);
       }
@@ -220,7 +223,13 @@ return;
         })
         .select()
         .single();
-
+        await supabase
+        .from("property_members")
+        .insert({
+          property_id: buyingProperty.id,
+          user_id: user.id,
+          role: "buyer",
+        });
         if (buyingError) {
 
           console.error(

@@ -91,46 +91,75 @@ const propertyId =
     ? "buyer"
     : "seller";
 
-await supabase
-  .from("property_members")
-  .insert({
-    property_id: property.id,
-    user_id: user.id,
-    role: joiningRole,
-  });
-
-const {
-  data: members,
-} = await supabase
-  .from("property_members")
-  .select("*")
-  .eq("property_id", property.id);
-
-if (members && members.length >= 2) {
-
-  await supabase
-    .from("properties")
-    .update({
-      status: "healthy",
-    })
-    .eq("id", property.id);
-}
-if (sourceChainId) {
-
-  await supabase
-    .from("properties")
-    .delete()
-    .eq("chain_id", sourceChainId);
-
-}
-      await supabase
-      .from("properties")
-      .update({
-        status: "healthy",
+    const {
+      data: insertedMembership,
+      error: memberInsertError,
+    } = await supabase
+      .from("property_members")
+      .insert({
+        property_id: property.id,
+        user_id: user.id,
+        role: joiningRole,
       })
-      .eq("id", property.id);
+      
+      .select();
+      if (sourceChainId) {
+
+        const { data: onwardSale } = await supabase
+          .from("properties")
+          .select("*")
+          .eq("chain_id", sourceChainId)
+          .eq("relationship_type", "sale")
+          .eq("created_by_user_id", user.id)
+          .neq("id", property.id)
+          .single();
+      
+        console.log(
+          "ONWARD SALE",
+          onwardSale
+        );
+      
+        if (onwardSale) {
+      
+          await supabase
+  .from("properties")
+  .update({
+    linked_property_id: property.id,
+    chain_id: property.chain_id,
+  })
+  .eq("id", onwardSale.id);
+      
+        }
+      
+      }
+      console.log(
+        "INSERTED MEMBERSHIP",
+        insertedMembership
+      );
+      
+      console.log(
+        "MEMBER INSERT ERROR",
+        memberInsertError
+      );
+      
+      const {
+        data: members,
+      } = await supabase
+        .from("property_members")
+        .select("*")
+        .eq("property_id", property.id);
+      
+      if (sourceChainId) {
+      
+        await supabase
+          .from("properties")
+          .delete()
+          .eq("chain_id", sourceChainId);
+      
+      }
+      
       window.location.href =
-      `/dashboard?refresh=${Date.now()}`;
+        `/dashboard?refresh=${Date.now()}`;
   }
 
   return (
