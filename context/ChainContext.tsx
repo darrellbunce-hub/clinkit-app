@@ -157,15 +157,15 @@ linked_property_id:
         stage: property.stage,
 
         status: property.status,
-
         currentUserRole:
-  property.property_members?.find(
-    (member: {
-      user_id: string;
-      role: string;
-    }) =>
-      member.user_id === user?.id
-  )?.role || null,
+        property.property_members?.find(
+          (member: {
+            user_id: string;
+            role: string;
+          }) =>
+            member.user_id === user?.id
+        )?.role || null,
+        
 
           lastUpdatedDays: (() => {
 

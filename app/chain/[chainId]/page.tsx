@@ -109,38 +109,49 @@ export default function ChainPage() {
           )
       );
   
+      
+      const realProperties =
+      chainProperties.filter(
+        (property) =>
+          !property.is_searching
+      );
+    
       const rootProperties =
-  chainProperties.filter(
+  realProperties.filter(
     (property) =>
-      !property.linked_property_id
+
+      !realProperties.some(
+        (candidate) =>
+          candidate.linked_property_id ===
+          property.id
+      )
   );
-      
-      const transactionNodes = [];
-      
-      for (const root of rootProperties) {
-      
-        transactionNodes.push(root);
-      
-        let currentId = root.id;
-      
-        while (true) {
-      
-          const nextProperty =
-            chainProperties.find(
-              (candidate) =>
-                candidate.linked_property_id ===
-                currentId
-            );
-      
-          if (!nextProperty) {
-            break;
-          }
-      
-          transactionNodes.push(nextProperty);
-      
-          currentId = nextProperty.id;
-        }
+    
+      const transactionNodes: any[] = [];
+    
+    for (const root of rootProperties) {
+    
+      let current: any = root;
+    
+      while (current) {
+    
+        transactionNodes.push(current);
+    
+        const linkedProperty =
+  realProperties.find(
+    (candidate) =>
+      candidate.id ===
+      current.linked_property_id
+  );
+
+if (!linkedProperty) {
+  break;
+}
+
+current = linkedProperty;
       }
+    }
+
 
     let chainHealth =
       "Stable";
@@ -400,6 +411,7 @@ else {
     await supabase
     .from("activities")
     .insert({
+    
   
       property_id:
         propertyData.id,
@@ -642,286 +654,202 @@ else {
         )}
 
         {/* Chain */}
-        <div className="mt-12 bg-white rounded-3xl shadow-sm border border-slate-200 p-8 overflow-x-auto">
+<div className="mt-12 bg-white rounded-3xl shadow-sm border border-slate-200 p-8 overflow-x-auto">
 
-          <div className="flex items-center min-w-max">
-          {chainProperties[0]?.status ===
-  "awaiting_buyer" && (
+<div className="flex items-center min-w-max">
 
+  {transactionNodes.map((property, index) => {
+
+    const stage = STAGES.find(
+      (stage) =>
+        stage.value === property.stage
+    );
+
+
+      const isPurchase =
+      property.currentUserRole === "buyer";
+    
+    const isSale =
+      property.currentUserRole === "seller";
+
+      const currentUserIndex =
+  transactionNodes.findIndex(
+    (node) =>
+      node.currentUserRole === "seller" ||
+      node.currentUserRole === "buyer"
+  );
+    
+    let displayTitle =
+      `Property ${index + 1}`;
+    
+      if (property.currentUserRole) {
+    
+      if (
+        property.currentUserRole ===
+        "seller"
+      ) {
+    
+        displayTitle = "Your Sale";
+    
+      }
+    
+      if (
+        property.currentUserRole ===
+        "buyer"
+      ) {
+    
+        displayTitle = "Your Purchase";
+    
+      }
+    
+    }
+    
+    else if (index < currentUserIndex) {
+    
+      displayTitle = "Your Buyer";
+    
+    }
+    
+    else if (index > currentUserIndex) {
+    
+      displayTitle = "Your Seller";
+    
+    }
+    
+
+    let displayStage = "In Progress";
+
+    if (property.awaiting_buyer) {
+
+      displayStage = "Awaiting buyer";
+
+    } else if (stage?.label) {
+
+      displayStage = stage.label;
+
+    }
+    console.log(
+      "CHAIN NODE",
+      property.address,
+      property.currentUserRole
+    );
+    return (
+
+      <div
+        key={property.id}
+        className="flex items-center"
+      >
+
+        <Link
+          href={`/property/${property.id}`}
+          className="hover:scale-105 transition"
+        >
+
+          <ChainNode
+            propertyNumber={
+              property.chainPosition
+            }
+            displayTitle={displayTitle}
+            stageLabel={
+              property.status ===
+              "pending_connection"
+                ? "Awaiting seller connection"
+                : property.status ===
+                  "broken_connection"
+                ? "Reconnect required"
+                : displayStage
+            }
+            progress={stage?.progress || 0}
+            updatedDaysAgo={
+              property.lastUpdatedDays
+            }
+            currentUserRole={
+              property.currentUserRole
+            }
+            status={property.status}
+            buyer_connected={
+              property.buyer_connected
+            }
+            seller_connected={
+              property.seller_connected
+            }
+          />
+
+        </Link>
+
+        {index < transactionNodes.length - 1 && (
+
+          <div className="flex items-center mx-5">
+
+            <div
+              className={`
+                w-24 h-1 rounded-full
+
+                ${
+                  property.status === "healthy"
+                    ? "bg-green-400"
+
+                    : property.status ===
+                      "pending_connection"
+                    ? "bg-slate-300"
+
+                    : property.status ===
+                      "broken_connection"
+                    ? "bg-red-400"
+
+                    : property.status ===
+                      "delayed"
+                    ? "bg-amber-400"
+
+                    : "bg-slate-300"
+                }
+              `}
+            />
+
+          </div>
+
+        )}
+
+      </div>
+
+    );
+  })}
+
+  {/* Searching node */}
   <div className="flex items-center">
 
-    <div className="flex flex-col items-center text-center">
+    <div className="flex items-center mx-5">
 
       <div
         className="
           w-24
-          h-24
-          rounded-2xl
-          border-2
-          border-blue-300
-          bg-blue-50
-          flex
-          items-center
-          justify-center
-          text-5xl
+          border-t-4
+          border-dashed
+          border-slate-300
         "
-      >
-
-        🧍
-
-      </div>
-
-      <p className="mt-4 font-semibold text-slate-700">
-        Awaiting Buyer
-      </p>
-
-      <p className="text-sm mt-1 text-slate-500">
-        Waiting for buyer connection
-      </p>
+      ></div>
 
     </div>
 
-    <div
-      className="
-        w-24
-        border-t-4
-        border-dashed
-        border-blue-300
-        mx-4
-      "
-    ></div>
-
-  </div>
-
-)}
-<p className="text-red-500">
-  
-</p>
-{transactionNodes.map((property, index) => {
-              const stage = STAGES.find(
-                (stage) =>
-                  stage.value === property.stage
-              );
-              const isCurrentUserProperty =
-  (property as any).is_current_user;
-
-const isSearchingNode =
-  property.is_searching;
-
-const isPurchase =
-  property.relationship_type === "purchase";
-
-const isSale =
-  property.relationship_type === "sale";
-  let displayStage = "In progress";
-
-  if (isSearchingNode) {
-  
-    displayStage =
-      "Searching for forever home";
-  
-  } else if (property.awaiting_buyer) {
-  
-    displayStage =
-      "Awaiting buyer";
-  
-  } else if (stage?.label) {
-  
-    displayStage =
-      stage.label;
-  
-  }
-  let displayTitle = "Property";
-
-if (isCurrentUserProperty) {
-
-  if (isSale) {
-
-    displayTitle = "{displayTitle}";
-
-  } else if (isPurchase) {
-
-    displayTitle = "Your Purchase";
-
-  }
-
-} else {
-
-  if (isSale) {
-
-    displayTitle = "Property Sale";
-
-  } else if (isPurchase) {
-
-    displayTitle = "Property Purchase";
-
-  }
-
-}
-              if (
-                !stage &&
-                property.relationship_type !== "searching"
-              ) {
-                return null;
-          
-              }
-
-              return (
-
-                <div
-                key={property.id}
-                  className="flex items-center"
-                >
-
-<Link
-  href={`/property/${property.id}`}
-  className="hover:scale-105 transition"
->
-
-  <ChainNode
-    propertyNumber={property.chainPosition}
-    displayTitle={displayTitle}
-    stageLabel={
-      property.status === "pending_connection"
-        ? "Awaiting seller connection"
-        : property.status === "broken_connection"
-        ? "Reconnect required"
-        : displayStage
-    }
-    progress={stage?.progress || 0}
-    updatedDaysAgo={property.lastUpdatedDays}
-    currentUserRole={property.currentUserRole}
-    status={property.status}
-    buyer_connected={
-      property.buyer_connected
-    }
-    
-    seller_connected={
-      property.seller_connected
-    }
+    <ChainNode
+      propertyNumber={
+        transactionNodes.length + 1
+      }
+      displayTitle="Searching"
+      stageLabel="Searching for forever home"
+      progress={0}
+      updatedDaysAgo={0}
+      currentUserRole={null}
+      status="pending_connection"
+      buyer_connected={false}
+      seller_connected={false}
     />
 
-</Link>
-{property.is_searching && (
-
-<div className="flex items-center mx-5">
-
-  <div className="flex flex-col items-center">
-
-    <div
-      className="
-        w-20 h-20 rounded-3xl
-        border-[3px]
-        border-amber-400
-        flex items-center justify-center
-        text-5xl bg-white
-      "
-    >
-
-      🔎
-
-    </div>
-
-    <h3 className="mt-4 text-lg font-bold text-slate-900">
-      Searching
-    </h3>
-
-    <p className="text-sm text-slate-500">
-      Looking for next property
-    </p>
-
   </div>
 
 </div>
 
-)}
-                  {index < chainProperties.length - 1 && (
-
-<div className="flex items-center mx-5">
-
-<div
-  className={`
-    w-24 h-1 rounded-full
-
-    ${
-      property.status === "healthy"
-        ? "bg-green-400"
-
-        : property.status === "pending_connection"
-        ? "bg-slate-300"
-
-        : property.status === "broken_connection"
-        ? "bg-red-400"
-
-        : property.status === "delayed"
-        ? "bg-amber-400"
-
-        : "bg-slate-300"
-    }
-  `}
-/>
-
 </div>
-
-                  )}
-
-                </div>
-
-              );
-            })}
-{chainProperties.length === 1 && (
-
-<div className="flex items-center">
-
-  <div
-    className="
-      w-24
-      border-t-4
-      border-dashed
-      border-slate-300
-      mx-4
-    "
-  ></div>
-
-  <div className="flex flex-col items-center text-center">
-
-    <div
-      className="
-        w-24
-        h-24
-        rounded-2xl
-        border-2
-        border-slate-300
-        bg-slate-100
-        flex
-        items-center
-        justify-center
-        text-5xl
-      "
-    >
-
-      🔍
-
-    </div>
-
-    <p className="mt-4 font-semibold text-slate-700">
-      Searching
-    </p>
-
-    <p className="text-sm mt-1 text-slate-500">
-      Searching for forever home
-    </p>
-
-  </div>
-
-</div>
-
-)}
-          </div>
-
-          
-
-        </div>
 {/* Recent Activity Feed */}
 
 <div className="mt-10 bg-white border border-slate-200 rounded-3xl p-8">
