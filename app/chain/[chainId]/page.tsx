@@ -780,6 +780,7 @@ if (isCurrentUserProperty) {
 
   <ChainNode
     propertyNumber={property.chainPosition}
+    displayTitle={displayTitle}
     stageLabel={
       property.status === "pending_connection"
         ? "Awaiting seller connection"
