@@ -14,19 +14,25 @@ export default function LoginPage() {
     async function handleLogin() {
 
       const result =
-        await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
+      await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
     
-      if (result.error) {
-        alert(result.error.message);
-        return;
-      }
+    console.log("LOGIN RESULT", result);
     
-      window.location.href = "/dashboard";
-    
+    if (result.error) {
+      console.log("LOGIN ERROR", result.error);
+      alert(result.error.message);
+      return;
     }
+    
+    console.log("LOGIN SUCCESS");
+    
+    setTimeout(() => {
+      window.location.href = "/dashboard";
+    }, 500);
+  }
 
   async function handleSignup() {
 
