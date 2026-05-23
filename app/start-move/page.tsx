@@ -49,221 +49,317 @@ export default function StartMovePage() {
     
       return result;
     }
-  async function handleStartMove() {
-    if (document.activeElement instanceof HTMLElement) {
-      document.activeElement.blur();
-    }
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    async function handleStartMove() {
 
-    if (!user) {
-      alert("Please login first");
-      return;
-    }
-    const accessCode =
-    generateAccessCode();
-    const {
-      data: chainData,
-      error: chainError,
-    } = await supabase
-      .from("chains")
-      .insert({
-        name: `CHAIN-${Date.now()}`,
-
-access_code:
-  accessCode,
-      })
-      .select()
-      .single();
-
-    if (chainError || !chainData) {
-      console.error(chainError);
-      return;
-    }
-
-    if (!notSelling && sellingAddress) {
-      const {
-        data: existingSellingProperty,
-      } = await supabase
-        .from("properties")
-        .select("*")
-        .eq("address", sellingAddress)
-        .eq("postcode", sellingPostcode)
-        .single();
-      
-      if (existingSellingProperty) {
-      
-        const shouldJoinExisting =
-  window.confirm(
-    "This property already exists within an active chain.\n\nWould you like to connect to the existing transaction?"
-  );
-
-if (shouldJoinExisting) {
-
-  window.location.href =
-  `/join-chain?property=${existingSellingProperty.id}&sourceChain=${chainData.id}`;
-
-  return;
-}
-
-return;
-      }
-      const {
-        data: sellingProperty,
-        error: sellingError,
-      } = await supabase
-        .from("properties")
-        .insert({
-          chain_id: chainData.id,
-          chain_position: 1,
-          address: sellingAddress,
-          postcode: sellingPostcode,
-        
-          stage: "property_listed",
-        
-          status: "pending_connection",
-        
-          relationship_type: "sale",
-        
-          created_by_user_id: user.id,
-        
-          awaiting_buyer: notBuying,
-          buyer_connected: false,
-          seller_connected: true,
-          is_searching: false,
-        
-          is_current_user: true,
-        
-          last_updated_days: 0,
-        })
-        .select()
-        .single();
-        await supabase
-        .from("property_members")
-        .insert({
-          property_id: sellingProperty.id,
-          user_id: user.id,
-          role: "seller",
+      try {
+    
+        console.log("START MOVE CLICKED");
+    
+        console.log({
+          sellingAddress,
+          sellingPostcode,
+          buyingAddress,
+          buyingPostcode,
+          notSelling,
+          notBuying,
+          searchingForProperty,
         });
-      if (sellingError) {
-        console.error(sellingError);
-      }
-
-      if (sellingProperty) {
-
-        await supabase
-          .from("property_members")
+    
+        if (
+          document.activeElement instanceof HTMLElement
+        ) {
+          document.activeElement.blur();
+        }
+    
+        console.log("ABOUT TO GET USER");
+    
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+    
+        console.log("USER RESULT", user);
+    
+        if (!user) {
+    
+          alert("Please login first");
+    
+          return;
+    
+        }
+    
+        const accessCode =
+          generateAccessCode();
+    
+        console.log("ABOUT TO CREATE CHAIN");
+    
+        const {
+          data: chainData,
+          error: chainError,
+        } = await supabase
+          .from("chains")
           .insert({
-            property_id:
-              sellingProperty.id,
-
-            user_id: user.id,
-
-            role: "seller",
-          });
-      }
-    }
-
-    if (!notBuying && buyingAddress) {
-      const {
-        data: existingBuyingProperty,
-      } = await supabase
-        .from("properties")
-        .select("*")
-        .eq("address", buyingAddress)
-        .eq("postcode", buyingPostcode)
-        .single();
-      
-      if (existingBuyingProperty) {
-      
-        const shouldJoinExisting =
-  window.confirm(
-    "This property already exists within an active chain.\n\nWould you like to connect to the existing transaction?"
-  );
-
-if (shouldJoinExisting) {
-
-  window.location.href =
-  `/join-chain?property=${existingBuyingProperty.id}&sourceChain=${chainData.id}`;
-
-  return;
-}
-
-return;
-      }
-      const {
-        data: buyingProperty,
-        error: buyingError,
-      } = await supabase
-        .from("properties")
-        .insert({
-          chain_id: chainData.id,
-        
-          chain_position: 2,
-        
-          address: buyingAddress,
-        
-          postcode: buyingPostcode,
-        
-          stage: "offer_accepted",
-        
-          status: "pending_connection",
-        
-          relationship_type: "purchase",
-        
-          created_by_user_id: user.id,
-        
-          awaiting_buyer: false,
-          buyer_connected: true,
-          seller_connected: false,
-          is_searching: searchingForProperty,
-        
-          is_current_user: true,
-        
-          last_updated_days: 0,
-        })
-        .select()
-        .single();
-        await supabase
-        .from("property_members")
-        .insert({
-          property_id: buyingProperty.id,
-          user_id: user.id,
-          role: "buyer",
-        });
-        if (buyingError) {
-
-          console.error(
-            "BUYING PROPERTY ERROR:",
+            name: `CHAIN-${Date.now()}`,
+            access_code: accessCode,
+          })
+          .select()
+          .single();
+    
+        console.log(
+          "CHAIN RESULT",
+          chainData,
+          chainError
+        );
+    
+        if (chainError || !chainData) {
+    
+          console.error(chainError);
+    
+          alert("CHAIN CREATION FAILED");
+    
+          return;
+    
+        }
+    
+        // SELLING PROPERTY
+        if (!notSelling && sellingAddress) {
+    
+          console.log(
+            "CHECKING EXISTING SELLING PROPERTY"
+          );
+    
+          const {
+            data: existingSellingProperty,
+          } = await supabase
+            .from("properties")
+            .select("*")
+            .eq("address", sellingAddress)
+            .eq("postcode", sellingPostcode)
+            .single();
+    
+          if (existingSellingProperty) {
+    
+            const shouldJoinExisting =
+              window.confirm(
+                "This property already exists within an active chain.\n\nWould you like to connect to the existing transaction?"
+              );
+    
+            if (shouldJoinExisting) {
+    
+              window.location.href =
+                `/join-chain?property=${existingSellingProperty.id}&sourceChain=${chainData.id}`;
+    
+              return;
+    
+            }
+    
+            return;
+    
+          }
+    
+          console.log(
+            "ABOUT TO INSERT SELLING PROPERTY"
+          );
+    
+          const {
+            data: sellingProperty,
+            error: sellingError,
+          } = await supabase
+            .from("properties")
+            .insert({
+              chain_id: chainData.id,
+    
+              chain_position: 1,
+    
+              address: sellingAddress,
+    
+              postcode: sellingPostcode,
+    
+              stage: "property_listed",
+    
+              status: "pending_connection",
+    
+              relationship_type: "sale",
+    
+              created_by_user_id: user.id,
+    
+              awaiting_buyer: notBuying,
+    
+              buyer_connected: false,
+    
+              seller_connected: true,
+    
+              is_searching: false,
+    
+              is_current_user: true,
+    
+              last_updated_days: 0,
+            })
+            .select()
+            .single();
+    
+          console.log(
+            "SELLING RESULT",
+            sellingProperty,
+            sellingError
+          );
+    
+          if (sellingError) {
+    
+            console.error(sellingError);
+    
+            alert(
+              JSON.stringify(sellingError)
+            );
+    
+            return;
+    
+          }
+    
+          if (sellingProperty) {
+    
+            await supabase
+              .from("property_members")
+              .insert({
+                property_id:
+                  sellingProperty.id,
+    
+                user_id: user.id,
+    
+                role: "seller",
+              });
+    
+          }
+    
+        }
+    
+        // BUYING PROPERTY
+        if (!notBuying && buyingAddress) {
+    
+          console.log(
+            "CHECKING EXISTING BUYING PROPERTY"
+          );
+    
+          const {
+            data: existingBuyingProperty,
+          } = await supabase
+            .from("properties")
+            .select("*")
+            .eq("address", buyingAddress)
+            .eq("postcode", buyingPostcode)
+            .single();
+    
+          if (existingBuyingProperty) {
+    
+            const shouldJoinExisting =
+              window.confirm(
+                "This property already exists within an active chain.\n\nWould you like to connect to the existing transaction?"
+              );
+    
+            if (shouldJoinExisting) {
+    
+              window.location.href =
+                `/join-chain?property=${existingBuyingProperty.id}&sourceChain=${chainData.id}`;
+    
+              return;
+    
+            }
+    
+            return;
+    
+          }
+    
+          console.log(
+            "ABOUT TO INSERT BUYING PROPERTY"
+          );
+    
+          const {
+            data: buyingProperty,
+            error: buyingError,
+          } = await supabase
+            .from("properties")
+            .insert({
+              chain_id: chainData.id,
+    
+              chain_position: 2,
+    
+              address: buyingAddress,
+    
+              postcode: buyingPostcode,
+    
+              stage: "offer_accepted",
+    
+              status: "pending_connection",
+    
+              relationship_type: "purchase",
+    
+              created_by_user_id: user.id,
+    
+              awaiting_buyer: false,
+    
+              buyer_connected: true,
+    
+              seller_connected: false,
+    
+              is_searching: searchingForProperty,
+    
+              is_current_user: true,
+    
+              last_updated_days: 0,
+            })
+            .select()
+            .single();
+    
+          console.log(
+            "BUYING RESULT",
+            buyingProperty,
             buyingError
           );
-        
-          alert(
-            JSON.stringify(buyingError)
-          );
+    
+          if (buyingError) {
+    
+            console.error(buyingError);
+    
+            alert(
+              JSON.stringify(buyingError)
+            );
+    
+            return;
+    
+          }
+    
+          if (buyingProperty) {
+    
+            await supabase
+              .from("property_members")
+              .insert({
+                property_id:
+                  buyingProperty.id,
+    
+                user_id: user.id,
+    
+                role: "buyer",
+              });
+    
+          }
+    
         }
-
-      
-if (buyingProperty) {
-
-  await supabase
-    .from("property_members")
-    .insert({
-      property_id:
-        buyingProperty.id,
-
-      user_id: user.id,
-
-      role: "buyer",
-    });
-}
-
+    
+        console.log(
+          "REDIRECTING TO CHAIN"
+        );
+    
+        window.location.href =
+          `/chain/${chainData.id}?refresh=${Date.now()}`;
+    
+      } catch (error) {
+    
+        console.error(error);
+    
+        alert("HANDLE START MOVE FAILED");
+    
+      }
+    
     }
-
-    window.location.href =
-      `/chain/${chainData.id}?refresh=${Date.now()}`;
-  }
 
   return (
     <main className="min-h-screen bg-slate-100">
