@@ -277,7 +277,18 @@ if (buyingProperty) {
         <p className="mt-3 text-lg text-slate-600">
           Tell Keynetic about your move
         </p>
-
+        <div className="relative z-[9999] mt-10">
+  <button
+    type="button"
+    onClick={() => {
+      alert("BUTTON CLICKED");
+      handleStartMove();
+    }}
+    className="w-full bg-slate-900 text-white rounded-2xl py-5 text-lg font-semibold hover:bg-slate-800 transition"
+  >
+    Create Chain
+  </button>
+</div>
         {/* Selling */}
 <div className="mt-12 bg-white rounded-3xl border border-slate-200 p-8">
 
@@ -446,18 +457,6 @@ if (buyingProperty) {
 
 )}
 
-</div>
-<div className="relative z-[9999] mt-10">
-  <button
-    type="button"
-    onClick={() => {
-      alert("BUTTON CLICKED");
-      handleStartMove();
-    }}
-    className="w-full bg-slate-900 text-white rounded-2xl py-5 text-lg font-semibold hover:bg-slate-800 transition"
-  >
-    Create Chain
-  </button>
 </div>
 
       </div>
