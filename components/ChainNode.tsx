@@ -64,8 +64,14 @@ export default function ChainNode({
       >
 
 {
-  status === "pending_connection" &&
-  currentUserRole === "buyer"
+  displayTitle === "Buyer Ready"
+    ? "🧍"
+
+    : displayTitle === "Searching"
+    ? "🔎"
+
+    : status === "pending_connection" &&
+      currentUserRole === "buyer"
     ? "⏳"
 
     : status === "pending_connection"

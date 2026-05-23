@@ -97,7 +97,7 @@ export default function ChainPage() {
         (property) =>
           property.lastUpdatedDays > 21
       );
-    
+  
     const delayedProperties =
       chainProperties.filter(
         (property) =>
@@ -182,6 +182,15 @@ current = linkedProperty;
       chainHealthMessage =
         "Multiple delays or stale properties may impact chain progression.";
     }
+    const currentUserProperty =
+      transactionNodes.find(
+        (node) => node.currentUserRole
+      );
+    
+    const isEndOfChain =
+      currentUserProperty?.currentUserRole ===
+        "seller" &&
+      !currentUserProperty?.is_searching;
   const currentChain =
     chains.find(
       (chain) =>
@@ -657,7 +666,35 @@ else {
 <div className="mt-12 bg-white rounded-3xl shadow-sm border border-slate-200 p-8 overflow-x-auto">
 
 <div className="flex items-center min-w-max">
+{transactionNodes[0]?.currentUserRole === "buyer" && (
 
+<div className="flex items-center">
+
+  <ChainNode
+    propertyNumber={0}
+    displayTitle="Buyer Ready"
+    stageLabel="No related sale"
+    progress={100}
+    updatedDaysAgo={0}
+    currentUserRole="buyer"
+    status="healthy"
+    buyer_connected={true}
+    seller_connected={true}
+  />
+
+  <div className="flex items-center mx-5">
+
+    <div
+      className="
+        w-24 h-1 rounded-full bg-green-400
+      "
+    />
+
+  </div>
+
+</div>
+
+)}
   {transactionNodes.map((property, index) => {
 
     const stage = STAGES.find(
@@ -678,7 +715,10 @@ else {
       node.currentUserRole === "seller" ||
       node.currentUserRole === "buyer"
   );
-    
+  const isBottomOfChain =
+  index === 0 &&
+  !property.currentUserRole;
+
     let displayTitle =
       `Property ${index + 1}`;
     
@@ -705,8 +745,11 @@ else {
     }
     
     else if (index < currentUserIndex) {
-    
-      displayTitle = "Your Buyer";
+
+      displayTitle =
+        isBottomOfChain
+          ? "Buyer Ready"
+          : "Your Buyer";
     
     }
     
@@ -815,8 +858,8 @@ else {
     );
   })}
 
-  {/* Searching node */}
-  <div className="flex items-center">
+  {/* Top of chain node */}
+<div className="flex items-center">
 
     <div className="flex items-center mx-5">
 
@@ -835,12 +878,26 @@ else {
       propertyNumber={
         transactionNodes.length + 1
       }
-      displayTitle="Searching"
-      stageLabel="Searching for forever home"
-      progress={0}
+      displayTitle={
+        isEndOfChain
+          ? "End Of Chain"
+          : "Searching"
+      }
+      stageLabel={
+        isEndOfChain
+          ? "No onward purchase"
+          : "Searching for forever home"
+      }
+      progress={
+        isEndOfChain ? 100 : 0
+      }
       updatedDaysAgo={0}
-      currentUserRole={null}
-      status="pending_connection"
+currentUserRole={null}
+      status={
+        isEndOfChain
+          ? "healthy"
+          : "pending_connection"
+      }
       buyer_connected={false}
       seller_connected={false}
     />
