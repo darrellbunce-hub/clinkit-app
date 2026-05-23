@@ -423,7 +423,10 @@ export default function StartMovePage() {
         setSellingAddress(
           event.target.value
         )
+        
       }
+      onBlur={() => window.scrollTo(0, 0)}
+  autoComplete="off"
       placeholder="Selling property address"
       className="w-full border border-slate-300 text-base text-slate-900 rounded-2xl px-4 py-4"
     />
@@ -436,6 +439,8 @@ export default function StartMovePage() {
           event.target.value
         )
       }
+      onBlur={() => window.scrollTo(0, 0)}
+  autoComplete="off"
       placeholder="Selling postcode"
       className="mt-4 w-full border border-slate-300 text-base text-slate-900 rounded-2xl px-4 py-4"
     />
@@ -525,6 +530,8 @@ export default function StartMovePage() {
           event.target.value
         )
       }
+      onBlur={() => window.scrollTo(0, 0)}
+  autoComplete="off"
       placeholder="Buying property address"
       className="w-full border border-slate-300 text-base text-slate-900 rounded-2xl px-4 py-4"
     />
@@ -537,6 +544,8 @@ export default function StartMovePage() {
           event.target.value
         )
       }
+      onBlur={() => window.scrollTo(0, 0)}
+  autoComplete="off"
       placeholder="Buying postcode"
       className="mt-4 w-full border border-slate-300 text-base text-slate-900 rounded-2xl px-4 py-4"
     />
