@@ -326,7 +326,7 @@ if (buyingProperty) {
         )
       }
       placeholder="Selling property address"
-      className="w-full border border-slate-300 text-slate-900 rounded-2xl px-4 py-4"
+      className="w-full border border-slate-300 text-base text-slate-900 rounded-2xl px-4 py-4"
     />
 
     <input
@@ -338,7 +338,7 @@ if (buyingProperty) {
         )
       }
       placeholder="Selling postcode"
-      className="mt-4 w-full border border-slate-300 text-slate-900 rounded-2xl px-4 py-4"
+      className="mt-4 w-full border border-slate-300 text-base text-slate-900 rounded-2xl px-4 py-4"
     />
 
   </div>
@@ -427,7 +427,7 @@ if (buyingProperty) {
         )
       }
       placeholder="Buying property address"
-      className="w-full border border-slate-300 text-slate-900 rounded-2xl px-4 py-4"
+      className="w-full border border-slate-300 text-base text-slate-900 rounded-2xl px-4 py-4"
     />
 
     <input
@@ -439,7 +439,7 @@ if (buyingProperty) {
         )
       }
       placeholder="Buying postcode"
-      className="mt-4 w-full border border-slate-300 text-slate-900 rounded-2xl px-4 py-4"
+      className="mt-4 w-full border border-slate-300 text-base text-slate-900 rounded-2xl px-4 py-4"
     />
 
   </div>
@@ -447,7 +447,8 @@ if (buyingProperty) {
 )}
 
 </div>
-        <button
+<button
+  type="button"
   onClick={handleStartMove}
   className="mt-10 w-full bg-slate-900 text-white rounded-2xl py-5 text-lg font-semibold hover:bg-slate-800 transition"
 >
