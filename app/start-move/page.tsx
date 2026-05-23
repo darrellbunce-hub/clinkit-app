@@ -122,7 +122,7 @@ export default function StartMovePage() {
     
         // SELLING PROPERTY
         if (!notSelling && sellingAddress) {
-    
+          alert("SELLING PROPERTY BLOCK REACHED");
           console.log(
             "CHECKING EXISTING SELLING PROPERTY"
           );
@@ -234,7 +234,7 @@ export default function StartMovePage() {
     
         // BUYING PROPERTY
         if (!notBuying && buyingAddress) {
-    
+          alert("BUYING PROPERTY BLOCK REACHED");
           console.log(
             "CHECKING EXISTING BUYING PROPERTY"
           );
