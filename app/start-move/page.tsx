@@ -366,7 +366,13 @@ export default function StartMovePage() {
 
       <Navbar />
 
-      <div className="max-w-3xl mx-auto px-6 py-12">
+      <form
+  onSubmit={(event) => {
+    event.preventDefault();
+    handleStartMove();
+  }}
+  className="max-w-3xl mx-auto px-6 py-12"
+>
 
         <h1 className="text-5xl font-bold text-slate-900">
           Start Your Move
@@ -556,15 +562,15 @@ export default function StartMovePage() {
 
 </div>
 <div className="mt-10">
-  <div
-    onTouchStart={handleStartMove}
-    className="w-full bg-slate-900 text-white rounded-2xl py-5 text-lg font-semibold text-center active:scale-[0.98]"
-  >
-    Create Chain
-  </div>
+<button
+  type="submit"
+  className="mt-10 w-full bg-slate-900 text-white rounded-2xl py-5 text-lg font-semibold"
+>
+  Create Chain
+</button>
 </div>
 
-      </div>
+</form>
 
     </main>
   );
