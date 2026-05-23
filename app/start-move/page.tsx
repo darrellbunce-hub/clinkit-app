@@ -326,7 +326,7 @@ if (buyingProperty) {
         )
       }
       placeholder="Selling property address"
-      className="w-full border border-slate-300 rounded-2xl px-4 py-4"
+      className="w-full border border-slate-300 text-slate-900 rounded-2xl px-4 py-4"
     />
 
     <input
@@ -338,7 +338,7 @@ if (buyingProperty) {
         )
       }
       placeholder="Selling postcode"
-      className="mt-4 w-full border border-slate-300 rounded-2xl px-4 py-4"
+      className="mt-4 w-full border border-slate-300 text-slate-900 rounded-2xl px-4 py-4"
     />
 
   </div>
@@ -427,7 +427,7 @@ if (buyingProperty) {
         )
       }
       placeholder="Buying property address"
-      className="w-full border border-slate-300 rounded-2xl px-4 py-4"
+      className="w-full border border-slate-300 text-slate-900 rounded-2xl px-4 py-4"
     />
 
     <input
@@ -439,7 +439,7 @@ if (buyingProperty) {
         )
       }
       placeholder="Buying postcode"
-      className="mt-4 w-full border border-slate-300 rounded-2xl px-4 py-4"
+      className="mt-4 w-full border border-slate-300 text-slate-900 rounded-2xl px-4 py-4"
     />
 
   </div>

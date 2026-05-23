@@ -663,7 +663,7 @@ else {
         )}
 
         {/* Chain */}
-<div className="mt-12 bg-white rounded-3xl shadow-sm border border-slate-200 p-8 overflow-x-auto">
+<div className="mt-12 bg-white rounded-3xl shadow-sm border border-slate-200 p-8 overflow-x-auto pb-4">
 
 <div className="flex items-center min-w-max">
 {transactionNodes[0]?.currentUserRole === "buyer" && (
@@ -985,7 +985,7 @@ currentUserRole={null}
               )
             }
             placeholder="Property address"
-            className="mt-6 w-full border border-slate-300 rounded-2xl px-4 py-4"
+            className="mt-6 w-full border border-slate-300 text-slate-900 rounded-2xl px-4 py-4"
           />
 
           <input
@@ -997,7 +997,7 @@ currentUserRole={null}
               )
             }
             placeholder="Postcode"
-            className="mt-4 w-full border border-slate-300 rounded-2xl px-4 py-4"
+            className="mt-4 w-full border border-slate-300 text-slate-900 rounded-2xl px-4 py-4"
           />
 
           <button

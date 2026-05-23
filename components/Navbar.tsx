@@ -166,59 +166,94 @@ export default function Navbar() {
           "
         >
 
-          <div className="px-6 py-6 flex flex-col gap-4">
+<div className="px-6 py-6 flex flex-col gap-4">
 
-            <Link
-              href="/dashboard"
-              className="
-                text-slate-300
-                hover:text-white
-                transition
-                py-3
-              "
-              onClick={() =>
-                setMobileMenuOpen(false)
-              }
-            >
-              Dashboard
-            </Link>
+{user ? (
 
-            <Link
-              href="/join-chain"
-              className="
-                text-slate-300
-                hover:text-white
-                transition
-                py-3
-              "
-              onClick={() =>
-                setMobileMenuOpen(false)
-              }
-            >
-              Join Chain
-            </Link>
+  <>
 
-            <Link
-              href="/start-move"
-              className="
-                bg-blue-600
-                hover:bg-blue-500
-                text-white
-                px-5
-                py-5
-                rounded-xl
-                font-semibold
-                text-center
-                transition
-              "
-              onClick={() =>
-                setMobileMenuOpen(false)
-              }
-            >
-              Start Move
-            </Link>
+    <Link
+      href="/dashboard"
+      className="
+        text-slate-300
+        hover:text-white
+        transition
+        py-3
+      "
+      onClick={() =>
+        setMobileMenuOpen(false)
+      }
+    >
+      Dashboard
+    </Link>
 
-          </div>
+    <button
+      onClick={async () => {
+
+        await supabase.auth.signOut();
+
+        setMobileMenuOpen(false);
+
+window.location.href = "/";
+
+      }}
+      className="
+        text-left
+        text-slate-300
+        hover:text-white
+        transition
+        py-3
+      "
+    >
+      Logout
+    </button>
+
+  </>
+
+) : (
+
+  <>
+
+    <Link
+      href="/login"
+      className="
+        text-slate-300
+        hover:text-white
+        transition
+        py-3
+      "
+      onClick={() =>
+        setMobileMenuOpen(false)
+      }
+    >
+      Login
+    </Link>
+
+    <Link
+      href="/login"
+      className="
+        bg-blue-600
+        hover:bg-blue-500
+        text-white
+        px-5
+        py-5
+        rounded-xl
+        font-semibold
+        text-center
+        transition
+      "
+      onClick={() =>
+        setMobileMenuOpen(false)
+      }
+    >
+      Create Account
+    </Link>
+
+  </>
+
+)}
+
+</div>
 
         </div>
 

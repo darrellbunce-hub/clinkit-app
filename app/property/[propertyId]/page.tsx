@@ -20,6 +20,8 @@ export default function PropertyPage() {
 
   const [delayReason, setDelayReason] =
     useState("");
+    const [draftStage, setDraftStage] =
+  useState("");
     const [breakReason, setBreakReason] =
     useState("");
   const params = useParams();
@@ -28,6 +30,7 @@ export default function PropertyPage() {
     Array.isArray(params.propertyId)
       ? params.propertyId[0]
       : params.propertyId
+      
   );
 
   const {
@@ -546,13 +549,10 @@ async function handleStructuredUpdate() {
 
           <select
           disabled={!canEdit}
-            value={currentProperty.stage}
-            onChange={(event) =>
-              updatePropertyStage(
-                currentProperty.id,
-                event.target.value
-              )
-            }
+          value={draftStage}
+          onChange={(event) =>
+            setDraftStage(event.target.value)
+          }
             className="mt-6 w-full border border-slate-300 rounded-xl px-4 py-4 text-lg"
           >
 
@@ -568,7 +568,28 @@ async function handleStructuredUpdate() {
             ))}
 
           </select>
-
+          <button
+  disabled={!canEdit}
+  onClick={() =>
+    updatePropertyStage(
+      currentProperty.id,
+      draftStage
+    )
+  }
+  className="
+    mt-4
+    bg-slate-900
+    text-white
+    rounded-xl
+    px-6
+    py-3
+    font-semibold
+    hover:bg-slate-800
+    transition
+  "
+>
+  Submit Status Update
+</button>
         </div>
 
         {/* Structured Updates */}
