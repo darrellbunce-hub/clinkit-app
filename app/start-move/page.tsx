@@ -305,7 +305,7 @@ if (buyingProperty) {
       }
     />
 
-    <span className="text-slate-700 whitespace-nowrap">
+    <span className="text-slate-700">
       I am not selling
     </span>
 
@@ -350,7 +350,7 @@ if (buyingProperty) {
 {/* Buying */}
 <div className="mt-10 bg-white rounded-3xl border border-slate-200 p-8">
 
-<div className="flex items-start justify-between gap-6">
+<div className="flex flex-col md:flex-row items-start justify-between gap-6">
 
   <div>
 
@@ -383,7 +383,7 @@ if (buyingProperty) {
         }}
       />
 
-      <span className="text-slate-700 whitespace-nowrap">
+      <span className="text-slate-700">
         I am searching for my next property
       </span>
 
@@ -404,7 +404,7 @@ if (buyingProperty) {
         }}
       />
 
-      <span className="text-slate-700 whitespace-nowrap">
+      <span className="text-slate-700">
         I am not buying another property
       </span>
 
