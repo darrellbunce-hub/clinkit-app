@@ -232,7 +232,7 @@ export default function DashboardPage() {
 
               <Link
                 href={`/chain/${chain.id}`}
-                className="block mt-8 w-full border border-slate-300 py-4 rounded-xl hover:bg-slate-50 transition text-center"
+                className="block mt-8 w-full border border-slate-300 text-slate-900 py-4 rounded-xl hover:bg-slate-50 transition text-center"
               >
                 View Chain
               </Link>

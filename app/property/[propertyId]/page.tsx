@@ -553,7 +553,7 @@ async function handleStructuredUpdate() {
           onChange={(event) =>
             setDraftStage(event.target.value)
           }
-            className="mt-6 w-full border border-slate-300 rounded-xl px-4 py-4 text-lg"
+            className="mt-6 w-full border border-slate-300 text-slate-900 rounded-xl px-4 py-4 text-lg"
           >
 
             {STAGES.map((stage) => (
@@ -610,7 +610,7 @@ async function handleStructuredUpdate() {
             onChange={(event) =>
               setUpdateType(event.target.value)
             }
-            className="mt-6 w-full border border-slate-300 rounded-xl px-4 py-4"
+            className="mt-6 w-full border border-slate-300 text-slate-900 rounded-xl px-4 py-4"
           >
 
             <option value="">
@@ -649,7 +649,7 @@ async function handleStructuredUpdate() {
                   event.target.value
                 )
               }
-              className="mt-4 w-full border border-slate-300 rounded-xl px-4 py-4"
+              className="mt-4 w-full border border-slate-300 text-slate-900 rounded-xl px-4 py-4"
             >
 
               <option value="">
@@ -707,7 +707,7 @@ async function handleStructuredUpdate() {
         event.target.value
       )
     }
-    className="mt-6 w-full border border-slate-300 rounded-2xl px-4 py-4"
+    className="mt-6 w-full border border-slate-300 text-slate-900 rounded-2xl px-4 py-4"
   >
 
     <option value="">

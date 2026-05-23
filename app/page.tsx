@@ -428,7 +428,7 @@ export default function HomePage() {
 
             <Link
               href="/join-chain"
-              className="border border-slate-300 bg-white text-slate-900 px-8 py-5 rounded-2xl font-semibold text-lg hover:bg-slate-50 transition"
+              className="border border-slate-300 text-slate-900 bg-white text-slate-900 px-8 py-5 rounded-2xl font-semibold text-lg hover:bg-slate-50 transition"
             >
               Join Existing Chain
             </Link>

@@ -188,7 +188,7 @@ const propertyId =
               )
             }
             placeholder="Chain access code"
-            className="w-full border border-slate-300 rounded-2xl px-4 py-4"
+            className="w-full border border-slate-300 text-base text-slate-900 rounded-2xl px-4 py-4"
           />
 
           <input
@@ -200,7 +200,7 @@ const propertyId =
               )
             }
             placeholder="Property address"
-            className="mt-4 w-full border border-slate-300 rounded-2xl px-4 py-4"
+            className="mt-4 w-full border border-slate-300 text-base text-slate-900 text-slate-900 rounded-2xl px-4 py-4"
           />
 
           <input
@@ -212,7 +212,7 @@ const propertyId =
               )
             }
             placeholder="Property postcode"
-            className="mt-4 w-full border border-slate-300 rounded-2xl px-4 py-4"
+            className="mt-4 w-full border border-slate-300 text-base text-slate-900 rounded-2xl px-4 py-4"
           />
 
           <button

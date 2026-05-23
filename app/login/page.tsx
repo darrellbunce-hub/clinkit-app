@@ -89,7 +89,7 @@ export default function LoginPage() {
             onChange={(event) =>
               setEmail(event.target.value)
             }
-            className="mt-2 w-full border border-slate-300 rounded-2xl px-4 py-3"
+            className="mt-2 w-full border border-slate-300 text-base text-slate-900 rounded-2xl px-4 py-3"
           />
 
         </div>
@@ -106,7 +106,7 @@ export default function LoginPage() {
             onChange={(event) =>
               setPassword(event.target.value)
             }
-            className="mt-2 w-full border border-slate-300 rounded-2xl px-4 py-3"
+            className="mt-2 w-full border border-slate-300 text-base text-slate-900 rounded-2xl px-4 py-3"
           />
 
         </div>
@@ -125,7 +125,7 @@ export default function LoginPage() {
     event.preventDefault();
     handleSignup();
   }}
-  className="mt-4 w-full border border-slate-300 rounded-2xl py-4 font-semibold"
+  className="mt-4 w-full border border-slate-300 text-slate-900 rounded-2xl py-4 font-semibold"
 >
   Create Account
 </button>

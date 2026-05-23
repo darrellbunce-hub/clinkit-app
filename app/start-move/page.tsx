@@ -50,7 +50,9 @@ export default function StartMovePage() {
       return result;
     }
   async function handleStartMove() {
-
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -450,7 +452,7 @@ if (buyingProperty) {
 </div>
 <button
     type="button"
-    onClick={handleStartMove}
+    onTouchStart={handleStartMove}
     className="mt-10 w-full bg-slate-900 text-white rounded-2xl py-5 text-lg font-semibold hover:bg-slate-800 transition"
   >
     Create Chain
