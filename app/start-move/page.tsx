@@ -367,6 +367,7 @@ export default function StartMovePage() {
       <Navbar />
 
       <form
+  noValidate
   onSubmit={(event) => {
     event.preventDefault();
     handleStartMove();
