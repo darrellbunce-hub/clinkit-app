@@ -81,8 +81,6 @@ export default function StartMovePage() {
     
         if (!user) {
     
-          alert("Please login first");
-    
           return;
     
         }
@@ -113,8 +111,7 @@ export default function StartMovePage() {
         if (chainError || !chainData) {
     
           console.error(chainError);
-    
-          alert("CHAIN CREATION FAILED");
+  
     
           return;
     
@@ -122,7 +119,6 @@ export default function StartMovePage() {
     
         // SELLING PROPERTY
         if (!notSelling && sellingAddress) {
-          alert("SELLING PROPERTY BLOCK REACHED");
           console.log(
             "CHECKING EXISTING SELLING PROPERTY"
           );
@@ -207,9 +203,6 @@ export default function StartMovePage() {
     
             console.error(sellingError);
     
-            alert(
-              JSON.stringify(sellingError)
-            );
     
             return;
     
@@ -234,7 +227,7 @@ export default function StartMovePage() {
     
         // BUYING PROPERTY
         if (!notBuying && buyingAddress) {
-          alert("BUYING PROPERTY BLOCK REACHED");
+          
           console.log(
             "CHECKING EXISTING BUYING PROPERTY"
           );
@@ -318,10 +311,7 @@ export default function StartMovePage() {
           if (buyingError) {
     
             console.error(buyingError);
-    
-            alert(
-              JSON.stringify(buyingError)
-            );
+  
     
             return;
     
@@ -355,7 +345,6 @@ export default function StartMovePage() {
     
         console.error(error);
     
-        alert("HANDLE START MOVE FAILED");
     
       }
     
@@ -461,7 +450,7 @@ export default function StartMovePage() {
 {/* Buying */}
 <div className="mt-10 bg-white rounded-3xl border border-slate-200 p-8">
 
-<div className="flex flex-col md:flex-row items-start justify-between gap-6">
+<div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6">
 
   <div>
 
