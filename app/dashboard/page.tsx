@@ -130,8 +130,13 @@ export default function DashboardPage() {
 
         </div>
 
-        {/* Chains */}
-        <div className="grid gap-6 md:grid-cols-2 mt-12">
+        {/* Dashboard Layout */}
+<div className="grid grid-cols-1 xl:grid-cols-3 gap-8 mt-12">
+
+<div className="xl:col-span-2">
+
+  {/* Chains */}
+  <div className="grid gap-6 md:grid-cols-2">
 
           {chains.map((chain) => (
 
@@ -144,15 +149,18 @@ export default function DashboardPage() {
 
                 <div>
 
-                  <h2 className="text-2xl font-bold text-slate-900">
-                    Chain #{chain.id}
-                  </h2>
+                <h2 className="text-2xl font-bold text-slate-900">
 
-                  <p className="text-slate-500 mt-2">
-                    Access Code:
-                    {" "}
-                    {chain.access_code}
-                  </p>
+  {properties.find(
+    (property: any) =>
+      property.chain_id === chain.id
+  )?.address || `Chain #${chain.id}`}
+
+</h2>
+
+<p className="text-slate-500 mt-2">
+  Access Code: {chain.access_code}
+</p>
                   <div className="mt-6 space-y-4">
 
 {properties
@@ -180,13 +188,13 @@ export default function DashboardPage() {
         <h3 className="font-semibold text-slate-900">
 
 {
-  property.currentUserRole === "seller"
+  property.relationship_type === "selling"
     ? "Your Sale"
 
-    : property.currentUserRole === "buyer"
+    : property.relationship_type === "buying"
     ? "Your Purchase"
 
-    : `Property ${property.chain_position}`
+    : `Chain Property ${property.chain_position}`
 }
 
 </h3>
@@ -241,19 +249,110 @@ export default function DashboardPage() {
 
           ))}
 
-        </div>
+</div>
 
-        {/* Empty State */}
+</div>
+
+{/* Right Sidebar */}
+<div className="space-y-6">
+
+  <div className="bg-white rounded-3xl shadow-sm p-6 border border-slate-200">
+
+    <h2 className="text-xl font-bold text-slate-900">
+      Recommended Next Steps
+    </h2>
+
+    <div className="mt-6 space-y-4">
+
+    <div
+  className="
+    border
+    border-slate-200
+    rounded-2xl
+    p-4
+    hover:border-slate-300
+    hover:bg-slate-50
+    transition
+    cursor-pointer
+  "
+>
+
+        <p className="font-semibold text-slate-900">
+          Compare Home Insurance
+        </p>
+
+        <p className="text-sm text-slate-500 mt-1">
+          Recommended after searches and mortgage approval.
+        </p>
+
+      </div>
+
+      <div
+  className="
+    border
+    border-slate-200
+    rounded-2xl
+    p-4
+    hover:border-slate-300
+    hover:bg-slate-50
+    transition
+    cursor-pointer
+  "
+>
+
+        <p className="font-semibold text-slate-900">
+          Book a Removals Company
+        </p>
+
+        <p className="text-sm text-slate-500 mt-1">
+          Prepare early to secure your preferred moving date.
+        </p>
+
+      </div>
+
+      <div
+  className="
+    border
+    border-slate-200
+    rounded-2xl
+    p-4
+    hover:border-slate-300
+    hover:bg-slate-50
+    transition
+    cursor-pointer
+  "
+>
+
+        <p className="font-semibold text-slate-900">
+          Utilities & Broadband
+        </p>
+
+        <p className="text-sm text-slate-500 mt-1">
+          Set up your new services before completion day.
+        </p>
+
+      </div>
+
+    </div>
+
+  </div>
+
+</div>
+
+</div>
+
+{/* Empty State */}
         {chains.length === 0 && (
 
           <div className="mt-12 bg-white rounded-3xl border border-slate-200 p-12 text-center">
 
-            <h2 className="text-3xl font-bold text-slate-900">
-            No Active Moves Yet
-            <p className="mt-2 text-slate-500">
+<h2 className="text-3xl font-bold text-slate-900">
+  No Active Moves Yet
+</h2>
+
+<p className="mt-2 text-slate-500">
   Start a move to begin tracking your property chain progress.
 </p>
-            </h2>
 
             <p className="mt-4 text-slate-600">
               Start your first property move or join an existing chain.
