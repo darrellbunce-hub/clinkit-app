@@ -40,8 +40,9 @@ export default function PropertyPage() {
     breakChainConnection,
     currentUserId,
   } = useChain();
+  
+  
   useEffect(() => {
-
     async function checkAuth() {
   
       const {
@@ -108,7 +109,6 @@ export default function PropertyPage() {
   }
   const canEdit =
   currentProperty.created_by_user_id === currentUserId;
-
   const currentStage =
   STAGES.find(
     (stage) =>

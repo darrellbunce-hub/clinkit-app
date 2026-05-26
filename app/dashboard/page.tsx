@@ -181,7 +181,7 @@ export default function DashboardPage() {
       "
     >
 
-      <div className="flex items-center justify-between">
+<div className="flex flex-col gap-4">
 
         <div>
 
@@ -206,24 +206,80 @@ export default function DashboardPage() {
         </div>
 
         <div
-          className="
-            bg-blue-100
-            text-blue-700
-            px-3
-            py-1
-            rounded-full
-            text-sm
-            font-medium
-          "
-        >
+  className="
+    self-start
+    bg-blue-100
+    text-blue-700
+    px-2.5
+    py-0.5
+    rounded-full
+    text-sm
+    font-medium
+    mt-3
+  "
+>
 
-          {property.status || "Active"}
+  {property.status || "Active"}
+
+</div>
+
+<div className="mt-6 space-y-2">
+
+<div className="flex items-center gap-3">
+
+  <div className="w-3 h-3 rounded-full bg-green-500"></div>
+
+  <p className="text-sm text-slate-700">
+    Memorandum Issued
+  </p>
+
+</div>
+
+<div className="flex items-center gap-3">
+
+  <div className="w-3 h-3 rounded-full bg-green-500"></div>
+
+  <p className="text-sm text-slate-700">
+    Searches Ordered
+  </p>
+
+</div>
+
+<div className="flex items-center gap-3">
+
+  <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+
+  <p className="text-sm font-medium text-slate-900">
+    Awaiting Enquiries
+  </p>
+
+</div>
+
+<div className="flex items-center gap-3 opacity-50">
+
+  <div className="w-3 h-3 rounded-full bg-slate-300"></div>
+
+  <p className="text-sm text-slate-700">
+    Mortgage Offer
+  </p>
+
+</div>
+
+<div className="flex items-center gap-3 opacity-50">
+
+  <div className="w-3 h-3 rounded-full bg-slate-300"></div>
+
+  <p className="text-sm text-slate-700">
+    Exchange Contracts
+  </p>
+
+</div>
+
+</div>
 
         </div>
 
       </div>
-
-    </div>
 
   ))}
 
