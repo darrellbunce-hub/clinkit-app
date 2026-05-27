@@ -329,11 +329,33 @@ export default function StartMovePage() {
     
                 role: "buyer",
               });
-    
+          
           }
     
         }
-    
+        if (notSelling) {
+
+          await supabase
+            .from("chain_nodes")
+            .insert({
+        
+              chain_id: chainData.id,
+        
+              node_type: "buyer_ready",
+        
+              user_id: user.id,
+        
+              position: 0,
+        
+              stage: "mortgage_preparation",
+        
+              status: "healthy",
+        
+              progress: 10,
+        
+            });
+        
+        }
         console.log(
           "REDIRECTING TO CHAIN"
         );

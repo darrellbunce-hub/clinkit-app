@@ -25,7 +25,8 @@ export default function ChainPage() {
       chains,
       currentUserId,
     } = useChain();
-
+    const [chainNodes, setChainNodes] =
+    useState<any[]>([]);
     useEffect(() => {
 
       async function checkAuth() {
@@ -43,6 +44,35 @@ export default function ChainPage() {
       checkAuth();
     
     }, []);
+    useEffect(() => {
+
+      async function loadChainNodes() {
+    
+        const {
+          data: nodeData,
+          error: nodeError,
+        } = await supabase
+          .from("chain_nodes")
+          .select("*")
+          .eq("chain_id", Number(chainId))
+          .order("position");
+    
+        if (!nodeError && nodeData) {
+    
+          setChainNodes(nodeData);
+    
+        }
+    
+        console.log(
+          "CHAIN NODES",
+          nodeData,
+          nodeError
+        );
+      }
+    
+      loadChainNodes();
+    
+    }, [chainId]);
     console.log("CHAIN ID", chainId);
 
     console.log(
@@ -126,9 +156,16 @@ export default function ChainPage() {
           property.id
       )
   );
-    
+  console.log(
+    "CHAIN NODES",
+    chainNodes
+  );
       const transactionNodes: any[] = [];
-    
+      const buyerReadyNode =
+      chainNodes.find(
+        (node) =>
+          node.node_type === "buyer_ready"
+      );
     for (const root of rootProperties) {
     
       let current: any = root;
@@ -670,17 +707,30 @@ else {
 
 <div className="flex items-center">
 
+{buyerReadyNode && (
+
+<Link
+  href={`/buyer-ready/${chainId}`}
+  className="hover:scale-105 transition"
+>
+
   <ChainNode
     propertyNumber={0}
     displayTitle="Buyer Ready"
-    stageLabel="No related sale"
-    progress={100}
+    stageLabel="Mortgage preparation"
+    progress={
+      buyerReadyNode.progress
+    }
     updatedDaysAgo={0}
     currentUserRole="buyer"
-    status="healthy"
+    status={buyerReadyNode.status}
     buyer_connected={true}
     seller_connected={true}
   />
+
+</Link>
+
+)}
 
   <div className="flex items-center mx-5">
 
@@ -776,6 +826,11 @@ else {
       property.address,
       property.currentUserRole
     );
+    const buyerReadyNode =
+  chainNodes.find(
+    (node) =>
+      node.node_type === "buyer_ready"
+  );
     return (
 
       <div
