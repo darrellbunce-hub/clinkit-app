@@ -59,8 +59,9 @@ type ChainContextType = {
   ) => Promise<void>;
 
   addStructuredUpdate: (
-    propertyId: number,
-    updateMessage: string
+    targetId: number,
+    updateMessage: string,
+    targetType?: "property" | "buyer_ready"
   ) => Promise<void>;
   
   breakChainConnection: (
@@ -274,10 +275,10 @@ async function updatePropertyStage(
   newStage: string
 ) {
   const property =
-  properties.find(
-    (property) =>
-      property.id === propertyId
-  );
+properties.find(
+  (property) =>
+    property.id === propertyId
+);
 
 const canEdit =
   property?.members?.some(
@@ -364,14 +365,19 @@ if (!canEdit) {
 }
 
 async function addStructuredUpdate(
-  propertyId: number,
-  updateMessage: string
+  targetId: number,
+  updateMessage: string,
+  targetType: "property" | "buyer_ready" = "property"
 ) {
   const property =
-  properties.find(
-    (property) =>
-      property.id === propertyId
-  );
+  targetType === "property"
+
+    ? properties.find(
+        (property) =>
+          property.id === targetId
+      )
+
+    : null;
 
 const canEdit =
   property?.members?.some(
@@ -391,7 +397,7 @@ if (!canEdit) {
     .from("activities")
     .insert({
 
-      property_id: propertyId,
+      property_id: targetId,
 
       update: updateMessage,
 
@@ -402,7 +408,7 @@ if (!canEdit) {
   setProperties((previousProperties) =>
     previousProperties.map((property) => {
 
-      if (property.id === propertyId) {
+      if (property.id === targetId) {
 
         return {
 

@@ -183,13 +183,21 @@ export default function BuyerReadyPage() {
       .select()
       .single();
   
-    if (!error && data) {
-  
-      setBuyerNode(data);
-  
-      setDraftStage("");
-  
-    }
+      if (!error && data) {
+
+        await addStructuredUpdate(
+
+          buyerNode.id,
+        
+          selectedStage.label
+        
+        );
+      
+        setBuyerNode(data);
+      
+        setDraftStage("");
+      
+      }
   
     console.log(
       "BUYER NODE UPDATE",

@@ -94,7 +94,14 @@ export default function ChainPage() {
           a.chainPosition -
           b.chainPosition
       );
-      
+      const buyerReadyNode =
+  chainNodes.find(
+    (node) =>
+      node.node_type === "buyer_ready"
+  );
+
+const buyerReadyProgress =
+  buyerReadyNode?.progress || 0;
       const recentActivities =
 
   chainProperties
@@ -108,6 +115,25 @@ export default function ChainPage() {
 
         })
       )
+    )
+    .concat(
+
+      buyerReadyNode?.activities?.map(
+        (activity: any) => ({
+    
+          ...activity,
+    
+          propertyId: buyerReadyNode.id,
+    
+          propertyAddress:
+            "Buyer Ready",
+    
+          propertyRole:
+            "buyer_ready"
+    
+        })
+      ) || []
+    
     )
     .sort(
       (a, b) =>
@@ -161,12 +187,8 @@ export default function ChainPage() {
     chainNodes
   );
       const transactionNodes: any[] = [];
-      const buyerReadyNode =
-      chainNodes.find(
-        (node) =>
-          node.node_type === "buyer_ready"
-      );
-    for (const root of rootProperties) {
+
+for (const root of rootProperties) {
     
       let current: any = root;
     
@@ -260,12 +282,23 @@ current = linkedProperty;
       0
     );
 
+    const totalNodeCount =
+    chainProperties.length +
+    (buyerReadyNode ? 1 : 0);
+  
   const averageProgress =
-    chainProperties.length > 0
+    totalNodeCount > 0
+  
       ? Math.round(
-          totalProgress /
-          chainProperties.length
+  
+          (
+            totalProgress +
+            buyerReadyProgress
+          ) /
+  
+          totalNodeCount
         )
+  
       : 0;
 
   
