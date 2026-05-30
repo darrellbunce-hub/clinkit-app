@@ -50,6 +50,7 @@ type Chain = {
 };
 type ChainContextType = {
   properties: Property[];
+  chainNodes: any[];
   chains: Chain[];
   currentUserId: string | null;
 
@@ -82,7 +83,8 @@ export function ChainProvider({
 
   const [properties, setProperties] =
   useState<Property[]>([]);
-
+  const [chainNodes, setChainNodes] =
+  useState<any[]>([]);
 const [chains, setChains] =
   useState<Chain[]>([]);
   const [currentUserId, setCurrentUserId] =
@@ -119,7 +121,12 @@ useEffect(() => {
       )
     `);
     
-
+    const {
+      data: chainNodesData,
+      error: chainNodesError,
+    } = await supabase
+      .from("chain_nodes")
+      .select("*");
     const formattedProperties =
   (data || []).map((property) => ({
 
@@ -208,6 +215,11 @@ console.log(
   formattedProperties
 );
     setProperties(formattedProperties);
+    if (!chainNodesError && chainNodesData) {
+
+      setChainNodes(chainNodesData);
+    
+    }
     const {
       data: chainsData,
     } = await supabase
@@ -536,6 +548,7 @@ return (
   <ChainContext.Provider
       value={{
         properties,
+        chainNodes,
         chains,
         currentUserId,
         updatePropertyStage,
