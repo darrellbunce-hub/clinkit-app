@@ -126,9 +126,29 @@ useEffect(() => {
       error: chainNodesError,
     } = await supabase
       .from("chain_nodes")
-      .select("*");
+      .select(`
+        *,
+        activities (
+          id,
+          timestamp,
+          update,
+          updated_by,
+          chain_node_id
+        )
+      `);
+    
+      console.log(
+        "CHAIN NODES QUERY",
+        chainNodesData
+      );
+      
+      console.log(
+        "FIRST NODE ACTIVITIES",
+        chainNodesData?.[0]?.activities
+      );
+    
     const formattedProperties =
-  (data || []).map((property) => ({
+      (data || []).map((property) => ({
 
         id: property.id,
 
@@ -217,6 +237,23 @@ console.log(
     setProperties(formattedProperties);
     if (!chainNodesError && chainNodesData) {
 
+      console.log(
+        "SETTING CHAIN NODES",
+        chainNodesData
+      );
+      console.log(
+        "CHAIN NODE ACTIVITIES COUNT",
+        chainNodesData?.[0]?.activities?.length
+      );
+      
+      console.log(
+        "CHAIN NODE FULL",
+        JSON.stringify(
+          chainNodesData?.[0],
+          null,
+          2
+        )
+      );
       setChainNodes(chainNodesData);
     
     }
@@ -337,50 +374,60 @@ if (!canEdit) {
       updated_by: "homeowner",
 
     });
-
-  setProperties((previousProperties) =>
-    previousProperties.map((property) => {
-
-      if (property.id === propertyId) {
-
-        return {
-
-          ...property,
-
-          stage: newStage,
-
-          activities: [
-
-            {
-              id: Date.now(),
-
-              timestamp:
-                new Date().toISOString(),
-
-              update: formattedUpdate,
-
-              updated_by: "homeowner",
-
-            },
-
-            ...property.activities,
-
-          ],
-
-        };
-      }
-
-      return property;
-
-    })
-  );
-}
+    setProperties((previousProperties) =>
+      previousProperties.map((property) => {
+    
+        if (property.id === propertyId) {
+    
+          return {
+    
+            ...property,
+    
+            stage: newStage,
+    
+            activities: [
+    
+              {
+                id: Date.now(),
+    
+                timestamp:
+                  new Date().toISOString(),
+    
+                update: formattedUpdate,
+    
+                updated_by: "homeowner",
+    
+              },
+    
+              ...property.activities,
+    
+            ],
+    
+          };
+        }
+    
+        return property;
+    
+      })
+    );
+    
+    }
 
 async function addStructuredUpdate(
   targetId: number,
   updateMessage: string,
   targetType: "property" | "buyer_ready" = "property"
 ) {
+  console.log(
+    "ADD STRUCTURED UPDATE",
+    targetId,
+    updateMessage,
+    targetType
+  );
+  console.log(
+    "TARGET TYPE RECEIVED",
+    targetType
+  );
   const property =
   targetType === "property"
 
@@ -391,66 +438,120 @@ async function addStructuredUpdate(
 
     : null;
 
-const canEdit =
-  property?.members?.some(
-    (member) =>
-      member.user_id === currentUserId
-  );
+    if (targetType === "property") {
 
-if (!canEdit) {
-
-  alert(
-    "You do not have permission to update this property"
-  );
-
-  return;
-}
-  await supabase
+      const canEdit =
+        property?.members?.some(
+          (member) =>
+            member.user_id === currentUserId
+        );
+    
+      if (!canEdit) {
+    
+        alert(
+          "You do not have permission to update this property"
+        );
+    
+        return;
+      }
+    
+    }
+    await supabase
     .from("activities")
     .insert({
-
-      property_id: targetId,
-
+  
+      property_id:
+        targetType === "property"
+          ? targetId
+          : null,
+  
+      chain_node_id:
+        targetType === "buyer_ready"
+          ? targetId
+          : null,
+  
       update: updateMessage,
-
+  
       updated_by: "homeowner",
-
+  
     });
 
-  setProperties((previousProperties) =>
-    previousProperties.map((property) => {
+    if (targetType === "property") {
 
-      if (property.id === targetId) {
+      setProperties((previousProperties) =>
+        previousProperties.map((property) => {
+    
+          if (property.id === targetId) {
+    
+            return {
+    
+              ...property,
+    
+              activities: [
+    
+                {
+                  id: Date.now(),
+    
+                  timestamp:
+                    new Date().toISOString(),
+    
+                  update: updateMessage,
+    
+                  updated_by: "homeowner",
+    
+                },
+    
+                ...property.activities,
+    
+              ],
+    
+            };
+          }
+    
+          return property;
+    
+        })
+      );
+    
+    } else {
 
-        return {
+      setChainNodes((previousNodes) =>
+        previousNodes.map((node) => {
+    
+          if (node.id === targetId) {
+    
+            return {
+    
+              ...node,
+    
+              activities: [
+    
+                {
+                  id: Date.now(),
+    
+                  timestamp:
+                    new Date().toISOString(),
+    
+                  update: updateMessage,
+    
+                  updated_by: "homeowner",
+    
+                },
+    
+                ...(node.activities || []),
+    
+              ],
+    
+            };
+          }
+    
+          return node;
+    
+        })
+      );
+    
+    }
 
-          ...property,
-
-          activities: [
-
-            {
-              id: Date.now(),
-
-              timestamp:
-                new Date().toISOString(),
-
-              update: updateMessage,
-
-              updated_by: "homeowner",
-
-            },
-
-            ...property.activities,
-
-          ],
-
-        };
-      }
-
-      return property;
-
-    })
-  );
 }
 
 async function breakChainConnection(

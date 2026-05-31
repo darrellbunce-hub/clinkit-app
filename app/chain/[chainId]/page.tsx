@@ -52,8 +52,17 @@ export default function ChainPage() {
           data: nodeData,
           error: nodeError,
         } = await supabase
-          .from("chain_nodes")
-          .select("*")
+        .from("chain_nodes")
+        .select(`
+          *,
+          activities (
+            id,
+            timestamp,
+            update,
+            updated_by,
+            chain_node_id
+          )
+        `)
           .eq("chain_id", Number(chainId))
           .order("position");
     
@@ -99,7 +108,19 @@ export default function ChainPage() {
     (node) =>
       node.node_type === "buyer_ready"
   );
-
+  console.log(
+    "CHAIN PAGE BUYER NODE",
+    buyerReadyNode
+  );
+  
+  console.log(
+    "CHAIN PAGE BUYER ACTIVITIES",
+    buyerReadyNode?.activities
+  );
+  console.log(
+    "BUYER READY ACTIVITIES",
+    buyerReadyNode?.activities
+  );
 const buyerReadyProgress =
   buyerReadyNode?.progress || 0;
       const recentActivities =
@@ -148,6 +169,11 @@ const buyerReadyProgress =
           a.timestamp || 0
         ).getTime()
     );
+    console.log(
+      "RECENT ACTIVITIES",
+      recentActivities
+    );
+
       const staleProperties =
       chainProperties.filter(
         (property) =>
@@ -185,6 +211,14 @@ const buyerReadyProgress =
   console.log(
     "CHAIN NODES",
     chainNodes
+  );
+  
+  console.log(
+    "RAW BUYER NODE FROM CHAIN NODES",
+    chainNodes.find(
+      (node) =>
+        node.node_type === "buyer_ready"
+    )
   );
       const transactionNodes: any[] = [];
 
@@ -1004,7 +1038,6 @@ currentUserRole={null}
   </h2>
 
   <div className="mt-6 space-y-4">
-
     {recentActivities.length === 0 && (
 
       <p className="text-slate-500">

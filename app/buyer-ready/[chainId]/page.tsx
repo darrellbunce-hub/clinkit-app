@@ -184,12 +184,19 @@ export default function BuyerReadyPage() {
       .single();
   
       if (!error && data) {
-
+        console.log(
+          "CALLING ADD STRUCTURED UPDATE",
+          buyerNode.id,
+          selectedStage.label,
+          "buyer_ready"
+        );
         await addStructuredUpdate(
 
           buyerNode.id,
         
-          selectedStage.label
+          selectedStage.label,
+        
+          "buyer_ready"
         
         );
       
@@ -360,12 +367,10 @@ async function handleStructuredUpdate() {
       
       await addStructuredUpdate(
         buyerNode.id,
-        updateMessage
+        updateMessage,
+        "buyer_ready"
       );
-    
-      setUpdateType("");
-      setDelayReason("");
-    }
+}
   return (
     <main className="min-h-screen bg-slate-100">
 
