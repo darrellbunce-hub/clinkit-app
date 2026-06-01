@@ -108,6 +108,13 @@ export default function ChainPage() {
     (node) =>
       node.node_type === "buyer_ready"
   );
+  const buyerReadyStageLabel =
+  buyerReadyNode?.stage
+    ?.replaceAll("_", " ")
+    .replace(
+      /\b\w/g,
+      (char: string) => char.toUpperCase()
+    ) || "Buyer Ready";
   console.log(
     "CHAIN PAGE BUYER NODE",
     buyerReadyNode
@@ -179,7 +186,28 @@ const buyerReadyProgress =
         (property) =>
           property.lastUpdatedDays > 21
       );
-  
+      const buyerReadyStale =
+      buyerReadyNode?.activities?.length
+        ? (() => {
+    
+            const latestActivity =
+              buyerReadyNode.activities[0];
+    
+            const daysSinceUpdate =
+              Math.floor(
+                (
+                  Date.now() -
+                  new Date(
+                    latestActivity.timestamp
+                  ).getTime()
+                ) /
+                (1000 * 60 * 60 * 24)
+              );
+    
+            return daysSinceUpdate > 21;
+    
+          })()
+        : true;
     const delayedProperties =
       chainProperties.filter(
         (property) =>
@@ -352,9 +380,13 @@ current = linkedProperty;
     let confidenceScore =
     85;
 
-  confidenceScore -= blockedCount * 25;
-  confidenceScore -= delayedCount * 10;
-  confidenceScore -= staleProperties.length * 5;
+    confidenceScore -= blockedCount * 25;
+    confidenceScore -= delayedCount * 10;
+    confidenceScore -= staleProperties.length * 5;
+    
+    if (buyerReadyStale) {
+      confidenceScore -= 5;
+    }
 
   if (confidenceScore < 0) {
     confidenceScore = 0;
@@ -418,10 +450,14 @@ else if (delayedCount > 0) {
     `${estimatedChainCompletion} (delays reported)`;
 }
 
-else if (staleProperties.length > 0) {
+else if (
+  staleProperties.length > 0 ||
+  buyerReadyStale
+) {
 
   estimatedChainCompletion =
     `${estimatedChainCompletion} (awaiting updates)`;
+
 }
 let bottleneckProperty =
   null;
@@ -781,19 +817,19 @@ else {
   className="hover:scale-105 transition"
 >
 
-  <ChainNode
-    propertyNumber={0}
-    displayTitle="Buyer Ready"
-    stageLabel="Mortgage preparation"
-    progress={
-      buyerReadyNode.progress
-    }
-    updatedDaysAgo={0}
-    currentUserRole="buyer"
-    status={buyerReadyNode.status}
-    buyer_connected={true}
-    seller_connected={true}
-  />
+    <ChainNode
+  propertyNumber={0}
+  displayTitle="Buyer Ready"
+  stageLabel={buyerReadyStageLabel}
+  progress={
+    buyerReadyNode.progress
+  }
+  updatedDaysAgo={0}
+  currentUserRole="buyer"
+  status={buyerReadyNode.status}
+  buyer_connected={true}
+  seller_connected={true}
+/>
 
 </Link>
 
@@ -893,11 +929,7 @@ else {
       property.address,
       property.currentUserRole
     );
-    const buyerReadyNode =
-  chainNodes.find(
-    (node) =>
-      node.node_type === "buyer_ready"
-  );
+    
     return (
 
       <div

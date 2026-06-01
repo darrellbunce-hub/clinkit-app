@@ -62,7 +62,16 @@ export default function BuyerReadyPage() {
         error,
       } = await supabase
         .from("chain_nodes")
-        .select("*")
+        .select(`
+          *,
+          activities (
+            id,
+            timestamp,
+            update,
+            updated_by,
+            chain_node_id
+          )
+        `)
         .eq("chain_id", chainId)
         .eq("node_type", "buyer_ready")
         .single();
@@ -312,9 +321,16 @@ if (
     `${estimatedCompletion} (stale activity)`;
 }
 async function handleStructuredUpdate() {
-      if (!updateType) {
-        return;
-      }
+
+  console.log(
+    "STRUCTURED UPDATE CLICKED",
+    updateType,
+    delayReason
+  );
+
+  if (!updateType) {
+    return;
+  }
     
       let updateMessage =
         "General Update";
@@ -759,11 +775,11 @@ Buyer Ready
           )}
 
 <button
-  onClick={updateBuyerStage}
-            className="mt-6 bg-slate-900 text-white px-6 py-4 rounded-2xl font-semibold hover:bg-slate-700 transition"
-          >
-            Add Update
-          </button>
+  onClick={handleStructuredUpdate}
+  className="mt-6 bg-slate-900 text-white px-6 py-4 rounded-2xl font-semibold hover:bg-slate-700 transition"
+>
+  Add Update
+</button>
 
         </div>
 {/* Break Chain Connection */}
@@ -830,7 +846,14 @@ Buyer Ready
 
           <div className="mt-6">
 
-  {(buyerNode.activities || []).map((activity: any, index: number) => (
+  {(buyerNode.activities || [])
+  .sort(
+    (a: any, b: any) =>
+      new Date(b.timestamp).getTime() -
+      new Date(a.timestamp).getTime()
+  )
+  .map(
+    (activity: any, index: number) => (
 
     <div
       key={activity.id}
