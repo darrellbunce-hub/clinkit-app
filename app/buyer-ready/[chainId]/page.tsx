@@ -24,6 +24,12 @@ export default function BuyerReadyPage() {
     useState("");
     const [draftStage, setDraftStage] =
   useState("");
+  const [successMessage, setSuccessMessage] =
+  useState("");
+  const [warningMessage, setWarningMessage] =
+  useState("");
+  const [isSaving, setIsSaving] =
+  useState(false);
     const [breakReason, setBreakReason] =
     useState("");
   const params = useParams();
@@ -142,34 +148,39 @@ export default function BuyerReadyPage() {
       stage.value === buyerNode?.stage
   );
   async function updateBuyerStage() {
-    console.log(
-        "UPDATE CLICKED",
-        draftStage
-      );
-    console.log(
-        "UPDATE BUYER STAGE CLICKED"
-      );
+    
+      if (isSaving) {
+        return;
+      }
+      
+      setIsSaving(true);
     const selectedStage =
       BUYER_READY_STAGES.find(
         (stage) =>
           stage.value === draftStage
       );
-      console.log(
-        "DRAFT STAGE",
-        draftStage
-      );
+    
     if (!selectedStage) {
       return;
     }
-    console.log(
-        "BUYER NODE FULL",
-        buyerNode
+    if (
+      buyerNode.stage === selectedStage.value
+    ) {
+    
+      setWarningMessage(
+        "This status has already been recorded."
       );
       
-      console.log(
-        "BUYER NODE ID",
-        buyerNode.id
-      );
+      setTimeout(() => {
+      
+        setWarningMessage("");
+      
+      }, 4000);
+    
+      return;
+    
+    }
+
     const {
       data,
       error,
@@ -193,12 +204,7 @@ export default function BuyerReadyPage() {
       .single();
   
       if (!error && data) {
-        console.log(
-          "CALLING ADD STRUCTURED UPDATE",
-          buyerNode.id,
-          selectedStage.label,
-          "buyer_ready"
-        );
+      
         await addStructuredUpdate(
 
           buyerNode.id,
@@ -210,16 +216,20 @@ export default function BuyerReadyPage() {
         );
       
         setBuyerNode(data);
-      
-        setDraftStage("");
-      
+
+setDraftStage("");
+
+setSuccessMessage(
+  "Buyer Ready status updated successfully."
+);
+
+setTimeout(() => {
+
+  setSuccessMessage("");
+
+}, 4000);
       }
   
-    console.log(
-      "BUYER NODE UPDATE",
-      data,
-      error
-    );
   }
   const latestDelay = null;
 
@@ -263,15 +273,7 @@ BUYER_READY_STAGES.findIndex(
     (stage) =>
       stage.value === buyerNode.stage
   );
-  console.log(
-    "BUYER NODE STAGE",
-    buyerNode.stage
-  );
   
-  console.log(
-    "BUYER STAGE INDEX",
-    currentStageIndex
-  );
   const completedStages =
   currentStageIndex >= 0
     ? BUYER_READY_STAGES.slice(
@@ -321,12 +323,6 @@ if (
     `${estimatedCompletion} (stale activity)`;
 }
 async function handleStructuredUpdate() {
-
-  console.log(
-    "STRUCTURED UPDATE CLICKED",
-    updateType,
-    delayReason
-  );
 
   if (!updateType) {
     return;
@@ -381,11 +377,46 @@ async function handleStructuredUpdate() {
         return;
       }
       
+      const latestActivity =
+        buyerNode.activities?.[0];
+      
+      if (
+        latestActivity?.update ===
+        updateMessage
+      ) {
+      
+        setWarningMessage(
+          "This update has already been recorded."
+        );
+        
+        setTimeout(() => {
+        
+          setWarningMessage("");
+        
+        }, 4000);
+      
+        return;
+      
+      }
+      
       await addStructuredUpdate(
         buyerNode.id,
         updateMessage,
         "buyer_ready"
       );
+      
+      setUpdateType("");
+      setDelayReason("");
+      
+      setSuccessMessage(
+        "Update shared with the chain."
+      );
+      
+      setTimeout(() => {
+      
+        setSuccessMessage("");
+      
+      }, 4000);
 }
   return (
     <main className="min-h-screen bg-slate-100">
@@ -393,7 +424,46 @@ async function handleStructuredUpdate() {
       <Navbar />
 
       <div className="max-w-4xl mx-auto px-6 py-12">
-      <div className="flex items-center gap-4 mb-6">
+
+  {successMessage && (
+
+    <div
+      className="
+        mb-6
+        rounded-2xl
+        border
+        border-green-200
+        bg-green-50
+        px-5
+        py-4
+        text-green-700
+        font-medium
+      "
+    >
+      ✓ {successMessage}
+    </div>
+
+  )}
+{warningMessage && (
+
+<div
+  className="
+    mb-6
+    rounded-2xl
+    border
+    border-amber-200
+    bg-amber-50
+    px-5
+    py-4
+    text-amber-700
+    font-medium
+  "
+>
+  ⚠ {warningMessage}
+</div>
+
+)}
+  <div className="flex items-center gap-4 mb-6">
 
 <Link
   href={`/chain/${buyerNode.chain_id}`}

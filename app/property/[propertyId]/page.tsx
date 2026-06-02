@@ -22,6 +22,11 @@ export default function PropertyPage() {
     useState("");
     const [draftStage, setDraftStage] =
   useState("");
+  const [successMessage, setSuccessMessage] =
+  useState("");
+
+const [warningMessage, setWarningMessage] =
+  useState("");
     const [breakReason, setBreakReason] =
     useState("");
   const params = useParams();
@@ -61,6 +66,18 @@ export default function PropertyPage() {
   const currentProperty = properties.find(
     (property) => property.id === propertyId
   );
+  useEffect(() => {
+
+    if (currentProperty) {
+  
+      setDraftStage(
+        currentProperty.stage
+      );
+  
+    }
+  
+  }, [currentProperty]);
+  
 
   function formatTimeAgo(
     timestamp: string
@@ -272,6 +289,46 @@ async function handleStructuredUpdate() {
       setUpdateType("");
       setDelayReason("");
     }
+    async function handlePropertyStageUpdate() {
+
+      if (!currentProperty) {
+        return;
+      }
+    
+      if (
+        currentProperty.stage === draftStage
+      ) {
+    
+        setWarningMessage(
+          "This status has already been recorded."
+        );
+    
+        setTimeout(() => {
+    
+          setWarningMessage("");
+    
+        }, 4000);
+    
+        return;
+    
+      }
+    
+      await updatePropertyStage(
+        currentProperty.id,
+        draftStage
+      );
+    
+      setSuccessMessage(
+        "Property status updated successfully."
+      );
+    
+      setTimeout(() => {
+    
+        setSuccessMessage("");
+    
+      }, 4000);
+    
+    }
   return (
     <main className="min-h-screen bg-slate-100">
 
@@ -279,7 +336,45 @@ async function handleStructuredUpdate() {
 
       <div className="max-w-4xl mx-auto px-6 py-12">
       <div className="flex items-center gap-4 mb-6">
+      {successMessage && (
 
+<div
+  className="
+    mb-6
+    rounded-2xl
+    border
+    border-green-200
+    bg-green-50
+    px-5
+    py-4
+    text-green-700
+    font-medium
+  "
+>
+  ✓ {successMessage}
+</div>
+
+)}
+
+{warningMessage && (
+
+<div
+  className="
+    mb-6
+    rounded-2xl
+    border
+    border-amber-200
+    bg-amber-50
+    px-5
+    py-4
+    text-amber-700
+    font-medium
+  "
+>
+  ⚠ {warningMessage}
+</div>
+
+)}
 <Link
   href={`/chain/${currentProperty.chainId}`}
   className="
@@ -570,12 +665,7 @@ async function handleStructuredUpdate() {
           </select>
           <button
   disabled={!canEdit}
-  onClick={() =>
-    updatePropertyStage(
-      currentProperty.id,
-      draftStage
-    )
-  }
+  onClick={handlePropertyStageUpdate}
   className="
     mt-4
     bg-slate-900
