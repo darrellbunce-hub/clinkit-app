@@ -42,7 +42,11 @@ export default function BuyerReadyPage() {
     breakChainConnection,
     currentUserId,
   } = useChain();
-  
+  console.log(
+  "BUYER READY PROPERTIES",
+  properties
+);
+
   
   useEffect(() => {
     async function checkAuth() {
@@ -94,7 +98,20 @@ export default function BuyerReadyPage() {
   }, [chainId]);
   const [buyerNode, setBuyerNode] =
   useState<any>(null);
-
+  console.log(
+    "CURRENT USER",
+    currentUserId
+  );
+  
+  console.log(
+    "PROPERTIES",
+    properties
+  );
+  
+  console.log(
+    "BUYER NODE",
+    buyerNode
+  );
   function formatTimeAgo(
     timestamp: string
   ) {
@@ -895,7 +912,7 @@ Buyer Ready
       }
 
       breakChainConnection(
-        buyerNode.id,
+        buyerNode.linked_property_id,
         breakReason
       );
     }}

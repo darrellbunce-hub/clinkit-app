@@ -280,12 +280,40 @@ async function handleStructuredUpdate() {
       if (!currentProperty) {
         return;
       }
-      
+      const latestActivity =
+  currentProperty.activities?.[0];
+
+if (
+  latestActivity?.update ===
+  updateMessage
+) {
+
+  setWarningMessage(
+    "This update has already been recorded."
+  );
+
+  setTimeout(() => {
+
+    setWarningMessage("");
+
+  }, 4000);
+
+  return;
+
+}
       await addStructuredUpdate(
         currentProperty.id,
         updateMessage
       );
-    
+      setSuccessMessage(
+        "Update shared with the chain."
+      );
+      
+      setTimeout(() => {
+      
+        setSuccessMessage("");
+      
+      }, 4000);
       setUpdateType("");
       setDelayReason("");
     }

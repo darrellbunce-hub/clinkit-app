@@ -224,7 +224,7 @@ export default function StartMovePage() {
           }
     
         }
-    
+        let buyerReadyPropertyId = null;
         // BUYING PROPERTY
         if (!notBuying && buyingAddress) {
           
@@ -318,7 +318,8 @@ export default function StartMovePage() {
           }
     
           if (buyingProperty) {
-    
+            buyerReadyPropertyId =
+            buyingProperty.id;
             await supabase
               .from("property_members")
               .insert({
@@ -336,24 +337,27 @@ export default function StartMovePage() {
         if (notSelling) {
 
           await supabase
-            .from("chain_nodes")
-            .insert({
-        
-              chain_id: chainData.id,
-        
-              node_type: "buyer_ready",
-        
-              user_id: user.id,
-        
-              position: 0,
-        
-              stage: "mortgage_preparation",
-        
-              status: "healthy",
-        
-              progress: 10,
-        
-            });
+  .from("chain_nodes")
+  .insert({
+
+    chain_id: chainData.id,
+
+    linked_property_id:
+  buyerReadyPropertyId,
+
+    node_type: "buyer_ready",
+
+    user_id: user.id,
+
+    position: 0,
+
+    stage: "mortgage_preparation",
+
+    status: "healthy",
+
+    progress: 10,
+
+  });
         
         }
         console.log(
