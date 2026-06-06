@@ -307,11 +307,61 @@ current = linkedProperty;
       transactionNodes.find(
         (node) => node.currentUserRole
       );
-    
-    const isEndOfChain =
-      currentUserProperty?.currentUserRole ===
-        "seller" &&
-      !currentUserProperty?.is_searching;
+
+    const isBuyerOnChain =
+      chainProperties.some(
+        (property) =>
+          property.currentUserRole === "buyer"
+      );
+
+    const isBuyerReadyUser =
+      !!buyerReadyNode &&
+      (isBuyerOnChain ||
+        buyerReadyNode.user_id === currentUserId);
+
+    const currentUserSellerProperty =
+      transactionNodes.find(
+        (node) =>
+          node.currentUserRole === "seller"
+      ) ||
+      chainProperties.find(
+        (property) =>
+          property.currentUserRole === "seller"
+      );
+
+    const sellerHasOnwardPurchase =
+      !!currentUserSellerProperty &&
+      chainProperties.some(
+        (property) =>
+          property.relationship_type ===
+            "purchase" &&
+          (property.created_by_user_id ===
+            currentUserId ||
+            property.currentUserRole ===
+              "buyer")
+      );
+
+    let showSyntheticTopTile = false;
+    let isEndOfChain = false;
+
+    if (
+      isBuyerOnChain ||
+      isBuyerReadyUser
+    ) {
+      showSyntheticTopTile = false;
+    } else if (currentUserSellerProperty) {
+      if (sellerHasOnwardPurchase) {
+        showSyntheticTopTile = false;
+      } else if (
+        currentUserSellerProperty.awaiting_buyer
+      ) {
+        showSyntheticTopTile = true;
+        isEndOfChain = true;
+      } else {
+        showSyntheticTopTile = true;
+        isEndOfChain = false;
+      }
+    }
   const currentChain =
     chains.find(
       (chain) =>
@@ -1012,8 +1062,8 @@ else {
     );
   })}
 
-  {/* Top of chain node */}
-<div className="flex items-center">
+  {showSyntheticTopTile && (
+  <div className="flex items-center">
 
     <div className="flex items-center mx-5">
 
@@ -1046,7 +1096,7 @@ else {
         isEndOfChain ? 100 : 0
       }
       updatedDaysAgo={0}
-currentUserRole={null}
+      currentUserRole={null}
       status={
         isEndOfChain
           ? "healthy"
@@ -1057,6 +1107,7 @@ currentUserRole={null}
     />
 
   </div>
+  )}
 
 </div>
 
