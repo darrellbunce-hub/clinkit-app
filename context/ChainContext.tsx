@@ -570,7 +570,7 @@ const canEdit =
       member.user_id === currentUserId
   );
 
-if (!canEdit) {
+if (!property || !canEdit) {
 
   alert(
     "You do not have permission to update this property"
@@ -583,15 +583,72 @@ if (!canEdit) {
       ? "Chain Connection Broken - Buyer Side"
       : "Chain Connection Broken - Seller Side";
 
-  await supabase
-    .from("properties")
-    .update({
+  const propertyUpdates =
+    new Map<
+      number,
+      {
+        linked_property_id?: null;
+        status?: string;
+        buyer_connected?: boolean;
+        seller_connected?: boolean;
+      }
+    >();
 
-      status:
-        "broken_connection",
+  if (breakReason === "seller_side") {
 
-    })
-    .eq("id", propertyId);
+    const upstreamPropertyId =
+      property.linked_property_id;
+
+    propertyUpdates.set(propertyId, {
+      status: "broken_connection",
+      linked_property_id: null,
+      seller_connected: false,
+    });
+
+    if (upstreamPropertyId) {
+
+      propertyUpdates.set(
+        upstreamPropertyId,
+        {
+          buyer_connected: false,
+        }
+      );
+    }
+  } else {
+
+    propertyUpdates.set(propertyId, {
+      status: "broken_connection",
+      buyer_connected: false,
+    });
+
+    properties
+      .filter(
+        (chainProperty) =>
+          chainProperty.linked_property_id ===
+          propertyId
+      )
+      .forEach((inboundProperty) => {
+
+        propertyUpdates.set(
+          inboundProperty.id,
+          {
+            linked_property_id: null,
+            seller_connected: false,
+          }
+        );
+      });
+  }
+
+  for (const [
+    updatedPropertyId,
+    updates,
+  ] of propertyUpdates) {
+
+    await supabase
+      .from("properties")
+      .update(updates)
+      .eq("id", updatedPropertyId);
+  }
 
   await supabase
     .from("activities")
@@ -605,42 +662,50 @@ if (!canEdit) {
 
     });
 
-  setProperties((previousProperties) =>
-    previousProperties.map((property) => {
+  const newActivity = {
+    id: Date.now(),
 
-      if (property.id === propertyId) {
+    timestamp:
+      new Date().toISOString(),
+
+    update: updateMessage,
+
+    updated_by: "homeowner",
+  };
+
+  setProperties((previousProperties) =>
+    previousProperties.map((chainProperty) => {
+
+      const updates =
+        propertyUpdates.get(
+          chainProperty.id
+        );
+
+      if (
+        !updates &&
+        chainProperty.id !== propertyId
+      ) {
+        return chainProperty;
+      }
+
+      const updatedProperty = {
+        ...chainProperty,
+        ...updates,
+      };
+
+      if (chainProperty.id === propertyId) {
 
         return {
-
-          ...property,
-
-          status:
-            "broken_connection",
+          ...updatedProperty,
 
           activities: [
-
-            {
-              id: Date.now(),
-
-              timestamp:
-                new Date().toISOString(),
-
-              update: updateMessage,
-
-              updated_by:
-                "homeowner",
-
-            },
-
-            ...property.activities,
-
+            newActivity,
+            ...chainProperty.activities,
           ],
-
         };
       }
 
-      return property;
-
+      return updatedProperty;
     })
   );
 }

@@ -30,6 +30,8 @@ export default function BuyerReadyPage() {
   useState("");
   const [isSaving, setIsSaving] =
   useState(false);
+  const [isBreaking, setIsBreaking] =
+    useState(false);
     const [breakReason, setBreakReason] =
     useState("");
   const params = useParams();
@@ -159,6 +161,80 @@ export default function BuyerReadyPage() {
   }
   const canEdit =
   buyerNode.user_id === currentUserId;
+
+  const linkedProperty =
+    properties.find(
+      (property) =>
+        property.id ===
+        buyerNode.linked_property_id
+    );
+
+  const isConnectionBroken =
+    linkedProperty?.status ===
+    "broken_connection";
+
+  const canBreakLinkedProperty =
+    linkedProperty?.members?.some(
+      (member) =>
+        member.user_id === currentUserId
+    ) ?? false;
+
+  const isBreakDisabled =
+    isConnectionBroken ||
+    isBreaking ||
+    !breakReason;
+
+  const timelineActivities = [
+    ...(buyerNode.activities || []),
+    ...(linkedProperty?.activities || []),
+  ].sort(
+    (a, b) =>
+      new Date(b.timestamp).getTime() -
+      new Date(a.timestamp).getTime()
+  );
+
+  async function handleBreakChainConnection() {
+    if (
+      !breakReason ||
+      isConnectionBroken ||
+      isBreaking ||
+      !buyerNode.linked_property_id
+    ) {
+      return;
+    }
+
+    if (!canBreakLinkedProperty) {
+      setWarningMessage(
+        "You do not have permission to break this chain connection."
+      );
+
+      setTimeout(() => {
+        setWarningMessage("");
+      }, 4000);
+
+      return;
+    }
+
+    setIsBreaking(true);
+
+    try {
+      await breakChainConnection(
+        buyerNode.linked_property_id,
+        breakReason
+      );
+
+      setSuccessMessage(
+        "Chain connection broken successfully."
+      );
+
+      setTimeout(() => {
+        setSuccessMessage("");
+      }, 4000);
+    } finally {
+      setIsBreaking(false);
+    }
+  }
+
   const currentStage =
   BUYER_READY_STAGES.find(
     (stage) =>
@@ -872,9 +948,31 @@ Buyer Ready
 {/* Break Chain Connection */}
 <div className="mt-8 bg-white rounded-3xl shadow-sm border border-red-200 p-8">
 
-  <h2 className="text-3xl font-bold text-slate-900">
-    Break Chain Connection
-  </h2>
+  <div className="flex items-start justify-between gap-6">
+
+    <h2 className="text-3xl font-bold text-slate-900">
+      Break Chain Connection
+    </h2>
+
+    {linkedProperty && (
+      <span
+        className={`
+          shrink-0 px-4 py-2 rounded-full text-sm font-semibold
+
+          ${
+            isConnectionBroken
+              ? "bg-red-100 text-red-700"
+              : "bg-green-100 text-green-700"
+          }
+        `}
+      >
+        {isConnectionBroken
+          ? "Connection Broken"
+          : "Connection Active"}
+      </span>
+    )}
+
+  </div>
 
   <p className="mt-4 text-slate-600 max-w-2xl">
     This should only be used after discussions with estate agents or solicitors. Breaking a chain connection may impact confidence scoring and overall chain progression.
@@ -887,7 +985,8 @@ Buyer Ready
         event.target.value
       )
     }
-    className="mt-6 w-full border border-slate-300 text-slate-900 rounded-2xl px-4 py-4"
+    disabled={isConnectionBroken}
+    className="mt-6 w-full border border-slate-300 text-slate-900 rounded-2xl px-4 py-4 disabled:bg-slate-100 disabled:text-slate-500"
   >
 
     <option value="">
@@ -905,21 +1004,22 @@ Buyer Ready
   </select>
 
   <button
-    onClick={() => {
+    onClick={handleBreakChainConnection}
+    disabled={isBreakDisabled}
+    className={`
+      mt-6 px-6 py-4 rounded-2xl font-semibold transition
 
-      if (!breakReason) {
-        return;
+      ${
+        isBreakDisabled
+          ? "bg-slate-300 text-slate-500 cursor-not-allowed"
+          : "bg-red-600 hover:bg-red-700 text-white"
       }
-
-      breakChainConnection(
-        buyerNode.linked_property_id,
-        breakReason
-      );
-    }}
-    className="mt-6 bg-red-600 hover:bg-red-700 text-white px-6 py-4 rounded-2xl font-semibold transition"
+    `}
   >
 
-    Break Chain Connection
+    {isConnectionBroken
+      ? "Connection Already Broken"
+      : "Break Chain Connection"}
 
   </button>
 
@@ -933,23 +1033,17 @@ Buyer Ready
 
           <div className="mt-6">
 
-  {(buyerNode.activities || [])
-  .sort(
-    (a: any, b: any) =>
-      new Date(b.timestamp).getTime() -
-      new Date(a.timestamp).getTime()
-  )
-  .map(
-    (activity: any, index: number) => (
+  {timelineActivities.map(
+    (activity, index) => (
 
     <div
-      key={activity.id}
+      key={`${activity.id}-${index}`}
       className="relative pl-10 pb-10"
     >
 
       {/* Vertical Line */}
       {index !==
-        buyerNode.activities.length - 1 && (
+        timelineActivities.length - 1 && (
 
         <div
           className="

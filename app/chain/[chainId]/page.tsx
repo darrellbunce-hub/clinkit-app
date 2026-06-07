@@ -11,6 +11,76 @@ import { useChain } from "@/context/ChainContext";
 import { supabase } from "@/lib/supabase";
 import { STAGES } from "@/data/stages";
 
+type SegmentGapState =
+  | "connected"
+  | "awaiting_connection"
+  | "broken";
+
+function getSegmentGapState(
+  previousSegment: {
+    id: number;
+    status: string;
+    linked_property_id: number | null;
+    buyer_connected: boolean;
+    seller_connected: boolean;
+  }[],
+  nextSegment: {
+    id: number;
+    status: string;
+    linked_property_id: number | null;
+    buyer_connected: boolean;
+    seller_connected: boolean;
+  }[]
+): SegmentGapState {
+  const tail =
+    previousSegment[
+      previousSegment.length - 1
+    ];
+  const head = nextSegment[0];
+
+  if (
+    tail.status ===
+      "broken_connection" ||
+    head.status === "broken_connection"
+  ) {
+    return "broken";
+  }
+
+  const hasTopologyLink =
+    tail.linked_property_id ===
+      head.id ||
+    head.linked_property_id ===
+      tail.id;
+
+  if (
+    hasTopologyLink &&
+    tail.status === "healthy" &&
+    head.status === "healthy" &&
+    tail.buyer_connected &&
+    tail.seller_connected &&
+    head.buyer_connected &&
+    head.seller_connected
+  ) {
+    return "connected";
+  }
+
+  if (
+    tail.status ===
+      "pending_connection" ||
+    head.status ===
+      "pending_connection" ||
+    !hasTopologyLink ||
+    !tail.buyer_connected ||
+    !tail.seller_connected ||
+    !head.buyer_connected ||
+    !head.seller_connected
+  ) {
+    return "awaiting_connection";
+  }
+
+  return "connected";
+}
+
 export default function ChainPage() {
 
   const params = useParams();
@@ -220,17 +290,17 @@ const buyerReadyProgress =
       );
   
       
-      const realProperties =
+      const renderableProperties =
       chainProperties.filter(
         (property) =>
-          !property.is_searching
+          property.address
       );
-    
+
       const rootProperties =
-  realProperties.filter(
+  renderableProperties.filter(
     (property) =>
 
-      !realProperties.some(
+      !renderableProperties.some(
         (candidate) =>
           candidate.linked_property_id ===
           property.id
@@ -248,18 +318,20 @@ const buyerReadyProgress =
         node.node_type === "buyer_ready"
     )
   );
-      const transactionNodes: any[] = [];
+      const chainSegments: any[][] = [];
 
 for (const root of rootProperties) {
-    
+
+      const segment: any[] = [];
+
       let current: any = root;
-    
+
       while (current) {
-    
-        transactionNodes.push(current);
-    
+
+        segment.push(current);
+
         const linkedProperty =
-  realProperties.find(
+  renderableProperties.find(
     (candidate) =>
       candidate.id ===
       current.linked_property_id
@@ -271,8 +343,55 @@ if (!linkedProperty) {
 
 current = linkedProperty;
       }
+
+      if (segment.length > 0) {
+
+        chainSegments.push(segment);
+
+      }
     }
 
+      const flatNodes =
+        chainSegments.flat();
+
+    const hasPurchaseProperty =
+      renderableProperties.some(
+        (property) =>
+          property.relationship_type ===
+          "purchase"
+      );
+
+    const saleProperties =
+      renderableProperties.filter(
+        (property) =>
+          property.relationship_type ===
+          "sale"
+      );
+
+    const sellerConfirmedEndOfChain =
+      saleProperties.some(
+        (property) =>
+          property.awaiting_buyer
+      );
+
+    const showBuyerReadyPrefix =
+      !!buyerReadyNode;
+
+    let showSyntheticTopTile = false;
+    let isEndOfChain = false;
+
+    if (
+      !hasPurchaseProperty &&
+      renderableProperties.length > 0
+    ) {
+      if (sellerConfirmedEndOfChain) {
+        showSyntheticTopTile = true;
+        isEndOfChain = true;
+      } else {
+        showSyntheticTopTile = true;
+        isEndOfChain = false;
+      }
+    }
 
     let chainHealth =
       "Stable";
@@ -303,65 +422,25 @@ current = linkedProperty;
       chainHealthMessage =
         "Multiple delays or stale properties may impact chain progression.";
     }
-    const currentUserProperty =
-      transactionNodes.find(
-        (node) => node.currentUserRole
-      );
 
-    const isBuyerOnChain =
-      chainProperties.some(
+    const brokenConnectionProperties =
+      chainProperties.filter(
         (property) =>
-          property.currentUserRole === "buyer"
+          property.status ===
+          "broken_connection"
       );
 
-    const isBuyerReadyUser =
-      !!buyerReadyNode &&
-      (isBuyerOnChain ||
-        buyerReadyNode.user_id === currentUserId);
+    const requiresReplacementBuyer =
+      brokenConnectionProperties.length > 0;
 
-    const currentUserSellerProperty =
-      transactionNodes.find(
-        (node) =>
-          node.currentUserRole === "seller"
-      ) ||
-      chainProperties.find(
-        (property) =>
-          property.currentUserRole === "seller"
-      );
+    if (requiresReplacementBuyer) {
+      chainHealth =
+        "Replacement Buyer Required";
 
-    const sellerHasOnwardPurchase =
-      !!currentUserSellerProperty &&
-      chainProperties.some(
-        (property) =>
-          property.relationship_type ===
-            "purchase" &&
-          (property.created_by_user_id ===
-            currentUserId ||
-            property.currentUserRole ===
-              "buyer")
-      );
-
-    let showSyntheticTopTile = false;
-    let isEndOfChain = false;
-
-    if (
-      isBuyerOnChain ||
-      isBuyerReadyUser
-    ) {
-      showSyntheticTopTile = false;
-    } else if (currentUserSellerProperty) {
-      if (sellerHasOnwardPurchase) {
-        showSyntheticTopTile = false;
-      } else if (
-        currentUserSellerProperty.awaiting_buyer
-      ) {
-        showSyntheticTopTile = true;
-        isEndOfChain = true;
-      } else {
-        showSyntheticTopTile = true;
-        isEndOfChain = false;
-      }
+      chainHealthMessage =
+        "A chain connection has been broken. A replacement buyer may be required before the chain can progress.";
     }
+
   const currentChain =
     chains.find(
       (chain) =>
@@ -433,7 +512,9 @@ current = linkedProperty;
     confidenceScore -= blockedCount * 25;
     confidenceScore -= delayedCount * 10;
     confidenceScore -= staleProperties.length * 5;
-    
+    confidenceScore -=
+      brokenConnectionProperties.length * 30;
+
     if (buyerReadyStale) {
       confidenceScore -= 5;
     }
@@ -467,6 +548,11 @@ else if (confidenceScore >= 40) {
 }
   let estimatedChainCompletion =
   "16–20 weeks";
+
+if (requiresReplacementBuyer) {
+  estimatedChainCompletion =
+    "Awaiting chain recovery";
+} else {
 
 if (averageProgress >= 20) {
   estimatedChainCompletion =
@@ -507,6 +593,8 @@ else if (
 
   estimatedChainCompletion =
     `${estimatedChainCompletion} (awaiting updates)`;
+
+}
 
 }
 let bottleneckProperty =
@@ -856,7 +944,7 @@ else {
 <div className="mt-12 bg-white rounded-3xl shadow-sm border border-slate-200 p-8 overflow-x-auto pb-4">
 
 <div className="flex items-center min-w-max">
-{transactionNodes[0]?.currentUserRole === "buyer" && (
+{showBuyerReadyPrefix && (
 
 <div className="flex items-center">
 
@@ -898,32 +986,134 @@ else {
 </div>
 
 )}
-  {transactionNodes.map((property, index) => {
+  {chainSegments.map((segment, segmentIndex) => {
+
+    const currentUserIndex =
+      flatNodes.findIndex(
+        (node) =>
+          node.currentUserRole === "seller" ||
+          node.currentUserRole === "buyer"
+      );
+
+    const segmentGapState =
+      segmentIndex > 0
+        ? getSegmentGapState(
+            chainSegments[
+              segmentIndex - 1
+            ],
+            segment
+          )
+        : null;
+
+    return (
+
+      <div
+        key={`segment-${segmentIndex}`}
+        className="flex items-center"
+      >
+
+        {segmentGapState === "broken" && (
+
+          <div
+            className="flex flex-col items-center mx-10 shrink-0"
+            aria-label="Chain break"
+          >
+
+            <div
+              className="
+                h-20
+                border-l-4
+                border-dashed
+                border-red-400
+              "
+            />
+
+            <p
+              className="
+                mt-2
+                text-xs
+                font-semibold
+                text-red-600
+                whitespace-nowrap
+              "
+            >
+              Chain break
+            </p>
+
+          </div>
+
+        )}
+
+        {segmentGapState ===
+          "awaiting_connection" && (
+
+          <div
+            className="flex flex-col items-center mx-10 shrink-0"
+            aria-label="Awaiting connection"
+          >
+
+            <div
+              className="
+                h-20
+                border-l-4
+                border-dashed
+                border-amber-400
+              "
+            />
+
+            <p
+              className="
+                mt-2
+                text-xs
+                font-semibold
+                text-amber-700
+                whitespace-nowrap
+              "
+            >
+              Awaiting connection
+            </p>
+
+          </div>
+
+        )}
+
+        {segmentGapState ===
+          "connected" && (
+
+          <div className="flex items-center mx-5">
+
+            <div
+              className="
+                w-24
+                h-1
+                rounded-full
+                bg-green-400
+              "
+            />
+
+          </div>
+
+        )}
+
+        {segment.map((property, propertyIndex) => {
 
     const stage = STAGES.find(
       (stage) =>
         stage.value === property.stage
     );
 
+    const globalIndex =
+      flatNodes.findIndex(
+        (node) =>
+          node.id === property.id
+      );
 
-      const isPurchase =
-      property.currentUserRole === "buyer";
-    
-    const isSale =
-      property.currentUserRole === "seller";
-
-      const currentUserIndex =
-  transactionNodes.findIndex(
-    (node) =>
-      node.currentUserRole === "seller" ||
-      node.currentUserRole === "buyer"
-  );
   const isBottomOfChain =
-  index === 0 &&
+  globalIndex === 0 &&
   !property.currentUserRole;
 
     let displayTitle =
-      `Property ${index + 1}`;
+      `Property ${globalIndex + 1}`;
     
       if (property.currentUserRole) {
     
@@ -947,7 +1137,7 @@ else {
     
     }
     
-    else if (index < currentUserIndex) {
+    else if (globalIndex < currentUserIndex) {
 
       displayTitle =
         isBottomOfChain
@@ -956,7 +1146,7 @@ else {
     
     }
     
-    else if (index > currentUserIndex) {
+    else if (globalIndex > currentUserIndex) {
     
       displayTitle = "Your Seller";
     
@@ -1024,7 +1214,7 @@ else {
 
         </Link>
 
-        {index < transactionNodes.length - 1 && (
+        {propertyIndex < segment.length - 1 && (
 
           <div className="flex items-center mx-5">
 
@@ -1062,6 +1252,11 @@ else {
     );
   })}
 
+      </div>
+
+    );
+  })}
+
   {showSyntheticTopTile && (
   <div className="flex items-center">
 
@@ -1080,7 +1275,7 @@ else {
 
     <ChainNode
       propertyNumber={
-        transactionNodes.length + 1
+        flatNodes.length + 1
       }
       displayTitle={
         isEndOfChain
