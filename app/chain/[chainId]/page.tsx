@@ -10,76 +10,12 @@ import Link from "next/link";
 import { useChain } from "@/context/ChainContext";
 import { supabase } from "@/lib/supabase";
 import { STAGES } from "@/data/stages";
-
-type SegmentGapState =
-  | "connected"
-  | "awaiting_connection"
-  | "broken";
-
-function getSegmentGapState(
-  previousSegment: {
-    id: number;
-    status: string;
-    linked_property_id: number | null;
-    buyer_connected: boolean;
-    seller_connected: boolean;
-  }[],
-  nextSegment: {
-    id: number;
-    status: string;
-    linked_property_id: number | null;
-    buyer_connected: boolean;
-    seller_connected: boolean;
-  }[]
-): SegmentGapState {
-  const tail =
-    previousSegment[
-      previousSegment.length - 1
-    ];
-  const head = nextSegment[0];
-
-  if (
-    tail.status ===
-      "broken_connection" ||
-    head.status === "broken_connection"
-  ) {
-    return "broken";
-  }
-
-  const hasTopologyLink =
-    tail.linked_property_id ===
-      head.id ||
-    head.linked_property_id ===
-      tail.id;
-
-  if (
-    hasTopologyLink &&
-    tail.status === "healthy" &&
-    head.status === "healthy" &&
-    tail.buyer_connected &&
-    tail.seller_connected &&
-    head.buyer_connected &&
-    head.seller_connected
-  ) {
-    return "connected";
-  }
-
-  if (
-    tail.status ===
-      "pending_connection" ||
-    head.status ===
-      "pending_connection" ||
-    !hasTopologyLink ||
-    !tail.buyer_connected ||
-    !tail.seller_connected ||
-    !head.buyer_connected ||
-    !head.seller_connected
-  ) {
-    return "awaiting_connection";
-  }
-
-  return "connected";
-}
+import { buildChainTopology } from "@/lib/buildChainTopology";
+import {
+  type ChainNodesChainSummary,
+  summaryToBuyerReadyTopologyInput,
+  isBuyerReadySummaryStale,
+} from "@/lib/chainNodesSummary";
 
 export default function ChainPage() {
 
@@ -95,8 +31,12 @@ export default function ChainPage() {
       chains,
       currentUserId,
     } = useChain();
-    const [chainNodes, setChainNodes] =
-    useState<any[]>([]);
+    const [
+      buyerReadySummary,
+      setBuyerReadySummary,
+    ] = useState<ChainNodesChainSummary | null>(
+      null
+    );
     useEffect(() => {
 
       async function checkAuth() {
@@ -116,40 +56,38 @@ export default function ChainPage() {
     }, []);
     useEffect(() => {
 
-      async function loadChainNodes() {
+      async function loadBuyerReadySummary() {
     
         const {
-          data: nodeData,
-          error: nodeError,
+          data: summaryData,
+          error: summaryError,
         } = await supabase
-        .from("chain_nodes")
-        .select(`
-          *,
-          activities (
-            id,
-            timestamp,
-            update,
-            updated_by,
-            chain_node_id
-          )
-        `)
+        .from("chain_nodes_chain_summary")
+        .select("*")
           .eq("chain_id", Number(chainId))
-          .order("position");
+          .eq("node_type", "buyer_ready")
+          .order("position")
+          .limit(1)
+          .maybeSingle();
     
-        if (!nodeError && nodeData) {
+        if (!summaryError && summaryData) {
     
-          setChainNodes(nodeData);
+          setBuyerReadySummary(summaryData);
+    
+        } else {
+    
+          setBuyerReadySummary(null);
     
         }
     
         console.log(
-          "CHAIN NODES",
-          nodeData,
-          nodeError
+          "BUYER READY SUMMARY",
+          summaryData,
+          summaryError
         );
       }
     
-      loadChainNodes();
+      loadBuyerReadySummary();
     
     }, [chainId]);
     console.log("CHAIN ID", chainId);
@@ -173,33 +111,26 @@ export default function ChainPage() {
           a.chainPosition -
           b.chainPosition
       );
-      const buyerReadyNode =
-  chainNodes.find(
-    (node) =>
-      node.node_type === "buyer_ready"
+  const buyerReadyTopologyInput =
+    buyerReadySummary
+      ? summaryToBuyerReadyTopologyInput(
+          buyerReadySummary
+        )
+      : null;
+
+  const topology = buildChainTopology(
+    chainProperties,
+    buyerReadyTopologyInput
   );
-  const buyerReadyStageLabel =
-  buyerReadyNode?.stage
-    ?.replaceAll("_", " ")
-    .replace(
-      /\b\w/g,
-      (char: string) => char.toUpperCase()
-    ) || "Buyer Ready";
+
   console.log(
-    "CHAIN PAGE BUYER NODE",
-    buyerReadyNode
+    "CHAIN PAGE BUYER READY SUMMARY",
+    buyerReadySummary
   );
-  
-  console.log(
-    "CHAIN PAGE BUYER ACTIVITIES",
-    buyerReadyNode?.activities
-  );
-  console.log(
-    "BUYER READY ACTIVITIES",
-    buyerReadyNode?.activities
-  );
+
 const buyerReadyProgress =
-  buyerReadyNode?.progress || 0;
+  buyerReadySummary?.progress || 0;
+
       const recentActivities =
 
   chainProperties
@@ -213,25 +144,6 @@ const buyerReadyProgress =
 
         })
       )
-    )
-    .concat(
-
-      buyerReadyNode?.activities?.map(
-        (activity: any) => ({
-    
-          ...activity,
-    
-          propertyId: buyerReadyNode.id,
-    
-          propertyAddress:
-            "Buyer Ready",
-    
-          propertyRole:
-            "buyer_ready"
-    
-        })
-      ) || []
-    
     )
     .sort(
       (a, b) =>
@@ -257,27 +169,9 @@ const buyerReadyProgress =
           property.lastUpdatedDays > 21
       );
       const buyerReadyStale =
-      buyerReadyNode?.activities?.length
-        ? (() => {
-    
-            const latestActivity =
-              buyerReadyNode.activities[0];
-    
-            const daysSinceUpdate =
-              Math.floor(
-                (
-                  Date.now() -
-                  new Date(
-                    latestActivity.timestamp
-                  ).getTime()
-                ) /
-                (1000 * 60 * 60 * 24)
-              );
-    
-            return daysSinceUpdate > 21;
-    
-          })()
-        : true;
+        isBuyerReadySummaryStale(
+          buyerReadySummary
+        );
     const delayedProperties =
       chainProperties.filter(
         (property) =>
@@ -289,109 +183,18 @@ const buyerReadyProgress =
           )
       );
   
-      
-      const renderableProperties =
-      chainProperties.filter(
-        (property) =>
-          property.address
-      );
-
-      const rootProperties =
-  renderableProperties.filter(
-    (property) =>
-
-      !renderableProperties.some(
-        (candidate) =>
-          candidate.linked_property_id ===
-          property.id
-      )
-  );
   console.log(
-    "CHAIN NODES",
-    chainNodes
+    "CHAIN TOPOLOGY",
+    topology
   );
-  
-  console.log(
-    "RAW BUYER NODE FROM CHAIN NODES",
-    chainNodes.find(
+
+  const currentUserIndex =
+    topology.flatPropertyNodes.findIndex(
       (node) =>
-        node.node_type === "buyer_ready"
-    )
-  );
-      const chainSegments: any[][] = [];
-
-for (const root of rootProperties) {
-
-      const segment: any[] = [];
-
-      let current: any = root;
-
-      while (current) {
-
-        segment.push(current);
-
-        const linkedProperty =
-  renderableProperties.find(
-    (candidate) =>
-      candidate.id ===
-      current.linked_property_id
-  );
-
-if (!linkedProperty) {
-  break;
-}
-
-current = linkedProperty;
-      }
-
-      if (segment.length > 0) {
-
-        chainSegments.push(segment);
-
-      }
-    }
-
-      const flatNodes =
-        chainSegments.flat();
-
-    const hasPurchaseProperty =
-      renderableProperties.some(
-        (property) =>
-          property.relationship_type ===
-          "purchase"
-      );
-
-    const saleProperties =
-      renderableProperties.filter(
-        (property) =>
-          property.relationship_type ===
-          "sale"
-      );
-
-    const sellerConfirmedEndOfChain =
-      saleProperties.some(
-        (property) =>
-          property.awaiting_buyer
-      );
-
-    const showBuyerReadyPrefix =
-      !!buyerReadyNode;
-
-    let showSyntheticTopTile = false;
-    let isEndOfChain = false;
-
-    if (
-      !hasPurchaseProperty &&
-      renderableProperties.length > 0
-    ) {
-      if (sellerConfirmedEndOfChain) {
-        showSyntheticTopTile = true;
-        isEndOfChain = true;
-      } else {
-        showSyntheticTopTile = true;
-        isEndOfChain = false;
-      }
-    }
+        node.currentUserRole ===
+          "seller" ||
+        node.currentUserRole === "buyer"
+    );
 
     let chainHealth =
       "Stable";
@@ -475,7 +278,7 @@ current = linkedProperty;
 
     const totalNodeCount =
     chainProperties.length +
-    (buyerReadyNode ? 1 : 0);
+    (buyerReadySummary ? 1 : 0);
   
   const averageProgress =
     totalNodeCount > 0
@@ -944,11 +747,9 @@ else {
 <div className="mt-12 bg-white rounded-3xl shadow-sm border border-slate-200 p-8 overflow-x-auto pb-4">
 
 <div className="flex items-center min-w-max">
-{showBuyerReadyPrefix && (
+{topology.buyerReadyPrefix && (
 
 <div className="flex items-center">
-
-{buyerReadyNode && (
 
 <Link
   href={`/buyer-ready/${chainId}`}
@@ -958,20 +759,22 @@ else {
     <ChainNode
   propertyNumber={0}
   displayTitle="Buyer Ready"
-  stageLabel={buyerReadyStageLabel}
+  stageLabel={
+    topology.buyerReadyPrefix.stageLabel
+  }
   progress={
-    buyerReadyNode.progress
+    topology.buyerReadyPrefix.node.progress
   }
   updatedDaysAgo={0}
   currentUserRole="buyer"
-  status={buyerReadyNode.status}
+  status={
+    topology.buyerReadyPrefix.node.status
+  }
   buyer_connected={true}
   seller_connected={true}
 />
 
 </Link>
-
-)}
 
   <div className="flex items-center mx-5">
 
@@ -986,24 +789,10 @@ else {
 </div>
 
 )}
-  {chainSegments.map((segment, segmentIndex) => {
-
-    const currentUserIndex =
-      flatNodes.findIndex(
-        (node) =>
-          node.currentUserRole === "seller" ||
-          node.currentUserRole === "buyer"
-      );
+  {topology.segments.map((segment, segmentIndex) => {
 
     const segmentGapState =
-      segmentIndex > 0
-        ? getSegmentGapState(
-            chainSegments[
-              segmentIndex - 1
-            ],
-            segment
-          )
-        : null;
+      segment.gapBefore;
 
     return (
 
@@ -1095,7 +884,7 @@ else {
 
         )}
 
-        {segment.map((property, propertyIndex) => {
+        {segment.propertyNodes.map((property, propertyIndex) => {
 
     const stage = STAGES.find(
       (stage) =>
@@ -1103,7 +892,7 @@ else {
     );
 
     const globalIndex =
-      flatNodes.findIndex(
+      topology.flatPropertyNodes.findIndex(
         (node) =>
           node.id === property.id
       );
@@ -1214,7 +1003,7 @@ else {
 
         </Link>
 
-        {propertyIndex < segment.length - 1 && (
+        {propertyIndex < segment.propertyNodes.length - 1 && (
 
           <div className="flex items-center mx-5">
 
@@ -1257,7 +1046,7 @@ else {
     );
   })}
 
-  {showSyntheticTopTile && (
+  {topology.syntheticTerminus && (
   <div className="flex items-center">
 
     <div className="flex items-center mx-5">
@@ -1275,25 +1064,31 @@ else {
 
     <ChainNode
       propertyNumber={
-        flatNodes.length + 1
+        topology.syntheticTerminus.propertyNumber
       }
       displayTitle={
-        isEndOfChain
+        topology.syntheticTerminus.terminus ===
+        "end_of_chain"
           ? "End Of Chain"
           : "Searching"
       }
       stageLabel={
-        isEndOfChain
+        topology.syntheticTerminus.terminus ===
+        "end_of_chain"
           ? "No onward purchase"
           : "Searching for forever home"
       }
       progress={
-        isEndOfChain ? 100 : 0
+        topology.syntheticTerminus.terminus ===
+        "end_of_chain"
+          ? 100
+          : 0
       }
       updatedDaysAgo={0}
       currentUserRole={null}
       status={
-        isEndOfChain
+        topology.syntheticTerminus.terminus ===
+        "end_of_chain"
           ? "healthy"
           : "pending_connection"
       }
