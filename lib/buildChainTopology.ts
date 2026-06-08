@@ -1,8 +1,8 @@
 /**
  * Chain topology builder — single source of truth for chain row structure.
  *
- * Phase 1: centralises topology construction only. Visibility (RLS) and
- * persisted searching placeholders are unchanged until later phases.
+ * Phase 3: addressless searching placeholders (stage = searching) participate
+ * in linked_property_id walks. Lifecycle is stage-authoritative.
  */
 
 export type SegmentGapState =
@@ -18,7 +18,7 @@ export type TopologyProperty = {
   status: string;
   currentUserRole: string | null;
   lastUpdatedDays: number;
-  address: string;
+  address: string | null;
   awaiting_buyer: boolean;
   is_searching: boolean;
   buyer_connected: boolean;
@@ -160,14 +160,37 @@ function formatBuyerReadyStageLabel(
 }
 
 /**
- * Properties with an address are real tiles and participate in linked walks.
- * (Phase 3 will extend this to is_searching placeholders without addresses.)
+ * Stage-authoritative searching placeholder (address/postcode null at DB).
  */
+export function isSearchingPlaceholder<
+  T extends Pick<
+    TopologyProperty,
+    "stage" | "address"
+  >
+>(property: T): boolean {
+  return (
+    property.stage === "searching" &&
+    !property.address
+  );
+}
+
+/**
+ * Addressed properties and stage searching placeholders participate in walks.
+ */
+export function isRenderableTopologyProperty<
+  T extends TopologyProperty
+>(property: T): boolean {
+  return (
+    !!property.address ||
+    isSearchingPlaceholder(property)
+  );
+}
+
 function getRenderableProperties<
   T extends TopologyProperty
 >(chainProperties: T[]): T[] {
   return chainProperties.filter(
-    (property) => property.address
+    isRenderableTopologyProperty
   );
 }
 

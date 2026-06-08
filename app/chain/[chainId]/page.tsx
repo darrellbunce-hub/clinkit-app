@@ -10,7 +10,10 @@ import Link from "next/link";
 import { useChain } from "@/context/ChainContext";
 import { supabase } from "@/lib/supabase";
 import { STAGES } from "@/data/stages";
-import { buildChainTopology } from "@/lib/buildChainTopology";
+import {
+  buildChainTopology,
+  isSearchingPlaceholder,
+} from "@/lib/buildChainTopology";
 import {
   type ChainNodesChainSummary,
   summaryToBuyerReadyTopologyInput,
@@ -901,10 +904,17 @@ else {
   globalIndex === 0 &&
   !property.currentUserRole;
 
+    const searchingPlaceholder =
+      isSearchingPlaceholder(property);
+
     let displayTitle =
       `Property ${globalIndex + 1}`;
-    
-      if (property.currentUserRole) {
+
+    if (searchingPlaceholder) {
+
+      displayTitle = "Searching";
+
+    } else if (property.currentUserRole) {
     
       if (
         property.currentUserRole ===
@@ -944,7 +954,12 @@ else {
 
     let displayStage = "In Progress";
 
-    if (property.awaiting_buyer) {
+    if (searchingPlaceholder) {
+
+      displayStage =
+        "Searching for forever home";
+
+    } else if (property.awaiting_buyer) {
 
       displayStage = "Awaiting buyer";
 
@@ -965,6 +980,32 @@ else {
         key={property.id}
         className="flex items-center"
       >
+
+        {searchingPlaceholder ? (
+
+          <ChainNode
+            propertyNumber={
+              property.chainPosition
+            }
+            displayTitle={displayTitle}
+            stageLabel={displayStage}
+            progress={stage?.progress || 0}
+            updatedDaysAgo={
+              property.lastUpdatedDays
+            }
+            currentUserRole={
+              property.currentUserRole
+            }
+            status={property.status}
+            buyer_connected={
+              property.buyer_connected
+            }
+            seller_connected={
+              property.seller_connected
+            }
+          />
+
+        ) : (
 
         <Link
           href={`/property/${property.id}`}
@@ -1002,6 +1043,8 @@ else {
           />
 
         </Link>
+
+        )}
 
         {propertyIndex < segment.propertyNodes.length - 1 && (
 

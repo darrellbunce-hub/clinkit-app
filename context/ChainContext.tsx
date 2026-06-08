@@ -25,8 +25,8 @@ type Property = {
   lastUpdatedDays: number;
   activities: Activity[];
   chainPosition: number;
-  address: string;
-postcode: string;
+  address: string | null;
+postcode: string | null;
 awaiting_buyer: boolean;
 
 is_searching: boolean;

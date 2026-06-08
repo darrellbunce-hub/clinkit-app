@@ -117,6 +117,9 @@ export default function StartMovePage() {
     
         }
     
+        let sellingPropertyId =
+          null;
+
         // SELLING PROPERTY
         if (!notSelling && sellingAddress) {
           console.log(
@@ -140,10 +143,27 @@ export default function StartMovePage() {
               );
     
             if (shouldJoinExisting) {
-    
+
+              const joinParams =
+                new URLSearchParams({
+                  property: String(
+                    existingSellingProperty.id
+                  ),
+                  sourceChain: String(
+                    chainData.id
+                  ),
+                });
+
+              if (searchingForProperty) {
+                joinParams.set(
+                  "searching",
+                  "1"
+                );
+              }
+
               window.location.href =
-                `/join-chain?property=${existingSellingProperty.id}&sourceChain=${chainData.id}`;
-    
+                `/join-chain?${joinParams.toString()}`;
+
               return;
     
             }
@@ -209,6 +229,9 @@ export default function StartMovePage() {
           }
     
           if (sellingProperty) {
+
+            sellingPropertyId =
+              sellingProperty.id;
     
             await supabase
               .from("property_members")
@@ -293,7 +316,7 @@ export default function StartMovePage() {
     
               seller_connected: false,
     
-              is_searching: searchingForProperty,
+              is_searching: false,
     
               is_current_user: true,
     
@@ -334,6 +357,111 @@ export default function StartMovePage() {
           }
     
         }
+
+        // SEARCHING PLACEHOLDER (stage-authoritative; no buying address)
+        if (
+          searchingForProperty &&
+          !buyingAddress
+        ) {
+
+          const {
+            data: chainProperties,
+          } = await supabase
+            .from("properties")
+            .select("chain_position")
+            .eq("chain_id", chainData.id)
+            .order("chain_position", {
+              ascending: false,
+            })
+            .limit(1);
+
+          const nextChainPosition =
+            (chainProperties?.[0]
+              ?.chain_position ?? 0) + 1;
+
+          const {
+            data: searchingPlaceholder,
+            error: searchingError,
+          } = await supabase
+            .from("properties")
+            .insert({
+              chain_id: chainData.id,
+
+              chain_position:
+                nextChainPosition,
+
+              stage: "searching",
+
+              address: null,
+
+              postcode: null,
+
+              relationship_type:
+                "purchase",
+
+              status:
+                "pending_connection",
+
+              created_by_user_id:
+                user.id,
+
+              linked_property_id: null,
+
+              awaiting_buyer: false,
+
+              buyer_connected: false,
+
+              seller_connected: true,
+
+              is_searching: true,
+
+              is_current_user: true,
+
+              last_updated_days: 0,
+            })
+            .select()
+            .single();
+
+          if (searchingError) {
+
+            console.error(searchingError);
+
+            return;
+
+          }
+
+          if (searchingPlaceholder) {
+
+            await supabase
+              .from("property_members")
+              .insert({
+                property_id:
+                  searchingPlaceholder.id,
+
+                user_id: user.id,
+
+                role: "buyer",
+              });
+
+            if (sellingPropertyId) {
+
+              await supabase
+                .from("properties")
+                .update({
+                  linked_property_id:
+                    searchingPlaceholder.id,
+                })
+                .eq(
+                  "id",
+                  sellingPropertyId
+                );
+
+            }
+
+          }
+
+        }
+
         if (notSelling) {
 
           await supabase
