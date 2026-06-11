@@ -87,7 +87,63 @@ type GapProperty = {
   linked_property_id: number | null;
   buyer_connected: boolean;
   seller_connected: boolean;
+  stage: string;
+  address: string | null;
+  relationship_type?: string | null;
 };
+
+/**
+ * Connection state between two adjacent properties in the same topology segment.
+ */
+export function getLinkedPropertyGapState(
+  tail: GapProperty,
+  head: GapProperty
+): SegmentGapState {
+  if (
+    tail.status === "broken_connection" ||
+    head.status === "broken_connection"
+  ) {
+    return "broken";
+  }
+
+  const hasTopologyLink =
+    tail.linked_property_id === head.id;
+
+  if (!hasTopologyLink) {
+    return "awaiting_connection";
+  }
+
+  if (isSearchingPlaceholder(head)) {
+    return tail.status === "healthy" &&
+      tail.seller_connected
+      ? "connected"
+      : "awaiting_connection";
+  }
+
+  if (
+    tail.status === "healthy" &&
+    head.status === "healthy" &&
+    tail.seller_connected &&
+    head.seller_connected &&
+    head.buyer_connected &&
+    tail.buyer_connected
+  ) {
+    return "connected";
+  }
+
+  if (
+    tail.status === "pending_connection" ||
+    head.status === "pending_connection" ||
+    !tail.seller_connected ||
+    !head.seller_connected ||
+    !head.buyer_connected ||
+    !tail.buyer_connected
+  ) {
+    return "awaiting_connection";
+  }
+
+  return "connected";
+}
 
 /**
  * Classifies the connector between two adjacent segments using tail/head
@@ -110,35 +166,15 @@ export function getSegmentGapState(
     return "broken";
   }
 
-  const hasTopologyLink =
-    tail.linked_property_id === head.id ||
-    head.linked_property_id === tail.id;
-
-  if (
-    hasTopologyLink &&
-    tail.status === "healthy" &&
-    head.status === "healthy" &&
-    tail.buyer_connected &&
-    tail.seller_connected &&
-    head.buyer_connected &&
-    head.seller_connected
-  ) {
-    return "connected";
+  if (isSearchingPlaceholder(tail)) {
+    return getLinkedPropertyGapState(tail, head);
   }
 
-  if (
-    tail.status === "pending_connection" ||
-    head.status === "pending_connection" ||
-    !hasTopologyLink ||
-    !tail.buyer_connected ||
-    !tail.seller_connected ||
-    !head.buyer_connected ||
-    !head.seller_connected
-  ) {
-    return "awaiting_connection";
+  if (isSearchingPlaceholder(head)) {
+    return getLinkedPropertyGapState(tail, head);
   }
 
-  return "connected";
+  return getLinkedPropertyGapState(tail, head);
 }
 
 function formatBuyerReadyStageLabel(

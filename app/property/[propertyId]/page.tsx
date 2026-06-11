@@ -13,6 +13,11 @@ import Navbar from "@/components/Navbar";
 import { useChain } from "@/context/ChainContext";
 import { STAGES } from "@/data/stages";
 import { supabase } from "@/lib/supabase";
+import {
+  canEditProperty,
+  canEditBuyerReady,
+  VIEW_ONLY_PURCHASE_MESSAGE,
+} from "@/lib/propertyPermissions";
 export default function PropertyPage() {
 
   const [updateType, setUpdateType] =
@@ -40,6 +45,7 @@ const [warningMessage, setWarningMessage] =
 
   const {
     properties,
+    chainNodes,
     updatePropertyStage,
     addStructuredUpdate,
     breakChainConnection,
@@ -124,8 +130,14 @@ const [warningMessage, setWarningMessage] =
       </div>
     );
   }
-  const canEdit =
-  currentProperty.created_by_user_id === currentUserId;
+  const canEdit = canEditProperty(
+    currentProperty,
+    currentUserId,
+    properties,
+    chainNodes
+  );
+
+  const viewOnlyMessage = VIEW_ONLY_PURCHASE_MESSAGE;
   const currentStage =
   STAGES.find(
     (stage) =>
@@ -340,6 +352,22 @@ if (
         return;
     
       }
+
+      if (
+        draftStage === "searching" &&
+        (currentProperty.address ||
+          currentProperty.postcode)
+      ) {
+        setWarningMessage(
+          "An agreed purchase cannot be changed back to searching."
+        );
+
+        setTimeout(() => {
+          setWarningMessage("");
+        }, 4000);
+
+        return;
+      }
     
       await updatePropertyStage(
         currentProperty.id,
@@ -430,11 +458,15 @@ if (
 <h1 className="text-5xl font-bold text-slate-900">
 
   {
-    currentProperty.currentUserRole === "seller"
-      ? "Your Sale"
+    canEdit
+      ? "Sale"
 
-      : currentProperty.currentUserRole === "buyer"
-      ? "Your Purchase"
+      : currentProperty.currentUserRole === "buyer" ||
+        currentProperty.relationship_type === "purchase"
+      ? "Purchase (view only)"
+
+      : currentProperty.currentUserRole === "seller"
+      ? "Sale"
 
       : `Property ${currentProperty.chainPosition}`
   }
@@ -444,11 +476,15 @@ if (
 <p className="text-slate-600 mt-3 text-lg">
 
   {
-    currentProperty.currentUserRole === "seller"
-      ? "Property you are selling"
+    canEdit
+      ? "This is your chain position — you can update progress here."
 
-      : currentProperty.currentUserRole === "buyer"
-      ? "Property you are purchasing"
+      : currentProperty.currentUserRole === "buyer" ||
+        currentProperty.relationship_type === "purchase"
+      ? "Transaction context — only the participant at the relevant Sale position can update progress."
+
+      : currentProperty.currentUserRole === "seller"
+      ? "Property being sold in this chain segment."
 
       : `Chain position #${currentProperty.chainPosition}`
   }
@@ -652,12 +688,28 @@ if (
   </div>
 
 </div>
+{canEdit && (
+
+<div className="mt-8 bg-blue-50 border border-blue-200 rounded-3xl p-6">
+
+  <p className="text-blue-800 font-semibold">
+    ★ Your Position — Sale
+  </p>
+
+  <p className="mt-2 text-blue-700">
+    This is your chain position. You can update progress here.
+  </p>
+
+</div>
+
+)}
+
 {!canEdit && (
 
 <div className="mt-8 bg-amber-50 border border-amber-200 rounded-3xl p-6">
 
   <p className="text-amber-700 font-semibold">
-    You can view this property but only the property owner can make operational updates.
+    {viewOnlyMessage}
   </p>
 
 </div>
@@ -679,7 +731,14 @@ if (
             className="mt-6 w-full border border-slate-300 text-slate-900 rounded-xl px-4 py-4 text-lg"
           >
 
-            {STAGES.map((stage) => (
+            {STAGES.filter(
+              (stage) =>
+                !(
+                  stage.value ===
+                    "searching" &&
+                  currentProperty.address
+                )
+            ).map((stage) => (
 
               <option
                 key={stage.value}
@@ -799,8 +858,9 @@ if (
           )}
 
 <button
+  disabled={!canEdit}
   onClick={handleStructuredUpdate}
-            className="mt-6 bg-slate-900 text-white px-6 py-4 rounded-2xl font-semibold hover:bg-slate-700 transition"
+            className="mt-6 bg-slate-900 text-white px-6 py-4 rounded-2xl font-semibold hover:bg-slate-700 transition disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed"
           >
             Add Update
           </button>
@@ -843,9 +903,10 @@ if (
   </select>
 
   <button
+    disabled={!canEdit}
     onClick={() => {
 
-      if (!breakReason) {
+      if (!breakReason || !canEdit) {
         return;
       }
 
@@ -854,7 +915,7 @@ if (
         breakReason
       );
     }}
-    className="mt-6 bg-red-600 hover:bg-red-700 text-white px-6 py-4 rounded-2xl font-semibold transition"
+    className="mt-6 bg-red-600 hover:bg-red-700 text-white px-6 py-4 rounded-2xl font-semibold transition disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed"
   >
 
     Break Chain Connection

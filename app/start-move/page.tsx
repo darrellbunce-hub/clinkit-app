@@ -272,10 +272,27 @@ export default function StartMovePage() {
               );
     
             if (shouldJoinExisting) {
-    
+
+              const joinParams =
+                new URLSearchParams({
+                  property: String(
+                    existingBuyingProperty.id
+                  ),
+                  sourceChain: String(
+                    chainData.id
+                  ),
+                });
+
+              if (searchingForProperty) {
+                joinParams.set(
+                  "searching",
+                  "1"
+                );
+              }
+
               window.location.href =
-                `/join-chain?property=${existingBuyingProperty.id}&sourceChain=${chainData.id}`;
-    
+                `/join-chain?${joinParams.toString()}`;
+
               return;
     
             }

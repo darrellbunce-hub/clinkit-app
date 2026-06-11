@@ -1,3 +1,8 @@
+import {
+  CHAIN_TILE_LABEL,
+  getOperationalSaleChainHeadline,
+} from "@/lib/operationalPosition";
+
 type ChainNodeProps = {
 
   propertyNumber: number;
@@ -14,6 +19,10 @@ type ChainNodeProps = {
   buyer_connected: boolean;
 
   seller_connected: boolean;
+
+  isOperationalPosition?: boolean;
+
+  positionKind?: "buyer_ready" | "sale";
 };
 
 export default function ChainNode({
@@ -32,11 +41,49 @@ export default function ChainNode({
   buyer_connected,
 
   seller_connected,
+
+  isOperationalPosition = false,
+
+  positionKind,
 }: ChainNodeProps) {
+
+  const isOperationalSale =
+    isOperationalPosition &&
+    positionKind === "sale";
+
+  const headlineTitle = isOperationalSale
+    ? getOperationalSaleChainHeadline()
+    : displayTitle;
+
+  const positionLabel =
+    positionKind === "buyer_ready"
+      ? "Buyer Ready"
+      : displayTitle;
 
   return (
 
     <div className="flex flex-col items-center min-w-[160px]">
+
+      {isOperationalPosition &&
+        positionKind === "buyer_ready" && (
+
+        <div
+          className="
+            mb-3
+            rounded-full
+            bg-blue-600
+            px-3
+            py-1
+            text-xs
+            font-semibold
+            text-white
+            whitespace-nowrap
+          "
+        >
+          ★ Your Position
+        </div>
+
+      )}
 
       <div
         className={`
@@ -46,7 +93,10 @@ export default function ChainNode({
           text-5xl bg-white
 
           ${
-            status === "healthy"
+            isOperationalPosition
+              ? "border-blue-600 ring-4 ring-blue-100"
+
+              : status === "healthy"
               ? "border-green-500"
 
               : status === "pending_connection"
@@ -67,7 +117,7 @@ export default function ChainNode({
   displayTitle === "Buyer Ready"
     ? "🧍"
 
-    : displayTitle === "Searching"
+    : displayTitle === CHAIN_TILE_LABEL.nextHomeSearch
     ? "🔎"
 
     : status === "pending_connection" &&
@@ -88,9 +138,18 @@ export default function ChainNode({
       <h3 className="mt-4 text-lg font-bold text-slate-900">
 
       
-      {displayTitle}
+      {headlineTitle}
 
       </h3>
+
+      {isOperationalPosition &&
+        positionKind === "buyer_ready" && (
+
+        <p className="mt-1 text-sm font-medium text-blue-700">
+          {positionLabel}
+        </p>
+
+      )}
 
       <p className="text-sm text-slate-600">
         {stageLabel}

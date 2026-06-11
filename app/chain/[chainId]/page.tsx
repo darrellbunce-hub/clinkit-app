@@ -12,13 +12,21 @@ import { supabase } from "@/lib/supabase";
 import { STAGES } from "@/data/stages";
 import {
   buildChainTopology,
+  getLinkedPropertyGapState,
   isSearchingPlaceholder,
 } from "@/lib/buildChainTopology";
+import { computeChainIntelligence } from "@/lib/chainIntelligence";
+import {
+  CHAIN_TILE_LABEL,
+  findSearchingPlaceholderLinkedFromSale,
+  getChainTileDisplayTitle,
+  resolveOperationalPosition,
+} from "@/lib/operationalPosition";
 import {
   type ChainNodesChainSummary,
   summaryToBuyerReadyTopologyInput,
-  isBuyerReadySummaryStale,
 } from "@/lib/chainNodesSummary";
+import { convertSearchingPlaceholder } from "@/lib/searchingPlaceholder";
 
 export default function ChainPage() {
 
@@ -32,6 +40,7 @@ export default function ChainPage() {
     const {
       properties,
       chains,
+      chainNodes,
       currentUserId,
     } = useChain();
     const [
@@ -131,9 +140,6 @@ export default function ChainPage() {
     buyerReadySummary
   );
 
-const buyerReadyProgress =
-  buyerReadySummary?.progress || 0;
-
       const recentActivities =
 
   chainProperties
@@ -166,86 +172,66 @@ const buyerReadyProgress =
       recentActivities
     );
 
-      const staleProperties =
-      chainProperties.filter(
-        (property) =>
-          property.lastUpdatedDays > 21
-      );
-      const buyerReadyStale =
-        isBuyerReadySummaryStale(
-          buyerReadySummary
-        );
-    const delayedProperties =
-      chainProperties.filter(
-        (property) =>
-          property.activities.some(
-            (activity) =>
-              activity.update.includes(
-                "Delay Reported"
-              )
-          )
-      );
+  const intelligence =
+    computeChainIntelligence({
+      chainProperties,
+      buyerReadySummary,
+      stages: STAGES,
+    });
+
+  const {
+    staleProperties,
+    chainHealth,
+    chainHealthMessage,
+    averageProgress,
+    confidenceScore,
+    confidenceLabel,
+    confidenceColour,
+    confidenceBg,
+    estimatedChainCompletion,
+    bottleneckProperty,
+  } = intelligence;
   
   console.log(
     "CHAIN TOPOLOGY",
     topology
   );
 
-  const currentUserIndex =
-    topology.flatPropertyNodes.findIndex(
-      (node) =>
-        node.currentUserRole ===
-          "seller" ||
-        node.currentUserRole === "buyer"
+  const operationalPositionResult =
+    resolveOperationalPosition(
+      currentUserId,
+      chainId,
+      chainProperties,
+      chainNodes
     );
 
-    let chainHealth =
-      "Stable";
-    
-    let chainHealthMessage =
-      "Most properties updated recently with no major delays reported.";
-    
-    if (
-      staleProperties.length >= 1 ||
-      delayedProperties.length >= 1
-    ) {
-    
-      chainHealth =
-        "Active";
-    
-      chainHealthMessage =
-        "Some delays or stale updates detected within the chain.";
-    }
-    
-    if (
-      staleProperties.length >= 2 ||
-      delayedProperties.length >= 2
-    ) {
-    
-      chainHealth =
-        "At Risk";
-    
-      chainHealthMessage =
-        "Multiple delays or stale properties may impact chain progression.";
-    }
+  const operationalPosition =
+    operationalPositionResult.position;
 
-    const brokenConnectionProperties =
-      chainProperties.filter(
-        (property) =>
-          property.status ===
-          "broken_connection"
-      );
+  if (operationalPositionResult.ambiguity) {
+    console.warn(
+      "Operational position ambiguity",
+      operationalPositionResult.ambiguity,
+      chainId,
+      currentUserId
+    );
+  }
 
-    const requiresReplacementBuyer =
-      brokenConnectionProperties.length > 0;
+  const saleOperationalPropertyId =
+    operationalPosition?.kind === "sale"
+      ? operationalPosition.propertyId
+      : null;
 
-    if (requiresReplacementBuyer) {
-      chainHealth =
-        "Replacement Buyer Required";
+  const searchingPlaceholderLinkedFromSale =
+    saleOperationalPropertyId
+      ? findSearchingPlaceholderLinkedFromSale(
+          chainProperties,
+          saleOperationalPropertyId
+        )
+      : null;
 
-      chainHealthMessage =
-        "A chain connection has been broken. A replacement buyer may be required before the chain can progress.";
-    }
+  const activeSearchingPlaceholder =
+    searchingPlaceholderLinkedFromSale !== null;
 
   const currentChain =
     chains.find(
@@ -260,198 +246,6 @@ const buyerReadyProgress =
   const [newPostcode, setNewPostcode] =
     useState("");
 
-  const totalProgress =
-    chainProperties.reduce(
-      (total, property) => {
-
-        const stage = STAGES.find(
-          (stage) =>
-            stage.value === property.stage
-        );
-
-        if (!stage) {
-          return total;
-        }
-
-        return total + (stage.progress || 0);
-
-      },
-      0
-    );
-
-    const totalNodeCount =
-    chainProperties.length +
-    (buyerReadySummary ? 1 : 0);
-  
-  const averageProgress =
-    totalNodeCount > 0
-  
-      ? Math.round(
-  
-          (
-            totalProgress +
-            buyerReadyProgress
-          ) /
-  
-          totalNodeCount
-        )
-  
-      : 0;
-
-  
-
-  const blockedCount =
-    chainProperties.filter(
-      (property) =>
-        property.status === "blocked"
-    ).length;
-
-  const delayedCount =
-    chainProperties.filter(
-      (property) =>
-        property.status === "delayed"
-    ).length;
-
-    let confidenceScore =
-    85;
-
-    confidenceScore -= blockedCount * 25;
-    confidenceScore -= delayedCount * 10;
-    confidenceScore -= staleProperties.length * 5;
-    confidenceScore -=
-      brokenConnectionProperties.length * 30;
-
-    if (buyerReadyStale) {
-      confidenceScore -= 5;
-    }
-
-  if (confidenceScore < 0) {
-    confidenceScore = 0;
-  }
-
-  let confidenceLabel =
-  "Needs Attention";
-
-let confidenceColour =
-  "text-amber-700";
-
-let confidenceBg =
-  "bg-amber-100";
-
-if (confidenceScore >= 70) {
-
-  confidenceLabel = "Healthy";
-  confidenceColour = "text-green-700";
-  confidenceBg = "bg-green-100";
-
-}
-else if (confidenceScore >= 40) {
-
-  confidenceLabel = "Progress Slowing";
-  confidenceColour = "text-amber-700";
-  confidenceBg = "bg-amber-100";
-
-}
-  let estimatedChainCompletion =
-  "16–20 weeks";
-
-if (requiresReplacementBuyer) {
-  estimatedChainCompletion =
-    "Awaiting chain recovery";
-} else {
-
-if (averageProgress >= 20) {
-  estimatedChainCompletion =
-    "12–16 weeks";
-}
-
-if (averageProgress >= 40) {
-  estimatedChainCompletion =
-    "8–12 weeks";
-}
-
-if (averageProgress >= 60) {
-  estimatedChainCompletion =
-    "4–8 weeks";
-}
-
-if (averageProgress >= 80) {
-  estimatedChainCompletion =
-    "1–3 weeks";
-}
-
-if (blockedCount > 0) {
-
-  estimatedChainCompletion =
-    `${estimatedChainCompletion} (blocked property detected)`;
-}
-
-else if (delayedCount > 0) {
-
-  estimatedChainCompletion =
-    `${estimatedChainCompletion} (delays reported)`;
-}
-
-else if (
-  staleProperties.length > 0 ||
-  buyerReadyStale
-) {
-
-  estimatedChainCompletion =
-    `${estimatedChainCompletion} (awaiting updates)`;
-
-}
-
-}
-let bottleneckProperty =
-  null;
-
-const blockedProperty =
-  chainProperties.find(
-    (property) =>
-      property.status === "blocked"
-  );
-
-const delayedProperty =
-  chainProperties.find(
-    (property) =>
-      property.activities.some(
-        (activity) =>
-          activity.update.includes(
-            "Delay Reported"
-          )
-      )
-  );
-
-const staleProperty =
-  chainProperties.find(
-    (property) =>
-      property.lastUpdatedDays > 14
-  );
-
-if (blockedProperty) {
-
-  bottleneckProperty =
-    blockedProperty;
-}
-
-else if (delayedProperty) {
-
-  bottleneckProperty =
-    delayedProperty;
-}
-
-else if (staleProperty) {
-
-  bottleneckProperty =
-    staleProperty;
-}
-
-else {
-
-  bottleneckProperty =
-    null;
-}
   async function handleAddProperty() {
 
     if (!newAddress || !newPostcode) {
@@ -461,58 +255,60 @@ else {
       return;
     }
 
-    const nextPosition =
-      chainProperties.length + 1;
+    if (!currentUserId) {
 
-      const {
-        data: propertyData,
-        error,
-      } =
-      await supabase
-        .from("properties")
-        .insert({
-
-          chain_id: chainId,
-
-          chain_position:
-            nextPosition,
-
-          address: newAddress,
-
-          postcode: newPostcode,
-
-          stage: "property_listed",
-
-          status:
-            "pending_connection",
-
-          is_current_user: true,
-          created_by_user_id:
-  currentUserId,
-          last_updated_days: 0,
-
-        })
-        .select()
-        .single();
-
-    if (error) {
-
-      alert(error.message);
+      alert(
+        "Please log in to add your onward purchase."
+      );
 
       return;
     }
-    await supabase
-    .from("activities")
-    .insert({
-    
-  
-      property_id:
-        propertyData.id,
-  
-      update:
-        "Onward purchase added",
-  
-    });
+
+    if (!saleOperationalPropertyId) {
+
+      alert(
+        "Only a participant at a Sale position can add an onward purchase."
+      );
+
+      return;
+    }
+
+    const result =
+      await convertSearchingPlaceholder(
+        supabase,
+        {
+          chainId,
+          salePropertyId: saleOperationalPropertyId,
+          address: newAddress,
+          postcode: newPostcode,
+        }
+      );
+
+    if (!result.ok) {
+
+      if (
+        result.reason ===
+        "duplicate_address"
+      ) {
+        alert(
+          "This property already exists within an active chain."
+        );
+      } else if (
+        result.reason === "not_found"
+      ) {
+        alert(
+          "No active searching placeholder found on this chain."
+        );
+      } else {
+        alert(
+          "Could not add your onward purchase. Please try again."
+        );
+        console.error(result.error);
+      }
+
+      return;
+    }
+
     window.location.reload();
   }
 
@@ -775,6 +571,11 @@ else {
   }
   buyer_connected={true}
   seller_connected={true}
+  isOperationalPosition={
+    operationalPosition?.kind ===
+    "buyer_ready"
+  }
+  positionKind="buyer_ready"
 />
 
 </Link>
@@ -894,85 +695,43 @@ else {
         stage.value === property.stage
     );
 
-    const globalIndex =
-      topology.flatPropertyNodes.findIndex(
-        (node) =>
-          node.id === property.id
-      );
-
-  const isBottomOfChain =
-  globalIndex === 0 &&
-  !property.currentUserRole;
-
     const searchingPlaceholder =
       isSearchingPlaceholder(property);
 
-    let displayTitle =
-      `Property ${globalIndex + 1}`;
+    const isOperationalPosition =
+      operationalPosition?.kind === "sale" &&
+      operationalPosition.propertyId ===
+        property.id;
 
-    if (searchingPlaceholder) {
-
-      displayTitle = "Searching";
-
-    } else if (property.currentUserRole) {
-    
-      if (
-        property.currentUserRole ===
-        "seller"
-      ) {
-    
-        displayTitle = "Your Sale";
-    
-      }
-    
-      if (
-        property.currentUserRole ===
-        "buyer"
-      ) {
-    
-        displayTitle = "Your Purchase";
-    
-      }
-    
-    }
-    
-    else if (globalIndex < currentUserIndex) {
-
-      displayTitle =
-        isBottomOfChain
-          ? "Buyer Ready"
-          : "Your Buyer";
-    
-    }
-    
-    else if (globalIndex > currentUserIndex) {
-    
-      displayTitle = "Your Seller";
-    
-    }
-    
+    const displayTitle = getChainTileDisplayTitle(
+      property,
+      isOperationalPosition
+    );
 
     let displayStage = "In Progress";
 
     if (searchingPlaceholder) {
 
       displayStage =
-        "Searching for forever home";
+        "Onward purchase not yet identified";
 
     } else if (property.awaiting_buyer) {
 
       displayStage = "Awaiting buyer";
+
+    } else if (
+      property.status === "pending_connection" &&
+      property.relationship_type ===
+        "purchase"
+    ) {
+
+      displayStage = "Awaiting seller connection";
 
     } else if (stage?.label) {
 
       displayStage = stage.label;
 
     }
-    console.log(
-      "CHAIN NODE",
-      property.address,
-      property.currentUserRole
-    );
     
     return (
 
@@ -1002,6 +761,14 @@ else {
             }
             seller_connected={
               property.seller_connected
+            }
+            isOperationalPosition={
+              isOperationalPosition
+            }
+            positionKind={
+              isOperationalPosition
+                ? "sale"
+                : undefined
             }
           />
 
@@ -1040,14 +807,32 @@ else {
             seller_connected={
               property.seller_connected
             }
+            isOperationalPosition={
+              isOperationalPosition
+            }
+            positionKind={
+              isOperationalPosition
+                ? "sale"
+                : undefined
+            }
           />
 
         </Link>
 
         )}
 
-        {propertyIndex < segment.propertyNodes.length - 1 && (
+        {propertyIndex < segment.propertyNodes.length - 1 && (() => {
+          const nextProperty =
+            segment.propertyNodes[
+              propertyIndex + 1
+            ];
+          const linkGapState =
+            getLinkedPropertyGapState(
+              property,
+              nextProperty
+            );
 
+          return (
           <div className="flex items-center mx-5">
 
             <div
@@ -1055,29 +840,20 @@ else {
                 w-24 h-1 rounded-full
 
                 ${
-                  property.status === "healthy"
+                  linkGapState === "connected"
                     ? "bg-green-400"
 
-                    : property.status ===
-                      "pending_connection"
-                    ? "bg-slate-300"
-
-                    : property.status ===
-                      "broken_connection"
+                    : linkGapState === "broken"
                     ? "bg-red-400"
 
-                    : property.status ===
-                      "delayed"
-                    ? "bg-amber-400"
-
-                    : "bg-slate-300"
+                    : "bg-amber-400"
                 }
               `}
             />
 
           </div>
-
-        )}
+          );
+        })()}
 
       </div>
 
@@ -1113,7 +889,7 @@ else {
         topology.syntheticTerminus.terminus ===
         "end_of_chain"
           ? "End Of Chain"
-          : "Searching"
+          : CHAIN_TILE_LABEL.nextHomeSearch
       }
       stageLabel={
         topology.syntheticTerminus.terminus ===
@@ -1202,7 +978,7 @@ else {
   </div>
 
 </div>
-        {/* Add Property */}
+        {activeSearchingPlaceholder && (
         <div className="mt-10 bg-white rounded-3xl border border-slate-200 p-8">
 
           <h2 className="text-2xl font-bold text-slate-900">
@@ -1210,7 +986,7 @@ else {
           </h2>
 
           <p className="mt-2 text-slate-600">
-            Continue building your property chain
+            Only add your onward purchase once your offer has been accepted.
           </p>
 
           <input
@@ -1243,6 +1019,9 @@ else {
           >
             Add Property
           </button>
+
+        </div>
+        )}
           <div className="mt-8 bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
 
 <h2 className="text-2xl font-bold text-slate-900">
@@ -1352,7 +1131,6 @@ else {
 
 </div>
 
-</div>
         </div>
 
       </div>

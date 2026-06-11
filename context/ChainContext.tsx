@@ -8,6 +8,15 @@ useEffect,
   ReactNode,
 } from "react";
 import { supabase } from "@/lib/supabase";
+import {
+  canEditProperty,
+  canEditBuyerReady,
+  OPERATIONAL_EDIT_DENIED_MESSAGE,
+} from "@/lib/propertyPermissions";
+import {
+  mapToOperationalProperties,
+  type OperationalProperty,
+} from "@/lib/operationalPosition";
 type Activity = {
   id: number;
   timestamp: string;
@@ -329,16 +338,25 @@ properties.find(
     property.id === propertyId
 );
 
-const canEdit =
-  property?.members?.some(
-    (member) =>
-      member.user_id === currentUserId
-  );
+if (
+  !canEditProperty(
+    property,
+    currentUserId,
+    mapToOperationalProperties(properties),
+    chainNodes
+  )
+) {
+  alert(OPERATIONAL_EDIT_DENIED_MESSAGE);
 
-if (!canEdit) {
+  return;
+}
 
+if (
+  newStage === "searching" &&
+  (property?.address || property?.postcode)
+) {
   alert(
-    "You do not have permission to update this property"
+    "An agreed purchase cannot be changed back to searching."
   );
 
   return;
@@ -438,23 +456,39 @@ async function addStructuredUpdate(
 
     : null;
 
-    if (targetType === "property") {
+    if (
+      targetType === "property" &&
+      !canEditProperty(
+        property,
+        currentUserId,
+        mapToOperationalProperties(properties),
+        chainNodes
+      )
+    ) {
+      alert(OPERATIONAL_EDIT_DENIED_MESSAGE);
 
-      const canEdit =
-        property?.members?.some(
-          (member) =>
-            member.user_id === currentUserId
-        );
-    
-      if (!canEdit) {
-    
-        alert(
-          "You do not have permission to update this property"
-        );
-    
+      return;
+    }
+
+    if (targetType === "buyer_ready") {
+      const buyerReadyNode = chainNodes.find(
+        (node) => node.id === targetId
+      );
+
+      if (
+        !buyerReadyNode ||
+        !canEditBuyerReady(
+          targetId,
+          buyerReadyNode.chain_id,
+          currentUserId,
+          mapToOperationalProperties(properties),
+          chainNodes
+        )
+      ) {
+        alert(OPERATIONAL_EDIT_DENIED_MESSAGE);
+
         return;
       }
-    
     }
     await supabase
     .from("activities")
@@ -564,17 +598,16 @@ async function breakChainConnection(
       property.id === propertyId
   );
 
-const canEdit =
-  property?.members?.some(
-    (member) =>
-      member.user_id === currentUserId
-  );
-
-if (!property || !canEdit) {
-
-  alert(
-    "You do not have permission to update this property"
-  );
+if (
+  !property ||
+  !canEditProperty(
+    property,
+    currentUserId,
+    mapToOperationalProperties(properties),
+    chainNodes
+  )
+) {
+  alert(OPERATIONAL_EDIT_DENIED_MESSAGE);
 
   return;
 }

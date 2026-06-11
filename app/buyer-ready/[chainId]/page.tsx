@@ -15,6 +15,9 @@ import {
     BUYER_READY_STAGES
   } from "@/data/buyerReadyStages";
 import { supabase } from "@/lib/supabase";
+import {
+  canEditBuyerReady,
+} from "@/lib/propertyPermissions";
 export default function BuyerReadyPage() {
 
   const [updateType, setUpdateType] =
@@ -30,18 +33,14 @@ export default function BuyerReadyPage() {
   useState("");
   const [isSaving, setIsSaving] =
   useState(false);
-  const [isBreaking, setIsBreaking] =
-    useState(false);
-    const [breakReason, setBreakReason] =
-    useState("");
   const params = useParams();
   const router = useRouter();
   const chainId = Number(params.chainId);
 
   const {
     properties,
-        addStructuredUpdate,
-    breakChainConnection,
+    chainNodes,
+    addStructuredUpdate,
     currentUserId,
   } = useChain();
   console.log(
@@ -159,8 +158,13 @@ export default function BuyerReadyPage() {
       </div>
     );
   }
-  const canEdit =
-  buyerNode.user_id === currentUserId;
+  const canEdit = canEditBuyerReady(
+    buyerNode.id,
+    chainId,
+    currentUserId,
+    properties,
+    chainNodes
+  );
 
   const linkedProperty =
     properties.find(
@@ -168,21 +172,6 @@ export default function BuyerReadyPage() {
         property.id ===
         buyerNode.linked_property_id
     );
-
-  const isConnectionBroken =
-    linkedProperty?.status ===
-    "broken_connection";
-
-  const canBreakLinkedProperty =
-    linkedProperty?.members?.some(
-      (member) =>
-        member.user_id === currentUserId
-    ) ?? false;
-
-  const isBreakDisabled =
-    isConnectionBroken ||
-    isBreaking ||
-    !breakReason;
 
   const timelineActivities = [
     ...(buyerNode.activities || []),
@@ -193,48 +182,6 @@ export default function BuyerReadyPage() {
       new Date(a.timestamp).getTime()
   );
 
-  async function handleBreakChainConnection() {
-    if (
-      !breakReason ||
-      isConnectionBroken ||
-      isBreaking ||
-      !buyerNode.linked_property_id
-    ) {
-      return;
-    }
-
-    if (!canBreakLinkedProperty) {
-      setWarningMessage(
-        "You do not have permission to break this chain connection."
-      );
-
-      setTimeout(() => {
-        setWarningMessage("");
-      }, 4000);
-
-      return;
-    }
-
-    setIsBreaking(true);
-
-    try {
-      await breakChainConnection(
-        buyerNode.linked_property_id,
-        breakReason
-      );
-
-      setSuccessMessage(
-        "Chain connection broken successfully."
-      );
-
-      setTimeout(() => {
-        setSuccessMessage("");
-      }, 4000);
-    } finally {
-      setIsBreaking(false);
-    }
-  }
-
   const currentStage =
   BUYER_READY_STAGES.find(
     (stage) =>
@@ -242,7 +189,7 @@ export default function BuyerReadyPage() {
   );
   async function updateBuyerStage() {
     
-      if (isSaving) {
+      if (isSaving || !canEdit) {
         return;
       }
       
@@ -417,7 +364,7 @@ if (
 }
 async function handleStructuredUpdate() {
 
-  if (!updateType) {
+  if (!updateType || !canEdit) {
     return;
   }
     
@@ -791,12 +738,28 @@ Buyer Ready
   </div>
 
 </div>
+{canEdit && (
+
+<div className="mt-8 bg-blue-50 border border-blue-200 rounded-3xl p-6">
+
+  <p className="text-blue-800 font-semibold">
+    ★ Your Position — Buyer Ready
+  </p>
+
+  <p className="mt-2 text-blue-700">
+    This is your chain position. You can update progress here.
+  </p>
+
+</div>
+
+)}
+
 {!canEdit && (
 
 <div className="mt-8 bg-amber-50 border border-amber-200 rounded-3xl p-6">
 
   <p className="text-amber-700 font-semibold">
-    You can view this property but only the transaction participant can make operational updates.
+    View only — you can view this chain node but only the participant at this Buyer Ready position can make operational updates.
   </p>
 
 </div>
@@ -810,7 +773,7 @@ Buyer Ready
           </h2>
 
           <select
-    
+          disabled={!canEdit}
           value={draftStage}
           onChange={(event) =>
             setDraftStage(event.target.value)
@@ -833,7 +796,7 @@ Buyer Ready
 
           </select>
           <button
-  
+  disabled={!canEdit}
   onClick={updateBuyerStage}
   className="
     mt-4
@@ -845,6 +808,9 @@ Buyer Ready
     font-semibold
     hover:bg-slate-800
     transition
+    disabled:bg-slate-300
+    disabled:text-slate-500
+    disabled:cursor-not-allowed
   "
 >
   Submit Status Update
@@ -864,6 +830,7 @@ Buyer Ready
           </p>
 
           <select
+          disabled={!canEdit}
             value={updateType}
             onChange={(event) =>
               setUpdateType(event.target.value)
@@ -900,6 +867,7 @@ Buyer Ready
           {updateType === "delay" && (
 
             <select
+              disabled={!canEdit}
               value={delayReason}
               onChange={(event) =>
                 setDelayReason(
@@ -938,92 +906,23 @@ Buyer Ready
           )}
 
 <button
+  disabled={!canEdit}
   onClick={handleStructuredUpdate}
-  className="mt-6 bg-slate-900 text-white px-6 py-4 rounded-2xl font-semibold hover:bg-slate-700 transition"
+  className="mt-6 bg-slate-900 text-white px-6 py-4 rounded-2xl font-semibold hover:bg-slate-700 transition disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed"
 >
   Add Update
 </button>
 
         </div>
-{/* Break Chain Connection */}
-<div className="mt-8 bg-white rounded-3xl shadow-sm border border-red-200 p-8">
+{canEdit && (
+<div className="mt-8 bg-slate-50 border border-slate-200 rounded-3xl p-6">
 
-  <div className="flex items-start justify-between gap-6">
-
-    <h2 className="text-3xl font-bold text-slate-900">
-      Break Chain Connection
-    </h2>
-
-    {linkedProperty && (
-      <span
-        className={`
-          shrink-0 px-4 py-2 rounded-full text-sm font-semibold
-
-          ${
-            isConnectionBroken
-              ? "bg-red-100 text-red-700"
-              : "bg-green-100 text-green-700"
-          }
-        `}
-      >
-        {isConnectionBroken
-          ? "Connection Broken"
-          : "Connection Active"}
-      </span>
-    )}
-
-  </div>
-
-  <p className="mt-4 text-slate-600 max-w-2xl">
-    This should only be used after discussions with estate agents or solicitors. Breaking a chain connection may impact confidence scoring and overall chain progression.
+  <p className="text-slate-600">
+    Chain connection breaks are initiated from a participant&apos;s Sale position only. Purchase tiles are view-only transaction context.
   </p>
 
-  <select
-    value={breakReason}
-    onChange={(event) =>
-      setBreakReason(
-        event.target.value
-      )
-    }
-    disabled={isConnectionBroken}
-    className="mt-6 w-full border border-slate-300 text-slate-900 rounded-2xl px-4 py-4 disabled:bg-slate-100 disabled:text-slate-500"
-  >
-
-    <option value="">
-      Select break reason
-    </option>
-
-    <option value="buyer_side">
-  My buyer’s transaction ended
-</option>
-
-<option value="seller_side">
-  My purchase transaction ended
-</option>
-
-  </select>
-
-  <button
-    onClick={handleBreakChainConnection}
-    disabled={isBreakDisabled}
-    className={`
-      mt-6 px-6 py-4 rounded-2xl font-semibold transition
-
-      ${
-        isBreakDisabled
-          ? "bg-slate-300 text-slate-500 cursor-not-allowed"
-          : "bg-red-600 hover:bg-red-700 text-white"
-      }
-    `}
-  >
-
-    {isConnectionBroken
-      ? "Connection Already Broken"
-      : "Break Chain Connection"}
-
-  </button>
-
 </div>
+)}
         {/* Activity Timeline */}
         <div className="mt-8 bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
 
