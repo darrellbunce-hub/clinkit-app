@@ -2,7 +2,7 @@ export const STAGES = [
 
   {
     value: "searching",
-    label: "Searching",
+    label: "Next Home Search",
     progress: 0,
     nextStep: "Offer Accepted",
     expectedTimeframe: "Variable",
@@ -108,7 +108,15 @@ export const STAGES = [
     value: "contracts_exchanged",
     label: "Contracts Exchanged",
     progress: 98,
-    nextStep: "Completion",
+    nextStep: "Completion Date Agreed",
+    expectedTimeframe: "1–4 weeks",
+  },
+
+  {
+    value: "completion_date_agreed",
+    label: "Completion Date Agreed",
+    progress: 99,
+    nextStep: "Completed",
     expectedTimeframe: "1–4 weeks",
   },
 

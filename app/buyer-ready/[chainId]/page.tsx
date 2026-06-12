@@ -17,7 +17,37 @@ import {
 import { supabase } from "@/lib/supabase";
 import {
   canEditBuyerReady,
+  CHAIN_TILE_LABEL,
+  CONNECTED_POSITION_MESSAGE,
+  getOperationalBuyerReadyHeadline,
+  OPERATIONAL_BUYER_READY_BANNER_MESSAGE,
 } from "@/lib/propertyPermissions";
+import {
+  validateBuyerReadyStageTransition,
+  COMPLETION_DATE_AGREED_REQUIRES_CONTRACTS_EXCHANGED_MESSAGE,
+  isChainInCompletedCompletionMode,
+  isChainInScheduledCompletionMode,
+} from "@/lib/completionLifecycle";
+import OperationalCompletionDatePanel from "@/components/OperationalCompletionDatePanel";
+import {
+  mapToOperationalProperties,
+} from "@/lib/operationalPosition";
+import {
+  canShowOperationalCompletionDateEntry,
+} from "@/lib/recordChainCompletionDate";
+import {
+  canAmendChainCompletionDate,
+} from "@/lib/amendChainCompletionDate";
+import {
+  canConfirmChainCompletion,
+} from "@/lib/confirmChainCompletion";
+import {
+  daysSinceLastActivity,
+  getLatestDelayReport,
+  hasActiveDelayReport,
+  STALE_DAYS_PAGE_ALERT,
+} from "@/lib/activityIntelligence";
+import type { CompletionAmendmentReasonCode } from "@/lib/completionLifecycle";
 export default function BuyerReadyPage() {
 
   const [updateType, setUpdateType] =
@@ -40,8 +70,12 @@ export default function BuyerReadyPage() {
   const {
     properties,
     chainNodes,
+    chains,
     addStructuredUpdate,
     currentUserId,
+    recordChainCompletionDate,
+    amendChainCompletionDate,
+    confirmChainCompletion,
   } = useChain();
   console.log(
   "BUYER READY PROPERTIES",
@@ -166,6 +200,128 @@ export default function BuyerReadyPage() {
     chainNodes
   );
 
+  const currentChain = chains.find(
+    (chain) => Number(chain.id) === Number(chainId)
+  );
+
+  const isScheduledCompletionMode =
+    isChainInScheduledCompletionMode({
+      completionLifecycleStatus:
+        currentChain?.completionLifecycleStatus,
+      completionScheduledDate:
+        currentChain?.completionScheduledDate,
+    });
+
+  const isCompletedCompletionMode =
+    isChainInCompletedCompletionMode({
+      completionLifecycleStatus:
+        currentChain?.completionLifecycleStatus,
+      completionScheduledDate:
+        currentChain?.completionScheduledDate,
+    });
+
+  const isCompletionLifecycleFrozen =
+    isScheduledCompletionMode ||
+    isCompletedCompletionMode;
+
+  const chainPropertiesForCompletion =
+    mapToOperationalProperties(
+      properties.filter(
+        (property) =>
+          Number(property.chainId) ===
+          Number(chainId)
+      )
+    );
+
+  const showOperationalCompletionEntry =
+    canShowOperationalCompletionDateEntry({
+      chainScheduledDate:
+        currentChain?.completionScheduledDate,
+      userId: currentUserId,
+      chainId,
+      chainProperties:
+        chainPropertiesForCompletion,
+      chainNodes: chainNodes,
+    });
+
+  const showOperationalCompletionPanel =
+    isCompletedCompletionMode ||
+    !!currentChain?.completionScheduledDate ||
+    showOperationalCompletionEntry;
+
+  const showAmendCompletionDate =
+    canAmendChainCompletionDate({
+      chainScheduledDate:
+        currentChain?.completionScheduledDate,
+      chainLifecycleStatus:
+        currentChain?.completionLifecycleStatus,
+      userId: currentUserId,
+      chainId,
+      chainProperties:
+        chainPropertiesForCompletion,
+      chainNodes: chainNodes,
+    });
+
+  const showConfirmCompletion =
+    canConfirmChainCompletion({
+      completionLifecycleStatus:
+        currentChain?.completionLifecycleStatus,
+      completionScheduledDate:
+        currentChain?.completionScheduledDate,
+      userId: currentUserId,
+      chainId,
+      chainProperties:
+        chainPropertiesForCompletion,
+      chainNodes: chainNodes,
+    });
+
+  async function handleRecordCompletionDate(
+    scheduledDate: string
+  ) {
+    const result = await recordChainCompletionDate(
+      chainId,
+      scheduledDate
+    );
+
+    return {
+      ok: result.ok,
+      message: result.ok
+        ? undefined
+        : result.message,
+    };
+  }
+
+  async function handleAmendCompletionDate(
+    newScheduledDate: string,
+    reasonCode: CompletionAmendmentReasonCode
+  ) {
+    const result = await amendChainCompletionDate(
+      chainId,
+      newScheduledDate,
+      reasonCode
+    );
+
+    return {
+      ok: result.ok,
+      message: result.ok
+        ? undefined
+        : result.message,
+    };
+  }
+
+  async function handleConfirmCompletion() {
+    const result = await confirmChainCompletion(
+      chainId
+    );
+
+    return {
+      ok: result.ok,
+      message: result.ok
+        ? undefined
+        : result.message,
+    };
+  }
+
   const linkedProperty =
     properties.find(
       (property) =>
@@ -201,6 +357,7 @@ export default function BuyerReadyPage() {
       );
     
     if (!selectedStage) {
+      setIsSaving(false);
       return;
     }
     if (
@@ -217,8 +374,27 @@ export default function BuyerReadyPage() {
       
       }, 4000);
     
+      setIsSaving(false);
       return;
     
+    }
+
+    const stageGateResult =
+      validateBuyerReadyStageTransition(
+        buyerNode.stage,
+        selectedStage.value
+      );
+
+    if (!stageGateResult.ok) {
+      setWarningMessage(stageGateResult.message);
+
+      setTimeout(() => {
+        setWarningMessage("");
+      }, 4000);
+
+      setIsSaving(false);
+
+      return;
     }
 
     const {
@@ -268,10 +444,44 @@ setTimeout(() => {
   setSuccessMessage("");
 
 }, 4000);
+      } else if (error) {
+        console.error(error);
+
+        if (
+          typeof error.message === "string" &&
+          error.message.includes(
+            "completion_date_agreed_requires_contracts_exchanged"
+          )
+        ) {
+          setWarningMessage(
+            COMPLETION_DATE_AGREED_REQUIRES_CONTRACTS_EXCHANGED_MESSAGE
+          );
+        } else {
+          setWarningMessage(
+            "Could not update Buyer Ready status."
+          );
+        }
+
+        setTimeout(() => {
+          setWarningMessage("");
+        }, 4000);
       }
+
+      setIsSaving(false);
   
   }
-  const latestDelay = null;
+  const latestDelay =
+    getLatestDelayReport(
+      buyerNode.activities
+    );
+  const activeDelayReport =
+    hasActiveDelayReport(
+      buyerNode.activities
+    );
+  const buyerLastUpdatedDays =
+    daysSinceLastActivity(
+      buyerNode.activities
+    );
 
 let actionTitle =
   "No Immediate Actions";
@@ -282,27 +492,28 @@ let actionMessage =
 let actionColour =
   "bg-green-100 text-green-700";
 
-if (latestDelay) {
+if (activeDelayReport && latestDelay) {
 
   actionTitle =
     "Delay Reported";
 
   actionMessage =
-    "No active delays reported"
+    latestDelay.update;
 
   actionColour =
     "bg-amber-100 text-amber-700";
 }
 
 if (
-    buyerNode.lastUpdatedDays > 14
+  !isCompletionLifecycleFrozen &&
+    buyerLastUpdatedDays > STALE_DAYS_PAGE_ALERT
 ) {
 
   actionTitle =
     "Update Recommended";
 
   actionMessage =
-    `No updates have been added for ${buyerNode.lastUpdatedDays} days. Consider checking progress with your estate agent or conveyancer.`;
+    `No updates have been added for ${buyerLastUpdatedDays} days. Consider checking progress with your estate agent or conveyancer.`;
 
   actionColour =
     "bg-red-100 text-red-700";
@@ -349,14 +560,15 @@ if (progress >= 80) {
     "1–3 weeks remaining";
 }
 
-if (latestDelay) {
+if (activeDelayReport) {
 
   estimatedCompletion =
     `${estimatedCompletion} (delay detected)`;
 }
 
 if (
-    buyerNode.lastUpdatedDays > 14
+  !isCompletionLifecycleFrozen &&
+    buyerLastUpdatedDays > STALE_DAYS_PAGE_ALERT
 ) {
 
   estimatedCompletion =
@@ -531,7 +743,7 @@ async function handleStructuredUpdate() {
 
 <h1 className="text-5xl font-bold text-slate-900">
 
-Buyer Ready
+{CHAIN_TILE_LABEL.buyerReady}
 
 </h1>
 
@@ -647,6 +859,8 @@ Buyer Ready
   </div>
 
 </div>
+{!isCompletionLifecycleFrozen && (
+<>
 {/* Estimated Completion */}
 <div className="mt-10 bg-blue-50 border border-blue-200 rounded-3xl p-6">
 
@@ -699,11 +913,14 @@ Buyer Ready
   </div>
 
 </div>
+</>
+)}
 
 </div>
 
 
 {/* Action Required */}
+{!isCompletedCompletionMode && (
 <div className="mt-8 bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
 
   <div className="flex items-start justify-between gap-6">
@@ -738,16 +955,18 @@ Buyer Ready
   </div>
 
 </div>
-{canEdit && (
+)}
+
+{canEdit && !isCompletedCompletionMode && (
 
 <div className="mt-8 bg-blue-50 border border-blue-200 rounded-3xl p-6">
 
   <p className="text-blue-800 font-semibold">
-    ★ Your Position — Buyer Ready
+    {getOperationalBuyerReadyHeadline()}
   </p>
 
   <p className="mt-2 text-blue-700">
-    This is your chain position. You can update progress here.
+    {OPERATIONAL_BUYER_READY_BANNER_MESSAGE}
   </p>
 
 </div>
@@ -759,12 +978,43 @@ Buyer Ready
 <div className="mt-8 bg-amber-50 border border-amber-200 rounded-3xl p-6">
 
   <p className="text-amber-700 font-semibold">
-    View only — you can view this chain node but only the participant at this Buyer Ready position can make operational updates.
+    {CONNECTED_POSITION_MESSAGE}
   </p>
 
 </div>
 
 )}
+
+{showOperationalCompletionPanel && (
+  <OperationalCompletionDatePanel
+    chainScheduledDate={
+      currentChain?.completionScheduledDate
+    }
+    chainLifecycleStatus={
+      currentChain?.completionLifecycleStatus
+    }
+    completionConfirmedAt={
+      currentChain?.completionConfirmedAt
+    }
+    showEntryForm={
+      showOperationalCompletionEntry
+    }
+    showChangeButton={
+      showAmendCompletionDate
+    }
+    showConfirmButton={
+      showConfirmCompletion
+    }
+    onSubmit={handleRecordCompletionDate}
+    onChangeDate={handleAmendCompletionDate}
+    onConfirmCompletion={
+      handleConfirmCompletion
+    }
+  />
+)}
+
+        {!isCompletedCompletionMode && (
+        <>
         {/* Update Status */}
         <div className="mt-8 bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
 
@@ -914,15 +1164,9 @@ Buyer Ready
 </button>
 
         </div>
-{canEdit && (
-<div className="mt-8 bg-slate-50 border border-slate-200 rounded-3xl p-6">
+        </>
+        )}
 
-  <p className="text-slate-600">
-    Chain connection breaks are initiated from a participant&apos;s Sale position only. Purchase tiles are view-only transaction context.
-  </p>
-
-</div>
-)}
         {/* Activity Timeline */}
         <div className="mt-8 bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
 

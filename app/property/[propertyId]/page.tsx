@@ -16,8 +16,36 @@ import { supabase } from "@/lib/supabase";
 import {
   canEditProperty,
   canEditBuyerReady,
-  VIEW_ONLY_PURCHASE_MESSAGE,
+  CONNECTED_POSITION_MESSAGE,
+  getOperationalSaleChainHeadline,
+  getPropertyPageHeadline,
+  getPropertyPageSubtitle,
+  OPERATIONAL_SALE_BANNER_MESSAGE,
 } from "@/lib/propertyPermissions";
+import OperationalCompletionDatePanel from "@/components/OperationalCompletionDatePanel";
+import {
+  mapToOperationalProperties,
+} from "@/lib/operationalPosition";
+import {
+  canShowOperationalCompletionDateEntry,
+} from "@/lib/recordChainCompletionDate";
+import {
+  canAmendChainCompletionDate,
+} from "@/lib/amendChainCompletionDate";
+import {
+  canConfirmChainCompletion,
+} from "@/lib/confirmChainCompletion";
+import type { CompletionAmendmentReasonCode } from "@/lib/completionLifecycle";
+import {
+  isChainInCompletedCompletionMode,
+  isChainInScheduledCompletionMode,
+} from "@/lib/completionLifecycle";
+import {
+  daysSinceLastActivity,
+  getLatestDelayReport,
+  hasActiveDelayReport,
+  STALE_DAYS_PAGE_ALERT,
+} from "@/lib/activityIntelligence";
 export default function PropertyPage() {
 
   const [updateType, setUpdateType] =
@@ -46,10 +74,14 @@ const [warningMessage, setWarningMessage] =
   const {
     properties,
     chainNodes,
+    chains,
     updatePropertyStage,
     addStructuredUpdate,
     breakChainConnection,
     currentUserId,
+    recordChainCompletionDate,
+    amendChainCompletionDate,
+    confirmChainCompletion,
   } = useChain();
   
   
@@ -137,7 +169,133 @@ const [warningMessage, setWarningMessage] =
     chainNodes
   );
 
-  const viewOnlyMessage = VIEW_ONLY_PURCHASE_MESSAGE;
+  const viewOnlyMessage = CONNECTED_POSITION_MESSAGE;
+
+  const currentChain = chains.find(
+    (chain) =>
+      chain.id === currentProperty.chainId
+  );
+
+  const isScheduledCompletionMode =
+    isChainInScheduledCompletionMode({
+      completionLifecycleStatus:
+        currentChain?.completionLifecycleStatus,
+      completionScheduledDate:
+        currentChain?.completionScheduledDate,
+    });
+
+  const isCompletedCompletionMode =
+    isChainInCompletedCompletionMode({
+      completionLifecycleStatus:
+        currentChain?.completionLifecycleStatus,
+      completionScheduledDate:
+        currentChain?.completionScheduledDate,
+    });
+
+  const isCompletionLifecycleFrozen =
+    isScheduledCompletionMode ||
+    isCompletedCompletionMode;
+
+  const chainPropertiesForCompletion =
+    mapToOperationalProperties(
+      properties.filter(
+        (property) =>
+          property.chainId ===
+          currentProperty.chainId
+      )
+    );
+
+  const showOperationalCompletionEntry =
+    canShowOperationalCompletionDateEntry({
+      chainScheduledDate:
+        currentChain?.completionScheduledDate,
+      userId: currentUserId,
+      chainId: currentProperty.chainId,
+      chainProperties:
+        chainPropertiesForCompletion,
+      chainNodes: chainNodes,
+    });
+
+  const showOperationalCompletionPanel =
+    isCompletedCompletionMode ||
+    !!currentChain?.completionScheduledDate ||
+    showOperationalCompletionEntry;
+
+  const propertyChainId = currentProperty.chainId;
+
+  const showAmendCompletionDate =
+    canAmendChainCompletionDate({
+      chainScheduledDate:
+        currentChain?.completionScheduledDate,
+      chainLifecycleStatus:
+        currentChain?.completionLifecycleStatus,
+      userId: currentUserId,
+      chainId: propertyChainId,
+      chainProperties:
+        chainPropertiesForCompletion,
+      chainNodes: chainNodes,
+    });
+
+  const showConfirmCompletion =
+    canConfirmChainCompletion({
+      completionLifecycleStatus:
+        currentChain?.completionLifecycleStatus,
+      completionScheduledDate:
+        currentChain?.completionScheduledDate,
+      userId: currentUserId,
+      chainId: propertyChainId,
+      chainProperties:
+        chainPropertiesForCompletion,
+      chainNodes: chainNodes,
+    });
+
+  async function handleRecordCompletionDate(
+    scheduledDate: string
+  ) {
+    const result = await recordChainCompletionDate(
+      propertyChainId,
+      scheduledDate
+    );
+
+    return {
+      ok: result.ok,
+      message: result.ok
+        ? undefined
+        : result.message,
+    };
+  }
+
+  async function handleAmendCompletionDate(
+    newScheduledDate: string,
+    reasonCode: CompletionAmendmentReasonCode
+  ) {
+    const result = await amendChainCompletionDate(
+      propertyChainId,
+      newScheduledDate,
+      reasonCode
+    );
+
+    return {
+      ok: result.ok,
+      message: result.ok
+        ? undefined
+        : result.message,
+    };
+  }
+
+  async function handleConfirmCompletion() {
+    const result = await confirmChainCompletion(
+      propertyChainId
+    );
+
+    return {
+      ok: result.ok,
+      message: result.ok
+        ? undefined
+        : result.message,
+    };
+  }
+
   const currentStage =
   STAGES.find(
     (stage) =>
@@ -145,11 +303,16 @@ const [warningMessage, setWarningMessage] =
   );
 
 const latestDelay =
-  currentProperty.activities.find(
-    (activity) =>
-      activity.update.includes(
-        "Delay Reported"
-      )
+  getLatestDelayReport(
+    currentProperty.activities
+  );
+const activeDelayReport =
+  hasActiveDelayReport(
+    currentProperty.activities
+  );
+const propertyLastUpdatedDays =
+  daysSinceLastActivity(
+    currentProperty.activities
   );
 
 let actionTitle =
@@ -161,7 +324,7 @@ let actionMessage =
 let actionColour =
   "bg-green-100 text-green-700";
 
-if (latestDelay) {
+if (activeDelayReport && latestDelay) {
 
   actionTitle =
     "Delay Reported";
@@ -174,14 +337,15 @@ if (latestDelay) {
 }
 
 if (
-  currentProperty.lastUpdatedDays > 14
+  !isCompletionLifecycleFrozen &&
+  propertyLastUpdatedDays > STALE_DAYS_PAGE_ALERT
 ) {
 
   actionTitle =
     "Update Recommended";
 
   actionMessage =
-    `No updates have been added for ${currentProperty.lastUpdatedDays} days. Consider checking progress with your estate agent or conveyancer.`;
+    `No updates have been added for ${propertyLastUpdatedDays} days. Consider checking progress with your estate agent or conveyancer.`;
 
   actionColour =
     "bg-red-100 text-red-700";
@@ -226,14 +390,15 @@ if (progress >= 80) {
     "1–3 weeks remaining";
 }
 
-if (latestDelay) {
+if (activeDelayReport) {
 
   estimatedCompletion =
     `${estimatedCompletion} (delay detected)`;
 }
 
 if (
-  currentProperty.lastUpdatedDays > 14
+  !isCompletionLifecycleFrozen &&
+  propertyLastUpdatedDays > STALE_DAYS_PAGE_ALERT
 ) {
 
   estimatedCompletion =
@@ -457,37 +622,13 @@ if (
 
 <h1 className="text-5xl font-bold text-slate-900">
 
-  {
-    canEdit
-      ? "Sale"
-
-      : currentProperty.currentUserRole === "buyer" ||
-        currentProperty.relationship_type === "purchase"
-      ? "Purchase (view only)"
-
-      : currentProperty.currentUserRole === "seller"
-      ? "Sale"
-
-      : `Property ${currentProperty.chainPosition}`
-  }
+  {getPropertyPageHeadline(currentProperty, canEdit)}
 
 </h1>
 
 <p className="text-slate-600 mt-3 text-lg">
 
-  {
-    canEdit
-      ? "This is your chain position — you can update progress here."
-
-      : currentProperty.currentUserRole === "buyer" ||
-        currentProperty.relationship_type === "purchase"
-      ? "Transaction context — only the participant at the relevant Sale position can update progress."
-
-      : currentProperty.currentUserRole === "seller"
-      ? "Property being sold in this chain segment."
-
-      : `Chain position #${currentProperty.chainPosition}`
-  }
+  {getPropertyPageSubtitle(currentProperty, canEdit)}
 
 </p>
 
@@ -597,6 +738,8 @@ if (
   </div>
 
 </div>
+{!isCompletionLifecycleFrozen && (
+<>
 {/* Estimated Completion */}
 <div className="mt-10 bg-blue-50 border border-blue-200 rounded-3xl p-6">
 
@@ -649,11 +792,13 @@ if (
   </div>
 
 </div>
+</>
+)}
 
 </div>
 
-
 {/* Action Required */}
+{!isCompletedCompletionMode && (
 <div className="mt-8 bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
 
   <div className="flex items-start justify-between gap-6">
@@ -688,16 +833,18 @@ if (
   </div>
 
 </div>
-{canEdit && (
+)}
+
+{canEdit && !isCompletedCompletionMode && (
 
 <div className="mt-8 bg-blue-50 border border-blue-200 rounded-3xl p-6">
 
   <p className="text-blue-800 font-semibold">
-    ★ Your Position — Sale
+    {getOperationalSaleChainHeadline()}
   </p>
 
   <p className="mt-2 text-blue-700">
-    This is your chain position. You can update progress here.
+    {OPERATIONAL_SALE_BANNER_MESSAGE}
   </p>
 
 </div>
@@ -715,6 +862,37 @@ if (
 </div>
 
 )}
+
+{showOperationalCompletionPanel && (
+  <OperationalCompletionDatePanel
+    chainScheduledDate={
+      currentChain?.completionScheduledDate
+    }
+    chainLifecycleStatus={
+      currentChain?.completionLifecycleStatus
+    }
+    completionConfirmedAt={
+      currentChain?.completionConfirmedAt
+    }
+    showEntryForm={
+      showOperationalCompletionEntry
+    }
+    showChangeButton={
+      showAmendCompletionDate
+    }
+    showConfirmButton={
+      showConfirmCompletion
+    }
+    onSubmit={handleRecordCompletionDate}
+    onChangeDate={handleAmendCompletionDate}
+    onConfirmCompletion={
+      handleConfirmCompletion
+    }
+  />
+)}
+
+        {!isCompletedCompletionMode && (
+        <>
         {/* Update Status */}
         <div className="mt-8 bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
 
@@ -923,6 +1101,9 @@ if (
   </button>
 
 </div>
+        </>
+        )}
+
         {/* Activity Timeline */}
         <div className="mt-8 bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
 

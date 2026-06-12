@@ -1,68 +1,153 @@
 "use client";
 
-import { useState } from "react";
+import {
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
+
+function readCredentials(form: HTMLFormElement) {
+  const formData = new FormData(form);
+
+  return {
+    email: String(formData.get("email") ?? "").trim(),
+    password: String(formData.get("password") ?? ""),
+  };
+}
+
 export default function LoginPage() {
+  const formRef =
+    useRef<HTMLFormElement>(null);
+  const router = useRouter();
 
-  const [email, setEmail] =
+  const [errorMessage, setErrorMessage] =
     useState("");
+  const [isLoggingIn, setIsLoggingIn] =
+    useState(false);
+  const [isSigningUp, setIsSigningUp] =
+    useState(false);
 
-  const [password, setPassword] =
-    useState("");
-    const router = useRouter();
-    async function handleLogin() {
+  async function handleLogin(
+    event: FormEvent<HTMLFormElement>
+  ) {
+    event.preventDefault();
+    setErrorMessage("");
 
-      const result =
-      await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-    
-    console.log("LOGIN RESULT", result);
-    
-    if (result.error) {
-      console.log("LOGIN ERROR", result.error);
-      alert(result.error.message);
+    const { email, password } =
+      readCredentials(event.currentTarget);
+
+    if (!email || !password) {
+      setErrorMessage(
+        "Enter your email and password to continue."
+      );
+
       return;
     }
-    
-    console.log("LOGIN SUCCESS");
-    
-    setTimeout(() => {
+
+    setIsLoggingIn(true);
+
+    try {
+      const result =
+        await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+
+      if (process.env.NODE_ENV === "development") {
+        console.log("[login signInWithPassword]", {
+          hasError: Boolean(result.error),
+          error: result.error?.message ?? null,
+          hasSession: Boolean(result.data.session),
+          hasUser: Boolean(result.data.user),
+        });
+      }
+
+      if (result.error) {
+        setErrorMessage(result.error.message);
+
+        return;
+      }
+
+      if (!result.data.session) {
+        setErrorMessage(
+          "Sign in succeeded but no session was created. Check your email verification status."
+        );
+
+        return;
+      }
+
       window.location.href = "/dashboard";
-    }, 500);
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Could not sign in. Check your connection and try again."
+      );
+    } finally {
+      setIsLoggingIn(false);
+    }
   }
 
   async function handleSignup() {
+    if (!formRef.current) {
+      return;
+    }
 
-    const {
-      data,
-      error,
-    } =
-      await supabase.auth.signUp({
+    setErrorMessage("");
+
+    const { email, password } =
+      readCredentials(formRef.current);
+
+    if (!email || !password) {
+      setErrorMessage(
+        "Enter your email and password to create an account."
+      );
+
+      return;
+    }
+
+    setIsSigningUp(true);
+
+    try {
+      const {
+        data,
+        error,
+      } = await supabase.auth.signUp({
         email,
         password,
       });
 
-    if (error) {
-      alert(error.message);
-      return;
-    }
-    if (data.user) {
+      if (error) {
+        setErrorMessage(error.message);
 
-      await supabase
-        .from("profiles")
-        .insert({
-    
-          id: data.user.id,
-    
-          role: "homeowner",
-    
-        });
+        return;
+      }
+
+      if (data.user) {
+        await supabase
+          .from("profiles")
+          .insert({
+            id: data.user.id,
+            role: "homeowner",
+          });
+      }
+
+      router.push("/dashboard");
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Could not create your account. Check your connection and try again."
+      );
+    } finally {
+      setIsSigningUp(false);
     }
-    router.push("/dashboard");
   }
+
+  const isBusy =
+    isLoggingIn || isSigningUp;
 
   return (
     <main className="min-h-screen bg-slate-100 flex items-center justify-center px-6">
@@ -77,58 +162,85 @@ export default function LoginPage() {
           Access your property chain
         </p>
 
-        <div className="mt-8">
+        <form
+          ref={formRef}
+          onSubmit={handleLogin}
+          className="mt-8"
+          noValidate
+        >
+          <div>
 
-          <label className="block text-sm font-medium text-slate-700">
-            Email
-          </label>
+            <label
+              htmlFor="login-email"
+              className="block text-sm font-medium text-slate-700"
+            >
+              Email
+            </label>
 
-          <input
-            type="email"
-            value={email}
-            onChange={(event) =>
-              setEmail(event.target.value)
-            }
-            className="mt-2 w-full border border-slate-300 text-base text-slate-900 rounded-2xl px-4 py-3"
-          />
+            <input
+              id="login-email"
+              name="email"
+              type="email"
+              autoComplete="email"
+              inputMode="email"
+              enterKeyHint="next"
+              disabled={isBusy}
+              className="mt-2 w-full border border-slate-300 text-base text-slate-900 rounded-2xl px-4 py-3 disabled:bg-slate-100"
+            />
 
-        </div>
+          </div>
 
-        <div className="mt-6">
+          <div className="mt-6">
 
-          <label className="block text-sm font-medium text-slate-700">
-            Password
-          </label>
+            <label
+              htmlFor="login-password"
+              className="block text-sm font-medium text-slate-700"
+            >
+              Password
+            </label>
 
-          <input
-            type="password"
-            value={password}
-            onChange={(event) =>
-              setPassword(event.target.value)
-            }
-            className="mt-2 w-full border border-slate-300 text-base text-slate-900 rounded-2xl px-4 py-3"
-          />
+            <input
+              id="login-password"
+              name="password"
+              type="password"
+              autoComplete="current-password"
+              enterKeyHint="go"
+              disabled={isBusy}
+              className="mt-2 w-full border border-slate-300 text-base text-slate-900 rounded-2xl px-4 py-3 disabled:bg-slate-100"
+            />
 
-        </div>
+          </div>
 
-        <button
-  type="button"
-  onClick={handleLogin}
-  className="mt-8 w-full bg-slate-900 text-white rounded-2xl py-4 font-semibold"
->
-  Login
-</button>
+          {errorMessage && (
+            <p
+              role="alert"
+              className="mt-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800"
+            >
+              {errorMessage}
+            </p>
+          )}
 
-<button
-  type="button"
-  onClick={(event) => {
-    event.preventDefault();
-    handleSignup();
-  }}
-  className="mt-4 w-full border border-slate-300 text-slate-900 rounded-2xl py-4 font-semibold"
->
-  Create Account
-</button>
+          <button
+            type="submit"
+            disabled={isBusy}
+            className="mt-8 w-full bg-slate-900 text-white rounded-2xl py-4 font-semibold disabled:bg-slate-400"
+          >
+            {isLoggingIn
+              ? "Signing in..."
+              : "Login"}
+          </button>
+
+          <button
+            type="button"
+            disabled={isBusy}
+            onClick={handleSignup}
+            className="mt-4 w-full border border-slate-300 text-slate-900 rounded-2xl py-4 font-semibold disabled:bg-slate-100 disabled:text-slate-400"
+          >
+            {isSigningUp
+              ? "Creating account..."
+              : "Create Account"}
+          </button>
+        </form>
 
       </div>
 

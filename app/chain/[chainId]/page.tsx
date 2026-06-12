@@ -20,6 +20,7 @@ import {
   CHAIN_TILE_LABEL,
   findSearchingPlaceholderLinkedFromSale,
   getChainTileDisplayTitle,
+  mapToOperationalProperties,
   resolveOperationalPosition,
 } from "@/lib/operationalPosition";
 import {
@@ -27,6 +28,18 @@ import {
   summaryToBuyerReadyTopologyInput,
 } from "@/lib/chainNodesSummary";
 import { convertSearchingPlaceholder } from "@/lib/searchingPlaceholder";
+import CompletionScheduledBanner from "@/components/CompletionScheduledBanner";
+import ChainCompletedBanner from "@/components/ChainCompletedBanner";
+import RecordCompletionDateForm from "@/components/RecordCompletionDateForm";
+import { canShowCompletionSchedulingForm } from "@/lib/recordChainCompletionDate";
+import { canAmendChainCompletionDate } from "@/lib/amendChainCompletionDate";
+import { canConfirmChainCompletion } from "@/lib/confirmChainCompletion";
+import type { CompletionAmendmentReasonCode } from "@/lib/completionLifecycle";
+import {
+  COMPLETION_SCHEDULED_CONFIDENCE_NOTE,
+  isChainInCompletedCompletionMode,
+  isChainInScheduledCompletionMode,
+} from "@/lib/completionLifecycle";
 
 export default function ChainPage() {
 
@@ -42,6 +55,9 @@ export default function ChainPage() {
       chains,
       chainNodes,
       currentUserId,
+      recordChainCompletionDate,
+      amendChainCompletionDate,
+      confirmChainCompletion,
     } = useChain();
     const [
       buyerReadySummary,
@@ -172,11 +188,52 @@ export default function ChainPage() {
       recentActivities
     );
 
+  const currentChain =
+    chains.find(
+      (chain) =>
+        Number(chain.id) ===
+        Number(chainId)
+    );
+
+  const isScheduledCompletionMode =
+    isChainInScheduledCompletionMode({
+      completionLifecycleStatus:
+        currentChain?.completionLifecycleStatus,
+      completionScheduledDate:
+        currentChain?.completionScheduledDate,
+    });
+
+  const isCompletedCompletionMode =
+    isChainInCompletedCompletionMode({
+      completionLifecycleStatus:
+        currentChain?.completionLifecycleStatus,
+      completionScheduledDate:
+        currentChain?.completionScheduledDate,
+    });
+
+  const isCompletionLifecycleFrozen =
+    isScheduledCompletionMode ||
+    isCompletedCompletionMode;
+
+  const buyerReadyNode =
+    chainNodes.find(
+      (node) =>
+        Number(node.chain_id) ===
+          Number(chainId) &&
+        node.node_type === "buyer_ready"
+    );
+
+  const buyerReadyActivities =
+    buyerReadyNode?.activities ?? [];
+
   const intelligence =
     computeChainIntelligence({
       chainProperties,
       buyerReadySummary,
+      buyerReadyActivities,
       stages: STAGES,
+      scheduledCompletionMode:
+        isCompletionLifecycleFrozen,
     });
 
   const {
@@ -233,12 +290,103 @@ export default function ChainPage() {
   const activeSearchingPlaceholder =
     searchingPlaceholderLinkedFromSale !== null;
 
-  const currentChain =
-    chains.find(
-      (chain) =>
-        Number(chain.id) ===
-        Number(chainId)
+  const chainPropertiesForCompletion =
+    mapToOperationalProperties(
+      chainProperties
     );
+
+  const showCompletionScheduledBanner =
+    isScheduledCompletionMode;
+
+  const showCompletedBanner =
+    isCompletedCompletionMode &&
+    !!currentChain?.completionScheduledDate &&
+    !!currentChain?.completionConfirmedAt;
+
+  const showCompletionSchedulingForm =
+    !isCompletedCompletionMode &&
+    canShowCompletionSchedulingForm({
+      chainScheduledDate:
+        currentChain?.completionScheduledDate,
+      userId: currentUserId,
+      chainId,
+      chainProperties:
+        chainPropertiesForCompletion,
+      chainNodes: chainNodes,
+    });
+
+  const showAmendCompletionDate =
+    canAmendChainCompletionDate({
+      chainScheduledDate:
+        currentChain?.completionScheduledDate,
+      chainLifecycleStatus:
+        currentChain?.completionLifecycleStatus,
+      userId: currentUserId,
+      chainId,
+      chainProperties:
+        chainPropertiesForCompletion,
+      chainNodes: chainNodes,
+    });
+
+  const showConfirmCompletion =
+    canConfirmChainCompletion({
+      completionLifecycleStatus:
+        currentChain?.completionLifecycleStatus,
+      completionScheduledDate:
+        currentChain?.completionScheduledDate,
+      userId: currentUserId,
+      chainId,
+      chainProperties:
+        chainPropertiesForCompletion,
+      chainNodes: chainNodes,
+    });
+
+  async function handleRecordCompletionDate(
+    scheduledDate: string
+  ) {
+    const result = await recordChainCompletionDate(
+      chainId,
+      scheduledDate
+    );
+
+    return {
+      ok: result.ok,
+      message: result.ok
+        ? undefined
+        : result.message,
+    };
+  }
+
+  async function handleAmendCompletionDate(
+    newScheduledDate: string,
+    reasonCode: CompletionAmendmentReasonCode
+  ) {
+    const result = await amendChainCompletionDate(
+      chainId,
+      newScheduledDate,
+      reasonCode
+    );
+
+    return {
+      ok: result.ok,
+      message: result.ok
+        ? undefined
+        : result.message,
+    };
+  }
+
+  async function handleConfirmCompletion() {
+    const result = await confirmChainCompletion(
+      chainId
+    );
+
+    return {
+      ok: result.ok,
+      message: result.ok
+        ? undefined
+        : result.message,
+    };
+  }
 
   const [newAddress, setNewAddress] =
     useState("");
@@ -324,6 +472,44 @@ export default function ChainPage() {
           <h1 className="text-5xl font-bold text-slate-900">
             Chain #{chainId}
           </h1>
+
+        {showCompletedBanner &&
+          currentChain?.completionScheduledDate &&
+          currentChain?.completionConfirmedAt && (
+            <ChainCompletedBanner
+              scheduledDate={
+                currentChain.completionScheduledDate
+              }
+              confirmedAt={
+                currentChain.completionConfirmedAt
+              }
+              layout="primary"
+            />
+          )}
+
+        {showCompletionScheduledBanner &&
+          currentChain?.completionScheduledDate && (
+            <CompletionScheduledBanner
+              scheduledDate={
+                currentChain.completionScheduledDate
+              }
+              layout="primary"
+              showChangeButton={
+                showAmendCompletionDate
+              }
+              showConfirmButton={
+                showConfirmCompletion
+              }
+              onChangeDate={
+                handleAmendCompletionDate
+              }
+              onConfirmCompletion={
+                handleConfirmCompletion
+              }
+            />
+          )}
+
+          {!isCompletedCompletionMode && (
           <div className="mt-8 bg-white rounded-3xl border border-slate-200 p-8">
 
 <div className="flex items-center gap-4">
@@ -355,6 +541,8 @@ export default function ChainPage() {
 </p>
 
 </div>
+          )}
+
           <p className="text-slate-600 mt-3 text-lg">
             Live property chain progress tracking
           </p>
@@ -378,6 +566,14 @@ export default function ChainPage() {
 
         </div>
 
+        {showCompletionSchedulingForm && (
+          <RecordCompletionDateForm
+            onSubmit={handleRecordCompletionDate}
+          />
+        )}
+
+        {!isCompletedCompletionMode && (
+        <>
         {/* Progress */}
         <div className="mt-10 bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
 
@@ -442,16 +638,17 @@ export default function ChainPage() {
                 {confidenceLabel}
               </p>
               <p className="text-xs text-slate-500 mt-4 max-w-xs">
-  Confidence is calculated using
-  chain progress, recent activity,
-  delayed updates and blocked
-  transactions.
+  {isScheduledCompletionMode
+    ? COMPLETION_SCHEDULED_CONFIDENCE_NOTE
+    : "Confidence is calculated using chain progress, recent activity, delayed updates and blocked transactions."}
 </p>
             </div>
 
           </div>
 
         </div>
+{!isCompletionLifecycleFrozen && (
+<>
 {/* Estimated Chain Completion */}
 <div className="mt-10 bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
 
@@ -528,8 +725,11 @@ export default function ChainPage() {
 </div>
 
 )}
+</>
+)}
         {/* Warning */}
-        {staleProperties.length > 0 && (
+        {!isCompletionLifecycleFrozen &&
+        staleProperties.length > 0 && (
 
           <div className="mt-10 bg-amber-100 border border-amber-300 rounded-3xl p-6">
 
@@ -540,6 +740,9 @@ export default function ChainPage() {
 
           </div>
 
+        )}
+
+        </>
         )}
 
         {/* Chain */}
@@ -557,7 +760,7 @@ export default function ChainPage() {
 
     <ChainNode
   propertyNumber={0}
-  displayTitle="Buyer Ready"
+  displayTitle={CHAIN_TILE_LABEL.buyerReady}
   stageLabel={
     topology.buyerReadyPrefix.stageLabel
   }

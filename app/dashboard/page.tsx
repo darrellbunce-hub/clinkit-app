@@ -4,6 +4,7 @@ import Navbar from "@/components/Navbar";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
+import { getDashboardPropertyLabel } from "@/lib/operationalPosition";
 type Chain = {
   id: number;
   access_code: string;
@@ -187,15 +188,12 @@ export default function DashboardPage() {
 
         <h3 className="font-semibold text-slate-900">
 
-{
-  property.relationship_type === "selling"
-    ? "Your Sale"
-
-    : property.relationship_type === "buying"
-    ? "Your Purchase"
-
-    : `Chain Property ${property.chain_position}`
-}
+{getDashboardPropertyLabel({
+  relationship_type: property.relationship_type,
+  stage: property.stage,
+  address: property.address,
+  chain_position: property.chain_position,
+})}
 
 </h3>
 

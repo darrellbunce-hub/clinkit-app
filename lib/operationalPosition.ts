@@ -40,10 +40,20 @@ export type ResolveOperationalPositionResult = {
 };
 
 export const OPERATIONAL_EDIT_DENIED_MESSAGE =
-  "You do not have permission to update this chain position. Only your operational position can be updated.";
+  "Updates can only be made from your operational position in the chain.";
 
+export const CONNECTED_POSITION_MESSAGE =
+  "This is a connected chain position. Progress is updated from the participant's operational position.";
+
+/** @deprecated Use CONNECTED_POSITION_MESSAGE */
 export const VIEW_ONLY_PURCHASE_MESSAGE =
-  "View only — this tile shows transaction context. Only your operational chain position can be updated.";
+  CONNECTED_POSITION_MESSAGE;
+
+export const OPERATIONAL_SALE_BANNER_MESSAGE =
+  "This is your sale in the chain. You can update progress here.";
+
+export const OPERATIONAL_BUYER_READY_BANNER_MESSAGE =
+  "This is your Buyer Ready step in the chain. You can update progress here.";
 
 function isSellerHopForUser(
   property: OperationalProperty,
@@ -289,6 +299,7 @@ export function mapToOperationalProperties<
 }
 
 export const CHAIN_TILE_LABEL = {
+  buyerReady: "Buyer Ready",
   yourSale: "Your Sale",
   connectedSale: "Connected Sale",
   connectedPurchase: "Connected Purchase",
@@ -297,6 +308,89 @@ export const CHAIN_TILE_LABEL = {
 
 export function getOperationalSaleChainHeadline(): string {
   return `★ ${CHAIN_TILE_LABEL.yourSale}`;
+}
+
+export function getOperationalBuyerReadyHeadline(): string {
+  return `★ ${CHAIN_TILE_LABEL.buyerReady}`;
+}
+
+type ChainDisplayProperty = Pick<
+  OperationalProperty,
+  "relationship_type" | "stage" | "address"
+> & {
+  currentUserRole?: string | null;
+  chainPosition?: number;
+};
+
+export function getPropertyPageHeadline(
+  property: ChainDisplayProperty,
+  canEdit: boolean
+): string {
+  if (canEdit) {
+    return getOperationalSaleChainHeadline();
+  }
+
+  if (isSearchingPlaceholder(property)) {
+    return CHAIN_TILE_LABEL.nextHomeSearch;
+  }
+
+  return getChainTileDisplayTitle(property, false);
+}
+
+export function getPropertyPageSubtitle(
+  property: ChainDisplayProperty,
+  canEdit: boolean
+): string {
+  if (canEdit) {
+    return OPERATIONAL_SALE_BANNER_MESSAGE;
+  }
+
+  if (isSearchingPlaceholder(property)) {
+    return "Your onward home has not been chosen yet.";
+  }
+
+  if (
+    property.relationship_type === "purchase" ||
+    property.currentUserRole === "buyer"
+  ) {
+    return CONNECTED_POSITION_MESSAGE;
+  }
+
+  if (
+    property.relationship_type === "sale" ||
+    property.currentUserRole === "seller"
+  ) {
+    return "A connected sale in this chain.";
+  }
+
+  return CONNECTED_POSITION_MESSAGE;
+}
+
+export function getDashboardPropertyLabel(
+  property: Pick<
+    ChainDisplayProperty,
+    "relationship_type" | "stage" | "address"
+  > & {
+    chainPosition?: number;
+    chain_position?: number;
+  }
+): string {
+  if (isSearchingPlaceholder(property)) {
+    return CHAIN_TILE_LABEL.nextHomeSearch;
+  }
+
+  if (property.relationship_type === "sale") {
+    return CHAIN_TILE_LABEL.connectedSale;
+  }
+
+  if (property.relationship_type === "purchase") {
+    return CHAIN_TILE_LABEL.connectedPurchase;
+  }
+
+  const chainPosition =
+    property.chainPosition ?? property.chain_position;
+
+  return `Chain Property ${chainPosition ?? ""}`.trim();
 }
 
 export function getChainTileDisplayTitle(

@@ -1,8 +1,19 @@
 import { isSearchingPlaceholder } from "@/lib/buildChainTopology";
 import {
+  countActiveDelayReports,
+  daysSinceLastActivity,
+  DELAY_REPORTED_PREFIX,
+  hasActiveDelayReport,
+  type OperationalActivity,
+  STALE_DAYS_CONFIDENCE,
+} from "@/lib/activityIntelligence";
+import {
   isBuyerReadySummaryStale,
   type ChainNodesChainSummary,
 } from "@/lib/chainNodesSummary";
+import {
+  COMPLETION_SCHEDULED_CHAIN_HEALTH_MESSAGE,
+} from "@/lib/completionLifecycle";
 
 export type IntelligenceProperty = {
   id: number;
@@ -11,7 +22,7 @@ export type IntelligenceProperty = {
   status: string;
   address: string | null;
   lastUpdatedDays: number;
-  activities: { update: string }[];
+  activities: OperationalActivity[];
 };
 
 export type StageDefinition = {
@@ -35,6 +46,7 @@ export type ChainIntelligenceResult<
   requiresReplacementBuyer: boolean;
   blockedCount: number;
   delayedCount: number;
+  buyerReadyHasActiveDelay: boolean;
   buyerReadyStale: boolean;
   chainHealth: ChainHealthStatus;
   chainHealthMessage: string;
@@ -45,6 +57,7 @@ export type ChainIntelligenceResult<
   confidenceBg: string;
   estimatedChainCompletion: string;
   bottleneckProperty: T | null;
+  isScheduledCompletionMode: boolean;
 };
 
 const CONFIDENCE_BASE = 85;
@@ -53,9 +66,9 @@ const PENALTY_DELAYED = 10;
 const PENALTY_STALE = 5;
 const PENALTY_BROKEN = 30;
 const PENALTY_BUYER_READY_STALE = 5;
-const STALE_DAYS_CONFIDENCE = 21;
 const STALE_DAYS_BOTTLENECK = 14;
-const DELAY_REPORTED_PREFIX = "Delay Reported";
+
+export { DELAY_REPORTED_PREFIX };
 
 export function isConfidenceScopeProperty(
   property: Pick<
@@ -84,8 +97,9 @@ export function getStaleProperties<
     properties
   ).filter(
     (property) =>
-      property.lastUpdatedDays >
-      staleAfterDays
+      daysSinceLastActivity(
+        property.activities
+      ) > staleAfterDays
   );
 }
 
@@ -95,12 +109,39 @@ export function getDelayReportedProperties<
   return getConfidenceScopeProperties(
     properties
   ).filter((property) =>
-    property.activities.some(
-      (activity) =>
-        activity.update.includes(
-          DELAY_REPORTED_PREFIX
-        )
+    hasActiveDelayReport(
+      property.activities
     )
+  );
+}
+
+export function isBuyerReadyOperationallyStale(
+  params: {
+    buyerReadySummary:
+      | ChainNodesChainSummary
+      | null
+      | undefined;
+    buyerReadyActivities?:
+      | OperationalActivity[]
+      | null;
+    staleAfterDays?: number;
+  }
+): boolean {
+  const staleAfterDays =
+    params.staleAfterDays ??
+    STALE_DAYS_CONFIDENCE;
+
+  if (params.buyerReadyActivities?.length) {
+    return (
+      daysSinceLastActivity(
+        params.buyerReadyActivities
+      ) > staleAfterDays
+    );
+  }
+
+  return isBuyerReadySummaryStale(
+    params.buyerReadySummary,
+    staleAfterDays
   );
 }
 
@@ -144,7 +185,7 @@ export function computeAverageProgress(
 
 export function computeChainConfidence(params: {
   blockedCount: number;
-  delayedCount: number;
+  activeDelayCount: number;
   staleCount: number;
   brokenCount: number;
   buyerReadyStale: boolean;
@@ -157,7 +198,7 @@ export function computeChainConfidence(params: {
   let score = CONFIDENCE_BASE;
 
   score -= params.blockedCount * PENALTY_BLOCKED;
-  score -= params.delayedCount * PENALTY_DELAYED;
+  score -= params.activeDelayCount * PENALTY_DELAYED;
   score -= params.staleCount * PENALTY_STALE;
   score -= params.brokenCount * PENALTY_BROKEN;
 
@@ -195,6 +236,7 @@ export function computeChainHealth(params: {
   staleCount: number;
   delayReportedCount: number;
   requiresReplacementBuyer: boolean;
+  scheduledCompletionMode?: boolean;
 }): {
   status: ChainHealthStatus;
   message: string;
@@ -204,6 +246,29 @@ export function computeChainHealth(params: {
       status: "Replacement Buyer Required",
       message:
         "A chain connection has been broken. A replacement buyer may be required before the chain can progress.",
+    };
+  }
+
+  if (params.scheduledCompletionMode) {
+    if (params.delayReportedCount >= 2) {
+      return {
+        status: "At Risk",
+        message:
+          "Multiple delays have been reported while awaiting the agreed completion date.",
+      };
+    }
+
+    if (params.delayReportedCount >= 1) {
+      return {
+        status: "Active",
+        message:
+          "A delay has been reported while awaiting the agreed completion date.",
+      };
+    }
+
+    return {
+      status: "Stable",
+      message: COMPLETION_SCHEDULED_CHAIN_HEALTH_MESSAGE,
     };
   }
 
@@ -240,7 +305,7 @@ export function computeEstimatedChainCompletion(params: {
   averageProgress: number;
   requiresReplacementBuyer: boolean;
   blockedCount: number;
-  delayedCount: number;
+  activeDelayCount: number;
   staleCount: number;
   buyerReadyStale: boolean;
 }): string {
@@ -271,7 +336,7 @@ export function computeEstimatedChainCompletion(params: {
     return `${estimatedChainCompletion} (blocked property detected)`;
   }
 
-  if (params.delayedCount > 0) {
+  if (params.activeDelayCount > 0) {
     return `${estimatedChainCompletion} (delays reported)`;
   }
 
@@ -300,11 +365,8 @@ export function selectBottleneckProperty<
 
   const delayedProperty =
     inScopeProperties.find((property) =>
-      property.activities.some(
-        (activity) =>
-          activity.update.includes(
-            DELAY_REPORTED_PREFIX
-          )
+      hasActiveDelayReport(
+        property.activities
       )
     );
 
@@ -315,8 +377,9 @@ export function selectBottleneckProperty<
   const staleProperty =
     inScopeProperties.find(
       (property) =>
-        property.lastUpdatedDays >
-        STALE_DAYS_BOTTLENECK
+        daysSinceLastActivity(
+          property.activities
+        ) > STALE_DAYS_BOTTLENECK
     );
 
   return staleProperty ?? null;
@@ -329,22 +392,49 @@ export function computeChainIntelligence<
   buyerReadySummary:
     | ChainNodesChainSummary
     | null;
+  buyerReadyActivities?:
+    | OperationalActivity[]
+    | null;
   stages: StageDefinition[];
+  scheduledCompletionMode?: boolean;
 }): ChainIntelligenceResult<T> {
+  const scheduledCompletionMode =
+    params.scheduledCompletionMode ?? false;
+
   const inScopeProperties =
     getConfidenceScopeProperties(
       params.chainProperties
     );
 
-  const staleProperties =
+  const stalePropertiesRaw =
     getStaleProperties(
       params.chainProperties
     );
+
+  const staleProperties =
+    scheduledCompletionMode
+      ? []
+      : stalePropertiesRaw;
 
   const delayedProperties =
     getDelayReportedProperties(
       params.chainProperties
     );
+
+  const buyerReadyHasActiveDelay =
+    hasActiveDelayReport(
+      params.buyerReadyActivities
+    );
+
+  const activeDelayCount =
+    countActiveDelayReports({
+      propertyActivitiesList:
+        inScopeProperties.map(
+          (property) => property.activities
+        ),
+      buyerReadyActivities:
+        params.buyerReadyActivities,
+    });
 
   const brokenConnectionProperties =
     inScopeProperties.filter(
@@ -362,16 +452,18 @@ export function computeChainIntelligence<
         property.status === "blocked"
     ).length;
 
-  const delayedCount =
-    inScopeProperties.filter(
-      (property) =>
-        property.status === "delayed"
-    ).length;
+  const buyerReadyStaleRaw =
+    isBuyerReadyOperationallyStale({
+      buyerReadySummary:
+        params.buyerReadySummary,
+      buyerReadyActivities:
+        params.buyerReadyActivities,
+    });
 
   const buyerReadyStale =
-    isBuyerReadySummaryStale(
-      params.buyerReadySummary
-    );
+    scheduledCompletionMode
+      ? false
+      : buyerReadyStaleRaw;
 
   const buyerReadyProgress =
     params.buyerReadySummary?.progress ??
@@ -391,35 +483,45 @@ export function computeChainIntelligence<
   const confidence =
     computeChainConfidence({
       blockedCount,
-      delayedCount,
-      staleCount: staleProperties.length,
+      activeDelayCount,
+      staleCount: scheduledCompletionMode
+        ? 0
+        : stalePropertiesRaw.length,
       brokenCount:
         brokenConnectionProperties.length,
-      buyerReadyStale,
+      buyerReadyStale: scheduledCompletionMode
+        ? false
+        : buyerReadyStaleRaw,
     });
 
   const chainHealth =
     computeChainHealth({
-      staleCount: staleProperties.length,
-      delayReportedCount:
-        delayedProperties.length,
+      staleCount: scheduledCompletionMode
+        ? 0
+        : stalePropertiesRaw.length,
+      delayReportedCount: activeDelayCount,
       requiresReplacementBuyer,
+      scheduledCompletionMode,
     });
 
   const estimatedChainCompletion =
-    computeEstimatedChainCompletion({
-      averageProgress,
-      requiresReplacementBuyer,
-      blockedCount,
-      delayedCount,
-      staleCount: staleProperties.length,
-      buyerReadyStale,
-    });
+    scheduledCompletionMode
+      ? ""
+      : computeEstimatedChainCompletion({
+          averageProgress,
+          requiresReplacementBuyer,
+          blockedCount,
+          activeDelayCount,
+          staleCount: stalePropertiesRaw.length,
+          buyerReadyStale: buyerReadyStaleRaw,
+        });
 
   const bottleneckProperty =
-    selectBottleneckProperty(
-      inScopeProperties
-    );
+    scheduledCompletionMode
+      ? null
+      : selectBottleneckProperty(
+          inScopeProperties
+        );
 
   return {
     inScopeProperties,
@@ -428,7 +530,8 @@ export function computeChainIntelligence<
     brokenConnectionProperties,
     requiresReplacementBuyer,
     blockedCount,
-    delayedCount,
+    delayedCount: activeDelayCount,
+    buyerReadyHasActiveDelay,
     buyerReadyStale,
     chainHealth: chainHealth.status,
     chainHealthMessage: chainHealth.message,
@@ -439,5 +542,7 @@ export function computeChainIntelligence<
     confidenceBg: confidence.bg,
     estimatedChainCompletion,
     bottleneckProperty,
+    isScheduledCompletionMode:
+      scheduledCompletionMode,
   };
 }

@@ -14,15 +14,34 @@ import {
   OPERATIONAL_EDIT_DENIED_MESSAGE,
 } from "@/lib/propertyPermissions";
 import {
+  validatePropertyStageTransition,
+  COMPLETION_DATE_AGREED_REQUIRES_CONTRACTS_EXCHANGED_MESSAGE,
+} from "@/lib/completionLifecycle";
+import {
   mapToOperationalProperties,
+  resolveOperationalPosition,
+  type OperationalBuyerReadyNode,
   type OperationalProperty,
 } from "@/lib/operationalPosition";
-type Activity = {
-  id: number;
-  timestamp: string;
-  update: string;
-  updated_by?: string;
-};
+import {
+  recordChainCompletionDate as persistChainCompletionDate,
+  type RecordChainCompletionDateResult,
+} from "@/lib/recordChainCompletionDate";
+import {
+  amendChainCompletionDate as persistChainCompletionDateAmendment,
+  type AmendChainCompletionDateResult,
+} from "@/lib/amendChainCompletionDate";
+import {
+  confirmChainCompletion as persistChainCompletionConfirmation,
+  type ConfirmChainCompletionResult,
+} from "@/lib/confirmChainCompletion";
+import type { CompletionAmendmentReasonCode } from "@/lib/completionLifecycle";
+import {
+  daysSinceLastActivity,
+  sortActivitiesNewestFirst,
+  type OperationalActivity,
+} from "@/lib/activityIntelligence";
+type Activity = OperationalActivity;
 
 type Property = {
   
@@ -56,6 +75,13 @@ type Chain = {
   id: number;
   accessCode: string;
   state: string;
+  completionLifecycleStatus: string | null;
+  completionScheduledDate: string | null;
+  completionDateRecordedAt: string | null;
+  completionDateRecordedByUserId: string | null;
+  completionConfirmedAt: string | null;
+  completionConfirmedByUserId: string | null;
+  completedAt: string | null;
 };
 type ChainContextType = {
   properties: Property[];
@@ -78,6 +104,21 @@ type ChainContextType = {
     propertyId: number,
     breakReason: string
   ) => void;
+
+  recordChainCompletionDate: (
+    chainId: number,
+    scheduledDate: string
+  ) => Promise<RecordChainCompletionDateResult>;
+
+  amendChainCompletionDate: (
+    chainId: number,
+    newScheduledDate: string,
+    reasonCode: CompletionAmendmentReasonCode
+  ) => Promise<AmendChainCompletionDateResult>;
+
+  confirmChainCompletion: (
+    chainId: number
+  ) => Promise<ConfirmChainCompletionResult>;
 
 };
 
@@ -204,37 +245,14 @@ linked_property_id:
         )?.role || null,
         
 
-          lastUpdatedDays: (() => {
-
-            if (
-              !property.activities ||
-              property.activities.length === 0
-            ) {
-              return 0;
-            }
-          
-            const latestActivity =
-              property.activities[0];
-          
-            const updatedDate =
-              new Date(
-                latestActivity.timestamp
-              );
-          
-            const now = new Date();
-          
-            const difference =
-              now.getTime() -
-              updatedDate.getTime();
-          
-            return Math.floor(
-              difference /
-              (1000 * 60 * 60 * 24)
-            );
-          
-          })(),
+          lastUpdatedDays:
+            daysSinceLastActivity(
+              property.activities
+            ),
           activities:
-          property.activities || [],
+            sortActivitiesNewestFirst(
+              property.activities || []
+            ),
         
         }));
         console.log("RAW DATA", data);
@@ -289,34 +307,46 @@ console.log(
                   property.status ===
                   "pending_connection"
               );
-              return {
-                id: chain.id,
-                accessCode: chain.access_code,
-                state: chain.state,
-              };
-              const hasUnclaimedProperties =
-  chainProperties.some(
-    (property) =>
-      property.members.length === 0
-  );
-            
+
+            const hasUnclaimedProperties =
+              chainProperties.some(
+                (property) =>
+                  property.members.length === 0
+              );
+
             const isIncomplete =
               chainProperties.length === 1 ||
               hasPendingConnection ||
               hasUnclaimedProperties;
-      
+
             return {
-      
               id: chain.id,
-      
-              accessCode:
-                chain.access_code,
-      
+              accessCode: chain.access_code,
               state:
-                isIncomplete
+                chain.state ||
+                (isIncomplete
                   ? "active_incomplete"
-                  : "active_connected",
-      
+                  : "active_connected"),
+              completionLifecycleStatus:
+                chain.completion_lifecycle_status ??
+                null,
+              completionScheduledDate:
+                chain.completion_scheduled_date ??
+                null,
+              completionDateRecordedAt:
+                chain.completion_date_recorded_at ??
+                null,
+              completionDateRecordedByUserId:
+                chain.completion_date_recorded_by_user_id ??
+                null,
+              completionConfirmedAt:
+                chain.completion_confirmed_at ??
+                null,
+              completionConfirmedByUserId:
+                chain.completion_confirmed_by_user_id ??
+                null,
+              completedAt:
+                chain.completed_at ?? null,
             };
           });
       
@@ -361,6 +391,17 @@ if (
 
   return;
 }
+
+const stageGateResult = validatePropertyStageTransition(
+  property?.stage ?? "",
+  newStage
+);
+
+if (!stageGateResult.ok) {
+  alert(stageGateResult.message);
+
+  return;
+}
   const { error } =
     await supabase
       .from("properties")
@@ -371,6 +412,18 @@ if (
 
   if (error) {
     console.error(error);
+
+    if (
+      typeof error.message === "string" &&
+      error.message.includes(
+        "completion_date_agreed_requires_contracts_exchanged"
+      )
+    ) {
+      alert(
+        COMPLETION_DATE_AGREED_REQUIRES_CONTRACTS_EXCHANGED_MESSAGE
+      );
+    }
+
     return;
   }
 
@@ -743,6 +796,224 @@ if (
   );
 }
 
+async function recordChainCompletionDate(
+  chainId: number,
+  scheduledDate: string
+): Promise<RecordChainCompletionDateResult> {
+  if (!currentUserId) {
+    return {
+      ok: false,
+      message:
+        "Please log in to record the agreed completion date.",
+    };
+  }
+
+  const result = await persistChainCompletionDate(
+    supabase,
+    {
+      chainId,
+      userId: currentUserId,
+      scheduledDate,
+      chainProperties:
+        mapToOperationalProperties(properties),
+      chainNodes: chainNodes as OperationalBuyerReadyNode[],
+    }
+  );
+
+  if (!result.ok) {
+    return result;
+  }
+
+  const { position } = resolveOperationalPosition(
+    currentUserId,
+    chainId,
+    mapToOperationalProperties(properties),
+    chainNodes as OperationalBuyerReadyNode[]
+  );
+
+  setChains((previousChains) =>
+    previousChains.map((chain) =>
+      chain.id === chainId
+        ? {
+            ...chain,
+            completionLifecycleStatus:
+              result.chain
+                .completion_lifecycle_status,
+            completionScheduledDate:
+              result.chain
+                .completion_scheduled_date,
+            completionDateRecordedAt:
+              result.chain
+                .completion_date_recorded_at,
+            completionDateRecordedByUserId:
+              result.chain
+                .completion_date_recorded_by_user_id,
+          }
+        : chain
+    )
+  );
+
+  setProperties((previousProperties) =>
+    previousProperties.map((property) =>
+      position?.kind === "sale" &&
+      property.id === position.propertyId
+        ? {
+            ...property,
+            stage: "completion_date_agreed",
+          }
+        : property
+    )
+  );
+
+  setChainNodes((previousNodes) =>
+    previousNodes.map((node) =>
+      position?.kind === "buyer_ready" &&
+      node.id === position.nodeId
+        ? {
+            ...node,
+            stage: "completion_date_agreed",
+            progress: 100,
+            status: "healthy",
+          }
+        : node
+    )
+  );
+
+  return result;
+}
+
+async function amendChainCompletionDate(
+  chainId: number,
+  newScheduledDate: string,
+  reasonCode: CompletionAmendmentReasonCode
+): Promise<AmendChainCompletionDateResult> {
+  if (!currentUserId) {
+    return {
+      ok: false,
+      message:
+        "Please log in to change the agreed completion date.",
+    };
+  }
+
+  const result =
+    await persistChainCompletionDateAmendment(
+      supabase,
+      {
+        chainId,
+        userId: currentUserId,
+        newScheduledDate,
+        reasonCode,
+        chainProperties:
+          mapToOperationalProperties(properties),
+        chainNodes:
+          chainNodes as OperationalBuyerReadyNode[],
+      }
+    );
+
+  if (!result.ok) {
+    return result;
+  }
+
+  setChains((previousChains) =>
+    previousChains.map((chain) =>
+      chain.id === chainId
+        ? {
+            ...chain,
+            completionLifecycleStatus:
+              result.chain
+                .completion_lifecycle_status,
+            completionScheduledDate:
+              result.chain
+                .completion_scheduled_date,
+            completionDateRecordedAt:
+              result.chain
+                .completion_date_recorded_at,
+            completionDateRecordedByUserId:
+              result.chain
+                .completion_date_recorded_by_user_id,
+          }
+        : chain
+    )
+  );
+
+  await addStructuredUpdate(
+    result.activityTarget.kind === "sale"
+      ? result.activityTarget.propertyId
+      : result.activityTarget.nodeId,
+    result.activityUpdate,
+    result.activityTarget.kind === "sale"
+      ? "property"
+      : "buyer_ready"
+  );
+
+  return result;
+}
+
+async function confirmChainCompletion(
+  chainId: number
+): Promise<ConfirmChainCompletionResult> {
+  if (!currentUserId) {
+    return {
+      ok: false,
+      message:
+        "Please log in to confirm completion.",
+    };
+  }
+
+  const result =
+    await persistChainCompletionConfirmation(
+      supabase,
+      {
+        chainId,
+        userId: currentUserId,
+        chainProperties:
+          mapToOperationalProperties(properties),
+        chainNodes:
+          chainNodes as OperationalBuyerReadyNode[],
+      }
+    );
+
+  if (!result.ok) {
+    return result;
+  }
+
+  setChains((previousChains) =>
+    previousChains.map((chain) =>
+      chain.id === chainId
+        ? {
+            ...chain,
+            completionLifecycleStatus:
+              result.chain
+                .completion_lifecycle_status,
+            completionScheduledDate:
+              result.chain
+                .completion_scheduled_date,
+            completionConfirmedAt:
+              result.chain
+                .completion_confirmed_at,
+            completionConfirmedByUserId:
+              result.chain
+                .completion_confirmed_by_user_id,
+            completedAt:
+              result.chain.completed_at,
+          }
+        : chain
+    )
+  );
+
+  await addStructuredUpdate(
+    result.activityTarget.kind === "sale"
+      ? result.activityTarget.propertyId
+      : result.activityTarget.nodeId,
+    result.activityUpdate,
+    result.activityTarget.kind === "sale"
+      ? "property"
+      : "buyer_ready"
+  );
+
+  return result;
+}
+
 return (
   <ChainContext.Provider
       value={{
@@ -753,6 +1024,9 @@ return (
         updatePropertyStage,
         addStructuredUpdate,
         breakChainConnection,
+        recordChainCompletionDate,
+        amendChainCompletionDate,
+        confirmChainCompletion,
       }}
     >
       {children}
