@@ -47,84 +47,45 @@ function JoinChainContent() {
     }
 
     const {
-      data: chain,
-    } = await supabase
-      .from("chains")
-      .select("*")
-      .eq("access_code", accessCode)
-      .single();
+      data: joinResult,
+      error: joinError,
+    } = await supabase.rpc("join_chain_property", {
+      p_access_code: accessCode,
+      p_address: address,
+      p_postcode: postcode,
+    });
 
-    if (!chain) {
-
-      alert("Invalid access code");
-
+    if (joinError) {
+      console.error(joinError);
+      alert("Could not join this chain.");
       return;
     }
 
-    const {
-      data: property,
-    } = await supabase
-      .from("properties")
-      .select("*")
-      .eq("chain_id", chain.id)
-      .eq("address", address)
-      .eq("postcode", postcode)
-      .single();
+    if (!joinResult?.ok) {
+      if (joinResult?.error === "invalid_access_code") {
+        alert("Invalid access code");
+        return;
+      }
 
-    if (!property) {
+      if (joinResult?.error === "property_not_found") {
+        alert("Property not found in this chain");
+        return;
+      }
 
-      alert(
-        "Property not found in this chain"
-      );
-
+      alert("Could not join this property.");
       return;
     }
 
-    await supabase
-      .from("properties")
-      .update({
-        status: "healthy",
+    const property = {
+      id: joinResult.property_id as number,
+      chain_id: joinResult.chain_id as number,
+      linked_property_id:
+        joinResult.linked_property_id as number | null,
+      relationship_type:
+        joinResult.relationship_type as string,
+    };
 
-        buyer_connected:
-          property.relationship_type === "sale"
-            ? true
-            : property.relationship_type === "purchase"
-            ? true
-            : property.buyer_connected,
-
-        seller_connected:
-          property.relationship_type === "purchase"
-            ? true
-            : property.seller_connected,
-      })
-      .eq("id", property.id);
-
-    const joiningRole =
-      property.relationship_type === "sale"
-        ? "buyer"
-        : "seller";
-
-    const {
-      data: insertedMembership,
-      error: memberInsertError,
-    } = await supabase
-      .from("property_members")
-      .insert({
-        property_id: property.id,
-        user_id: user.id,
-        role: joiningRole,
-      })
-      .select();
-
-    if (memberInsertError) {
-      alert(
-        "Could not join this property. You may already be a member."
-      );
-      console.error(memberInsertError);
-      return;
-    }
-
-    if (joiningRole === "seller") {
+    if (joinResult.joining_role === "seller") {
       await establishConnectedHopAfterSellerJoinsPurchase(
         supabase,
         property.id
@@ -158,16 +119,6 @@ function JoinChainContent() {
         migratedSearchingId =
           migrationResult.onwardSearchingId;
 
-        console.log(
-          "ONWARD SEARCHING",
-          migrationResult.onwardSearchingId
-        );
-
-        console.log(
-          "ONWARD SALE MIGRATED",
-          migrationResult.onwardSaleMigrated
-        );
-
         if (migratedSearchingId) {
           const migrationRelinkResult =
             await relinkJoinedPropertyToSearching(
@@ -192,22 +143,11 @@ function JoinChainContent() {
         }
       }
 
-      const {
-        data: joinedPropertyState,
-      } = await supabase
-        .from("properties")
-        .select(
-          "id, chain_id, linked_property_id"
-        )
-        .eq("id", property.id)
-        .single();
-
-      if (!joinedPropertyState) {
-        alert(
-          "Joined property could not be loaded after membership was created."
-        );
-        return;
-      }
+      const joinedPropertyState = {
+        id: property.id,
+        chain_id: property.chain_id,
+        linked_property_id: property.linked_property_id,
+      };
 
       const intentResult =
         await resolveSearchingFromJoinIntent(
@@ -244,23 +184,18 @@ function JoinChainContent() {
         return;
       }
 
-      if (intentResult?.ok) {
-        console.log(
-          "SEARCHING INTENT RESOLVED",
-          intentResult
-        );
-      }
-
-      console.log(
-        "INSERTED MEMBERSHIP",
-        insertedMembership
-      );
-
       if (sourceChainId) {
-        await supabase
-          .from("properties")
-          .delete()
-          .eq("chain_id", sourceChainId);
+        const { error: cleanupError } =
+          await supabase.rpc(
+            "cleanup_abandoned_onboarding_chain",
+            {
+              p_chain_id: Number(sourceChainId),
+            }
+          );
+
+        if (cleanupError) {
+          console.error(cleanupError);
+        }
       }
 
       joinCompleted = true;

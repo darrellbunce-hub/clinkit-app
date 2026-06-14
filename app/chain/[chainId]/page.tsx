@@ -30,6 +30,7 @@ import {
 import { convertSearchingPlaceholder } from "@/lib/searchingPlaceholder";
 import CompletionScheduledBanner from "@/components/CompletionScheduledBanner";
 import ChainCompletedBanner from "@/components/ChainCompletedBanner";
+import PropertyEstateAgentAssignment from "@/components/estate-agents/PropertyEstateAgentAssignment";
 import RecordCompletionDateForm from "@/components/RecordCompletionDateForm";
 import { canShowCompletionSchedulingForm } from "@/lib/recordChainCompletionDate";
 import { canAmendChainCompletionDate } from "@/lib/amendChainCompletionDate";
@@ -1225,116 +1226,27 @@ export default function ChainPage() {
 
         </div>
         )}
-          <div className="mt-8 bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
+          <div className="mt-8">
+            {saleOperationalPropertyId ? (
+              <PropertyEstateAgentAssignment
+                propertyId={
+                  saleOperationalPropertyId
+                }
+              />
+            ) : (
+              <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
+                <h2 className="text-2xl font-bold text-slate-900">
+                  Estate Agent
+                </h2>
 
-<h2 className="text-2xl font-bold text-slate-900">
-  Estate Agent
-</h2>
-
-<p className="text-slate-500 mt-2">
-  Add the estate agent managing this transaction.
-</p>
-
-<div className="mt-6 space-y-4">
-
-  <div>
-
-    <label className="block text-sm font-medium text-slate-700 mb-2">
-      Estate Agency
-    </label>
-
-    <input
-      type="text"
-      placeholder="Search estate agency"
-      className="
-        w-full
-        border
-        border-slate-300
-        rounded-2xl
-        px-4
-        py-3
-        focus:outline-none
-        focus:ring-2
-        focus:ring-slate-300
-      "
-    />
-
-  </div>
-
-  <div>
-
-    <label className="block text-sm font-medium text-slate-700 mb-2">
-      Branch
-    </label>
-
-    <select
-      className="
-        w-full
-        border
-        border-slate-300
-        rounded-2xl
-        px-4
-        py-3
-        bg-white
-        focus:outline-none
-        focus:ring-2
-        focus:ring-slate-300
-      "
-    >
-
-      <option>Select branch</option>
-      <option>Fareham</option>
-      <option>Stubbington</option>
-
-    </select>
-
-  </div>
-
-  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
-
-    <label className="flex items-start gap-3">
-
-      <input
-        type="checkbox"
-        className="mt-1"
-      />
-
-      <span className="text-sm text-slate-700">
-
-        Allow this estate agent to post transaction updates on your behalf.
-
-      </span>
-
-    </label>
-
-    <p className="text-xs text-slate-500 mt-3">
-
-      Estate agents added to a transaction can always view operational chain progress.
-
-    </p>
-
-  </div>
-
-  <button
-  type="button"
-  onClick={() => alert("Estate agent added")}
-    className="
-      w-full
-      bg-slate-900
-      text-white
-      rounded-2xl
-      py-4
-      font-semibold
-      hover:bg-slate-800
-      transition
-    "
-  >
-    Add Estate Agent
-  </button>
-
-</div>
-
-        </div>
+                <p className="text-slate-500 mt-2">
+                  Assign an estate agent from your operational
+                  sale property page when you have an editable
+                  sale position in this chain.
+                </p>
+              </div>
+            )}
+          </div>
 
       </div>
 

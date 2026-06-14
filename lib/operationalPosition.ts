@@ -366,31 +366,78 @@ export function getPropertyPageSubtitle(
   return CONNECTED_POSITION_MESSAGE;
 }
 
-export function getDashboardPropertyLabel(
+export function getParticipantPropertyLabel(
   property: Pick<
     ChainDisplayProperty,
     "relationship_type" | "stage" | "address"
   > & {
     chainPosition?: number;
     chain_position?: number;
+    is_own_property?: boolean;
+    isOwnProperty?: boolean;
+    currentUserRole?: string | null;
   }
 ): string {
   if (isSearchingPlaceholder(property)) {
     return CHAIN_TILE_LABEL.nextHomeSearch;
   }
 
-  if (property.relationship_type === "sale") {
-    return CHAIN_TILE_LABEL.connectedSale;
-  }
-
-  if (property.relationship_type === "purchase") {
-    return CHAIN_TILE_LABEL.connectedPurchase;
+  if (
+    property.address &&
+    (property.is_own_property ||
+      property.isOwnProperty ||
+      property.currentUserRole)
+  ) {
+    return property.address;
   }
 
   const chainPosition =
     property.chainPosition ?? property.chain_position;
 
-  return `Chain Property ${chainPosition ?? ""}`.trim();
+  return `Property ${chainPosition ?? ""}`.trim();
+}
+
+/** @deprecated Use getParticipantPropertyLabel */
+export function getDashboardPropertyLabel(
+  property: Parameters<typeof getParticipantPropertyLabel>[0]
+): string {
+  return getParticipantPropertyLabel(property);
+}
+
+export function getDashboardChainTitle(
+  chainId: number,
+  properties: Array<
+    Pick<
+      ChainDisplayProperty,
+      "stage" | "address"
+    > & {
+      chainId?: number;
+      chain_id?: number;
+      is_own_property?: boolean;
+      isOwnProperty?: boolean;
+      currentUserRole?: string | null;
+    }
+  >
+): string {
+  const chainProperties = properties.filter(
+    (property) =>
+      Number(property.chainId ?? property.chain_id) ===
+      Number(chainId)
+  );
+
+  const ownPropertyWithAddress = chainProperties.find(
+    (property) =>
+      property.address &&
+      (property.is_own_property ||
+        property.isOwnProperty ||
+        property.currentUserRole)
+  );
+
+  if (ownPropertyWithAddress?.address) {
+    return ownPropertyWithAddress.address;
+  }
+
+  return `Chain #${chainId}`;
 }
 
 export function getChainTileDisplayTitle(
@@ -399,6 +446,8 @@ export function getChainTileDisplayTitle(
     "relationship_type" | "stage" | "address"
   > & {
     currentUserRole?: string | null;
+    chainPosition?: number;
+    chain_position?: number;
   },
   isOperationalPosition: boolean
 ): string {
@@ -408,6 +457,13 @@ export function getChainTileDisplayTitle(
 
   if (isOperationalPosition) {
     return CHAIN_TILE_LABEL.yourSale;
+  }
+
+  if (!property.address) {
+    const chainPosition =
+      property.chainPosition ?? property.chain_position;
+
+    return `Property ${chainPosition ?? ""}`.trim();
   }
 
   if (isViewOnlyPurchaseTile(property, isOperationalPosition)) {

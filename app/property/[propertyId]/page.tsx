@@ -23,6 +23,7 @@ import {
   OPERATIONAL_SALE_BANNER_MESSAGE,
 } from "@/lib/propertyPermissions";
 import OperationalCompletionDatePanel from "@/components/OperationalCompletionDatePanel";
+import PropertyEstateAgentAssignment from "@/components/estate-agents/PropertyEstateAgentAssignment";
 import {
   mapToOperationalProperties,
 } from "@/lib/operationalPosition";
@@ -1102,6 +1103,14 @@ if (
 
 </div>
         </>
+        )}
+
+        {canEdit && (
+          <div className="mt-8">
+            <PropertyEstateAgentAssignment
+              propertyId={currentProperty.id}
+            />
+          </div>
         )}
 
         {/* Activity Timeline */}

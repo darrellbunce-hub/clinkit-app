@@ -1,104 +1,14 @@
 "use client";
-import { useEffect, useState } from "react";
-import Navbar from "@/components/Navbar";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
-import { useRouter } from "next/navigation";
-import { getDashboardPropertyLabel } from "@/lib/operationalPosition";
-type Chain = {
-  id: number;
-  access_code: string;
-};
+import Navbar from "@/components/Navbar";
+import { useChain } from "@/context/ChainContext";
+import {
+  getDashboardChainTitle,
+  getParticipantPropertyLabel,
+} from "@/lib/operationalPosition";
 
 export default function DashboardPage() {
-
-  const [properties, setProperties] =
-  useState<any[]>([]);
-  
-  const [chains, setChains] =
-    useState<Chain[]>([]);
-    const router = useRouter();
-    useEffect(() => {
-
-      async function loadProperties() {
-    
-        const {
-          data,
-          error,
-        } = await supabase
-          .from("properties")
-          .select("*")
-          .order("chain_position");
-    
-        if (error) {
-          console.error(error);
-          return;
-        }
-    
-        setProperties(data || []);
-    
-      }
-    
-      loadProperties();
-    
-    }, []);
-  useEffect(() => {
-
-    async function loadChains() {
-
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) {
-        return;
-      }
-
-      const {
-        data: memberships,
-      } = await supabase
-        .from("property_members")
-        .select(`
-          property_id,
-          properties (
-            chain_id
-          )
-        `)
-        .eq("user_id", user.id);
-
-      if (!memberships) {
-        return;
-      }
-
-      const chainIds =
-  memberships
-    .filter(
-      (membership: any) =>
-        membership.properties
-    )
-    .map(
-      (membership: any) =>
-        membership.properties.chain_id
-    );
-
-      const uniqueChainIds =
-        [...new Set(chainIds)];
-
-      const {
-        data: chainsData,
-      } = await supabase
-        .from("chains")
-        .select("*")
-        .in("id", uniqueChainIds);
-
-      if (chainsData) {
-        setChains(chainsData);
-      }
-    }
-
-    loadChains();
-
-  }, []);
+  const { properties, chains } = useChain();
 
   return (
     <main className="min-h-screen bg-slate-100">
@@ -139,8 +49,13 @@ export default function DashboardPage() {
   {/* Chains */}
   <div className="grid gap-6 md:grid-cols-2">
 
-          {chains.map((chain) => (
+          {chains.map((chain) => {
+            const chainProperties = properties.filter(
+              (property) =>
+                property.chainId === chain.id
+            );
 
+            return (
             <div
               key={chain.id}
               className="bg-white rounded-3xl shadow-sm p-8 border border-slate-200"
@@ -152,24 +67,16 @@ export default function DashboardPage() {
 
                 <h2 className="text-2xl font-bold text-slate-900">
 
-  {properties.find(
-    (property: any) =>
-      property.chain_id === chain.id
-  )?.address || `Chain #${chain.id}`}
+  {getDashboardChainTitle(chain.id, properties)}
 
 </h2>
 
 <p className="text-slate-500 mt-2">
-  Access Code: {chain.access_code}
+  Access Code: {chain.accessCode}
 </p>
                   <div className="mt-6 space-y-4">
 
-{properties
-  .filter(
-    (property: any) =>
-      property.chain_id === chain.id
-  )
-  .map((property: any) => (
+{chainProperties.map((property) => (
 
     <div
       key={property.id}
@@ -188,17 +95,19 @@ export default function DashboardPage() {
 
         <h3 className="font-semibold text-slate-900">
 
-{getDashboardPropertyLabel({
+{getParticipantPropertyLabel({
   relationship_type: property.relationship_type,
   stage: property.stage,
   address: property.address,
-  chain_position: property.chain_position,
+  chainPosition: property.chainPosition,
+  is_own_property: property.isOwnProperty,
+  currentUserRole: property.currentUserRole,
 })}
 
 </h3>
 
           <p className="text-sm text-slate-500 mt-1">
-            Position #{property.chain_position}
+            Position #{property.chainPosition}
           </p>
 
         </div>
@@ -300,8 +209,8 @@ export default function DashboardPage() {
               </Link>
 
             </div>
-
-          ))}
+          );
+          })}
 
 </div>
 

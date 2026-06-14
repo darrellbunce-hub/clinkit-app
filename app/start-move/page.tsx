@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import Navbar from "@/components/Navbar";
+import { ensurePropertyMembership } from "@/lib/ensurePropertyMembership";
+import { getNextChainPosition } from "@/lib/searchingPlaceholder";
 
 export default function StartMovePage() {
  
@@ -127,15 +129,16 @@ export default function StartMovePage() {
           );
     
           const {
-            data: existingSellingProperty,
-          } = await supabase
-            .from("properties")
-            .select("*")
-            .eq("address", sellingAddress)
-            .eq("postcode", sellingPostcode)
-            .single();
+            data: sellingExists,
+          } = await supabase.rpc(
+            "property_exists_for_onboarding",
+            {
+              p_address: sellingAddress,
+              p_postcode: sellingPostcode,
+            }
+          );
     
-          if (existingSellingProperty) {
+          if (sellingExists) {
     
             const shouldJoinExisting =
               window.confirm(
@@ -146,9 +149,6 @@ export default function StartMovePage() {
 
               const joinParams =
                 new URLSearchParams({
-                  property: String(
-                    existingSellingProperty.id
-                  ),
                   sourceChain: String(
                     chainData.id
                   ),
@@ -233,17 +233,19 @@ export default function StartMovePage() {
             sellingPropertyId =
               sellingProperty.id;
     
-            await supabase
-              .from("property_members")
-              .insert({
-                property_id:
-                  sellingProperty.id,
-    
-                user_id: user.id,
-    
-                role: "seller",
-              });
-    
+            const { error: sellerMemberError } =
+              await ensurePropertyMembership(
+                supabase,
+                {
+                  propertyId: sellingProperty.id,
+                  role: "seller",
+                }
+              );
+
+            if (sellerMemberError) {
+              console.error(sellerMemberError);
+              return;
+            }
           }
     
         }
@@ -256,15 +258,16 @@ export default function StartMovePage() {
           );
     
           const {
-            data: existingBuyingProperty,
-          } = await supabase
-            .from("properties")
-            .select("*")
-            .eq("address", buyingAddress)
-            .eq("postcode", buyingPostcode)
-            .single();
+            data: buyingExists,
+          } = await supabase.rpc(
+            "property_exists_for_onboarding",
+            {
+              p_address: buyingAddress,
+              p_postcode: buyingPostcode,
+            }
+          );
     
-          if (existingBuyingProperty) {
+          if (buyingExists) {
     
             const shouldJoinExisting =
               window.confirm(
@@ -275,9 +278,6 @@ export default function StartMovePage() {
 
               const joinParams =
                 new URLSearchParams({
-                  property: String(
-                    existingBuyingProperty.id
-                  ),
                   sourceChain: String(
                     chainData.id
                   ),
@@ -360,17 +360,19 @@ export default function StartMovePage() {
           if (buyingProperty) {
             buyerReadyPropertyId =
             buyingProperty.id;
-            await supabase
-              .from("property_members")
-              .insert({
-                property_id:
-                  buyingProperty.id,
-    
-                user_id: user.id,
-    
-                role: "buyer",
-              });
-          
+            const { error: buyerMemberError } =
+              await ensurePropertyMembership(
+                supabase,
+                {
+                  propertyId: buyingProperty.id,
+                  role: "buyer",
+                }
+              );
+
+            if (buyerMemberError) {
+              console.error(buyerMemberError);
+              return;
+            }
           }
     
         }
@@ -381,20 +383,11 @@ export default function StartMovePage() {
           !buyingAddress
         ) {
 
-          const {
-            data: chainProperties,
-          } = await supabase
-            .from("properties")
-            .select("chain_position")
-            .eq("chain_id", chainData.id)
-            .order("chain_position", {
-              ascending: false,
-            })
-            .limit(1);
-
           const nextChainPosition =
-            (chainProperties?.[0]
-              ?.chain_position ?? 0) + 1;
+            await getNextChainPosition(
+              supabase,
+              chainData.id
+            );
 
           const {
             data: searchingPlaceholder,
@@ -449,16 +442,19 @@ export default function StartMovePage() {
 
           if (searchingPlaceholder) {
 
-            await supabase
-              .from("property_members")
-              .insert({
-                property_id:
-                  searchingPlaceholder.id,
+            const { error: searchingMemberError } =
+              await ensurePropertyMembership(
+                supabase,
+                {
+                  propertyId: searchingPlaceholder.id,
+                  role: "buyer",
+                }
+              );
 
-                user_id: user.id,
-
-                role: "buyer",
-              });
+            if (searchingMemberError) {
+              console.error(searchingMemberError);
+              return;
+            }
 
             if (sellingPropertyId) {
 

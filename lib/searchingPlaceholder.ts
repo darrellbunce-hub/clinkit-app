@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { ensurePropertyMembership } from "@/lib/ensurePropertyMembership";
+
 export type SearchingPlaceholderRef = {
   id: number;
 };
@@ -52,14 +54,19 @@ export async function getNextChainPosition(
   supabase: SupabaseClient,
   chainId: number
 ): Promise<number> {
-  const { data: chainProperties } = await supabase
-    .from("properties")
-    .select("chain_position")
-    .eq("chain_id", chainId)
-    .order("chain_position", { ascending: false })
-    .limit(1);
+  const { data, error } = await supabase.rpc(
+    "get_next_chain_position",
+    {
+      p_chain_id: chainId,
+    }
+  );
 
-  return (chainProperties?.[0]?.chain_position ?? 0) + 1;
+  if (error || data == null) {
+    console.error(error);
+    return 1;
+  }
+
+  return Number(data);
 }
 
 export async function insertSearchingPlaceholder(
@@ -112,11 +119,9 @@ export async function insertSearchingPlaceholder(
     };
   }
 
-  const { error: memberError } = await supabase
-    .from("property_members")
-    .insert({
-      property_id: placeholder.id,
-      user_id: params.userId,
+  const { error: memberError } =
+    await ensurePropertyMembership(supabase, {
+      propertyId: placeholder.id,
       role: "buyer",
     });
 
@@ -165,16 +170,22 @@ export async function convertSearchingPlaceholder(
   }
 
   const {
-    data: existingProperty,
-  } = await supabase
-    .from("properties")
-    .select("id")
-    .eq("address", params.address)
-    .eq("postcode", params.postcode)
-    .neq("id", placeholder.id)
-    .maybeSingle();
+    data: addressExists,
+    error: existsError,
+  } = await supabase.rpc(
+    "property_exists_for_onboarding",
+    {
+      p_address: params.address,
+      p_postcode: params.postcode,
+      p_exclude_property_id: placeholder.id,
+    }
+  );
 
-  if (existingProperty) {
+  if (existsError) {
+    console.error(existsError);
+  }
+
+  if (addressExists) {
     return {
       ok: false,
       reason: "duplicate_address",

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import Logo from "@/components/Logo";
+import { ROUTES } from "@/lib/auth/routes";
 export default function Navbar() {
 
   const [mobileMenuOpen, setMobileMenuOpen] =
@@ -97,6 +98,19 @@ export default function Navbar() {
 ) : (
 
   <>
+
+    <Link
+      href={ROUTES.estateAgentMarketing}
+      className="
+        text-slate-300
+        hover:text-white
+        transition
+        px-4
+        py-2
+      "
+    >
+      Estate Agents
+    </Link>
 
     <Link
       href="/login"
@@ -213,6 +227,19 @@ window.location.href = "/";
 ) : (
 
   <>
+
+    <Link
+      href={ROUTES.estateAgentMarketing}
+      className="
+        text-slate-300
+        hover:text-white
+        transition
+        px-4
+        py-2
+      "
+    >
+      Estate Agents
+    </Link>
 
     <Link
       href="/login"

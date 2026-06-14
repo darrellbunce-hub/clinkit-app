@@ -66,6 +66,8 @@ relationship_type: string | null;
 created_by_user_id: string | null;
 
 linked_property_id: number | null;
+isOwnProperty: boolean;
+hasMembers: boolean;
 members: {
   user_id: string;
   role: string;
@@ -150,31 +152,131 @@ useEffect(() => {
       setCurrentUserId(user.id);
     }
   }
-  async function fetchProperties() {
+  async function fetchParticipantData() {
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    const { data, error } =
-  await supabase
-    .from("properties")
-    .select(`
-      *,
-      activities (
-        id,
-        timestamp,
-        update,
-        updated_by
-      ),
-      property_members (
-        user_id,
-        role
-      )
-    `);
-    
+
+    if (!user) {
+      return;
+    }
+
     const {
-      data: chainNodesData,
-      error: chainNodesError,
+      data: participantProperties,
+      error: propertiesError,
     } = await supabase
+      .from("chain_properties_participant")
+      .select("*")
+      .order("chain_id")
+      .order("chain_position");
+
+    if (propertiesError) {
+      console.error(propertiesError);
+      return;
+    }
+
+    const propertyIds =
+      (participantProperties || []).map(
+        (property) => property.id
+      );
+
+    let activitiesByPropertyId = new Map<
+      number,
+      Activity[]
+    >();
+
+    if (propertyIds.length > 0) {
+      const {
+        data: activitiesData,
+        error: activitiesError,
+      } = await supabase
+        .from("activities")
+        .select(
+          "id, timestamp, update, updated_by, property_id"
+        )
+        .in("property_id", propertyIds);
+
+      if (activitiesError) {
+        console.error(activitiesError);
+      } else {
+        for (const activity of activitiesData || []) {
+          if (!activity.property_id) {
+            continue;
+          }
+
+          const existing =
+            activitiesByPropertyId.get(
+              activity.property_id
+            ) || [];
+
+          existing.push({
+            id: activity.id,
+            timestamp: activity.timestamp,
+            update: activity.update,
+            updated_by: activity.updated_by,
+          });
+
+          activitiesByPropertyId.set(
+            activity.property_id,
+            existing
+          );
+        }
+      }
+    }
+
+    const formattedProperties =
+      (participantProperties || []).map((property) => {
+        const activities =
+          activitiesByPropertyId.get(property.id) || [];
+
+        return {
+          id: property.id,
+          chainId: property.chain_id,
+          chainPosition: property.chain_position,
+          address: property.address,
+          postcode: property.postcode,
+          awaiting_buyer:
+            property.awaiting_buyer ?? false,
+          is_searching:
+            property.is_searching ?? false,
+          buyer_connected:
+            property.buyer_connected ?? false,
+          seller_connected:
+            property.seller_connected ?? false,
+          relationship_type:
+            property.relationship_type ?? null,
+          created_by_user_id:
+            property.created_by_user_id ?? null,
+          linked_property_id:
+            property.linked_property_id ?? null,
+          isOwnProperty:
+            property.is_own_property ?? false,
+          hasMembers: property.has_members ?? false,
+          members: [],
+          stage: property.stage,
+          status: property.status,
+          currentUserRole:
+            property.current_user_role ?? null,
+          lastUpdatedDays: daysSinceLastActivity(
+            activities
+          ),
+          activities: sortActivitiesNewestFirst(
+            activities
+          ),
+        };
+      });
+
+    setProperties(formattedProperties);
+
+    const participantChainIds = [
+      ...new Set(
+        formattedProperties.map(
+          (property) => property.chainId
+        )
+      ),
+    ];
+
+    const chainNodesQuery = supabase
       .from("chain_nodes")
       .select(`
         *,
@@ -186,175 +288,93 @@ useEffect(() => {
           chain_node_id
         )
       `);
-    
-      console.log(
-        "CHAIN NODES QUERY",
-        chainNodesData
-      );
-      
-      console.log(
-        "FIRST NODE ACTIVITIES",
-        chainNodesData?.[0]?.activities
-      );
-    
-    const formattedProperties =
-      (data || []).map((property) => ({
 
-        id: property.id,
-
-        chainId:
-          property.chain_id,
-        
-        chainPosition:
-          property.chain_position,
-          address:
-          property.address,
-        
-        postcode:
-          property.postcode,
-          awaiting_buyer:
-  property.awaiting_buyer ?? false,
-
-is_searching:
-  property.is_searching ?? false,
-  buyer_connected:
-  property.buyer_connected ?? false,
-
-seller_connected:
-  property.seller_connected ?? false,
-relationship_type:
-  property.relationship_type ?? null,
-
-created_by_user_id:
-  property.created_by_user_id ?? null,
-
-linked_property_id:
-  property.linked_property_id ?? null,
-          members:
-  property.property_members || [],
-        stage: property.stage,
-
-        status: property.status,
-        currentUserRole:
-        property.property_members?.find(
-          (member: {
-            user_id: string;
-            role: string;
-          }) =>
-            member.user_id === user?.id
-        )?.role || null,
-        
-
-          lastUpdatedDays:
-            daysSinceLastActivity(
-              property.activities
-            ),
-          activities:
-            sortActivitiesNewestFirst(
-              property.activities || []
-            ),
-        
-        }));
-        console.log("RAW DATA", data);
-
-console.log(
-  "FORMATTED",
-  formattedProperties
-);
-    setProperties(formattedProperties);
-    if (!chainNodesError && chainNodesData) {
-
-      console.log(
-        "SETTING CHAIN NODES",
-        chainNodesData
-      );
-      console.log(
-        "CHAIN NODE ACTIVITIES COUNT",
-        chainNodesData?.[0]?.activities?.length
-      );
-      
-      console.log(
-        "CHAIN NODE FULL",
-        JSON.stringify(
-          chainNodesData?.[0],
-          null,
-          2
-        )
-      );
-      setChainNodes(chainNodesData);
-    
-    }
     const {
-      data: chainsData,
-    } = await supabase
-      .from("chains")
-      .select("*");
-    
-      if (chainsData) {
+      data: chainNodesData,
+      error: chainNodesError,
+    } =
+      participantChainIds.length > 0
+        ? await chainNodesQuery.in(
+            "chain_id",
+            participantChainIds
+          )
+        : await chainNodesQuery.limit(0);
 
-        const formattedChains =
-          chainsData.map((chain) => {
-            
-            const chainProperties =
-              formattedProperties.filter(
-                (property) =>
-                  Number(property.chainId) === Number(chain.id)
-              );
-      
-            const hasPendingConnection =
-              chainProperties.some(
-                (property) =>
-                  property.status ===
-                  "pending_connection"
-              );
+    if (!chainNodesError && chainNodesData) {
+      setChainNodes(chainNodesData);
+    }
 
-            const hasUnclaimedProperties =
-              chainProperties.some(
-                (property) =>
-                  property.members.length === 0
-              );
+    const chainsQuery = supabase.from("chains").select("*");
 
-            const isIncomplete =
-              chainProperties.length === 1 ||
-              hasPendingConnection ||
-              hasUnclaimedProperties;
+    const { data: chainsData } =
+      participantChainIds.length > 0
+        ? await chainsQuery.in(
+            "id",
+            participantChainIds
+          )
+        : await chainsQuery.limit(0);
 
-            return {
-              id: chain.id,
-              accessCode: chain.access_code,
-              state:
-                chain.state ||
-                (isIncomplete
-                  ? "active_incomplete"
-                  : "active_connected"),
-              completionLifecycleStatus:
-                chain.completion_lifecycle_status ??
-                null,
-              completionScheduledDate:
-                chain.completion_scheduled_date ??
-                null,
-              completionDateRecordedAt:
-                chain.completion_date_recorded_at ??
-                null,
-              completionDateRecordedByUserId:
-                chain.completion_date_recorded_by_user_id ??
-                null,
-              completionConfirmedAt:
-                chain.completion_confirmed_at ??
-                null,
-              completionConfirmedByUserId:
-                chain.completion_confirmed_by_user_id ??
-                null,
-              completedAt:
-                chain.completed_at ?? null,
-            };
-          });
-      
-        setChains(formattedChains);
-      }
+    if (chainsData) {
+      const formattedChains = chainsData.map((chain) => {
+        const chainProperties =
+          formattedProperties.filter(
+            (property) =>
+              Number(property.chainId) ===
+              Number(chain.id)
+          );
+
+        const hasPendingConnection =
+          chainProperties.some(
+            (property) =>
+              property.status ===
+              "pending_connection"
+          );
+
+        const hasUnclaimedProperties =
+          chainProperties.some(
+            (property) => !property.hasMembers
+          );
+
+        const isIncomplete =
+          chainProperties.length === 1 ||
+          hasPendingConnection ||
+          hasUnclaimedProperties;
+
+        return {
+          id: chain.id,
+          accessCode: chain.access_code,
+          state:
+            chain.state ||
+            (isIncomplete
+              ? "active_incomplete"
+              : "active_connected"),
+          completionLifecycleStatus:
+            chain.completion_lifecycle_status ??
+            null,
+          completionScheduledDate:
+            chain.completion_scheduled_date ??
+            null,
+          completionDateRecordedAt:
+            chain.completion_date_recorded_at ??
+            null,
+          completionDateRecordedByUserId:
+            chain.completion_date_recorded_by_user_id ??
+            null,
+          completionConfirmedAt:
+            chain.completion_confirmed_at ??
+            null,
+          completionConfirmedByUserId:
+            chain.completion_confirmed_by_user_id ??
+            null,
+          completedAt: chain.completed_at ?? null,
+        };
+      });
+
+      setChains(formattedChains);
+    }
   }
   fetchUser();
-  fetchProperties();
+  fetchParticipantData();
 
 }, []);
 
@@ -664,6 +684,20 @@ if (
 
   return;
 }
+  const { error } = await supabase.rpc(
+    "break_chain_connection",
+    {
+      p_property_id: propertyId,
+      p_break_reason: breakReason,
+    }
+  );
+
+  if (error) {
+    console.error(error);
+    alert("Could not break the chain connection.");
+    return;
+  }
+
   const updateMessage =
     breakReason === "buyer_side"
       ? "Chain Connection Broken - Buyer Side"
@@ -681,7 +715,6 @@ if (
     >();
 
   if (breakReason === "seller_side") {
-
     const upstreamPropertyId =
       property.linked_property_id;
 
@@ -692,7 +725,6 @@ if (
     });
 
     if (upstreamPropertyId) {
-
       propertyUpdates.set(
         upstreamPropertyId,
         {
@@ -701,7 +733,6 @@ if (
       );
     }
   } else {
-
     propertyUpdates.set(propertyId, {
       status: "broken_connection",
       buyer_connected: false,
@@ -714,7 +745,6 @@ if (
           propertyId
       )
       .forEach((inboundProperty) => {
-
         propertyUpdates.set(
           inboundProperty.id,
           {
@@ -724,29 +754,6 @@ if (
         );
       });
   }
-
-  for (const [
-    updatedPropertyId,
-    updates,
-  ] of propertyUpdates) {
-
-    await supabase
-      .from("properties")
-      .update(updates)
-      .eq("id", updatedPropertyId);
-  }
-
-  await supabase
-    .from("activities")
-    .insert({
-
-      property_id: propertyId,
-
-      update: updateMessage,
-
-      updated_by: "homeowner",
-
-    });
 
   const newActivity = {
     id: Date.now(),
