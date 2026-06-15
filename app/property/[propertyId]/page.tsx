@@ -1,9 +1,6 @@
 "use client";
 
-import {
-  useParams,
-  useRouter,
-} from "next/navigation";
+import { useParams } from "next/navigation";
 import {
   useState,
   useEffect,
@@ -12,7 +9,6 @@ import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import { useChain } from "@/context/ChainContext";
 import { STAGES } from "@/data/stages";
-import { supabase } from "@/lib/supabase";
 import {
   canEditProperty,
   canEditBuyerReady,
@@ -64,7 +60,6 @@ const [warningMessage, setWarningMessage] =
     const [breakReason, setBreakReason] =
     useState("");
   const params = useParams();
-  const router = useRouter();
   const propertyId = Number(
     Array.isArray(params.propertyId)
       ? params.propertyId[0]
@@ -84,24 +79,7 @@ const [warningMessage, setWarningMessage] =
     amendChainCompletionDate,
     confirmChainCompletion,
   } = useChain();
-  
-  
-  useEffect(() => {
-    async function checkAuth() {
-  
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-  
-      if (!user) {
-  
-        router.push("/login");
-      }
-    }
-  
-    checkAuth();
-  
-  }, []);
+
   const currentProperty = properties.find(
     (property) => property.id === propertyId
   );

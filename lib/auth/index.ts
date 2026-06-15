@@ -37,3 +37,13 @@ export {
   type RouteGuardRedirect,
   type RouteGuardResult,
 } from "@/lib/auth/routeGuards";
+
+export {
+  parsePositiveIntParam,
+  isUserChainParticipant,
+  requireChainParticipantForRoute,
+} from "@/lib/auth/chainAccess";
+
+export {
+  requirePropertyParticipantForRoute,
+} from "@/lib/auth/propertyAccess";

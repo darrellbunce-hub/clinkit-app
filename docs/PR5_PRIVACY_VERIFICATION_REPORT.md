@@ -4,7 +4,23 @@
 **Migrations:**  
 - `supabase/migrations/20260610200000_phase5_homeowner_privacy_rls.sql`  
 - `supabase/migrations/20260610210000_fix_chain_properties_participant_role_subquery.sql`  
-- `supabase/migrations/20260610220000_reconcile_phase5_homeowner_privacy_rls.sql` (reconciliation)
+- `supabase/migrations/20260610220000_reconcile_phase5_homeowner_privacy_rls.sql` (reconciliation)  
+- `supabase/migrations/20260610215000_property_members_deduplicate_and_unique.sql`  
+- `supabase/migrations/20260610225000_drop_legacy_permissive_rls_policies.sql`  
+- `supabase/migrations/20260610226000_onboarding_bootstrap_rls.sql` (chain RPC + property B′ bootstrap)
+- `supabase/migrations/20260610227000_fix_property_bootstrap_rls_subquery.sql` (B′ uses `property_has_any_member`)
+
+---
+
+## Bootstrap verification (20260610226000 + 20260610227000)
+
+After legacy permissive SELECT policies are dropped, direct `chains.insert().select()` fails at setup. The verify script uses `create_chain_for_onboarding` RPC instead. Property inserts use B′ bootstrap SELECT on `properties_select_member_or_agent` (creator may read until **any** `property_members` row exists — checked via SECURITY DEFINER `property_has_any_member`, not an RLS-blind subquery).
+
+**Expected after apply:** `node scripts/verify-participant-privacy-rls.mjs` → **11/11 PASS**.
+
+**Key assertions unchanged:**
+- Peer address redacted in `chain_properties_participant`
+- Account A cannot read peer property via base `properties` table
 
 ---
 

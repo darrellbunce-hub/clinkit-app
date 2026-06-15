@@ -1,5 +1,5 @@
 /**
- * PR5 privacy verification — run after applying migration 20260610200000.
+ * PR5 privacy verification — run after applying migrations through 20260610227000.
  *
  * Usage:
  *   node scripts/verify-participant-privacy-rls.mjs
@@ -81,25 +81,32 @@ async function ensureTestUsers() {
 async function createSharedChain(clientA) {
   const accessCode = `KN-PRIV-${Date.now().toString(36).toUpperCase()}`;
 
-  const { data: chain, error: chainError } = await clientA
-    .from("chains")
-    .insert({
-      name: `PRIVACY-${Date.now()}`,
-      access_code: accessCode,
-    })
-    .select("id")
-    .single();
+  const { data: chainResult, error: chainError } = await clientA.rpc(
+    "create_chain_for_onboarding",
+    {
+      p_name: `PRIVACY-${Date.now()}`,
+      p_access_code: accessCode,
+    }
+  );
 
-  if (chainError || !chain) {
-    throw new Error(`Chain create failed: ${chainError?.message}`);
+  if (chainError) {
+    throw new Error(`Chain create failed: ${chainError.message}`);
   }
+
+  if (!chainResult?.ok || chainResult.chain_id == null) {
+    throw new Error(
+      `Chain create rejected: ${chainResult?.error ?? "unknown"}`
+    );
+  }
+
+  const chainId = chainResult.chain_id;
 
   const userA = (await clientA.auth.getUser()).data.user.id;
 
   const { data: propertyA, error: propertyAError } = await clientA
     .from("properties")
     .insert({
-      chain_id: chain.id,
+      chain_id: chainId,
       chain_position: 1,
       address: `357 Jenni Place ${Date.now()}`,
       postcode: "ABCD",
@@ -133,7 +140,7 @@ async function createSharedChain(clientA) {
   const { data: propertyB, error: propertyBError } = await clientA
     .from("properties")
     .insert({
-      chain_id: chain.id,
+      chain_id: chainId,
       chain_position: 2,
       address: `7777 Pickle Close ${Date.now()}`,
       postcode: "ABCD",
@@ -153,7 +160,7 @@ async function createSharedChain(clientA) {
   }
 
   return {
-    chainId: chain.id,
+    chainId,
     accessCode,
     propertyA,
     propertyB,

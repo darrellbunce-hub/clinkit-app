@@ -2,10 +2,7 @@
 import ChainNode from "@/components/ChainNode";
 import { useState, useEffect } from "react";
 import Navbar from "@/components/Navbar";
-import {
-  useParams,
-  useRouter,
-} from "next/navigation";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useChain } from "@/context/ChainContext";
 import { supabase } from "@/lib/supabase";
@@ -45,7 +42,6 @@ import {
 export default function ChainPage() {
 
   const params = useParams();
-  const router = useRouter();
   const chainId =
     parseInt(
       params.chainId as string
@@ -66,23 +62,6 @@ export default function ChainPage() {
     ] = useState<ChainNodesChainSummary | null>(
       null
     );
-    useEffect(() => {
-
-      async function checkAuth() {
-    
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-    
-        if (!user) {
-    
-          router.push("/login");
-        }
-      }
-    
-      checkAuth();
-    
-    }, []);
     useEffect(() => {
 
       async function loadBuyerReadySummary() {

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import Navbar from "@/components/Navbar";
+import { createChainForOnboarding } from "@/lib/createChainForOnboarding";
 import { ensurePropertyMembership } from "@/lib/ensurePropertyMembership";
 import { getNextChainPosition } from "@/lib/searchingPlaceholder";
 
@@ -87,37 +88,57 @@ export default function StartMovePage() {
     
         }
     
-        const accessCode =
+        let accessCode =
           generateAccessCode();
     
         console.log("ABOUT TO CREATE CHAIN");
     
-        const {
-          data: chainData,
-          error: chainError,
-        } = await supabase
-          .from("chains")
-          .insert({
-            name: `CHAIN-${Date.now()}`,
-            access_code: accessCode,
-          })
-          .select()
-          .single();
+        let chainId: number | null = null;
+
+        for (let attempt = 0; attempt < 5; attempt++) {
+          const chainResult =
+            await createChainForOnboarding(
+              supabase,
+              {
+                name: `CHAIN-${Date.now()}`,
+                accessCode,
+              }
+            );
+
+          if (
+            chainResult.error ===
+              "duplicate_access_code" &&
+            attempt < 4
+          ) {
+            accessCode =
+              generateAccessCode();
+            continue;
+          }
+
+          if (chainResult.error) {
+            console.error(
+              chainResult.rpcError ??
+                chainResult.error
+            );
+            return;
+          }
+
+          chainId = chainResult.chainId;
+          accessCode = chainResult.accessCode ?? accessCode;
+          break;
+        }
+
+        if (chainId == null) {
+          console.error(
+            "Chain create failed after retries"
+          );
+          return;
+        }
     
         console.log(
           "CHAIN RESULT",
-          chainData,
-          chainError
+          { id: chainId, accessCode }
         );
-    
-        if (chainError || !chainData) {
-    
-          console.error(chainError);
-  
-    
-          return;
-    
-        }
     
         let sellingPropertyId =
           null;
@@ -150,7 +171,7 @@ export default function StartMovePage() {
               const joinParams =
                 new URLSearchParams({
                   sourceChain: String(
-                    chainData.id
+                    chainId
                   ),
                 });
 
@@ -182,7 +203,7 @@ export default function StartMovePage() {
           } = await supabase
             .from("properties")
             .insert({
-              chain_id: chainData.id,
+              chain_id: chainId,
     
               chain_position: 1,
     
@@ -279,7 +300,7 @@ export default function StartMovePage() {
               const joinParams =
                 new URLSearchParams({
                   sourceChain: String(
-                    chainData.id
+                    chainId
                   ),
                 });
 
@@ -311,7 +332,7 @@ export default function StartMovePage() {
           } = await supabase
             .from("properties")
             .insert({
-              chain_id: chainData.id,
+              chain_id: chainId,
     
               chain_position: 2,
     
@@ -386,7 +407,7 @@ export default function StartMovePage() {
           const nextChainPosition =
             await getNextChainPosition(
               supabase,
-              chainData.id
+              chainId
             );
 
           const {
@@ -395,7 +416,7 @@ export default function StartMovePage() {
           } = await supabase
             .from("properties")
             .insert({
-              chain_id: chainData.id,
+              chain_id: chainId,
 
               chain_position:
                 nextChainPosition,
@@ -481,7 +502,7 @@ export default function StartMovePage() {
   .from("chain_nodes")
   .insert({
 
-    chain_id: chainData.id,
+    chain_id: chainId,
 
     linked_property_id:
   buyerReadyPropertyId,
@@ -506,7 +527,7 @@ export default function StartMovePage() {
         );
     
         window.location.href =
-          `/chain/${chainData.id}?refresh=${Date.now()}`;
+          `/chain/${chainId}?refresh=${Date.now()}`;
     
       } catch (error) {
     

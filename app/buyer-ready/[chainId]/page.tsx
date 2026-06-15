@@ -1,9 +1,6 @@
 "use client";
 
-import {
-  useParams,
-  useRouter,
-} from "next/navigation";
+import { useParams } from "next/navigation";
 import {
   useState,
   useEffect,
@@ -64,7 +61,6 @@ export default function BuyerReadyPage() {
   const [isSaving, setIsSaving] =
   useState(false);
   const params = useParams();
-  const router = useRouter();
   const chainId = Number(params.chainId);
 
   const {
@@ -83,22 +79,6 @@ export default function BuyerReadyPage() {
 );
 
   
-  useEffect(() => {
-    async function checkAuth() {
-  
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-  
-      if (!user) {
-  
-        router.push("/login");
-      }
-    }
-  
-    checkAuth();
-  
-  }, []);
   useEffect(() => {
 
     async function loadBuyerNode() {
