@@ -13,6 +13,11 @@ import {
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import Logo from "@/components/Logo";
+import {
+  MARKETING_SECTION_TITLE_CLASS,
+  PAGE_TITLE_INVERTED_CLASS,
+  SECTION_TITLE_CLASS,
+} from "@/components/mobileStandards";
 const steps = [
   {
     number: 1,
@@ -75,7 +80,7 @@ export default function HomePage() {
                 Live Property Chain Tracking
               </div>
 
-              <h1 className="mt-8 text-6xl font-bold text-white leading-tight">
+              <h1 className={`mt-8 ${PAGE_TITLE_INVERTED_CLASS} leading-tight`}>
                 Track Your Property Chain In Real Time
               </h1>
 
@@ -113,7 +118,7 @@ export default function HomePage() {
                     Chain Health
                   </p>
 
-                  <h2 className="mt-2 text-4xl font-bold text-white">
+                  <h2 className={`mt-2 ${SECTION_TITLE_CLASS} text-white`}>
                     Healthy
                   </h2>
                 </div>
@@ -174,7 +179,7 @@ export default function HomePage() {
         <div className="max-w-6xl mx-auto px-6 py-24">
 
           <div className="text-center">
-            <h2 className="text-5xl font-bold text-slate-900">
+            <h2 className={MARKETING_SECTION_TITLE_CLASS}>
               How Keynetic Works
             </h2>
 
@@ -214,7 +219,7 @@ export default function HomePage() {
       <section className="max-w-6xl mx-auto px-6 py-24">
 
         <div className="text-center">
-          <h2 className="text-5xl font-bold text-slate-900">
+          <h2 className={MARKETING_SECTION_TITLE_CLASS}>
             Built For Modern Property Chains
           </h2>
 
@@ -306,7 +311,7 @@ export default function HomePage() {
           <div className="grid md:grid-cols-4 gap-8 text-center">
 
             <div className="bg-slate-50 rounded-3xl p-8 border border-slate-200">
-              <h3 className="text-5xl font-bold text-slate-900">
+              <h3 className={MARKETING_SECTION_TITLE_CLASS}>
                 24/7
               </h3>
 
@@ -316,7 +321,7 @@ export default function HomePage() {
             </div>
 
             <div className="bg-slate-50 rounded-3xl p-8 border border-slate-200">
-              <h3 className="text-5xl font-bold text-slate-900">
+              <h3 className={MARKETING_SECTION_TITLE_CLASS}>
                 Real-Time
               </h3>
 
@@ -326,7 +331,7 @@ export default function HomePage() {
             </div>
 
             <div className="bg-slate-50 rounded-3xl p-8 border border-slate-200">
-              <h3 className="text-5xl font-bold text-slate-900">
+              <h3 className={MARKETING_SECTION_TITLE_CLASS}>
                 Secure
               </h3>
 
@@ -336,7 +341,7 @@ export default function HomePage() {
             </div>
 
             <div className="bg-slate-50 rounded-3xl p-8 border border-slate-200">
-              <h3 className="text-5xl font-bold text-slate-900">
+              <h3 className={MARKETING_SECTION_TITLE_CLASS}>
                 Chain-Wide
               </h3>
 
@@ -354,7 +359,7 @@ export default function HomePage() {
         <div className="max-w-5xl mx-auto px-6 py-24">
 
           <div className="text-center">
-            <h2 className="text-5xl font-bold text-slate-900">
+            <h2 className={MARKETING_SECTION_TITLE_CLASS}>
               Frequently Asked Questions
             </h2>
 
@@ -409,7 +414,7 @@ export default function HomePage() {
 
         <div className="max-w-5xl mx-auto px-6 py-24 text-center">
 
-          <h2 className="text-5xl font-bold text-slate-900 leading-tight">
+          <h2 className={`${MARKETING_SECTION_TITLE_CLASS} leading-tight`}>
             Ready To Reduce Property Chain Stress?
           </h2>
 

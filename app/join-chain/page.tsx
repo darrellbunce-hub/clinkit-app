@@ -5,6 +5,10 @@ import { useState } from "react";
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Navbar from "@/components/Navbar";
+import {
+  CARD_PADDING_CLASS,
+  PAGE_TITLE_CLASS,
+} from "@/components/mobileStandards";
 import { supabase } from "@/lib/supabase";
 import {
   formatTopologyConflictMessage,
@@ -219,7 +223,7 @@ function JoinChainContent() {
 
       <div className="max-w-2xl mx-auto px-6 py-12">
 
-        <h1 className="text-5xl font-bold text-slate-900">
+        <h1 className={PAGE_TITLE_CLASS}>
           Join Existing Chain
         </h1>
 
@@ -227,7 +231,7 @@ function JoinChainContent() {
           Enter your chain access details
         </p>
 
-        <div className="mt-10 bg-white rounded-3xl border border-slate-200 p-8">
+        <div className={`mt-10 bg-white rounded-3xl border border-slate-200 ${CARD_PADDING_CLASS}`}>
 
           <input
             type="text"

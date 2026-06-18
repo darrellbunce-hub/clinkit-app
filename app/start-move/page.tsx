@@ -3,6 +3,10 @@
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import Navbar from "@/components/Navbar";
+import {
+  CARD_PADDING_CLASS,
+  PAGE_TITLE_CLASS,
+} from "@/components/mobileStandards";
 import { createChainForOnboarding } from "@/lib/createChainForOnboarding";
 import { ensurePropertyMembership } from "@/lib/ensurePropertyMembership";
 import { getNextChainPosition } from "@/lib/searchingPlaceholder";
@@ -552,7 +556,7 @@ export default function StartMovePage() {
   className="max-w-3xl mx-auto px-6 py-12"
 >
 
-        <h1 className="text-5xl font-bold text-slate-900">
+        <h1 className={PAGE_TITLE_CLASS}>
           Start Your Move
         </h1>
 
@@ -562,7 +566,7 @@ export default function StartMovePage() {
       
  
         {/* Selling */}
-<div className="mt-12 bg-white rounded-3xl border border-slate-200 p-8">
+<div className={`mt-12 bg-white rounded-3xl border border-slate-200 ${CARD_PADDING_CLASS}`}>
 
 <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6">
 
@@ -636,7 +640,7 @@ export default function StartMovePage() {
 </div>
 
 {/* Buying */}
-<div className="mt-10 bg-white rounded-3xl border border-slate-200 p-8">
+<div className={`mt-10 bg-white rounded-3xl border border-slate-200 ${CARD_PADDING_CLASS}`}>
 
 <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6">
 

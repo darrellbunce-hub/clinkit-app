@@ -153,6 +153,7 @@ export async function middleware(
 
 export const config = {
   matcher: [
+    "/account/:path*",
     "/dashboard/:path*",
     "/start-move/:path*",
     "/join-chain/:path*",

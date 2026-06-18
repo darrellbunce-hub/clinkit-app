@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import Logo from "@/components/Logo";
+import { MENU_BUTTON_CLASS } from "@/components/mobileStandards";
 import { ROUTES } from "@/lib/auth/routes";
 export default function Navbar() {
 
@@ -72,6 +73,19 @@ export default function Navbar() {
       "
     >
       Dashboard
+    </Link>
+
+    <Link
+      href={ROUTES.accountSettings}
+      className="
+        text-slate-300
+        hover:text-white
+        transition
+        px-4
+        py-2
+      "
+    >
+      Account Settings
     </Link>
 
     <button
@@ -151,16 +165,19 @@ export default function Navbar() {
 
         {/* Mobile Button */}
         <button
+          type="button"
+          aria-expanded={mobileMenuOpen}
+          aria-label={
+            mobileMenuOpen
+              ? "Close menu"
+              : "Open menu"
+          }
           onClick={() =>
             setMobileMenuOpen(
               !mobileMenuOpen
             )
           }
-          className="
-            md:hidden
-            text-white
-            text-3xl
-          "
+          className={MENU_BUTTON_CLASS}
         >
           {mobileMenuOpen ? "✕" : "☰"}
         </button>
@@ -201,6 +218,21 @@ export default function Navbar() {
       Dashboard
     </Link>
 
+    <Link
+      href={ROUTES.accountSettings}
+      className="
+        text-slate-300
+        hover:text-white
+        transition
+        py-3
+      "
+      onClick={() =>
+        setMobileMenuOpen(false)
+      }
+    >
+      Account Settings
+    </Link>
+
     <button
       onClick={async () => {
 
@@ -234,9 +266,14 @@ window.location.href = "/";
         text-slate-300
         hover:text-white
         transition
-        px-4
-        py-2
+        py-3
+        min-h-11
+        inline-flex
+        items-center
       "
+      onClick={() =>
+        setMobileMenuOpen(false)
+      }
     >
       Estate Agents
     </Link>
@@ -248,6 +285,9 @@ window.location.href = "/";
         hover:text-white
         transition
         py-3
+        min-h-11
+        inline-flex
+        items-center
       "
       onClick={() =>
         setMobileMenuOpen(false)

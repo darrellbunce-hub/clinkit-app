@@ -7,6 +7,7 @@ import {
 } from "react";
 
 import EaMarketingShell from "@/components/estate-agents/EaMarketingShell";
+import { AUTH_TITLE_CLASS } from "@/components/mobileStandards";
 import { ROUTES } from "@/lib/auth/routes";
 import {
   completeEstateAgentOnboarding,
@@ -250,7 +251,7 @@ export default function EstateAgentOnboardingPage() {
           {step === "complete" &&
           completionSummary ? (
             <>
-              <h1 className="mt-8 text-4xl font-bold text-slate-900">
+              <h1 className={`mt-8 ${AUTH_TITLE_CLASS}`}>
                 Agency setup complete
               </h1>
 
@@ -320,7 +321,7 @@ export default function EstateAgentOnboardingPage() {
                 Step {step} of 2
               </p>
 
-              <h1 className="mt-4 text-4xl font-bold text-slate-900">
+              <h1 className={`mt-4 ${AUTH_TITLE_CLASS}`}>
                 {step === 1
                   ? "Company information"
                   : "First branch details"}

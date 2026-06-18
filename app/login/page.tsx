@@ -5,7 +5,10 @@ import {
   useState,
   type FormEvent,
 } from "react";
+import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { AUTH_TITLE_CLASS } from "@/components/mobileStandards";
+import { ROUTES } from "@/lib/auth/routes";
 import { useRouter } from "next/navigation";
 
 function readCredentials(form: HTMLFormElement) {
@@ -154,7 +157,7 @@ export default function LoginPage() {
 
       <div className="w-full max-w-md bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
 
-        <h1 className="text-4xl font-bold text-slate-900">
+        <h1 className={AUTH_TITLE_CLASS}>
           Login
         </h1>
 
@@ -192,12 +195,21 @@ export default function LoginPage() {
 
           <div className="mt-6">
 
-            <label
-              htmlFor="login-password"
-              className="block text-sm font-medium text-slate-700"
-            >
-              Password
-            </label>
+            <div className="flex items-center justify-between gap-4">
+              <label
+                htmlFor="login-password"
+                className="block text-sm font-medium text-slate-700"
+              >
+                Password
+              </label>
+
+              <Link
+                href={ROUTES.forgotPassword}
+                className="text-sm font-medium text-slate-600 hover:text-slate-900 underline underline-offset-2"
+              >
+                Forgot password?
+              </Link>
+            </div>
 
             <input
               id="login-password"

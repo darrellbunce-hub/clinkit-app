@@ -5,8 +5,18 @@ import {
   useState,
   useEffect,
 } from "react";
-import Link from "next/link";
 import Navbar from "@/components/Navbar";
+import {
+  CARD_PADDING_CLASS,
+  PAGE_TITLE_CLASS,
+  SECTION_TITLE_CLASS,
+} from "@/components/mobileStandards";
+import {
+  MobileAlert,
+  MobileAlertStack,
+  MobilePageNavRow,
+  MobilePanelHeader,
+} from "@/components/mobile/MobileLayout";
 import { useChain } from "@/context/ChainContext";
 import {
     BUYER_READY_STAGES
@@ -657,71 +667,41 @@ async function handleStructuredUpdate() {
 
       <div className="max-w-4xl mx-auto px-6 py-12">
 
-  {successMessage && (
+        {(successMessage || warningMessage) && (
+          <MobileAlertStack>
+            {successMessage ? (
+              <MobileAlert variant="success">
+                ✓ {successMessage}
+              </MobileAlert>
+            ) : null}
 
-    <div
-      className="
-        mb-6
-        rounded-2xl
-        border
-        border-green-200
-        bg-green-50
-        px-5
-        py-4
-        text-green-700
-        font-medium
-      "
-    >
-      ✓ {successMessage}
-    </div>
+            {warningMessage ? (
+              <MobileAlert variant="warning">
+                ⚠ {warningMessage}
+              </MobileAlert>
+            ) : null}
+          </MobileAlertStack>
+        )}
 
-  )}
-{warningMessage && (
+        <MobilePageNavRow
+          links={[
+            {
+              href: `/chain/${buyerNode.chain_id}`,
+              label: "← Back to Chain",
+            },
+            {
+              href: "/dashboard",
+              label: "Dashboard",
+            },
+          ]}
+        />
 
-<div
-  className="
-    mb-6
-    rounded-2xl
-    border
-    border-amber-200
-    bg-amber-50
-    px-5
-    py-4
-    text-amber-700
-    font-medium
-  "
->
-  ⚠ {warningMessage}
-</div>
-
-)}
-  <div className="flex items-center gap-4 mb-6">
-
-<Link
-  href={`/chain/${buyerNode.chain_id}`}
-  className="
-    inline-flex items-center
-    text-slate-600 hover:text-slate-900
-  "
->
-  ← Back to Chain
-</Link>
-
-<Link
-  href="/dashboard"
-  className="
-    inline-flex items-center
-    text-slate-600 hover:text-slate-900
-  "
->
-  Dashboard
-</Link>
-
-</div>
         {/* Header */}
-<div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
+        <div
+          className={`bg-white rounded-3xl shadow-sm border border-slate-200 ${CARD_PADDING_CLASS}`}
+        >
 
-<h1 className="text-5xl font-bold text-slate-900">
+<h1 className={PAGE_TITLE_CLASS}>
 
 {CHAIN_TILE_LABEL.buyerReady}
 
@@ -736,33 +716,28 @@ async function handleStructuredUpdate() {
 </div>
 
         {/* Current Status */}
-<div className="mt-8 bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
+        <div
+          className={`mt-8 bg-white rounded-3xl shadow-sm border border-slate-200 ${CARD_PADDING_CLASS}`}
+        >
+          <MobilePanelHeader
+            aside={
+              <div className="bg-green-100 text-green-700 px-5 py-3 rounded-2xl text-base sm:text-lg font-semibold whitespace-nowrap">
+                {currentStage?.progress}% Complete
+              </div>
+            }
+          >
+            <p className="text-sm font-medium text-slate-500">
+              Current Status
+            </p>
 
-<div className="flex items-start justify-between gap-6">
+            <h2 className={`mt-3 ${SECTION_TITLE_CLASS}`}>
+              {currentStage?.label}
+            </h2>
 
-  <div>
-
-    <p className="text-sm font-medium text-slate-500">
-      Current Status
-    </p>
-
-    <h2 className="mt-3 text-4xl font-bold text-slate-900">
-      {currentStage?.label}
-    </h2>
-
-    <p className="mt-4 text-slate-600 max-w-2xl">
-      Your property transaction is currently progressing through this stage of the chain process.
-    </p>
-
-  </div>
-
-  <div className="bg-green-100 text-green-700 px-5 py-3 rounded-2xl text-lg font-semibold">
-
-    {currentStage?.progress}% Complete
-
-  </div>
-
-</div>
+            <p className="mt-4 text-slate-600 max-w-2xl">
+              Your property transaction is currently progressing through this stage of the chain process.
+            </p>
+          </MobilePanelHeader>
 
 {/* Progress Bar */}
 <div className="mt-10">
@@ -901,38 +876,29 @@ async function handleStructuredUpdate() {
 
 {/* Action Required */}
 {!isCompletedCompletionMode && (
-<div className="mt-8 bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
+<div className={`mt-8 bg-white rounded-3xl shadow-sm border border-slate-200 ${CARD_PADDING_CLASS}`}>
 
-  <div className="flex items-start justify-between gap-6">
+  <MobilePanelHeader
+    aside={
+      <div
+        className={`${actionColour} px-5 py-3 rounded-2xl text-sm font-semibold whitespace-nowrap`}
+      >
+        Operational Alert
+      </div>
+    }
+  >
+    <p className="text-sm font-medium text-slate-500">
+      Action Required
+    </p>
 
-    <div>
+    <h2 className={`mt-3 ${SECTION_TITLE_CLASS}`}>
+      {actionTitle}
+    </h2>
 
-      <p className="text-sm font-medium text-slate-500">
-        Action Required
-      </p>
-
-      <h2 className="mt-3 text-3xl font-bold text-slate-900">
-        {actionTitle}
-      </h2>
-
-      <p className="mt-4 text-slate-600 max-w-2xl">
-        {actionMessage}
-      </p>
-
-    </div>
-
-    <div
-      className={`
-        ${actionColour}
-        px-5 py-3 rounded-2xl text-sm font-semibold
-      `}
-    >
-
-      Operational Alert
-
-    </div>
-
-  </div>
+    <p className="mt-4 text-slate-600 max-w-2xl">
+      {actionMessage}
+    </p>
+  </MobilePanelHeader>
 
 </div>
 )}
@@ -996,9 +962,9 @@ async function handleStructuredUpdate() {
         {!isCompletedCompletionMode && (
         <>
         {/* Update Status */}
-        <div className="mt-8 bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
+        <div className={`mt-8 bg-white rounded-3xl shadow-sm border border-slate-200 ${CARD_PADDING_CLASS}`}>
 
-          <h2 className="text-3xl font-bold text-slate-900">
+          <h2 className={SECTION_TITLE_CLASS}>
             Update Status
           </h2>
 
@@ -1048,9 +1014,9 @@ async function handleStructuredUpdate() {
         </div>
 
         {/* Structured Updates */}
-        <div className="mt-8 bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
+        <div className={`mt-8 bg-white rounded-3xl shadow-sm border border-slate-200 ${CARD_PADDING_CLASS}`}>
 
-          <h2 className="text-3xl font-bold text-slate-900">
+          <h2 className={SECTION_TITLE_CLASS}>
             Add Update
           </h2>
 
@@ -1148,9 +1114,9 @@ async function handleStructuredUpdate() {
         )}
 
         {/* Activity Timeline */}
-        <div className="mt-8 bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
+        <div className={`mt-8 bg-white rounded-3xl shadow-sm border border-slate-200 ${CARD_PADDING_CLASS}`}>
 
-          <h2 className="text-3xl font-bold text-slate-900">
+          <h2 className={SECTION_TITLE_CLASS}>
             Activity Timeline
           </h2>
 

@@ -13,6 +13,7 @@ import {
 } from "@/lib/auth/redirects";
 import {
   ROUTES,
+  isAccountSettingsRoute,
   isAgentHomeRoute,
   isEstateAgentOnboardingRoute,
   isEstateAgentProtectedRoute,
@@ -192,6 +193,10 @@ export function evaluateProtectedRouteAccess(
 
   if (!authGuard.allowed) {
     return authGuard;
+  }
+
+  if (isAccountSettingsRoute(pathname)) {
+    return allow();
   }
 
   if (isHomeownerProtectedRoute(pathname)) {

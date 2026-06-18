@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import EaMarketingShell from "@/components/estate-agents/EaMarketingShell";
+import { MARKETING_SECTION_TITLE_CLASS } from "@/components/mobileStandards";
 import { ROUTES } from "@/lib/auth/routes";
 
 const benefits = [
@@ -27,7 +28,7 @@ export default function EstateAgentsPage() {
             For estate agents
           </p>
 
-          <h1 className="mt-4 text-5xl font-bold text-slate-900 leading-tight">
+          <h1 className={`mt-4 ${MARKETING_SECTION_TITLE_CLASS} leading-tight`}>
             Operational visibility across your property transactions
           </h1>
 

@@ -2,6 +2,14 @@
 import ChainNode from "@/components/ChainNode";
 import { useState, useEffect } from "react";
 import Navbar from "@/components/Navbar";
+import {
+  CARD_PADDING_CLASS,
+  PAGE_TITLE_CLASS,
+  STAT_VALUE_CLASS,
+  SECTION_TITLE_CLASS,
+} from "@/components/mobileStandards";
+import { MobilePanelHeader } from "@/components/mobile/MobileLayout";
+import { MobileChainScrollRegion } from "@/components/mobile/MobileChainScrollRegion";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useChain } from "@/context/ChainContext";
@@ -449,7 +457,7 @@ export default function ChainPage() {
 
         <div>
 
-          <h1 className="text-5xl font-bold text-slate-900">
+          <h1 className={PAGE_TITLE_CLASS}>
             Chain #{chainId}
           </h1>
 
@@ -490,7 +498,7 @@ export default function ChainPage() {
           )}
 
           {!isCompletedCompletionMode && (
-          <div className="mt-8 bg-white rounded-3xl border border-slate-200 p-8">
+          <div className={`mt-8 bg-white rounded-3xl border border-slate-200 ${CARD_PADDING_CLASS}`}>
 
 <div className="flex items-center gap-4">
 
@@ -555,27 +563,23 @@ export default function ChainPage() {
         {!isCompletedCompletionMode && (
         <>
         {/* Progress */}
-        <div className="mt-10 bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
+        <div className={`mt-10 bg-white rounded-3xl shadow-sm border border-slate-200 ${CARD_PADDING_CLASS}`}>
 
-          <div className="flex items-center justify-between">
+          <MobilePanelHeader
+            aside={
+              <div className={STAT_VALUE_CLASS}>
+                {averageProgress}%
+              </div>
+            }
+          >
+            <h2 className={SECTION_TITLE_CLASS}>
+              Chain Progress
+            </h2>
 
-            <div>
-
-              <h2 className="text-3xl font-bold text-slate-900">
-                Chain Progress
-              </h2>
-
-              <p className="text-slate-600 mt-2">
-                Overall chain completion estimate
-              </p>
-
-            </div>
-
-            <div className="text-4xl font-bold text-slate-900">
-              {averageProgress}%
-            </div>
-
-          </div>
+            <p className="text-slate-600 mt-2">
+              Overall chain completion estimate
+            </p>
+          </MobilePanelHeader>
 
           <div className="mt-8 w-full h-6 bg-slate-200 rounded-full overflow-hidden">
 
@@ -591,116 +595,93 @@ export default function ChainPage() {
         </div>
 
         {/* Confidence */}
-        <div className="mt-10 bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
+        <div className={`mt-10 bg-white rounded-3xl shadow-sm border border-slate-200 ${CARD_PADDING_CLASS}`}>
 
-          <div className="flex items-center justify-between">
+          <MobilePanelHeader
+            aside={
+              <div
+                className={`${confidenceBg} px-6 py-4 rounded-2xl`}
+              >
+                <p className={`text-2xl sm:text-3xl font-bold ${confidenceColour}`}>
+                  {confidenceScore}%
+                </p>
 
-            <div>
+                <p className={`text-sm mt-1 ${confidenceColour}`}>
+                  {confidenceLabel}
+                </p>
 
-              <h2 className="text-3xl font-bold text-slate-900">
-                Chain Confidence
-              </h2>
-
-            </div>
-
-            <div
-              className={`
-                ${confidenceBg}
-                px-6 py-4 rounded-2xl
-              `}
-            >
-
-              <p className={`text-3xl font-bold ${confidenceColour}`}>
-                {confidenceScore}%
-              </p>
-
-              <p className={`text-sm mt-1 ${confidenceColour}`}>
-                {confidenceLabel}
-              </p>
-              <p className="text-xs text-slate-500 mt-4 max-w-xs">
-  {isScheduledCompletionMode
-    ? COMPLETION_SCHEDULED_CONFIDENCE_NOTE
-    : "Confidence is calculated using chain progress, recent activity, delayed updates and blocked transactions."}
-</p>
-            </div>
-
-          </div>
+                <p className="text-xs text-slate-500 mt-4 max-w-xs">
+                  {isScheduledCompletionMode
+                    ? COMPLETION_SCHEDULED_CONFIDENCE_NOTE
+                    : "Confidence is calculated using chain progress, recent activity, delayed updates and blocked transactions."}
+                </p>
+              </div>
+            }
+          >
+            <h2 className={SECTION_TITLE_CLASS}>
+              Chain Confidence
+            </h2>
+          </MobilePanelHeader>
 
         </div>
 {!isCompletionLifecycleFrozen && (
 <>
 {/* Estimated Chain Completion */}
-<div className="mt-10 bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
+<div className={`mt-10 bg-white rounded-3xl shadow-sm border border-slate-200 ${CARD_PADDING_CLASS}`}>
 
-  <div className="flex items-start justify-between gap-6">
+  <MobilePanelHeader
+    aside={
+      <div className="bg-blue-100 text-blue-700 px-5 py-3 rounded-2xl text-sm font-semibold whitespace-nowrap">
+        Forecast Engine
+      </div>
+    }
+  >
+    <p className="text-sm font-medium text-slate-500">
+      Estimated Chain Completion
+    </p>
 
-    <div>
+    <h2 className={`mt-3 ${SECTION_TITLE_CLASS}`}>
+      {estimatedChainCompletion}
+    </h2>
 
-      <p className="text-sm font-medium text-slate-500">
-        Estimated Chain Completion
-      </p>
-
-      <h2 className="mt-3 text-4xl font-bold text-slate-900">
-        {estimatedChainCompletion}
-      </h2>
-
-      <p className="mt-4 text-slate-600 max-w-2xl">
-        Estimated completion is based on overall chain progression, delays, stale activity and blocked transactions.
-      </p>
-
-    </div>
-
-    <div className="bg-blue-100 text-blue-700 px-5 py-3 rounded-2xl text-sm font-semibold">
-
-      Forecast Engine
-
-    </div>
-
-  </div>
+    <p className="mt-4 text-slate-600 max-w-2xl">
+      Estimated completion is based on overall chain progression, delays, stale activity and blocked transactions.
+    </p>
+  </MobilePanelHeader>
 
 </div>
 {/* Chain Bottleneck */}
 {bottleneckProperty && (
 
-<div className="mt-10 bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
+<div className={`mt-10 bg-white rounded-3xl shadow-sm border border-slate-200 ${CARD_PADDING_CLASS}`}>
 
-  <div className="flex items-start justify-between gap-6">
-
-    <div>
-
-      <p className="text-sm font-medium text-slate-500">
-        Chain Bottleneck
-      </p>
-
-      <h2 className="mt-3 text-3xl font-bold text-slate-900">
-        Property {bottleneckProperty.chainPosition}
-      </h2>
-
-      <p className="mt-4 text-slate-600">
-        This property currently appears to be slowing overall chain progression.
-      </p>
-
-      <div className="mt-6 space-y-2">
-
-        <p className="text-slate-900 font-medium">
-        
-        </p>
-
-        <p className="text-slate-500">
-          Last updated {bottleneckProperty.lastUpdatedDays} days ago
-        </p>
-
+  <MobilePanelHeader
+    aside={
+      <div className="bg-amber-100 text-amber-700 px-5 py-3 rounded-2xl text-sm font-semibold whitespace-nowrap">
+        Bottleneck Detected
       </div>
+    }
+  >
+    <p className="text-sm font-medium text-slate-500">
+      Chain Bottleneck
+    </p>
 
+    <h2 className={`mt-3 ${SECTION_TITLE_CLASS}`}>
+      Property {bottleneckProperty.chainPosition}
+    </h2>
+
+    <p className="mt-4 text-slate-600">
+      This property currently appears to be slowing overall chain progression.
+    </p>
+
+    <div className="mt-6 space-y-2">
+      <p className="text-slate-900 font-medium"></p>
+
+      <p className="text-slate-500">
+        Last updated {bottleneckProperty.lastUpdatedDays} days ago
+      </p>
     </div>
-
-    <div className="bg-amber-100 text-amber-700 px-5 py-3 rounded-2xl text-sm font-semibold">
-
-      Bottleneck Detected
-
-    </div>
-
-  </div>
+  </MobilePanelHeader>
 
 </div>
 
@@ -726,9 +707,11 @@ export default function ChainPage() {
         )}
 
         {/* Chain */}
-<div className="mt-12 bg-white rounded-3xl shadow-sm border border-slate-200 p-8 overflow-x-auto pb-4">
-
-<div className="flex items-center min-w-max">
+        <div
+          className={`mt-12 bg-white rounded-3xl shadow-sm border border-slate-200 ${CARD_PADDING_CLASS}`}
+        >
+          <MobileChainScrollRegion>
+            <div className="flex items-center min-w-max pr-4 md:pr-0">
 {topology.buyerReadyPrefix && (
 
 <div className="flex items-center">
@@ -1101,14 +1084,14 @@ export default function ChainPage() {
   </div>
   )}
 
-</div>
-
-</div>
+            </div>
+          </MobileChainScrollRegion>
+        </div>
 {/* Recent Activity Feed */}
 
-<div className="mt-10 bg-white border border-slate-200 rounded-3xl p-8">
+<div className={`mt-10 bg-white border border-slate-200 rounded-3xl ${CARD_PADDING_CLASS}`}>
 
-  <h2 className="text-2xl font-bold text-slate-900">
+  <h2 className={SECTION_TITLE_CLASS}>
     Recent Chain Activity
   </h2>
 
@@ -1128,15 +1111,13 @@ export default function ChainPage() {
         className="border border-slate-200 rounded-2xl p-5"
       >
 
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
 
-          <div>
+          <div className="min-w-0">
 
             <p className="font-semibold text-slate-900">
               {activity.update}
             </p>
-
-      
 
             <p className="text-xs text-slate-400 mt-2">
             Updated by {activity.updated_by || "homeowner"}
@@ -1144,7 +1125,7 @@ export default function ChainPage() {
 
           </div>
 
-          <div className="text-xs text-slate-400 whitespace-nowrap">
+          <div className="text-xs text-slate-400 shrink-0">
 
             {new Date(
               activity.timestamp
@@ -1162,7 +1143,7 @@ export default function ChainPage() {
 
 </div>
         {activeSearchingPlaceholder && (
-        <div className="mt-10 bg-white rounded-3xl border border-slate-200 p-8">
+        <div className={`mt-10 bg-white rounded-3xl border border-slate-200 ${CARD_PADDING_CLASS}`}>
 
           <h2 className="text-2xl font-bold text-slate-900">
             Add Onward Purchase
@@ -1213,7 +1194,7 @@ export default function ChainPage() {
                 }
               />
             ) : (
-              <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
+              <div className={`bg-white rounded-3xl shadow-sm border border-slate-200 ${CARD_PADDING_CLASS}`}>
                 <h2 className="text-2xl font-bold text-slate-900">
                   Estate Agent
                 </h2>

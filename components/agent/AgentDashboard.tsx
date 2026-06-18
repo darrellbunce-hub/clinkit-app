@@ -17,6 +17,7 @@ import {
   filterSummariesByTab,
 } from "@/lib/estateAgent/classifyAgentDashboard";
 import { getAgentAssignmentAccessLabel } from "@/lib/estateAgent/delegatedUpdates";
+import { PAGE_TITLE_CLASS } from "@/components/mobileStandards";
 import { supabase } from "@/lib/supabase";
 
 const tabs: {
@@ -70,7 +71,7 @@ export default function AgentDashboard({
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-4xl font-bold text-slate-900">
+        <h1 className={PAGE_TITLE_CLASS}>
           Welcome
           {context.contactName
             ? `, ${context.contactName}`

@@ -8,6 +8,7 @@ import {
 import Link from "next/link";
 
 import EaMarketingShell from "@/components/estate-agents/EaMarketingShell";
+import { AUTH_TITLE_CLASS } from "@/components/mobileStandards";
 import { resolvePostLoginRedirect } from "@/lib/auth/redirects";
 import { ROUTES } from "@/lib/auth/routes";
 import { fetchProfileAccountFields } from "@/lib/currentUserContext";
@@ -142,7 +143,7 @@ export default function EstateAgentLoginPage() {
     <EaMarketingShell>
       <section className="max-w-xl mx-auto px-6 py-16">
         <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-8">
-          <h1 className="text-4xl font-bold text-slate-900">
+          <h1 className={AUTH_TITLE_CLASS}>
             Estate Agent Login
           </h1>
 
@@ -175,12 +176,21 @@ export default function EstateAgentLoginPage() {
             </div>
 
             <div>
-              <label
-                htmlFor="ea-login-password"
-                className="block text-sm font-medium text-slate-700"
-              >
-                Password
-              </label>
+              <div className="flex items-center justify-between gap-4">
+                <label
+                  htmlFor="ea-login-password"
+                  className="block text-sm font-medium text-slate-700"
+                >
+                  Password
+                </label>
+
+                <Link
+                  href={ROUTES.forgotPassword}
+                  className="text-sm font-medium text-slate-600 hover:text-slate-900 underline underline-offset-2"
+                >
+                  Forgot password?
+                </Link>
+              </div>
 
               <input
                 id="ea-login-password"

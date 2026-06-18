@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
+import { PAGE_TITLE_INVERTED_CLASS } from "@/components/mobileStandards";
 
 export default function VerifyEmailPage() {
 
@@ -55,7 +56,7 @@ export default function VerifyEmailPage() {
 
           </div>
 
-          <h1 className="mt-10 text-5xl font-bold text-white leading-tight">
+          <h1 className={`mt-10 ${PAGE_TITLE_INVERTED_CLASS} leading-tight`}>
 
             Verify Your Email
 

@@ -11,6 +11,10 @@ export const ROUTES = {
   home: "/",
   homeownerLogin: "/login",
   homeownerDashboard: "/dashboard",
+  accountSettings: "/account",
+  forgotPassword: "/forgot-password",
+  resetPassword: "/reset-password",
+  authConfirm: "/auth/confirm",
   estateAgentLogin: "/estate-agents/login",
   estateAgentSignup: "/estate-agents/signup",
   estateAgentMarketing: "/estate-agents",
@@ -18,6 +22,11 @@ export const ROUTES = {
   estateAgentOnboarding: "/estate-agents/onboarding",
   agentHome: "/agent",
 } as const;
+
+/** Prefixes for account settings — any authenticated account type. */
+export const ACCOUNT_SETTINGS_PREFIXES = [
+  "/account",
+] as const;
 
 /** Prefixes for homeowner operational workflows — estate agents must not access these. */
 export const HOMEOWNER_PROTECTED_PREFIXES = [
@@ -40,6 +49,8 @@ export const ESTATE_AGENT_PROTECTED_PREFIXES = [
 export const PUBLIC_EXACT_PATHS = [
   ROUTES.home,
   ROUTES.homeownerLogin,
+  ROUTES.forgotPassword,
+  ROUTES.resetPassword,
   "/verify-email",
   ROUTES.estateAgentMarketing,
   ROUTES.estateAgentPricing,
@@ -85,6 +96,15 @@ export function isPublicExactPath(
   ).includes(normalizedPath);
 }
 
+export function isAccountSettingsRoute(
+  pathname: string
+): boolean {
+  return ACCOUNT_SETTINGS_PREFIXES.some(
+    (prefix) =>
+      matchesPrefix(pathname, prefix)
+  );
+}
+
 export function isHomeownerProtectedRoute(
   pathname: string
 ): boolean {
@@ -125,6 +145,7 @@ export function isAccountGatedRoute(
   pathname: string
 ): boolean {
   return (
+    isAccountSettingsRoute(pathname) ||
     isHomeownerProtectedRoute(pathname) ||
     isEstateAgentProtectedRoute(pathname)
   );
@@ -134,6 +155,7 @@ export function isAccountGatedRoute(
  * Middleware matcher paths — keep in sync with middleware config export.
  */
 export const MIDDLEWARE_MATCHER = [
+  "/account/:path*",
   "/dashboard/:path*",
   "/start-move/:path*",
   "/join-chain/:path*",

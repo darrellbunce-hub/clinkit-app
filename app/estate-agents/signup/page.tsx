@@ -7,6 +7,7 @@ import {
 import Link from "next/link";
 
 import EaMarketingShell from "@/components/estate-agents/EaMarketingShell";
+import { AUTH_TITLE_CLASS } from "@/components/mobileStandards";
 import { ROUTES } from "@/lib/auth/routes";
 import { validateBusinessEmail } from "@/lib/businessEmail";
 import { createEstateAgentProfile } from "@/lib/estateAgent/createEstateAgentProfile";
@@ -148,7 +149,7 @@ export default function EstateAgentSignupPage() {
     <EaMarketingShell>
       <section className="max-w-xl mx-auto px-6 py-16">
         <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-8">
-          <h1 className="text-4xl font-bold text-slate-900">
+          <h1 className={AUTH_TITLE_CLASS}>
             Estate Agent Sign Up
           </h1>
 

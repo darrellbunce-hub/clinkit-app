@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
+import { PAGE_TITLE_CLASS } from "@/components/mobileStandards";
 
 export default function NotFound() {
   return (
@@ -7,7 +8,7 @@ export default function NotFound() {
       <Navbar />
 
       <div className="max-w-2xl mx-auto px-6 py-24 text-center">
-        <h1 className="text-5xl font-bold text-slate-900">
+        <h1 className={PAGE_TITLE_CLASS}>
           Page not found
         </h1>
 

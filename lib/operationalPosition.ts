@@ -301,10 +301,193 @@ export function mapToOperationalProperties<
 export const CHAIN_TILE_LABEL = {
   buyerReady: "Buyer Ready",
   yourSale: "Your Sale",
-  connectedSale: "Connected Sale",
+  connectedBuyer: "Connected Buyer",
   connectedPurchase: "Connected Purchase",
   nextHomeSearch: "Next Home Search",
+  /** @deprecated Use connectedBuyer */
+  connectedSale: "Connected Buyer",
 } as const;
+
+export type HomeownerPropertyLabelSurface =
+  | "dashboard"
+  | "chain"
+  | "property";
+
+export type HomeownerPropertyLabelInput = Pick<
+  OperationalProperty,
+  "relationship_type" | "stage" | "address"
+> & {
+  id?: number;
+  chainPosition?: number;
+  chain_position?: number;
+  is_own_property?: boolean;
+  isOwnProperty?: boolean;
+  currentUserRole?: string | null;
+};
+
+export type HomeownerPropertyLabelContext = {
+  surface: HomeownerPropertyLabelSurface;
+  /** Chain topology only: authenticated user's editable Sale tile */
+  isOperationalPosition?: boolean;
+  /**
+   * Dashboard/property: when set, only this property id may show an address
+   * (the user's operational Sale hop). Matches chain-page privacy.
+   */
+  operationalPropertyId?: number | null;
+};
+
+/**
+ * Primary operational property for the current user (their sale or their purchase).
+ * Membership alone (e.g. buyer on someone else's sale) is a connected hop, not "own".
+ */
+export function isPrimaryHomeownerProperty(
+  property: HomeownerPropertyLabelInput
+): boolean {
+  if (property.relationship_type === "sale") {
+    return property.currentUserRole === "seller";
+  }
+
+  if (property.relationship_type === "purchase") {
+    return property.currentUserRole === "buyer";
+  }
+
+  return false;
+}
+
+export function shouldShowHomeownerAddress(
+  property: HomeownerPropertyLabelInput,
+  context: HomeownerPropertyLabelContext
+): boolean {
+  if (!property.address) {
+    return false;
+  }
+
+  if (context.surface === "chain") {
+    return false;
+  }
+
+  return (
+    context.operationalPropertyId != null &&
+    property.id != null &&
+    property.id === context.operationalPropertyId
+  );
+}
+
+/**
+ * Dashboard operational sale hop from participant view fields (no property_members).
+ * When the user is seller on multiple sale rows, the downstream hop (highest position) wins.
+ */
+export function resolveDashboardOperationalPropertyId<
+  T extends Pick<
+    HomeownerPropertyLabelInput,
+    | "id"
+    | "relationship_type"
+    | "currentUserRole"
+    | "chainPosition"
+    | "chain_position"
+  >
+>(chainProperties: T[]): number | null {
+  const sellerSaleProperties = chainProperties.filter(
+    (property) =>
+      property.relationship_type === "sale" &&
+      property.currentUserRole === "seller" &&
+      property.id != null
+  );
+
+  if (sellerSaleProperties.length === 0) {
+    return null;
+  }
+
+  const operationalProperty = sellerSaleProperties.sort(
+    (a, b) =>
+      (b.chainPosition ?? b.chain_position ?? 0) -
+      (a.chainPosition ?? a.chain_position ?? 0)
+  )[0];
+
+  return operationalProperty.id ?? null;
+}
+
+function getConnectedPeerLabel(
+  property: HomeownerPropertyLabelInput
+): string | null {
+  if (
+    property.relationship_type === "sale" &&
+    property.currentUserRole === "buyer"
+  ) {
+    return CHAIN_TILE_LABEL.connectedBuyer;
+  }
+
+  if (
+    property.relationship_type === "purchase" &&
+    property.currentUserRole === "seller"
+  ) {
+    return CHAIN_TILE_LABEL.connectedPurchase;
+  }
+
+  if (property.relationship_type === "purchase") {
+    return CHAIN_TILE_LABEL.connectedPurchase;
+  }
+
+  if (property.relationship_type === "sale") {
+    return CHAIN_TILE_LABEL.connectedBuyer;
+  }
+
+  if (property.currentUserRole === "buyer") {
+    return CHAIN_TILE_LABEL.connectedPurchase;
+  }
+
+  if (property.currentUserRole === "seller") {
+    return CHAIN_TILE_LABEL.connectedBuyer;
+  }
+
+  return null;
+}
+
+function getPropertyNumberFallbackLabel(
+  property: HomeownerPropertyLabelInput
+): string {
+  const chainPosition = getPropertyChainPosition(property);
+
+  return `Property ${chainPosition ?? ""}`.trim();
+}
+
+/**
+ * Canonical homeowner-facing property label (privacy-safe).
+ * Addresses only for primary homeowner roles on dashboard/property surfaces.
+ */
+export function getHomeownerPropertyLabel(
+  property: HomeownerPropertyLabelInput,
+  context: HomeownerPropertyLabelContext
+): string {
+  if (isSearchingPlaceholder(property)) {
+    return CHAIN_TILE_LABEL.nextHomeSearch;
+  }
+
+  if (
+    context.surface === "chain" &&
+    context.isOperationalPosition
+  ) {
+    return CHAIN_TILE_LABEL.yourSale;
+  }
+
+  if (shouldShowHomeownerAddress(property, context)) {
+    return property.address as string;
+  }
+
+  const connectedLabel = getConnectedPeerLabel(property);
+
+  if (connectedLabel) {
+    return connectedLabel;
+  }
+
+  return getPropertyNumberFallbackLabel(property);
+}
+
+function getPropertyChainPosition(
+  property: HomeownerPropertyLabelInput
+): number | undefined {
+  return property.chainPosition ?? property.chain_position;
+}
 
 export function getOperationalSaleChainHeadline(): string {
   return `★ ${CHAIN_TILE_LABEL.yourSale}`;
@@ -334,7 +517,9 @@ export function getPropertyPageHeadline(
     return CHAIN_TILE_LABEL.nextHomeSearch;
   }
 
-  return getChainTileDisplayTitle(property, false);
+  return getHomeownerPropertyLabel(property, {
+    surface: "property",
+  });
 }
 
 export function getPropertyPageSubtitle(
@@ -349,6 +534,16 @@ export function getPropertyPageSubtitle(
     return "Your onward home has not been chosen yet.";
   }
 
+  if (isPrimaryHomeownerProperty(property)) {
+    if (property.relationship_type === "sale") {
+      return "This is your sale in the chain.";
+    }
+
+    if (property.relationship_type === "purchase") {
+      return "This is your purchase in the chain.";
+    }
+  }
+
   if (
     property.relationship_type === "purchase" ||
     property.currentUserRole === "buyer"
@@ -360,41 +555,20 @@ export function getPropertyPageSubtitle(
     property.relationship_type === "sale" ||
     property.currentUserRole === "seller"
   ) {
-    return "A connected sale in this chain.";
+    return "A connected buyer in this chain.";
   }
 
   return CONNECTED_POSITION_MESSAGE;
 }
 
 export function getParticipantPropertyLabel(
-  property: Pick<
-    ChainDisplayProperty,
-    "relationship_type" | "stage" | "address"
-  > & {
-    chainPosition?: number;
-    chain_position?: number;
-    is_own_property?: boolean;
-    isOwnProperty?: boolean;
-    currentUserRole?: string | null;
-  }
+  property: HomeownerPropertyLabelInput,
+  operationalPropertyId?: number | null
 ): string {
-  if (isSearchingPlaceholder(property)) {
-    return CHAIN_TILE_LABEL.nextHomeSearch;
-  }
-
-  if (
-    property.address &&
-    (property.is_own_property ||
-      property.isOwnProperty ||
-      property.currentUserRole)
-  ) {
-    return property.address;
-  }
-
-  const chainPosition =
-    property.chainPosition ?? property.chain_position;
-
-  return `Property ${chainPosition ?? ""}`.trim();
+  return getHomeownerPropertyLabel(property, {
+    surface: "dashboard",
+    operationalPropertyId,
+  });
 }
 
 /** @deprecated Use getParticipantPropertyLabel */
@@ -409,15 +583,17 @@ export function getDashboardChainTitle(
   properties: Array<
     Pick<
       ChainDisplayProperty,
-      "stage" | "address"
+      "stage" | "address" | "relationship_type"
     > & {
+      id?: number;
       chainId?: number;
       chain_id?: number;
-      is_own_property?: boolean;
-      isOwnProperty?: boolean;
+      chainPosition?: number;
+      chain_position?: number;
       currentUserRole?: string | null;
     }
-  >
+  >,
+  operationalPropertyId?: number | null
 ): string {
   const chainProperties = properties.filter(
     (property) =>
@@ -425,68 +601,27 @@ export function getDashboardChainTitle(
       Number(chainId)
   );
 
-  const ownPropertyWithAddress = chainProperties.find(
-    (property) =>
-      property.address &&
-      (property.is_own_property ||
-        property.isOwnProperty ||
-        property.currentUserRole)
-  );
+  if (operationalPropertyId != null) {
+    const operationalProperty = chainProperties.find(
+      (property) => property.id === operationalPropertyId
+    );
 
-  if (ownPropertyWithAddress?.address) {
-    return ownPropertyWithAddress.address;
+    if (operationalProperty?.address) {
+      return operationalProperty.address;
+    }
   }
 
   return `Chain #${chainId}`;
 }
 
 export function getChainTileDisplayTitle(
-  property: Pick<
-    OperationalProperty,
-    "relationship_type" | "stage" | "address"
-  > & {
-    currentUserRole?: string | null;
-    chainPosition?: number;
-    chain_position?: number;
-  },
+  property: HomeownerPropertyLabelInput,
   isOperationalPosition: boolean
 ): string {
-  if (isSearchingPlaceholder(property)) {
-    return CHAIN_TILE_LABEL.nextHomeSearch;
-  }
-
-  if (isOperationalPosition) {
-    return CHAIN_TILE_LABEL.yourSale;
-  }
-
-  if (!property.address) {
-    const chainPosition =
-      property.chainPosition ?? property.chain_position;
-
-    return `Property ${chainPosition ?? ""}`.trim();
-  }
-
-  if (isViewOnlyPurchaseTile(property, isOperationalPosition)) {
-    return CHAIN_TILE_LABEL.connectedPurchase;
-  }
-
-  if (property.currentUserRole === "seller") {
-    return CHAIN_TILE_LABEL.connectedSale;
-  }
-
-  if (property.currentUserRole === "buyer") {
-    return CHAIN_TILE_LABEL.connectedPurchase;
-  }
-
-  if (property.relationship_type === "sale") {
-    return CHAIN_TILE_LABEL.connectedSale;
-  }
-
-  if (property.relationship_type === "purchase") {
-    return CHAIN_TILE_LABEL.connectedPurchase;
-  }
-
-  return CHAIN_TILE_LABEL.connectedSale;
+  return getHomeownerPropertyLabel(property, {
+    surface: "chain",
+    isOperationalPosition,
+  });
 }
 
 export function isOperationalSaleProperty(
