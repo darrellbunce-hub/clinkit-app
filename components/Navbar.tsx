@@ -1,33 +1,25 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import Logo from "@/components/Logo";
 import { MENU_BUTTON_CLASS } from "@/components/mobileStandards";
 import { ROUTES } from "@/lib/auth/routes";
+import { useChain } from "@/context/ChainContext";
+
 export default function Navbar() {
 
   const [mobileMenuOpen, setMobileMenuOpen] =
     useState(false);
-    const [user, setUser] =
-    useState<any>(null);
-    useEffect(() => {
+  const {
+    isAuthenticated,
+    authLoading,
+  } = useChain();
 
-      async function getUser() {
-    
-        const {
-          data,
-        } =
-          await supabase.auth.getUser();
-    
-        setUser(data.user);
-    
-      }
-    
-      getUser();
-    
-    }, []);
+  const showAuthenticatedNav =
+    !authLoading && isAuthenticated;
+
   return (
 
     <header
@@ -58,7 +50,7 @@ export default function Navbar() {
         {/* Desktop Nav */}
 <nav className="hidden md:flex items-center gap-3">
 
-{user ? (
+{showAuthenticatedNav ? (
 
   <>
 
@@ -199,7 +191,7 @@ export default function Navbar() {
 
 <div className="px-6 py-6 flex flex-col gap-4">
 
-{user ? (
+{showAuthenticatedNav ? (
 
   <>
 

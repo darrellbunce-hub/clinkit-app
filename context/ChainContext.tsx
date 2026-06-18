@@ -2,12 +2,22 @@
 
 import {
   createContext,
+  useCallback,
   useContext,
+  useEffect,
+  useRef,
   useState,
-useEffect,
-  ReactNode,
+  type ReactNode,
 } from "react";
+import { usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import {
+  resolveAuthEventDecision,
+  resolveParticipantLoadTransition,
+  requiresParticipantData,
+  shouldApplyBootstrapAuthResult,
+  nextAuthGenerationAfterMeaningfulEvent,
+} from "@/lib/chainParticipantLoadPolicy";
 import {
   canEditProperty,
   canEditBuyerReady,
@@ -90,6 +100,9 @@ type ChainContextType = {
   chainNodes: any[];
   chains: Chain[];
   currentUserId: string | null;
+  authLoading: boolean;
+  isAuthenticated: boolean;
+  refreshParticipantData: () => Promise<void>;
 
   updatePropertyStage: (
     propertyId: number,
@@ -127,6 +140,261 @@ type ChainContextType = {
 const ChainContext =
   createContext<ChainContextType | null>(null);
 
+type ParticipantDataset = {
+  properties: Property[];
+  chainNodes: any[];
+  chains: Chain[];
+};
+
+async function loadParticipantDataset(
+  isStale: () => boolean
+): Promise<ParticipantDataset | null> {
+  const {
+    data: participantProperties,
+    error: propertiesError,
+  } = await supabase
+    .from("chain_properties_participant")
+    .select("*")
+    .order("chain_id")
+    .order("chain_position");
+
+  if (isStale()) {
+    return null;
+  }
+
+  if (propertiesError) {
+    console.error(propertiesError);
+    return null;
+  }
+
+  const propertyIds =
+    (participantProperties || []).map(
+      (property) => property.id
+    );
+
+  const activitiesByPropertyId = new Map<
+    number,
+    Activity[]
+  >();
+
+  if (propertyIds.length > 0) {
+    const {
+      data: activitiesData,
+      error: activitiesError,
+    } = await supabase
+      .from("activities")
+      .select(
+        "id, timestamp, update, updated_by, property_id"
+      )
+      .in("property_id", propertyIds);
+
+    if (isStale()) {
+      return null;
+    }
+
+    if (activitiesError) {
+      console.error(activitiesError);
+    } else {
+      for (const activity of activitiesData || []) {
+        if (!activity.property_id) {
+          continue;
+        }
+
+        const existing =
+          activitiesByPropertyId.get(
+            activity.property_id
+          ) || [];
+
+        existing.push({
+          id: activity.id,
+          timestamp: activity.timestamp,
+          update: activity.update,
+          updated_by: activity.updated_by,
+        });
+
+        activitiesByPropertyId.set(
+          activity.property_id,
+          existing
+        );
+      }
+    }
+  }
+
+  const formattedProperties =
+    (participantProperties || []).map((property) => {
+      const activities =
+        activitiesByPropertyId.get(property.id) || [];
+
+      return {
+        id: property.id,
+        chainId: property.chain_id,
+        chainPosition: property.chain_position,
+        address: property.address,
+        postcode: property.postcode,
+        awaiting_buyer:
+          property.awaiting_buyer ?? false,
+        is_searching:
+          property.is_searching ?? false,
+        buyer_connected:
+          property.buyer_connected ?? false,
+        seller_connected:
+          property.seller_connected ?? false,
+        relationship_type:
+          property.relationship_type ?? null,
+        created_by_user_id:
+          property.created_by_user_id ?? null,
+        linked_property_id:
+          property.linked_property_id ?? null,
+        isOwnProperty:
+          property.is_own_property ?? false,
+        hasMembers: property.has_members ?? false,
+        members: [],
+        stage: property.stage,
+        status: property.status,
+        currentUserRole:
+          property.current_user_role ?? null,
+        lastUpdatedDays: daysSinceLastActivity(
+          activities
+        ),
+        activities: sortActivitiesNewestFirst(
+          activities
+        ),
+      };
+    });
+
+  const participantChainIds = [
+    ...new Set(
+      formattedProperties.map(
+        (property) => property.chainId
+      )
+    ),
+  ];
+
+  const chainNodesQuery = supabase
+    .from("chain_nodes")
+    .select(`
+        *,
+        activities (
+          id,
+          timestamp,
+          update,
+          updated_by,
+          chain_node_id
+        )
+      `);
+
+  const {
+    data: chainNodesData,
+    error: chainNodesError,
+  } =
+    participantChainIds.length > 0
+      ? await chainNodesQuery.in(
+          "chain_id",
+          participantChainIds
+        )
+      : await chainNodesQuery.limit(0);
+
+  if (isStale()) {
+    return null;
+  }
+
+  const chainNodes =
+    !chainNodesError && chainNodesData
+      ? chainNodesData
+      : [];
+
+  if (chainNodesError) {
+    console.error(chainNodesError);
+  }
+
+  const chainsQuery = supabase.from("chains").select("*");
+
+  const { data: chainsData } =
+    participantChainIds.length > 0
+      ? await chainsQuery.in(
+          "id",
+          participantChainIds
+        )
+      : await chainsQuery.limit(0);
+
+  if (isStale()) {
+    return null;
+  }
+
+  const formattedChains = (chainsData || []).map(
+    (chain) => {
+      const chainProperties =
+        formattedProperties.filter(
+          (property) =>
+            Number(property.chainId) ===
+            Number(chain.id)
+        );
+
+      const hasPendingConnection =
+        chainProperties.some(
+          (property) =>
+            property.status ===
+            "pending_connection"
+        );
+
+      const hasUnclaimedProperties =
+        chainProperties.some(
+          (property) => !property.hasMembers
+        );
+
+      const isIncomplete =
+        chainProperties.length === 1 ||
+        hasPendingConnection ||
+        hasUnclaimedProperties;
+
+      return {
+        id: chain.id,
+        accessCode: chain.access_code,
+        state:
+          chain.state ||
+          (isIncomplete
+            ? "active_incomplete"
+            : "active_connected"),
+        completionLifecycleStatus:
+          chain.completion_lifecycle_status ??
+          null,
+        completionScheduledDate:
+          chain.completion_scheduled_date ??
+          null,
+        completionDateRecordedAt:
+          chain.completion_date_recorded_at ??
+          null,
+        completionDateRecordedByUserId:
+          chain.completion_date_recorded_by_user_id ??
+          null,
+        completionConfirmedAt:
+          chain.completion_confirmed_at ??
+          null,
+        completionConfirmedByUserId:
+          chain.completion_confirmed_by_user_id ??
+          null,
+        completedAt: chain.completed_at ?? null,
+      };
+    }
+  );
+
+  return {
+    properties: formattedProperties,
+    chainNodes,
+    chains: formattedChains,
+  };
+}
+
+function clearParticipantState(
+  setProperties: (value: Property[]) => void,
+  setChainNodes: (value: any[]) => void,
+  setChains: (value: Chain[]) => void
+) {
+  setProperties([]);
+  setChainNodes([]);
+  setChains([]);
+}
+
 export function ChainProvider({
   children,
 }: {
@@ -140,243 +408,268 @@ export function ChainProvider({
 const [chains, setChains] =
   useState<Chain[]>([]);
   const [currentUserId, setCurrentUserId] =
-  useState<string | null>(null);
-useEffect(() => {
-  async function fetchUser() {
+    useState<string | null>(null);
+  const [authLoading, setAuthLoading] =
+    useState(true);
+  const [isAuthenticated, setIsAuthenticated] =
+    useState(false);
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-  
-    if (user) {
-      setCurrentUserId(user.id);
-    }
-  }
-  async function fetchParticipantData() {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+  const pathname = usePathname();
+  const shouldLoadParticipantData =
+    requiresParticipantData(pathname);
 
-    if (!user) {
-      return;
-    }
+  const participantRequestIdRef =
+    useRef(0);
+  const authGenerationRef =
+    useRef(0);
+  const bootstrapCompleteRef =
+    useRef(false);
+  const currentUserIdRef =
+    useRef<string | null>(null);
+  const participantLoadedUserIdRef =
+    useRef<string | null>(null);
+  const prevShouldLoadRef =
+    useRef(false);
+  const prevUserIdForLoadRef =
+    useRef<string | null>(null);
+  const pathnameRef = useRef(pathname);
 
-    const {
-      data: participantProperties,
-      error: propertiesError,
-    } = await supabase
-      .from("chain_properties_participant")
-      .select("*")
-      .order("chain_id")
-      .order("chain_position");
+  useEffect(() => {
+    pathnameRef.current = pathname;
+  }, [pathname]);
 
-    if (propertiesError) {
-      console.error(propertiesError);
-      return;
-    }
+  const applyParticipantDataset = useCallback(
+    (dataset: ParticipantDataset) => {
+      setProperties(dataset.properties);
+      setChainNodes(dataset.chainNodes);
+      setChains(dataset.chains);
+    },
+    []
+  );
 
-    const propertyIds =
-      (participantProperties || []).map(
-        (property) => property.id
-      );
+  const invalidateParticipantRequests =
+    useCallback(() => {
+      participantRequestIdRef.current += 1;
+    }, []);
 
-    let activitiesByPropertyId = new Map<
-      number,
-      Activity[]
-    >();
+  const runParticipantLoad =
+    useCallback(async () => {
+      const requestId =
+        ++participantRequestIdRef.current;
 
-    if (propertyIds.length > 0) {
-      const {
-        data: activitiesData,
-        error: activitiesError,
-      } = await supabase
-        .from("activities")
-        .select(
-          "id, timestamp, update, updated_by, property_id"
+      const dataset =
+        await loadParticipantDataset(() =>
+          requestId !==
+          participantRequestIdRef.current
+        );
+
+      if (
+        !dataset ||
+        requestId !==
+          participantRequestIdRef.current
+      ) {
+        return;
+      }
+
+      applyParticipantDataset(dataset);
+      participantLoadedUserIdRef.current =
+        currentUserIdRef.current;
+    }, [applyParticipantDataset]);
+
+  const refreshParticipantData =
+    useCallback(async () => {
+      const userId =
+        currentUserIdRef.current;
+
+      if (
+        !userId ||
+        !requiresParticipantData(
+          pathnameRef.current
         )
-        .in("property_id", propertyIds);
+      ) {
+        return;
+      }
 
-      if (activitiesError) {
-        console.error(activitiesError);
-      } else {
-        for (const activity of activitiesData || []) {
-          if (!activity.property_id) {
-            continue;
-          }
+      participantLoadedUserIdRef.current = null;
+      invalidateParticipantRequests();
 
-          const existing =
-            activitiesByPropertyId.get(
-              activity.property_id
-            ) || [];
+      await runParticipantLoad();
+    }, [
+      invalidateParticipantRequests,
+      runParticipantLoad,
+    ]);
 
-          existing.push({
-            id: activity.id,
-            timestamp: activity.timestamp,
-            update: activity.update,
-            updated_by: activity.updated_by,
-          });
+  useEffect(() => {
+    let cancelled = false;
 
-          activitiesByPropertyId.set(
-            activity.property_id,
-            existing
-          );
-        }
+    async function bootstrapSession() {
+      const capturedAuthGeneration =
+        authGenerationRef.current;
+
+      setAuthLoading(true);
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (cancelled) {
+        return;
+      }
+
+      bootstrapCompleteRef.current = true;
+
+      if (
+        !shouldApplyBootstrapAuthResult(
+          capturedAuthGeneration,
+          authGenerationRef.current
+        )
+      ) {
+        return;
+      }
+
+      const userId = user?.id ?? null;
+
+      currentUserIdRef.current = userId;
+      setCurrentUserId(userId);
+      setIsAuthenticated(userId !== null);
+      setAuthLoading(false);
+
+      if (!userId) {
+        invalidateParticipantRequests();
+        participantLoadedUserIdRef.current = null;
+        clearParticipantState(
+          setProperties,
+          setChainNodes,
+          setChains
+        );
       }
     }
 
-    const formattedProperties =
-      (participantProperties || []).map((property) => {
-        const activities =
-          activitiesByPropertyId.get(property.id) || [];
-
-        return {
-          id: property.id,
-          chainId: property.chain_id,
-          chainPosition: property.chain_position,
-          address: property.address,
-          postcode: property.postcode,
-          awaiting_buyer:
-            property.awaiting_buyer ?? false,
-          is_searching:
-            property.is_searching ?? false,
-          buyer_connected:
-            property.buyer_connected ?? false,
-          seller_connected:
-            property.seller_connected ?? false,
-          relationship_type:
-            property.relationship_type ?? null,
-          created_by_user_id:
-            property.created_by_user_id ?? null,
-          linked_property_id:
-            property.linked_property_id ?? null,
-          isOwnProperty:
-            property.is_own_property ?? false,
-          hasMembers: property.has_members ?? false,
-          members: [],
-          stage: property.stage,
-          status: property.status,
-          currentUserRole:
-            property.current_user_role ?? null,
-          lastUpdatedDays: daysSinceLastActivity(
-            activities
-          ),
-          activities: sortActivitiesNewestFirst(
-            activities
-          ),
-        };
-      });
-
-    setProperties(formattedProperties);
-
-    const participantChainIds = [
-      ...new Set(
-        formattedProperties.map(
-          (property) => property.chainId
-        )
-      ),
-    ];
-
-    const chainNodesQuery = supabase
-      .from("chain_nodes")
-      .select(`
-        *,
-        activities (
-          id,
-          timestamp,
-          update,
-          updated_by,
-          chain_node_id
-        )
-      `);
+    void bootstrapSession();
 
     const {
-      data: chainNodesData,
-      error: chainNodesError,
+      data: { subscription },
     } =
-      participantChainIds.length > 0
-        ? await chainNodesQuery.in(
-            "chain_id",
-            participantChainIds
-          )
-        : await chainNodesQuery.limit(0);
+      supabase.auth.onAuthStateChange(
+        (event, session) => {
+          const nextUserId =
+            session?.user?.id ?? null;
 
-    if (!chainNodesError && chainNodesData) {
-      setChainNodes(chainNodesData);
+          const decision =
+            resolveAuthEventDecision({
+              event,
+              bootstrapComplete:
+                bootstrapCompleteRef.current,
+              previousUserId:
+                currentUserIdRef.current,
+              nextUserId,
+            });
+
+          if (
+            decision.action === "ignore"
+          ) {
+            return;
+          }
+
+          authGenerationRef.current =
+            nextAuthGenerationAfterMeaningfulEvent(
+              authGenerationRef.current
+            );
+
+          if (
+            decision.action === "signed_out"
+          ) {
+            invalidateParticipantRequests();
+            participantLoadedUserIdRef.current =
+              null;
+            currentUserIdRef.current = null;
+            setCurrentUserId(null);
+            setIsAuthenticated(false);
+            setAuthLoading(false);
+            clearParticipantState(
+              setProperties,
+              setChainNodes,
+              setChains
+            );
+
+            return;
+          }
+
+          invalidateParticipantRequests();
+          participantLoadedUserIdRef.current =
+            null;
+
+          if (
+            decision.action ===
+            "user_changed"
+          ) {
+            clearParticipantState(
+              setProperties,
+              setChainNodes,
+              setChains
+            );
+          }
+
+          currentUserIdRef.current =
+            decision.userId;
+          setCurrentUserId(decision.userId);
+          setIsAuthenticated(true);
+          setAuthLoading(false);
+        }
+      );
+
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
+  }, [invalidateParticipantRequests]);
+
+  useEffect(() => {
+    if (authLoading) {
+      return;
     }
 
-    const chainsQuery = supabase.from("chains").select("*");
-
-    const { data: chainsData } =
-      participantChainIds.length > 0
-        ? await chainsQuery.in(
-            "id",
-            participantChainIds
-          )
-        : await chainsQuery.limit(0);
-
-    if (chainsData) {
-      const formattedChains = chainsData.map((chain) => {
-        const chainProperties =
-          formattedProperties.filter(
-            (property) =>
-              Number(property.chainId) ===
-              Number(chain.id)
-          );
-
-        const hasPendingConnection =
-          chainProperties.some(
-            (property) =>
-              property.status ===
-              "pending_connection"
-          );
-
-        const hasUnclaimedProperties =
-          chainProperties.some(
-            (property) => !property.hasMembers
-          );
-
-        const isIncomplete =
-          chainProperties.length === 1 ||
-          hasPendingConnection ||
-          hasUnclaimedProperties;
-
-        return {
-          id: chain.id,
-          accessCode: chain.access_code,
-          state:
-            chain.state ||
-            (isIncomplete
-              ? "active_incomplete"
-              : "active_connected"),
-          completionLifecycleStatus:
-            chain.completion_lifecycle_status ??
-            null,
-          completionScheduledDate:
-            chain.completion_scheduled_date ??
-            null,
-          completionDateRecordedAt:
-            chain.completion_date_recorded_at ??
-            null,
-          completionDateRecordedByUserId:
-            chain.completion_date_recorded_by_user_id ??
-            null,
-          completionConfirmedAt:
-            chain.completion_confirmed_at ??
-            null,
-          completionConfirmedByUserId:
-            chain.completion_confirmed_by_user_id ??
-            null,
-          completedAt: chain.completed_at ?? null,
-        };
+    const loadDecision =
+      resolveParticipantLoadTransition({
+        authLoading: false,
+        userId: currentUserIdRef.current,
+        shouldLoad: shouldLoadParticipantData,
+        previousShouldLoad:
+          prevShouldLoadRef.current,
+        previousUserId:
+          prevUserIdForLoadRef.current,
+        participantDataLoadedForUserId:
+          participantLoadedUserIdRef.current,
       });
 
-      setChains(formattedChains);
-    }
-  }
-  fetchUser();
-  fetchParticipantData();
+    prevShouldLoadRef.current =
+      shouldLoadParticipantData;
+    prevUserIdForLoadRef.current =
+      currentUserIdRef.current;
 
-}, []);
+    if (loadDecision.action === "clear") {
+      invalidateParticipantRequests();
+      participantLoadedUserIdRef.current =
+        null;
+      clearParticipantState(
+        setProperties,
+        setChainNodes,
+        setChains
+      );
+
+      return;
+    }
+
+    if (loadDecision.action === "load") {
+      void runParticipantLoad();
+    }
+  }, [
+    authLoading,
+    shouldLoadParticipantData,
+    currentUserId,
+    invalidateParticipantRequests,
+    runParticipantLoad,
+  ]);
 
 async function updatePropertyStage(
   propertyId: number,
@@ -1028,6 +1321,9 @@ return (
         chainNodes,
         chains,
         currentUserId,
+        authLoading,
+        isAuthenticated,
+        refreshParticipantData,
         updatePropertyStage,
         addStructuredUpdate,
         breakChainConnection,
