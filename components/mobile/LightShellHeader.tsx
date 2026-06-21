@@ -8,6 +8,10 @@ import {
 
 import Logo from "@/components/Logo";
 import { MENU_BUTTON_LIGHT_CLASS } from "@/components/mobileStandards";
+import {
+  BTN_PRIMARY_SM_CLASS,
+  LINK_MUTED_CLASS,
+} from "@/lib/theme/themeTokens";
 
 export type LightShellNavLink = {
   href: string;
@@ -51,8 +55,8 @@ export default function LightShellHeader({
               href={link.href}
               className={
                 link.primary
-                  ? "bg-slate-900 text-white px-4 py-2 min-h-11 inline-flex items-center rounded-xl hover:bg-slate-800"
-                  : "text-slate-600 hover:text-slate-900 px-3 py-2 min-h-11 inline-flex items-center"
+                  ? `${BTN_PRIMARY_SM_CLASS} px-4 py-2 min-h-11 inline-flex items-center`
+                  : `${LINK_MUTED_CLASS} px-3 py-2 min-h-11 inline-flex items-center`
               }
             >
               {link.label}
@@ -65,7 +69,7 @@ export default function LightShellHeader({
             <button
               type="button"
               onClick={() => void onLogout()}
-              className="text-slate-600 hover:text-slate-900 px-3 py-2 min-h-11 inline-flex items-center"
+              className="text-slate-600 hover:text-brand-primary px-3 py-2 min-h-11 inline-flex items-center"
             >
               Logout
             </button>
@@ -99,8 +103,8 @@ export default function LightShellHeader({
                 onClick={closeMenu}
                 className={
                   link.primary
-                    ? "bg-slate-900 text-white px-5 py-3 min-h-11 inline-flex items-center rounded-xl font-semibold text-center justify-center"
-                    : "text-slate-700 hover:text-slate-900 py-3 min-h-11 inline-flex items-center font-medium"
+                    ? `${BTN_PRIMARY_SM_CLASS} px-5 py-3 min-h-11 inline-flex items-center text-center justify-center`
+                    : "text-slate-700 hover:text-brand-primary py-3 min-h-11 inline-flex items-center font-medium"
                 }
               >
                 {link.label}
@@ -123,7 +127,7 @@ export default function LightShellHeader({
                   closeMenu();
                   await onLogout();
                 }}
-                className="text-left text-slate-700 hover:text-slate-900 py-3 min-h-11 inline-flex items-center font-medium"
+                className="text-left text-slate-700 hover:text-brand-primary py-3 min-h-11 inline-flex items-center font-medium"
               >
                 Logout
               </button>

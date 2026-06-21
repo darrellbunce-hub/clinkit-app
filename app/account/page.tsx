@@ -4,10 +4,12 @@ import { useEffect, useState } from "react";
 
 import AccountNav from "@/components/account/AccountNav";
 import { PAGE_TITLE_CLASS } from "@/components/mobileStandards";
+import { PAGE_BG_CLASS } from "@/lib/theme/themeTokens";
 import LegalPrivacySection from "@/components/account/LegalPrivacySection";
 import ProfileSection from "@/components/account/ProfileSection";
 import SecuritySection from "@/components/account/SecuritySection";
 import Navbar from "@/components/Navbar";
+import PageHeaderBand from "@/components/theme/PageHeaderBand";
 import AgentShell from "@/components/agent/AgentShell";
 import { getAccountType } from "@/lib/accountType";
 import { isEstateAgent } from "@/lib/accountType";
@@ -119,8 +121,9 @@ export default function AccountSettingsPage() {
 
   if (isLoading) {
     return (
-      <main className="min-h-screen bg-slate-100">
+      <main className={PAGE_BG_CLASS}>
         <Navbar />
+        <PageHeaderBand />
         <div className="max-w-3xl mx-auto px-6 py-12 text-slate-600">
           Loading account details...
         </div>
@@ -135,8 +138,9 @@ export default function AccountSettingsPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-100">
+    <main className={PAGE_BG_CLASS}>
       <Navbar />
+      <PageHeaderBand />
       {content}
     </main>
   );

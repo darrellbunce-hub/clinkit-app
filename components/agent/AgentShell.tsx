@@ -1,8 +1,10 @@
 "use client";
 
 import LightShellHeader from "@/components/mobile/LightShellHeader";
+import PageHeaderBand from "@/components/theme/PageHeaderBand";
 import { supabase } from "@/lib/supabase";
 import { ROUTES } from "@/lib/auth/routes";
+import { PAGE_BG_CLASS } from "@/lib/theme/themeTokens";
 
 const agentNavLinks = [
   {
@@ -22,7 +24,7 @@ export default function AgentShell({
   }
 
   return (
-    <main className="min-h-screen bg-slate-100">
+    <main className={PAGE_BG_CLASS}>
       <LightShellHeader
         logoHref={ROUTES.agentHome}
         links={agentNavLinks}
@@ -33,6 +35,8 @@ export default function AgentShell({
         }
         onLogout={handleLogout}
       />
+
+      <PageHeaderBand />
 
       {children}
     </main>

@@ -7,6 +7,7 @@ import {
   SECTION_TITLE_CLASS,
 } from "@/components/mobileStandards";
 import Navbar from "@/components/Navbar";
+import PageHeaderBand from "@/components/theme/PageHeaderBand";
 import { STAGES } from "@/data/stages";
 import { useChain } from "@/context/ChainContext";
 import {
@@ -14,6 +15,15 @@ import {
   getParticipantPropertyLabel,
   resolveDashboardOperationalPropertyId,
 } from "@/lib/operationalPosition";
+import { statusBadgeClasses } from "@/lib/theme/statusBadges";
+import {
+  BTN_PRIMARY_SM_CLASS,
+  CARD_CLASS_NO_PADDING,
+  DASHBOARD_LIST_CLASS,
+  DASHBOARD_LIST_ROW_CLASS,
+  PAGE_BG_CLASS,
+  SURFACE_PANEL_HOVER_CLASS,
+} from "@/lib/theme/themeTokens";
 
 function formatConnectionStatus(
   status: string | null | undefined
@@ -50,29 +60,13 @@ function getStageLabel(stage: string | null | undefined): string {
   );
 }
 
-function statusBadgeClasses(
-  status: string | null | undefined
-): string {
-  switch (status) {
-    case "healthy":
-      return "bg-green-100 text-green-700";
-    case "pending_connection":
-      return "bg-amber-100 text-amber-700";
-    case "broken_connection":
-      return "bg-red-100 text-red-700";
-    case "delayed":
-      return "bg-amber-100 text-amber-800";
-    default:
-      return "bg-slate-100 text-slate-700";
-  }
-}
-
 export default function DashboardPage() {
   const { properties, chains } = useChain();
 
   return (
-    <main className="min-h-screen bg-slate-100">
+    <main className={PAGE_BG_CLASS}>
       <Navbar />
+      <PageHeaderBand />
 
       <div className="max-w-6xl mx-auto px-6 py-12">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
@@ -88,7 +82,7 @@ export default function DashboardPage() {
 
           <Link
             href="/start-move"
-            className="bg-slate-900 text-white px-6 py-4 rounded-xl hover:bg-slate-700 transition"
+            className={`${BTN_PRIMARY_SM_CLASS} px-6 py-4`}
           >
             + Create Chain
           </Link>
@@ -116,7 +110,7 @@ export default function DashboardPage() {
                 return (
                   <div
                     key={chain.id}
-                    className={`bg-white rounded-3xl shadow-sm border border-slate-200 ${CARD_PADDING_CLASS}`}
+                    className={`bg-surface-card rounded-3xl shadow-sm border border-surface-card-border ${CARD_PADDING_CLASS}`}
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div className="min-w-0 flex-1">
@@ -163,7 +157,7 @@ export default function DashboardPage() {
                       </div>
                     </div>
 
-                    <div className="mt-4 divide-y divide-slate-200 border border-slate-200 rounded-2xl overflow-hidden">
+                    <div className={`mt-4 ${DASHBOARD_LIST_CLASS}`}>
                       {chainProperties.map((property) => {
                         const stageLabel = getStageLabel(
                           property.stage
@@ -175,7 +169,7 @@ export default function DashboardPage() {
                         return (
                           <div
                             key={property.id}
-                            className="px-4 py-3 bg-slate-50"
+                            className={DASHBOARD_LIST_ROW_CLASS}
                           >
                             <div className="min-w-0">
                               <h3 className="font-semibold text-slate-900 text-sm leading-snug">
@@ -210,7 +204,7 @@ export default function DashboardPage() {
 
                     <Link
                       href={`/chain/${chain.id}`}
-                      className="block mt-6 w-full border border-slate-300 text-slate-900 py-3 rounded-xl hover:bg-slate-50 transition text-center text-sm font-medium"
+                      className={`block mt-6 w-full border border-surface-card-border text-slate-900 py-3 rounded-xl ${SURFACE_PANEL_HOVER_CLASS} text-center text-sm font-medium`}
                     >
                       View Chain
                     </Link>
@@ -221,13 +215,13 @@ export default function DashboardPage() {
           </div>
 
           <div className="space-y-6">
-            <div className={`bg-white rounded-3xl shadow-sm border border-slate-200 ${CARD_PADDING_CLASS}`}>
+            <div className={`${CARD_CLASS_NO_PADDING} ${CARD_PADDING_CLASS}`}>
               <h2 className="text-xl font-bold text-slate-900">
                 Recommended Next Steps
               </h2>
 
               <div className="mt-6 space-y-4">
-                <div className="border border-slate-200 rounded-2xl p-4 hover:border-slate-300 hover:bg-slate-50 transition cursor-pointer">
+                <div className={`border border-surface-card-border rounded-2xl p-4 hover:border-brand-primary/30 ${SURFACE_PANEL_HOVER_CLASS} cursor-pointer`}>
                   <p className="font-semibold text-slate-900">
                     Compare Home Insurance
                   </p>
@@ -237,7 +231,7 @@ export default function DashboardPage() {
                   </p>
                 </div>
 
-                <div className="border border-slate-200 rounded-2xl p-4 hover:border-slate-300 hover:bg-slate-50 transition cursor-pointer">
+                <div className={`border border-surface-card-border rounded-2xl p-4 hover:border-brand-primary/30 ${SURFACE_PANEL_HOVER_CLASS} cursor-pointer`}>
                   <p className="font-semibold text-slate-900">
                     Book a Removals Company
                   </p>
@@ -247,7 +241,7 @@ export default function DashboardPage() {
                   </p>
                 </div>
 
-                <div className="border border-slate-200 rounded-2xl p-4 hover:border-slate-300 hover:bg-slate-50 transition cursor-pointer">
+                <div className={`border border-surface-card-border rounded-2xl p-4 hover:border-brand-primary/30 ${SURFACE_PANEL_HOVER_CLASS} cursor-pointer`}>
                   <p className="font-semibold text-slate-900">
                     Utilities & Broadband
                   </p>
@@ -262,7 +256,7 @@ export default function DashboardPage() {
         </div>
 
         {chains.length === 0 && (
-          <div className="mt-12 bg-white rounded-3xl border border-slate-200 p-12 text-center">
+          <div className={`mt-12 ${CARD_CLASS_NO_PADDING} p-12 text-center`}>
             <h2 className={SECTION_TITLE_CLASS}>
               No Active Moves Yet
             </h2>

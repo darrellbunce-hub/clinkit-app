@@ -3,6 +3,10 @@ import {
   getOperationalBuyerReadyHeadline,
   getOperationalSaleChainHeadline,
 } from "@/lib/operationalPosition";
+import {
+  OPERATIONAL_NODE_RING_CLASS,
+} from "@/lib/theme/themeTokens";
+import { chainNodeProgressFillClasses } from "@/lib/theme/chainViz";
 
 type ChainNodeProps = {
 
@@ -23,7 +27,7 @@ type ChainNodeProps = {
 
   isOperationalPosition?: boolean;
 
-  positionKind?: "buyer_ready" | "sale";
+  positionKind?: "awaiting_buyer" | "buyer_ready" | "sale";
 };
 
 export default function ChainNode({
@@ -56,6 +60,9 @@ export default function ChainNode({
     isOperationalPosition &&
     positionKind === "buyer_ready";
 
+  const isAwaitingBuyer =
+    positionKind === "awaiting_buyer";
+
   const headlineTitle = isOperationalSale
     ? getOperationalSaleChainHeadline()
     : isOperationalBuyerReady
@@ -71,11 +78,14 @@ export default function ChainNode({
           w-20 h-20 rounded-3xl
           border-[3px]
           flex items-center justify-center
-          text-5xl bg-white
+          text-5xl bg-surface-card
 
           ${
-            isOperationalPosition
-              ? "border-blue-600 ring-4 ring-blue-100"
+            isAwaitingBuyer
+              ? "border-amber-400 border-dashed bg-amber-50/50"
+
+              : isOperationalPosition
+              ? OPERATIONAL_NODE_RING_CLASS
 
               : status === "healthy"
               ? "border-green-500"
@@ -95,7 +105,10 @@ export default function ChainNode({
       >
 
 {
-  displayTitle === CHAIN_TILE_LABEL.buyerReady
+  isAwaitingBuyer
+    ? "❓"
+
+    : displayTitle === CHAIN_TILE_LABEL.buyerReady
     ? "🧍"
 
     : displayTitle === CHAIN_TILE_LABEL.nextHomeSearch
@@ -123,46 +136,41 @@ export default function ChainNode({
 
       </h3>
 
-      <p className="text-sm text-slate-600">
+      <p
+        className={
+          isAwaitingBuyer
+            ? "text-sm text-amber-700 font-medium"
+            : "text-sm text-slate-600"
+        }
+      >
         {stageLabel}
       </p>
 
-      <div className="mt-3 w-full h-2 rounded-full bg-slate-200 overflow-hidden">
+      {isAwaitingBuyer ? null : (
+        <>
+          <div className="mt-3 w-full h-2 rounded-full bg-chain-progress-track overflow-hidden">
 
-        <div
-          className={`
-            h-full rounded-full
+            <div
+              className={`
+                h-full rounded-full
+                ${chainNodeProgressFillClasses(status)}
+              `}
+              style={{
+                width: `${progress}%`,
+              }}
+            />
 
-            ${
-              status === "healthy"
-                ? "bg-green-500"
+          </div>
 
-                : status === "pending_connection"
-                ? "bg-amber-400"
+          <p className="mt-2 text-sm text-slate-500">
+            {progress}% complete
+          </p>
 
-                : status === "broken_connection"
-                ? "bg-red-500"
-
-                : status === "delayed"
-                ? "bg-amber-500"
-
-                : "bg-slate-400"
-            }
-          `}
-          style={{
-            width: `${progress}%`,
-          }}
-        />
-
-      </div>
-
-      <p className="mt-2 text-sm text-slate-500">
-        {progress}% complete
-      </p>
-
-      <p className="mt-2 text-xs text-slate-400">
-        Updated {updatedDaysAgo} days ago
-      </p>
+          <p className="mt-2 text-xs text-slate-400">
+            Updated {updatedDaysAgo} days ago
+          </p>
+        </>
+      )}
 
     </div>
 

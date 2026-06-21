@@ -18,6 +18,7 @@ import {
 } from "@/lib/estateAgent/classifyAgentDashboard";
 import { getAgentAssignmentAccessLabel } from "@/lib/estateAgent/delegatedUpdates";
 import { PAGE_TITLE_CLASS } from "@/components/mobileStandards";
+import { TAB_ACTIVE_CLASS } from "@/lib/theme/themeTokens";
 import { supabase } from "@/lib/supabase";
 
 const tabs: {
@@ -121,7 +122,7 @@ export default function AgentDashboard({
                 px-4 py-3 text-sm font-semibold border-b-2 transition
                 ${
                   activeTab === tab.id
-                    ? "border-slate-900 text-slate-900"
+                    ? TAB_ACTIVE_CLASS
                     : "border-transparent text-slate-500 hover:text-slate-700"
                 }
               `}

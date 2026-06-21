@@ -34,6 +34,13 @@ import PropertyEstateAgentAssignment from "@/components/estate-agents/PropertyEs
 import {
   mapToOperationalProperties,
 } from "@/lib/operationalPosition";
+import PageHeaderBand from "@/components/theme/PageHeaderBand";
+import {
+  BTN_PRIMARY_CLASS,
+  CARD_CLASS_NO_PADDING,
+  PAGE_BG_CLASS,
+  SURFACE_INSET_CLASS,
+} from "@/lib/theme/themeTokens";
 import {
   canShowOperationalCompletionDateEntry,
 } from "@/lib/recordChainCompletionDate";
@@ -541,9 +548,10 @@ if (
     
     }
   return (
-    <main className="min-h-screen bg-slate-100">
+    <main className={PAGE_BG_CLASS}>
 
       <Navbar />
+      <PageHeaderBand />
 
       <div className="max-w-4xl mx-auto px-6 py-12">
         {(successMessage || warningMessage) && (
@@ -576,7 +584,7 @@ if (
         />
 
         <div
-          className={`bg-white rounded-3xl shadow-sm border border-slate-200 ${CARD_PADDING_CLASS}`}
+          className={`bg-surface-card rounded-3xl shadow-sm border border-surface-card-border ${CARD_PADDING_CLASS}`}
         >
 
 <h1 className={PAGE_TITLE_CLASS}>
@@ -594,7 +602,7 @@ if (
 </div>
 
         <div
-          className={`mt-8 bg-white rounded-3xl shadow-sm border border-slate-200 ${CARD_PADDING_CLASS}`}
+          className={`mt-8 bg-surface-card rounded-3xl shadow-sm border border-surface-card-border ${CARD_PADDING_CLASS}`}
         >
           <MobilePanelHeader
             aside={
@@ -644,7 +652,7 @@ if (
 
     <div
       className="
-        bg-slate-50 rounded-2xl
+        bg-surface-inset rounded-2xl
         px-5 py-5
         text-slate-500
       "
@@ -662,7 +670,7 @@ if (
         key={stage.value}
         className="
           flex items-center gap-4
-          bg-slate-50 rounded-2xl
+          bg-surface-inset rounded-2xl
           px-5 py-4
         "
       >
@@ -712,7 +720,7 @@ if (
 {/* Operational Info */}
 <div className="grid md:grid-cols-2 gap-8 mt-10">
 
-  <div className="bg-slate-50 rounded-2xl p-6">
+  <div className="bg-surface-inset rounded-2xl p-6">
 
     <p className="text-sm text-slate-500">
       Expected Next Step
@@ -728,7 +736,7 @@ if (
 
   </div>
 
-  <div className="bg-slate-50 rounded-2xl p-6">
+  <div className="bg-surface-inset rounded-2xl p-6">
 
     <p className="text-sm text-slate-500">
       Typical Timeframe
@@ -752,7 +760,7 @@ if (
 
 {/* Action Required */}
 {!isCompletedCompletionMode && (
-<div className={`mt-8 bg-white rounded-3xl shadow-sm border border-slate-200 ${CARD_PADDING_CLASS}`}>
+<div className={`mt-8 bg-surface-card rounded-3xl shadow-sm border border-surface-card-border ${CARD_PADDING_CLASS}`}>
 
   <MobilePanelHeader
     aside={
@@ -838,7 +846,7 @@ if (
         {!isCompletedCompletionMode && (
         <>
         {/* Update Status */}
-        <div className={`mt-8 bg-white rounded-3xl shadow-sm border border-slate-200 ${CARD_PADDING_CLASS}`}>
+        <div className={`mt-8 bg-surface-card rounded-3xl shadow-sm border border-surface-card-border ${CARD_PADDING_CLASS}`}>
 
           <h2 className="text-3xl font-bold text-slate-900">
             Update Status
@@ -875,24 +883,14 @@ if (
           <button
   disabled={!canEdit}
   onClick={handlePropertyStageUpdate}
-  className="
-    mt-4
-    bg-slate-900
-    text-white
-    rounded-xl
-    px-6
-    py-3
-    font-semibold
-    hover:bg-slate-800
-    transition
-  "
+  className={`mt-4 ${BTN_PRIMARY_CLASS} rounded-xl px-6 py-3`}
 >
   Submit Status Update
 </button>
         </div>
 
         {/* Structured Updates */}
-        <div className={`mt-8 bg-white rounded-3xl shadow-sm border border-slate-200 ${CARD_PADDING_CLASS}`}>
+        <div className={`mt-8 bg-surface-card rounded-3xl shadow-sm border border-surface-card-border ${CARD_PADDING_CLASS}`}>
 
           <h2 className="text-3xl font-bold text-slate-900">
             Add Update
@@ -982,7 +980,7 @@ if (
 <button
   disabled={!canEdit}
   onClick={handleStructuredUpdate}
-            className="mt-6 bg-slate-900 text-white px-6 py-4 rounded-2xl font-semibold hover:bg-slate-700 transition disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed"
+            className={`mt-6 ${BTN_PRIMARY_CLASS} px-6 py-4 disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed`}
           >
             Add Update
           </button>
@@ -1057,7 +1055,7 @@ if (
         )}
 
         {/* Activity Timeline */}
-        <div className={`mt-8 bg-white rounded-3xl shadow-sm border border-slate-200 ${CARD_PADDING_CLASS}`}>
+        <div className={`mt-8 bg-surface-card rounded-3xl shadow-sm border border-surface-card-border ${CARD_PADDING_CLASS}`}>
 
           <h2 className="text-3xl font-bold text-slate-900">
             Activity Timeline

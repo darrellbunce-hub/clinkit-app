@@ -1,5 +1,7 @@
 import LightShellHeader from "@/components/mobile/LightShellHeader";
+import PageHeaderBand from "@/components/theme/PageHeaderBand";
 import { ROUTES } from "@/lib/auth/routes";
+import { PAGE_BG_CLASS } from "@/lib/theme/themeTokens";
 
 const marketingNavLinks = [
   {
@@ -23,11 +25,13 @@ export default function EaMarketingShell({
   children: React.ReactNode;
 }) {
   return (
-    <main className="min-h-screen bg-slate-100">
+    <main className={PAGE_BG_CLASS}>
       <LightShellHeader
         logoHref={ROUTES.home}
         links={[...marketingNavLinks]}
       />
+
+      <PageHeaderBand />
 
       {children}
     </main>

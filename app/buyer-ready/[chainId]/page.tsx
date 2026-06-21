@@ -39,6 +39,13 @@ import OperationalCompletionDatePanel from "@/components/OperationalCompletionDa
 import {
   mapToOperationalProperties,
 } from "@/lib/operationalPosition";
+import PageHeaderBand from "@/components/theme/PageHeaderBand";
+import {
+  BTN_PRIMARY_CLASS,
+  CARD_CLASS_NO_PADDING,
+  PAGE_BG_CLASS,
+  SURFACE_INSET_CLASS,
+} from "@/lib/theme/themeTokens";
 import {
   canShowOperationalCompletionDateEntry,
 } from "@/lib/recordChainCompletionDate";
@@ -661,9 +668,10 @@ async function handleStructuredUpdate() {
       }, 4000);
 }
   return (
-    <main className="min-h-screen bg-slate-100">
+    <main className={PAGE_BG_CLASS}>
 
       <Navbar />
+      <PageHeaderBand />
 
       <div className="max-w-4xl mx-auto px-6 py-12">
 
@@ -698,7 +706,7 @@ async function handleStructuredUpdate() {
 
         {/* Header */}
         <div
-          className={`bg-white rounded-3xl shadow-sm border border-slate-200 ${CARD_PADDING_CLASS}`}
+          className={`bg-surface-card rounded-3xl shadow-sm border border-surface-card-border ${CARD_PADDING_CLASS}`}
         >
 
 <h1 className={PAGE_TITLE_CLASS}>
@@ -717,7 +725,7 @@ async function handleStructuredUpdate() {
 
         {/* Current Status */}
         <div
-          className={`mt-8 bg-white rounded-3xl shadow-sm border border-slate-200 ${CARD_PADDING_CLASS}`}
+          className={`mt-8 bg-surface-card rounded-3xl shadow-sm border border-surface-card-border ${CARD_PADDING_CLASS}`}
         >
           <MobilePanelHeader
             aside={
@@ -767,7 +775,7 @@ async function handleStructuredUpdate() {
 
     <div
       className="
-        bg-slate-50 rounded-2xl
+        bg-surface-inset rounded-2xl
         px-5 py-5
         text-slate-500
       "
@@ -785,7 +793,7 @@ async function handleStructuredUpdate() {
         key={stage.value}
         className="
           flex items-center gap-4
-          bg-slate-50 rounded-2xl
+          bg-surface-inset rounded-2xl
           px-5 py-4
         "
       >
@@ -835,7 +843,7 @@ async function handleStructuredUpdate() {
 {/* Operational Info */}
 <div className="grid md:grid-cols-2 gap-8 mt-10">
 
-  <div className="bg-slate-50 rounded-2xl p-6">
+  <div className="bg-surface-inset rounded-2xl p-6">
 
     <p className="text-sm text-slate-500">
       Expected Next Step
@@ -851,7 +859,7 @@ async function handleStructuredUpdate() {
 
   </div>
 
-  <div className="bg-slate-50 rounded-2xl p-6">
+  <div className="bg-surface-inset rounded-2xl p-6">
 
     <p className="text-sm text-slate-500">
       Typical Timeframe
@@ -876,7 +884,7 @@ async function handleStructuredUpdate() {
 
 {/* Action Required */}
 {!isCompletedCompletionMode && (
-<div className={`mt-8 bg-white rounded-3xl shadow-sm border border-slate-200 ${CARD_PADDING_CLASS}`}>
+<div className={`mt-8 bg-surface-card rounded-3xl shadow-sm border border-surface-card-border ${CARD_PADDING_CLASS}`}>
 
   <MobilePanelHeader
     aside={
@@ -962,7 +970,7 @@ async function handleStructuredUpdate() {
         {!isCompletedCompletionMode && (
         <>
         {/* Update Status */}
-        <div className={`mt-8 bg-white rounded-3xl shadow-sm border border-slate-200 ${CARD_PADDING_CLASS}`}>
+        <div className={`mt-8 bg-surface-card rounded-3xl shadow-sm border border-surface-card-border ${CARD_PADDING_CLASS}`}>
 
           <h2 className={SECTION_TITLE_CLASS}>
             Update Status
@@ -994,27 +1002,14 @@ async function handleStructuredUpdate() {
           <button
   disabled={!canEdit}
   onClick={updateBuyerStage}
-  className="
-    mt-4
-    bg-slate-900
-    text-white
-    rounded-xl
-    px-6
-    py-3
-    font-semibold
-    hover:bg-slate-800
-    transition
-    disabled:bg-slate-300
-    disabled:text-slate-500
-    disabled:cursor-not-allowed
-  "
+  className={`mt-4 ${BTN_PRIMARY_CLASS} rounded-xl px-6 py-3 disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed`}
 >
   Submit Status Update
 </button>
         </div>
 
         {/* Structured Updates */}
-        <div className={`mt-8 bg-white rounded-3xl shadow-sm border border-slate-200 ${CARD_PADDING_CLASS}`}>
+        <div className={`mt-8 bg-surface-card rounded-3xl shadow-sm border border-surface-card-border ${CARD_PADDING_CLASS}`}>
 
           <h2 className={SECTION_TITLE_CLASS}>
             Add Update
@@ -1104,7 +1099,7 @@ async function handleStructuredUpdate() {
 <button
   disabled={!canEdit}
   onClick={handleStructuredUpdate}
-  className="mt-6 bg-slate-900 text-white px-6 py-4 rounded-2xl font-semibold hover:bg-slate-700 transition disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed"
+  className={`mt-6 ${BTN_PRIMARY_CLASS} px-6 py-4 disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed`}
 >
   Add Update
 </button>
@@ -1114,7 +1109,7 @@ async function handleStructuredUpdate() {
         )}
 
         {/* Activity Timeline */}
-        <div className={`mt-8 bg-white rounded-3xl shadow-sm border border-slate-200 ${CARD_PADDING_CLASS}`}>
+        <div className={`mt-8 bg-surface-card rounded-3xl shadow-sm border border-surface-card-border ${CARD_PADDING_CLASS}`}>
 
           <h2 className={SECTION_TITLE_CLASS}>
             Activity Timeline

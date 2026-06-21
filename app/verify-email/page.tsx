@@ -3,6 +3,12 @@
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import { PAGE_TITLE_INVERTED_CLASS } from "@/components/mobileStandards";
+import {
+  BTN_ACCENT_CLASS,
+  HERO_GLOW_PRIMARY_CLASS,
+  HERO_GLOW_SECONDARY_CLASS,
+  HERO_GRADIENT_CLASS,
+} from "@/lib/theme/themeTokens";
 
 export default function VerifyEmailPage() {
 
@@ -13,11 +19,11 @@ export default function VerifyEmailPage() {
       <Navbar />
 
       {/* Background Glow */}
-      <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950"></div>
+      <div className={`absolute inset-0 ${HERO_GRADIENT_CLASS}`}></div>
 
-      <div className="absolute top-[-200px] right-[-100px] w-[500px] h-[500px] bg-blue-500/20 rounded-full blur-3xl"></div>
+      <div className={HERO_GLOW_PRIMARY_CLASS}></div>
 
-      <div className="absolute bottom-[-200px] left-[-100px] w-[400px] h-[400px] bg-cyan-400/10 rounded-full blur-3xl"></div>
+      <div className={HERO_GLOW_SECONDARY_CLASS}></div>
 
       <section className="relative z-10 flex items-center justify-center px-6 py-24">
 
@@ -99,16 +105,7 @@ export default function VerifyEmailPage() {
 
             <Link
               href="/login"
-              className="
-                bg-blue-600
-                hover:bg-blue-500
-                text-white
-                px-8
-                py-4
-                rounded-2xl
-                font-semibold
-                transition
-              "
+              className={`${BTN_ACCENT_CLASS} px-8 py-4 text-center`}
             >
               Return To Login
             </Link>

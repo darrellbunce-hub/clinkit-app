@@ -19,6 +19,7 @@ import {
 import {
   establishConnectedHopAfterSellerJoinsPurchase,
 } from "@/lib/chainConnection";
+import { ensureBuyerReadyOnJoin } from "@/lib/ensureBuyerReadyOnJoin";
 
 function JoinChainContent() {
   const searchParams =
@@ -39,6 +40,9 @@ function JoinChainContent() {
   const [postcode, setPostcode] =
     useState("");
 
+  const [nothingToSell, setNothingToSell] =
+    useState(false);
+
   async function handleJoinChain() {
 
     const {
@@ -50,6 +54,11 @@ function JoinChainContent() {
       return;
     }
 
+    console.log("BUYER_READY_DEBUG", {
+      nothingToSell,
+      phase: "pre_join_chain_property",
+    });
+
     const {
       data: joinResult,
       error: joinError,
@@ -60,12 +69,26 @@ function JoinChainContent() {
     });
 
     if (joinError) {
+      console.log("BUYER_READY_DEBUG", {
+        nothingToSell,
+        joinResult: null,
+        joinError: joinError.message,
+        joiningRole: null,
+        shouldCreateBuyerReady: false,
+      });
       console.error(joinError);
       alert("Could not join this chain.");
       return;
     }
 
     if (!joinResult?.ok) {
+      console.log("BUYER_READY_DEBUG", {
+        nothingToSell,
+        joinResult,
+        joiningRole: joinResult?.joining_role ?? null,
+        shouldCreateBuyerReady: false,
+      });
+
       if (joinResult?.error === "invalid_access_code") {
         alert("Invalid access code");
         return;
@@ -89,11 +112,79 @@ function JoinChainContent() {
         joinResult.relationship_type as string,
     };
 
+    const joiningRole =
+      joinResult.joining_role as string;
+    const shouldCreateBuyerReady =
+      joiningRole === "buyer" && nothingToSell;
+
+    console.log("BUYER_READY_DEBUG", {
+      nothingToSell,
+      joinResult,
+      joiningRole,
+      shouldCreateBuyerReady,
+    });
+
     if (joinResult.joining_role === "seller") {
       await establishConnectedHopAfterSellerJoinsPurchase(
         supabase,
         property.id
       );
+    }
+
+    if (
+      joinResult.joining_role === "buyer" &&
+      nothingToSell
+    ) {
+      console.log("BUYER_READY_CREATE_START", {
+        chainId: property.chain_id,
+        propertyId: property.id,
+        userId: user.id,
+      });
+
+      let buyerReadyResult;
+
+      try {
+        buyerReadyResult =
+          await ensureBuyerReadyOnJoin(
+            supabase,
+            {
+              chainId: property.chain_id,
+              purchasePropertyId: property.id,
+              userId: user.id,
+            }
+          );
+      } catch (error) {
+        console.error(
+          "BUYER_READY_CREATE_EXCEPTION",
+          error
+        );
+        throw error;
+      }
+
+      console.log("BUYER_READY_CREATE_RESULT", {
+        ok: buyerReadyResult.ok,
+        created:
+          buyerReadyResult.ok
+            ? buyerReadyResult.created
+            : undefined,
+        nodeId:
+          buyerReadyResult.ok &&
+          buyerReadyResult.created
+            ? buyerReadyResult.nodeId
+            : undefined,
+        linkedPropertyId: property.id,
+        error:
+          buyerReadyResult.ok
+            ? undefined
+            : buyerReadyResult.error,
+      });
+
+      if (!buyerReadyResult.ok) {
+        console.error(buyerReadyResult.error);
+        alert(
+          "Join completed, but Buyer Ready could not be recorded. Please contact support."
+        );
+      }
     }
 
     let joinCompleted = false;
@@ -206,6 +297,10 @@ function JoinChainContent() {
       window.location.href =
         `/dashboard?refresh=${Date.now()}`;
     } catch (error) {
+      console.error(
+        "BUYER_READY_JOIN_EXCEPTION",
+        error
+      );
       console.error(error);
 
       if (!joinCompleted) {
@@ -268,6 +363,24 @@ function JoinChainContent() {
             placeholder="Property postcode"
             className="mt-4 w-full border border-slate-300 text-base text-slate-900 rounded-2xl px-4 py-4"
           />
+
+          <label className="mt-6 flex items-center gap-3">
+
+            <input
+              type="checkbox"
+              checked={nothingToSell}
+              onChange={() =>
+                setNothingToSell(
+                  !nothingToSell
+                )
+              }
+            />
+
+            <span className="text-slate-700">
+              I have nothing to sell
+            </span>
+
+          </label>
 
           <button
             onClick={handleJoinChain}

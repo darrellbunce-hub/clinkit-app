@@ -18,6 +18,28 @@ import {
   PAGE_TITLE_INVERTED_CLASS,
   SECTION_TITLE_CLASS,
 } from "@/components/mobileStandards";
+import {
+  BTN_ACCENT_CLASS,
+  BTN_GHOST_DARK_CLASS,
+  BTN_PRIMARY_CLASS,
+  BTN_SECONDARY_OUTLINE_CLASS,
+  FOOTER_BG_CLASS,
+  GLASS_CARD_CLASS,
+  HERO_BADGE_CLASS,
+  HERO_GLOW_PRIMARY_CLASS,
+  HERO_GLOW_SECONDARY_CLASS,
+  HERO_GRADIENT_CLASS,
+  MARKETING_FEATURE_CARD_CLASS,
+  MARKETING_FEATURE_ICON_CLASS,
+  MARKETING_METRIC_CARD_CLASS,
+  MARKETING_SECTION_GLOW_CLASS,
+  MARKETING_STEP_ACCENT_BAR_CLASS,
+  MARKETING_STEP_CARD_CLASS,
+  MARKETING_STEP_NUMBER_CLASS,
+  PAGE_BG_CLASS,
+  SECTION_BG_CLASS,
+  SECTION_CONTENT_CLASS,
+} from "@/lib/theme/themeTokens";
 const steps = [
   {
     number: 1,
@@ -38,34 +60,34 @@ const steps = [
 
 export default function HomePage() {
   return (
-    <main className="min-h-screen bg-slate-100">
+    <main className={PAGE_BG_CLASS}>
       <Navbar />
 
       {/* HERO */}
       <section className="relative overflow-hidden">
 
         {/* Background */}
-        <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950"></div>
+        <div className={`absolute inset-0 ${HERO_GRADIENT_CLASS}`}></div>
 
         <div className="absolute inset-0 opacity-20">
           <svg
             className="w-full h-full"
             xmlns="http://www.w3.org/2000/svg"
           >
-            <line x1="10%" y1="20%" x2="40%" y2="35%" stroke="#3382F6" strokeWidth="1" />
-            <line x1="40%" y1="35%" x2="70%" y2="15%" stroke="#3382F6" strokeWidth="1" />
-            <line x1="70%" y1="15%" x2="90%" y2="30%" stroke="#3382F6" strokeWidth="1" />
+            <line x1="10%" y1="20%" x2="40%" y2="35%" stroke="var(--brand-accent-line)" strokeWidth="1" />
+            <line x1="40%" y1="35%" x2="70%" y2="15%" stroke="var(--brand-accent-line)" strokeWidth="1" />
+            <line x1="70%" y1="15%" x2="90%" y2="30%" stroke="var(--brand-accent-line)" strokeWidth="1" />
 
-            <circle cx="10%" cy="20%" r="3" fill="#38B2F6" />
-            <circle cx="40%" cy="35%" r="3" fill="#38B2F6" />
-            <circle cx="70%" cy="15%" r="3" fill="#38B2F6" />
-            <circle cx="90%" cy="30%" r="3" fill="#38B2F6" />
+            <circle cx="10%" cy="20%" r="3" fill="var(--brand-accent-node)" />
+            <circle cx="40%" cy="35%" r="3" fill="var(--brand-accent-node)" />
+            <circle cx="70%" cy="15%" r="3" fill="var(--brand-accent-node)" />
+            <circle cx="90%" cy="30%" r="3" fill="var(--brand-accent-node)" />
           </svg>
         </div>
 
-        <div className="absolute top-[-200px] right-[-100px] w-[500px] h-[500px] bg-blue-500/20 rounded-full blur-3xl"></div>
+        <div className={HERO_GLOW_PRIMARY_CLASS}></div>
 
-        <div className="absolute bottom-[-200px] left-[-100px] w-[400px] h-[400px] bg-cyan-400/10 rounded-full blur-3xl"></div>
+        <div className={HERO_GLOW_SECONDARY_CLASS}></div>
 
         <div className="relative max-w-6xl mx-auto px-6 py-28">
           <div className="grid lg:grid-cols-2 gap-16 items-center">
@@ -76,7 +98,7 @@ export default function HomePage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.7 }}
             >
-              <div className="inline-flex items-center bg-blue-500/20 text-blue-200 border border-blue-400/30 px-4 py-2 rounded-full text-sm font-semibold">
+              <div className={HERO_BADGE_CLASS}>
                 Live Property Chain Tracking
               </div>
 
@@ -91,14 +113,14 @@ export default function HomePage() {
               <div className="mt-10 flex flex-col sm:flex-row gap-4">
                 <Link
                   href="/start-move"
-                  className="bg-blue-600 hover:bg-blue-500 hover:scale-[1.02] shadow-lg shadow-blue-500/30 text-white px-8 py-5 rounded-2xl font-semibold text-lg transition-all text-center"
+                  className={`${BTN_ACCENT_CLASS} hover:scale-[1.02] px-8 py-5 text-lg text-center`}
                 >
                   Start Your Move
                 </Link>
 
                 <Link
                   href="/join-chain"
-                  className="border border-white/20 bg-white/10 backdrop-blur-xl text-white px-8 py-5 rounded-2xl font-semibold text-lg hover:bg-white/20 transition text-center"
+                  className={`${BTN_GHOST_DARK_CLASS} px-8 py-5 text-lg text-center`}
                 >
                   Join Existing Chain
                 </Link>
@@ -110,7 +132,7 @@ export default function HomePage() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.6, delay: 0.2 }}
-              className="bg-white/10 backdrop-blur-xl rounded-3xl border border-white/10 p-10"
+              className={`${GLASS_CARD_CLASS} p-10`}
             >
               <div className="flex items-center justify-between">
                 <div>
@@ -172,11 +194,11 @@ export default function HomePage() {
       </section>
 
       {/* HOW IT WORKS */}
-      <section className="relative overflow-hidden bg-white border-y border-slate-200">
+      <section className={SECTION_BG_CLASS}>
 
-        <div className="absolute top-[-150px] right-[-100px] w-[400px] h-[400px] bg-blue-100 rounded-full blur-3xl opacity-40"></div>
+        <div className={MARKETING_SECTION_GLOW_CLASS}></div>
 
-        <div className="max-w-6xl mx-auto px-6 py-24">
+        <div className={SECTION_CONTENT_CLASS}>
 
           <div className="text-center">
             <h2 className={MARKETING_SECTION_TITLE_CLASS}>
@@ -194,11 +216,11 @@ export default function HomePage() {
                 key={item.number}
                 whileHover={{ y: -8 }}
                 transition={{ duration: 0.2 }}
-                className="relative overflow-hidden bg-slate-50 rounded-3xl p-8 border border-slate-200 hover:shadow-2xl hover:shadow-blue-100 transition-all duration-300"
+                className={MARKETING_STEP_CARD_CLASS}
               >
-                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-cyan-400"></div>
+                <div className={MARKETING_STEP_ACCENT_BAR_CLASS}></div>
 
-                <div className="w-16 h-16 rounded-2xl bg-blue-100 text-blue-700 flex items-center justify-center text-3xl font-bold">
+                <div className={MARKETING_STEP_NUMBER_CLASS}>
                   {item.number}
                 </div>
 
@@ -230,8 +252,8 @@ export default function HomePage() {
 
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 mt-16">
 
-          <div className="bg-white rounded-3xl border border-slate-200 p-8 hover:-translate-y-2 hover:shadow-2xl hover:shadow-blue-100 transition-all duration-300">
-            <TrendingUp className="w-12 h-12 text-blue-600" />
+          <div className={MARKETING_FEATURE_CARD_CLASS}>
+            <TrendingUp className={MARKETING_FEATURE_ICON_CLASS} />
 
             <h3 className="mt-6 text-2xl font-bold text-slate-900">
               Live Chain Progress
@@ -242,7 +264,7 @@ export default function HomePage() {
             </p>
           </div>
 
-          <div className="bg-white rounded-3xl border border-slate-200 p-8 hover:-translate-y-2 hover:shadow-2xl hover:shadow-blue-100 transition-all duration-300">
+          <div className={MARKETING_FEATURE_CARD_CLASS}>
             <AlertTriangle className="w-12 h-12 text-amber-500" />
 
             <h3 className="mt-6 text-2xl font-bold text-slate-900">
@@ -254,7 +276,7 @@ export default function HomePage() {
             </p>
           </div>
 
-          <div className="bg-white rounded-3xl border border-slate-200 p-8 hover:-translate-y-2 hover:shadow-2xl hover:shadow-blue-100 transition-all duration-300">
+          <div className={MARKETING_FEATURE_CARD_CLASS}>
             <ShieldCheck className="w-12 h-12 text-emerald-600" />
 
             <h3 className="mt-6 text-2xl font-bold text-slate-900">
@@ -266,7 +288,7 @@ export default function HomePage() {
             </p>
           </div>
 
-          <div className="bg-white rounded-3xl border border-slate-200 p-8 hover:-translate-y-2 hover:shadow-2xl hover:shadow-blue-100 transition-all duration-300">
+          <div className={MARKETING_FEATURE_CARD_CLASS}>
             <Home className="w-12 h-12 text-green-700" />
 
             <h3 className="mt-6 text-2xl font-bold text-slate-900">
@@ -278,7 +300,7 @@ export default function HomePage() {
             </p>
           </div>
 
-          <div className="bg-white rounded-3xl border border-slate-200 p-8 hover:-translate-y-2 hover:shadow-2xl hover:shadow-blue-100 transition-all duration-300">
+          <div className={MARKETING_FEATURE_CARD_CLASS}>
             <Zap className="w-12 h-12 text-yellow-500" />
 
             <h3 className="mt-6 text-2xl font-bold text-slate-900">
@@ -290,7 +312,7 @@ export default function HomePage() {
             </p>
           </div>
 
-          <div className="bg-white rounded-3xl border border-slate-200 p-8 hover:-translate-y-2 hover:shadow-2xl hover:shadow-blue-100 transition-all duration-300">
+          <div className={MARKETING_FEATURE_CARD_CLASS}>
             <Smartphone className="w-12 h-12 text-slate-700" />
 
             <h3 className="mt-6 text-2xl font-bold text-slate-900">
@@ -305,12 +327,12 @@ export default function HomePage() {
       </section>
 
       {/* METRICS */}
-      <section className="bg-white border-t border-slate-200">
+      <section className={`${SECTION_BG_CLASS} border-t-0`}>
 
         <div className="max-w-6xl mx-auto px-6 py-14">
           <div className="grid md:grid-cols-4 gap-8 text-center">
 
-            <div className="bg-slate-50 rounded-3xl p-8 border border-slate-200">
+            <div className={MARKETING_METRIC_CARD_CLASS}>
               <h3 className={MARKETING_SECTION_TITLE_CLASS}>
                 24/7
               </h3>
@@ -320,7 +342,7 @@ export default function HomePage() {
               </p>
             </div>
 
-            <div className="bg-slate-50 rounded-3xl p-8 border border-slate-200">
+            <div className={MARKETING_METRIC_CARD_CLASS}>
               <h3 className={MARKETING_SECTION_TITLE_CLASS}>
                 Real-Time
               </h3>
@@ -330,7 +352,7 @@ export default function HomePage() {
               </p>
             </div>
 
-            <div className="bg-slate-50 rounded-3xl p-8 border border-slate-200">
+            <div className={MARKETING_METRIC_CARD_CLASS}>
               <h3 className={MARKETING_SECTION_TITLE_CLASS}>
                 Secure
               </h3>
@@ -340,7 +362,7 @@ export default function HomePage() {
               </p>
             </div>
 
-            <div className="bg-slate-50 rounded-3xl p-8 border border-slate-200">
+            <div className={MARKETING_METRIC_CARD_CLASS}>
               <h3 className={MARKETING_SECTION_TITLE_CLASS}>
                 Chain-Wide
               </h3>
@@ -354,7 +376,7 @@ export default function HomePage() {
       </section>
 
       {/* FAQ */}
-      <section className="bg-slate-50 border-t border-slate-200">
+      <section className="bg-surface-muted border-t border-surface-section-border">
 
         <div className="max-w-5xl mx-auto px-6 py-24">
 
@@ -394,7 +416,7 @@ export default function HomePage() {
             ].map((faq) => (
               <div
                 key={faq.title}
-                className="bg-white rounded-3xl border border-slate-200 p-8 hover:-translate-y-1 hover:shadow-xl transition-all duration-300"
+                className={`${MARKETING_FEATURE_CARD_CLASS} hover:-translate-y-1`}
               >
                 <h3 className="text-2xl font-bold text-slate-900">
                   {faq.title}
@@ -410,7 +432,7 @@ export default function HomePage() {
       </section>
 
       {/* FINAL CTA */}
-      <section className="bg-white border-t border-slate-200">
+      <section className="bg-surface-section border-t border-surface-section-border">
 
         <div className="max-w-5xl mx-auto px-6 py-24 text-center">
 
@@ -426,14 +448,14 @@ export default function HomePage() {
 
             <Link
               href="/start-move"
-              className="bg-slate-900 hover:bg-slate-800 hover:scale-[1.02] transition-all duration-300 text-white px-8 py-5 rounded-2xl font-semibold text-lg"
+              className={`${BTN_PRIMARY_CLASS} hover:scale-[1.02] transition-all duration-300 px-8 py-5 text-lg`}
             >
               Start Your Move
             </Link>
 
             <Link
               href="/join-chain"
-              className="border border-slate-300 text-slate-900 bg-white text-slate-900 px-8 py-5 rounded-2xl font-semibold text-lg hover:bg-slate-50 transition"
+              className={`${BTN_SECONDARY_OUTLINE_CLASS} px-8 py-5 text-lg`}
             >
               Join Existing Chain
             </Link>
@@ -442,7 +464,7 @@ export default function HomePage() {
       </section>
 
       {/* FOOTER */}
-<footer className="bg-slate-950">
+<footer className={FOOTER_BG_CLASS}>
 
 <div className="max-w-6xl mx-auto px-6 py-12">
 

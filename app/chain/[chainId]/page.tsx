@@ -28,9 +28,21 @@ import {
   mapToOperationalProperties,
   resolveOperationalPosition,
 } from "@/lib/operationalPosition";
+import PageHeaderBand from "@/components/theme/PageHeaderBand";
+import {
+  chainAwaitingBuyerConnectorClasses,
+  chainConnectorClasses,
+} from "@/lib/theme/chainViz";
+import {
+  BTN_PRIMARY_CLASS,
+  CARD_CLASS_NO_PADDING,
+  CHAIN_PROGRESS_FILL_CLASS,
+  CHAIN_PROGRESS_TRACK_CLASS,
+  CHAIN_VIZ_CANVAS_CLASS,
+  PAGE_BG_CLASS,
+} from "@/lib/theme/themeTokens";
 import {
   type ChainNodesChainSummary,
-  summaryToBuyerReadyTopologyInput,
 } from "@/lib/chainNodesSummary";
 import { convertSearchingPlaceholder } from "@/lib/searchingPlaceholder";
 import CompletionScheduledBanner from "@/components/CompletionScheduledBanner";
@@ -46,6 +58,63 @@ import {
   isChainInCompletedCompletionMode,
   isChainInScheduledCompletionMode,
 } from "@/lib/completionLifecycle";
+import {
+  findBuyerReadySummaryForAnchor,
+  resolveUpstreamPurchaserState,
+  shouldRenderUpstreamPurchaserBeforeProperty,
+} from "@/lib/resolveUpstreamPurchaser";
+import { BUYER_READY_STAGES } from "@/data/buyerReadyStages";
+import type { OperationalPosition } from "@/lib/operationalPosition";
+
+function resolveOwnerBuyerReadyChainNode(
+  operationalPosition: OperationalPosition | null,
+  chainNodes: {
+    id: number;
+    chain_id: number;
+    node_type: string;
+    linked_property_id?: number | null;
+    stage?: string;
+    status?: string;
+    progress?: number;
+  }[]
+) {
+  if (operationalPosition?.kind !== "buyer_ready") {
+    return null;
+  }
+
+  return (
+    chainNodes.find(
+      (node) => node.id === operationalPosition.nodeId
+    ) ?? null
+  );
+}
+
+function resolveOwnerBuyerReadyStageLabel(
+  node: { stage?: string } | null,
+  summary: ChainNodesChainSummary | null
+): string {
+  if (summary?.public_stage_label) {
+    return summary.public_stage_label;
+  }
+
+  const stageDefinition = BUYER_READY_STAGES.find(
+    (stage) => stage.value === node?.stage
+  );
+
+  if (stageDefinition) {
+    return stageDefinition.label;
+  }
+
+  if (node?.stage) {
+    return node.stage
+      .replaceAll("_", " ")
+      .replace(/\b\w/g, (character) =>
+        character.toUpperCase()
+      );
+  }
+
+  return "Buyer Ready";
+}
 
 export default function ChainPage() {
 
@@ -65,14 +134,14 @@ export default function ChainPage() {
       confirmChainCompletion,
     } = useChain();
     const [
-      buyerReadySummary,
-      setBuyerReadySummary,
-    ] = useState<ChainNodesChainSummary | null>(
-      null
+      buyerReadySummaries,
+      setBuyerReadySummaries,
+    ] = useState<ChainNodesChainSummary[]>(
+      []
     );
     useEffect(() => {
 
-      async function loadBuyerReadySummary() {
+      async function loadBuyerReadySummaries() {
     
         const {
           data: summaryData,
@@ -82,28 +151,26 @@ export default function ChainPage() {
         .select("*")
           .eq("chain_id", Number(chainId))
           .eq("node_type", "buyer_ready")
-          .order("position")
-          .limit(1)
-          .maybeSingle();
+          .order("position");
     
         if (!summaryError && summaryData) {
     
-          setBuyerReadySummary(summaryData);
+          setBuyerReadySummaries(summaryData);
     
         } else {
     
-          setBuyerReadySummary(null);
+          setBuyerReadySummaries([]);
     
         }
     
         console.log(
-          "BUYER READY SUMMARY",
+          "BUYER READY SUMMARIES",
           summaryData,
           summaryError
         );
       }
     
-      loadBuyerReadySummary();
+      loadBuyerReadySummaries();
     
     }, [chainId]);
     console.log("CHAIN ID", chainId);
@@ -127,21 +194,45 @@ export default function ChainPage() {
           a.chainPosition -
           b.chainPosition
       );
-  const buyerReadyTopologyInput =
-    buyerReadySummary
-      ? summaryToBuyerReadyTopologyInput(
-          buyerReadySummary
-        )
-      : null;
 
+  const chainPropertiesLooseMatch =
+    properties.filter(
+      (property) =>
+        Number(property.chainId) ===
+        Number(chainId)
+    );
+
+  console.log("OPERATIONAL_POSITION_TIMING", {
+    phase:
+      chainProperties.length > 0
+        ? "chainProperties_loaded"
+        : "chainProperties_empty",
+    propertiesCount: properties.length,
+    chainPropertiesCount: chainProperties.length,
+    chainPropertiesLooseMatchCount:
+      chainPropertiesLooseMatch.length,
+    chainIdStrictFilterMismatch:
+      chainPropertiesLooseMatch.length > 0 &&
+      chainProperties.length === 0,
+    chainId,
+    chainIdType: typeof chainId,
+    currentUserId: currentUserId ?? null,
+    buyerReadySummariesCount:
+      buyerReadySummaries.length,
+  });
+
+  console.log(
+    "CHAIN_PROPERTIES_COUNT",
+    chainProperties.length
+  );
   const topology = buildChainTopology(
     chainProperties,
-    buyerReadyTopologyInput
+    null
   );
 
   console.log(
-    "CHAIN PAGE BUYER READY SUMMARY",
-    buyerReadySummary
+    "CHAIN PAGE BUYER READY SUMMARIES",
+    buyerReadySummaries
   );
 
       const recentActivities =
@@ -203,7 +294,57 @@ export default function ChainPage() {
     isScheduledCompletionMode ||
     isCompletedCompletionMode;
 
+  const operationalPositionResult =
+    resolveOperationalPosition(
+      currentUserId,
+      chainId,
+      chainProperties,
+      chainNodes
+    );
+
+  console.log(
+    "OPERATIONAL_POSITION_RESULT",
+    operationalPositionResult
+  );
+
+  if (operationalPositionResult.ambiguity) {
+    console.warn(
+      "Operational position ambiguity",
+      operationalPositionResult.ambiguity,
+      chainId,
+      currentUserId
+    );
+  }
+
+  const operationalPosition =
+    operationalPositionResult.position;
+
+  const ownerOperationalBuyerReadyNode =
+    resolveOwnerBuyerReadyChainNode(
+      operationalPosition,
+      chainNodes
+    );
+
+  const ownerOperationalBuyerReadySummary =
+    ownerOperationalBuyerReadyNode
+      ? buyerReadySummaries.find(
+          (summary) =>
+            summary.id ===
+            ownerOperationalBuyerReadyNode.id
+        ) ?? null
+      : null;
+
+  const ownerBuyerReadyLinkedPropertyId =
+    ownerOperationalBuyerReadyNode?.linked_property_id ??
+    ownerOperationalBuyerReadySummary?.linked_property_id ??
+    null;
+
+  const showOwnerOperationalBuyerReady =
+    operationalPosition?.kind === "buyer_ready" &&
+    ownerOperationalBuyerReadyNode != null;
+
   const buyerReadyNode =
+    ownerOperationalBuyerReadyNode ??
     chainNodes.find(
       (node) =>
         Number(node.chain_id) ===
@@ -214,10 +355,115 @@ export default function ChainPage() {
   const buyerReadyActivities =
     buyerReadyNode?.activities ?? [];
 
+  const saleOperationalPropertyId =
+    operationalPosition?.kind === "sale"
+      ? operationalPosition.propertyId
+      : null;
+
+  console.log(
+    "SALE_OPERATIONAL_PROPERTY_ID",
+    saleOperationalPropertyId
+  );
+
+  const buyerReadyForAnchor =
+    findBuyerReadySummaryForAnchor(
+      buyerReadySummaries,
+      saleOperationalPropertyId
+    );
+
+  console.log("BUYER_READY_ANCHOR_DEBUG", {
+    phase:
+      chainProperties.length > 0
+        ? "chainProperties_loaded"
+        : "chainProperties_empty",
+    propertiesCount: properties.length,
+    chainPropertiesCount: chainProperties.length,
+    currentUserId: currentUserId ?? null,
+    insertedLinkedPropertyId:
+      buyerReadySummaries[0]?.linked_property_id ?? null,
+    insertedLinkedPropertyIdType:
+      buyerReadySummaries[0]?.linked_property_id != null
+        ? typeof buyerReadySummaries[0].linked_property_id
+        : null,
+    operationalSalePropertyId:
+      saleOperationalPropertyId,
+    operationalSalePropertyIdType:
+      saleOperationalPropertyId != null
+        ? typeof saleOperationalPropertyId
+        : null,
+    operationalPositionKind:
+      operationalPosition?.kind ?? null,
+    operationalPositionPropertyId:
+      operationalPosition?.kind === "sale"
+        ? operationalPosition.propertyId
+        : null,
+    summaryLinkedPropertyIds:
+      buyerReadySummaries.map(
+        (summary) => summary.linked_property_id
+      ),
+    strictComparisons:
+      buyerReadySummaries.map((summary) => ({
+        summaryLinkedPropertyId:
+          summary.linked_property_id,
+        operationalSalePropertyId:
+          saleOperationalPropertyId,
+        strictEquals:
+          summary.linked_property_id ===
+          saleOperationalPropertyId,
+        numberEquals:
+          Number(summary.linked_property_id) ===
+          Number(saleOperationalPropertyId),
+        typeofSummaryLinked:
+          typeof summary.linked_property_id,
+        typeofOperationalSale:
+          typeof saleOperationalPropertyId,
+      })),
+    buyerReadyForAnchorId:
+      buyerReadyForAnchor?.id ?? null,
+    sellerHopProperties:
+      chainProperties
+        .filter(
+          (property) =>
+            property.currentUserRole ===
+              "seller" &&
+            property.isOwnProperty
+        )
+        .map((property) => ({
+          id: property.id,
+          idType: typeof property.id,
+          relationship_type:
+            property.relationship_type,
+          chainPosition:
+            property.chainPosition,
+          buyer_connected:
+            property.buyer_connected,
+        })),
+  });
+
+  const buyerReadySummaryForIntelligence =
+    buyerReadyForAnchor ??
+    buyerReadySummaries[0] ??
+    null;
+
+  const upstreamPurchaser =
+    resolveUpstreamPurchaserState({
+      operationalSalePropertyId:
+        saleOperationalPropertyId,
+      chainProperties: chainProperties.map(
+        (property) => ({
+          id: property.id,
+          buyer_connected:
+            property.buyer_connected,
+        })
+      ),
+      buyerReadyForAnchor,
+    });
+
   const intelligence =
     computeChainIntelligence({
       chainProperties,
-      buyerReadySummary,
+      buyerReadySummary:
+        buyerReadySummaryForIntelligence,
       buyerReadyActivities,
       stages: STAGES,
       scheduledCompletionMode:
@@ -241,31 +487,6 @@ export default function ChainPage() {
     "CHAIN TOPOLOGY",
     topology
   );
-
-  const operationalPositionResult =
-    resolveOperationalPosition(
-      currentUserId,
-      chainId,
-      chainProperties,
-      chainNodes
-    );
-
-  const operationalPosition =
-    operationalPositionResult.position;
-
-  if (operationalPositionResult.ambiguity) {
-    console.warn(
-      "Operational position ambiguity",
-      operationalPositionResult.ambiguity,
-      chainId,
-      currentUserId
-    );
-  }
-
-  const saleOperationalPropertyId =
-    operationalPosition?.kind === "sale"
-      ? operationalPosition.propertyId
-      : null;
 
   const searchingPlaceholderLinkedFromSale =
     saleOperationalPropertyId
@@ -449,9 +670,10 @@ export default function ChainPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-100">
+    <main className={PAGE_BG_CLASS}>
 
       <Navbar />
+      <PageHeaderBand />
 
       <div className="max-w-6xl mx-auto px-6 py-12">
 
@@ -498,7 +720,7 @@ export default function ChainPage() {
           )}
 
           {!isCompletedCompletionMode && (
-          <div className={`mt-8 bg-white rounded-3xl border border-slate-200 ${CARD_PADDING_CLASS}`}>
+          <div className={`mt-8 ${CARD_CLASS_NO_PADDING} ${CARD_PADDING_CLASS}`}>
 
 <div className="flex items-center gap-4">
 
@@ -563,7 +785,7 @@ export default function ChainPage() {
         {!isCompletedCompletionMode && (
         <>
         {/* Progress */}
-        <div className={`mt-10 bg-white rounded-3xl shadow-sm border border-slate-200 ${CARD_PADDING_CLASS}`}>
+        <div className={`mt-10 ${CARD_CLASS_NO_PADDING} ${CARD_PADDING_CLASS}`}>
 
           <MobilePanelHeader
             aside={
@@ -581,10 +803,10 @@ export default function ChainPage() {
             </p>
           </MobilePanelHeader>
 
-          <div className="mt-8 w-full h-6 bg-slate-200 rounded-full overflow-hidden">
+          <div className={`mt-8 ${CHAIN_PROGRESS_TRACK_CLASS}`}>
 
             <div
-              className="h-full bg-green-500 rounded-full"
+              className={CHAIN_PROGRESS_FILL_CLASS}
               style={{
                 width: `${averageProgress}%`,
               }}
@@ -595,7 +817,7 @@ export default function ChainPage() {
         </div>
 
         {/* Confidence */}
-        <div className={`mt-10 bg-white rounded-3xl shadow-sm border border-slate-200 ${CARD_PADDING_CLASS}`}>
+        <div className={`mt-10 ${CARD_CLASS_NO_PADDING} ${CARD_PADDING_CLASS}`}>
 
           <MobilePanelHeader
             aside={
@@ -627,7 +849,7 @@ export default function ChainPage() {
 {!isCompletionLifecycleFrozen && (
 <>
 {/* Estimated Chain Completion */}
-<div className={`mt-10 bg-white rounded-3xl shadow-sm border border-slate-200 ${CARD_PADDING_CLASS}`}>
+<div className={`mt-10 ${CARD_CLASS_NO_PADDING} ${CARD_PADDING_CLASS}`}>
 
   <MobilePanelHeader
     aside={
@@ -653,7 +875,7 @@ export default function ChainPage() {
 {/* Chain Bottleneck */}
 {bottleneckProperty && (
 
-<div className={`mt-10 bg-white rounded-3xl shadow-sm border border-slate-200 ${CARD_PADDING_CLASS}`}>
+<div className={`mt-10 ${CARD_CLASS_NO_PADDING} ${CARD_PADDING_CLASS}`}>
 
   <MobilePanelHeader
     aside={
@@ -708,57 +930,62 @@ export default function ChainPage() {
 
         {/* Chain */}
         <div
-          className={`mt-12 bg-white rounded-3xl shadow-sm border border-slate-200 ${CARD_PADDING_CLASS}`}
+          className={`mt-12 ${CARD_CLASS_NO_PADDING} ${CARD_PADDING_CLASS}`}
         >
           <MobileChainScrollRegion>
-            <div className="flex items-center min-w-max pr-4 md:pr-0">
-{topology.buyerReadyPrefix && (
+            <div className={`${CHAIN_VIZ_CANVAS_CLASS} flex items-center min-w-max pr-4 md:pr-0`}>
+  {showOwnerOperationalBuyerReady &&
+    ownerOperationalBuyerReadyNode && (
 
-<div className="flex items-center">
+    <div className="flex items-center">
 
-<Link
-  href={`/buyer-ready/${chainId}`}
-  className="hover:scale-105 transition"
->
+      <Link
+        href={`/buyer-ready/${chainId}`}
+        className="hover:scale-105 transition"
+      >
 
-    <ChainNode
-  propertyNumber={0}
-  displayTitle={CHAIN_TILE_LABEL.buyerReady}
-  stageLabel={
-    topology.buyerReadyPrefix.stageLabel
-  }
-  progress={
-    topology.buyerReadyPrefix.node.progress
-  }
-  updatedDaysAgo={0}
-  currentUserRole="buyer"
-  status={
-    topology.buyerReadyPrefix.node.status
-  }
-  buyer_connected={true}
-  seller_connected={true}
-  isOperationalPosition={
-    operationalPosition?.kind ===
-    "buyer_ready"
-  }
-  positionKind="buyer_ready"
-/>
+        <ChainNode
+          propertyNumber={0}
+          displayTitle={
+            CHAIN_TILE_LABEL.buyerReady
+          }
+          stageLabel={resolveOwnerBuyerReadyStageLabel(
+            ownerOperationalBuyerReadyNode,
+            ownerOperationalBuyerReadySummary
+          )}
+          progress={
+            ownerOperationalBuyerReadyNode.progress ??
+            ownerOperationalBuyerReadySummary?.progress ??
+            0
+          }
+          updatedDaysAgo={0}
+          currentUserRole="buyer"
+          status={
+            ownerOperationalBuyerReadyNode.status ??
+            ownerOperationalBuyerReadySummary?.status ??
+            "healthy"
+          }
+          buyer_connected={true}
+          seller_connected={true}
+          isOperationalPosition={true}
+          positionKind="buyer_ready"
+        />
 
-</Link>
+      </Link>
 
-  <div className="flex items-center mx-5">
+      <div className="flex items-center mx-5">
 
-    <div
-      className="
-        w-24 h-1 rounded-full bg-green-400
-      "
-    />
+        <div
+          className={chainConnectorClasses(
+            "connected"
+          )}
+        />
 
-  </div>
+      </div>
 
-</div>
+    </div>
 
-)}
+  )}
   {topology.segments.map((segment, segmentIndex) => {
 
     const segmentGapState =
@@ -842,12 +1069,7 @@ export default function ChainPage() {
           <div className="flex items-center mx-5">
 
             <div
-              className="
-                w-24
-                h-1
-                rounded-full
-                bg-green-400
-              "
+              className={chainConnectorClasses("connected")}
             />
 
           </div>
@@ -869,10 +1091,23 @@ export default function ChainPage() {
       operationalPosition.propertyId ===
         property.id;
 
-    const displayTitle = getChainTileDisplayTitle(
-      property,
-      isOperationalPosition
-    );
+    const showUpstreamPurchaserBeforeSale =
+      shouldRenderUpstreamPurchaserBeforeProperty(
+        upstreamPurchaser,
+        property.id,
+        isOperationalPosition
+      );
+
+    const displayTitle =
+      ownerBuyerReadyLinkedPropertyId !=
+        null &&
+      Number(property.id) ===
+        Number(ownerBuyerReadyLinkedPropertyId)
+        ? CHAIN_TILE_LABEL.connectedPurchase
+        : getChainTileDisplayTitle(
+            property,
+            isOperationalPosition
+          );
 
     let displayStage = "In Progress";
 
@@ -905,6 +1140,84 @@ export default function ChainPage() {
         key={property.id}
         className="flex items-center"
       >
+
+        {showUpstreamPurchaserBeforeSale &&
+          upstreamPurchaser?.kind ===
+            "awaiting_buyer" && (
+
+          <div
+            className="flex items-center"
+            aria-label="Awaiting buyer, no purchaser connected yet"
+          >
+
+            <ChainNode
+              propertyNumber={0}
+              displayTitle={
+                CHAIN_TILE_LABEL.awaitingBuyer
+              }
+              stageLabel="No purchaser connected yet"
+              progress={0}
+              updatedDaysAgo={0}
+              currentUserRole={null}
+              status="pending_connection"
+              buyer_connected={false}
+              seller_connected={false}
+              positionKind="awaiting_buyer"
+            />
+
+            <div className="flex items-center mx-5">
+
+              <div
+                className={chainAwaitingBuyerConnectorClasses()}
+              />
+
+            </div>
+
+          </div>
+
+        )}
+
+        {showUpstreamPurchaserBeforeSale &&
+          upstreamPurchaser?.kind ===
+            "buyer_ready" && (
+
+          <div
+            className="flex items-center"
+            aria-label="Buyer ready, ready to proceed"
+          >
+
+            <ChainNode
+              propertyNumber={0}
+              displayTitle={
+                CHAIN_TILE_LABEL.buyerReady
+              }
+              stageLabel="Ready to proceed"
+              progress={
+                upstreamPurchaser.summary.progress
+              }
+              updatedDaysAgo={0}
+              currentUserRole={null}
+              status={
+                upstreamPurchaser.summary.status
+              }
+              buyer_connected={true}
+              seller_connected={true}
+              positionKind="buyer_ready"
+            />
+
+            <div className="flex items-center mx-5">
+
+              <div
+                className={chainConnectorClasses(
+                  "connected"
+                )}
+              />
+
+            </div>
+
+          </div>
+
+        )}
 
         {searchingPlaceholder ? (
 
@@ -1002,19 +1315,13 @@ export default function ChainPage() {
           <div className="flex items-center mx-5">
 
             <div
-              className={`
-                w-24 h-1 rounded-full
-
-                ${
-                  linkGapState === "connected"
-                    ? "bg-green-400"
-
-                    : linkGapState === "broken"
-                    ? "bg-red-400"
-
-                    : "bg-amber-400"
-                }
-              `}
+              className={chainConnectorClasses(
+                linkGapState === "connected"
+                  ? "connected"
+                  : linkGapState === "broken"
+                  ? "broken"
+                  : "awaiting"
+              )}
             />
 
           </div>
@@ -1143,7 +1450,7 @@ export default function ChainPage() {
 
 </div>
         {activeSearchingPlaceholder && (
-        <div className={`mt-10 bg-white rounded-3xl border border-slate-200 ${CARD_PADDING_CLASS}`}>
+        <div className={`mt-10 ${CARD_CLASS_NO_PADDING} ${CARD_PADDING_CLASS}`}>
 
           <h2 className="text-2xl font-bold text-slate-900">
             Add Onward Purchase
@@ -1179,7 +1486,7 @@ export default function ChainPage() {
 
           <button
             onClick={handleAddProperty}
-            className="mt-6 bg-slate-900 text-white px-6 py-4 rounded-2xl font-semibold"
+            className={`mt-6 ${BTN_PRIMARY_CLASS} px-6 py-4`}
           >
             Add Property
           </button>
@@ -1194,7 +1501,7 @@ export default function ChainPage() {
                 }
               />
             ) : (
-              <div className={`bg-white rounded-3xl shadow-sm border border-slate-200 ${CARD_PADDING_CLASS}`}>
+              <div className={`${CARD_CLASS_NO_PADDING} ${CARD_PADDING_CLASS}`}>
                 <h2 className="text-2xl font-bold text-slate-900">
                   Estate Agent
                 </h2>

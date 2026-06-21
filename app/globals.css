@@ -1,19 +1,271 @@
 @import "tailwindcss";
 
-:root {
+/* ─── Theme A: Current Keynetic (default — production unchanged) ─── */
+:root,
+[data-brand-theme="keynetic"] {
+  --brand-primary: #0f172a;
+  --brand-primary-hover: #1e293b;
+  --brand-secondary: #2563eb;
+  --brand-on-primary: #ffffff;
+  --brand-on-secondary: #ffffff;
+  --brand-accent: #2563eb;
+  --brand-accent-hover: #3b82f6;
+  --brand-on-accent: #ffffff;
+  --brand-link: #2563eb;
+  --brand-link-hover: #1d4ed8;
+  --brand-header: rgb(2 6 23 / 0.8);
+  --brand-header-solid: rgb(2 6 23 / 0.95);
+  --brand-header-border: rgb(255 255 255 / 0.1);
+  --brand-header-link: #cbd5e1;
+  --brand-header-link-hover: #ffffff;
+  --brand-hero-from: #020617;
+  --brand-hero-via: #0f172a;
+  --brand-hero-to: #172554;
+  --brand-glow-primary: rgb(59 130 246 / 0.2);
+  --brand-glow-secondary: rgb(34 211 238 / 0.1);
+  --brand-accent-line: #3382f6;
+  --brand-accent-node: #38b2f6;
+  --brand-badge-bg: rgb(59 130 246 / 0.2);
+  --brand-badge-text: #bfdbfe;
+  --brand-badge-border: rgb(96 165 250 / 0.3);
+  --brand-logo-dark: #ffffff;
+  --brand-logo-tagline-dark: #94a3b8;
+  --brand-logo-light: #0f172a;
+  --brand-logo-tagline-light: #64748b;
+  --brand-operational: #2563eb;
+  --brand-operational-soft: #dbeafe;
+  --brand-info-bg: #eff6ff;
+  --brand-info-border: #bfdbfe;
+  --brand-info-text: #1d4ed8;
+  --surface-page: #f1f5f9;
+  --surface-section: #ffffff;
+  --surface-section-border: #e2e8f0;
+  --surface-muted: #f8fafc;
+  --surface-panel: #f1f5f9;
+  --surface-panel-hover: #e2e8f0;
+  --surface-inset: #f8fafc;
+  --surface-divider: #e2e8f0;
+  --surface-card: #ffffff;
+  --surface-card-border: #e2e8f0;
+  --chain-viz-canvas: #f4f7fb;
+  --chain-progress-track: #e2e8f0;
+  --chain-progress-fill: #22c55e;
+  --chain-connector-healthy: #4ade80;
+  --chain-connector-neutral: #cbd5e1;
+  --marketing-section-glow: rgb(219 234 254 / 0.45);
+  --marketing-step-bg: #f8fafc;
+  --marketing-step-border: #e2e8f0;
+  --marketing-step-accent-from: #3b82f6;
+  --marketing-step-accent-to: #22d3ee;
+  --marketing-step-number-bg: #dbeafe;
+  --marketing-step-number-text: #1d4ed8;
+  --marketing-feature-shadow: rgb(191 219 254 / 0.55);
+  --marketing-feature-icon: #2563eb;
+  --marketing-metric-bg: #f8fafc;
+  --footer-bg: #020617;
+  --footer-border: #1e293b;
   --background: #ffffff;
   --foreground: #171717;
+}
+
+/* ─── Theme B: Teal & Mimosa ─── */
+[data-brand-theme="teal-mimosa"] {
+  --brand-primary: #00555a;
+  --brand-primary-hover: #004448;
+  --brand-secondary: #ffc94b;
+  --brand-on-primary: #ffffff;
+  --brand-on-secondary: #003d42;
+  --brand-accent: #ffc94b;
+  --brand-accent-hover: #f5bc38;
+  --brand-on-accent: #003d42;
+  --brand-link: #00555a;
+  --brand-link-hover: #004448;
+  --brand-header: rgb(0 40 43 / 0.88);
+  --brand-header-solid: rgb(0 40 43 / 0.96);
+  --brand-header-border: rgb(255 201 75 / 0.15);
+  --brand-header-link: #b8d4d6;
+  --brand-header-link-hover: #ffc94b;
+  --brand-hero-from: #002428;
+  --brand-hero-via: #00555a;
+  --brand-hero-to: #003840;
+  --brand-glow-primary: rgb(255 201 75 / 0.22);
+  --brand-glow-secondary: rgb(0 85 90 / 0.35);
+  --brand-accent-line: #ffc94b;
+  --brand-accent-node: #ffe08a;
+  --brand-badge-bg: rgb(255 201 75 / 0.15);
+  --brand-badge-text: #ffe08a;
+  --brand-badge-border: rgb(255 201 75 / 0.35);
+  --brand-logo-dark: #ffffff;
+  --brand-logo-tagline-dark: #ffc94b;
+  --brand-logo-light: #00555a;
+  --brand-logo-tagline-light: #64748b;
+  --brand-operational: #00555a;
+  --brand-operational-soft: rgb(255 201 75 / 0.35);
+  --brand-info-bg: rgb(255 201 75 / 0.12);
+  --brand-info-border: rgb(255 201 75 / 0.4);
+  --brand-info-text: #004448;
+  --surface-page: #dcefee;
+  --surface-section: #ebf6f6;
+  --surface-section-border: #a8cccf;
+  --surface-muted: #cfe8e9;
+  --surface-panel: #bddddd;
+  --surface-panel-hover: #a8cccf;
+  --surface-inset: #d4eded;
+  --surface-divider: #a8cccf;
+  --surface-card: #ffffff;
+  --surface-card-border: #94b8bb;
+  --chain-viz-canvas: #d4eded;
+  --chain-progress-track: #b8d4d6;
+  --chain-progress-fill: #00555a;
+  --chain-connector-healthy: #00555a;
+  --chain-connector-neutral: #94b8bb;
+  --marketing-section-glow: rgb(255 201 75 / 0.35);
+  --marketing-step-bg: #f0faf9;
+  --marketing-step-border: #a8cccf;
+  --marketing-step-accent-from: #00555a;
+  --marketing-step-accent-to: #ffc94b;
+  --marketing-step-number-bg: rgb(255 201 75 / 0.45);
+  --marketing-step-number-text: #004448;
+  --marketing-feature-shadow: rgb(255 201 75 / 0.45);
+  --marketing-feature-icon: #00555a;
+  --marketing-metric-bg: #ebf6f6;
+  --footer-bg: #002428;
+  --footer-border: #004448;
+}
+
+/* ─── Theme C: Butter & Green ─── */
+[data-brand-theme="butter-green"] {
+  --brand-primary: #013e37;
+  --brand-primary-hover: #012922;
+  --brand-secondary: #ffefb3;
+  --brand-on-primary: #ffffff;
+  --brand-on-secondary: #013e37;
+  --brand-accent: #ffefb3;
+  --brand-accent-hover: #f5e59a;
+  --brand-on-accent: #013e37;
+  --brand-link: #013e37;
+  --brand-link-hover: #012922;
+  --brand-header: rgb(1 30 27 / 0.88);
+  --brand-header-solid: rgb(1 30 27 / 0.96);
+  --brand-header-border: rgb(255 239 179 / 0.15);
+  --brand-header-link: #c5d9d6;
+  --brand-header-link-hover: #ffefb3;
+  --brand-hero-from: #011f1b;
+  --brand-hero-via: #013e37;
+  --brand-hero-to: #025a50;
+  --brand-glow-primary: rgb(255 239 179 / 0.25);
+  --brand-glow-secondary: rgb(1 62 55 / 0.35);
+  --brand-accent-line: #ffefb3;
+  --brand-accent-node: #fff5d6;
+  --brand-badge-bg: rgb(255 239 179 / 0.15);
+  --brand-badge-text: #fff5d6;
+  --brand-badge-border: rgb(255 239 179 / 0.35);
+  --brand-logo-dark: #ffffff;
+  --brand-logo-tagline-dark: #ffefb3;
+  --brand-logo-light: #013e37;
+  --brand-logo-tagline-light: #64748b;
+  --brand-operational: #013e37;
+  --brand-operational-soft: rgb(255 239 179 / 0.4);
+  --brand-info-bg: rgb(255 239 179 / 0.2);
+  --brand-info-border: rgb(255 239 179 / 0.45);
+  --brand-info-text: #012922;
+  --surface-page: #ede9d8;
+  --surface-section: #f7f4e8;
+  --surface-section-border: #c5d4b8;
+  --surface-muted: #e8f0dc;
+  --surface-panel: #dce8cc;
+  --surface-panel-hover: #c5d4b8;
+  --surface-inset: #eef5e0;
+  --surface-divider: #c5d4b8;
+  --surface-card: #ffffff;
+  --surface-card-border: #a8bf98;
+  --chain-viz-canvas: #e8f0dc;
+  --chain-progress-track: #c5d4b8;
+  --chain-progress-fill: #013e37;
+  --chain-connector-healthy: #013e37;
+  --chain-connector-neutral: #a8bf98;
+  --marketing-section-glow: rgb(255 239 179 / 0.4);
+  --marketing-step-bg: #faf7ed;
+  --marketing-step-border: #c5d4b8;
+  --marketing-step-accent-from: #013e37;
+  --marketing-step-accent-to: #ffefb3;
+  --marketing-step-number-bg: rgb(255 239 179 / 0.55);
+  --marketing-step-number-text: #013e37;
+  --marketing-feature-shadow: rgb(255 239 179 / 0.5);
+  --marketing-feature-icon: #013e37;
+  --marketing-metric-bg: #f7f4e8;
+  --footer-bg: #011f1b;
+  --footer-border: #013e37;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-brand-primary: var(--brand-primary);
+  --color-brand-primary-hover: var(--brand-primary-hover);
+  --color-brand-secondary: var(--brand-secondary);
+  --color-brand-on-primary: var(--brand-on-primary);
+  --color-brand-on-secondary: var(--brand-on-secondary);
+  --color-brand-accent: var(--brand-accent);
+  --color-brand-accent-hover: var(--brand-accent-hover);
+  --color-brand-on-accent: var(--brand-on-accent);
+  --color-brand-link: var(--brand-link);
+  --color-brand-link-hover: var(--brand-link-hover);
+  --color-brand-header: var(--brand-header);
+  --color-brand-header-solid: var(--brand-header-solid);
+  --color-brand-header-border: var(--brand-header-border);
+  --color-brand-header-link: var(--brand-header-link);
+  --color-brand-header-link-hover: var(--brand-header-link-hover);
+  --color-brand-hero-from: var(--brand-hero-from);
+  --color-brand-hero-via: var(--brand-hero-via);
+  --color-brand-hero-to: var(--brand-hero-to);
+  --color-brand-glow-primary: var(--brand-glow-primary);
+  --color-brand-glow-secondary: var(--brand-glow-secondary);
+  --color-brand-badge-bg: var(--brand-badge-bg);
+  --color-brand-badge-text: var(--brand-badge-text);
+  --color-brand-badge-border: var(--brand-badge-border);
+  --color-brand-logo-dark: var(--brand-logo-dark);
+  --color-brand-logo-tagline-dark: var(--brand-logo-tagline-dark);
+  --color-brand-logo-light: var(--brand-logo-light);
+  --color-brand-logo-tagline-light: var(--brand-logo-tagline-light);
+  --color-brand-operational: var(--brand-operational);
+  --color-brand-operational-soft: var(--brand-operational-soft);
+  --color-brand-info-bg: var(--brand-info-bg);
+  --color-brand-info-border: var(--brand-info-border);
+  --color-brand-info-text: var(--brand-info-text);
+  --color-surface-page: var(--surface-page);
+  --color-surface-section: var(--surface-section);
+  --color-surface-section-border: var(--surface-section-border);
+  --color-surface-muted: var(--surface-muted);
+  --color-surface-panel: var(--surface-panel);
+  --color-surface-panel-hover: var(--surface-panel-hover);
+  --color-surface-inset: var(--surface-inset);
+  --color-surface-divider: var(--surface-divider);
+  --color-surface-card: var(--surface-card);
+  --color-surface-card-border: var(--surface-card-border);
+  --color-chain-viz-canvas: var(--chain-viz-canvas);
+  --color-chain-progress-track: var(--chain-progress-track);
+  --color-chain-progress-fill: var(--chain-progress-fill);
+  --color-chain-connector-healthy: var(--chain-connector-healthy);
+  --color-chain-connector-neutral: var(--chain-connector-neutral);
+  --color-marketing-section-glow: var(--marketing-section-glow);
+  --color-marketing-step-bg: var(--marketing-step-bg);
+  --color-marketing-step-border: var(--marketing-step-border);
+  --color-marketing-step-accent-from: var(--marketing-step-accent-from);
+  --color-marketing-step-accent-to: var(--marketing-step-accent-to);
+  --color-marketing-step-number-bg: var(--marketing-step-number-bg);
+  --color-marketing-step-number-text: var(--marketing-step-number-text);
+  --color-marketing-feature-shadow: var(--marketing-feature-shadow);
+  --color-marketing-feature-icon: var(--marketing-feature-icon);
+  --color-marketing-metric-bg: var(--marketing-metric-bg);
+  --color-footer-bg: var(--footer-bg);
+  --color-footer-border: var(--footer-border);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-brand-theme]) {
     --background: #0a0a0a;
     --foreground: #ededed;
   }
@@ -23,4 +275,8 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+[data-brand-theme] {
+  color-scheme: light;
 }

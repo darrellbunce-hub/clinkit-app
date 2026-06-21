@@ -1,3 +1,4 @@
+import { AppThemeShell } from "@/components/theme/AppThemeShell";
 import { ChainProvider } from "@/context/ChainContext";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
@@ -31,6 +32,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      data-brand-theme="keynetic"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body
@@ -42,9 +44,11 @@ export default function RootLayout({
   `}
 >
 
-<ChainProvider>
-  {children}
-</ChainProvider>
+<AppThemeShell>
+  <ChainProvider>
+    {children}
+  </ChainProvider>
+</AppThemeShell>
 </body>
     </html>
   );

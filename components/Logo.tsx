@@ -1,12 +1,24 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
+
+import {
+  LOGO_ACCENT_BAR_CLASS,
+  LOGO_TAGLINE_DARK_CLASS,
+  LOGO_TAGLINE_LIGHT_CLASS,
+  LOGO_WORDMARK_DARK_CLASS,
+  LOGO_WORDMARK_LIGHT_CLASS,
+} from "@/lib/theme/themeTokens";
 
 export type LogoVariant = "dark" | "light";
 
 /**
  * Logo wordmark variant:
- * - `dark` — for dark headers/backgrounds (white wordmark)
- * - `light` — for light headers/backgrounds (slate wordmark)
+ * - `dark` — for dark headers/backgrounds
+ * - `light` — for light headers/backgrounds
+ *
+ * Wordmark and tagline colours follow the active brand theme via CSS variables.
  */
 export default function Logo({
   href = "/",
@@ -20,24 +32,30 @@ export default function Logo({
   return (
     <Link
       href={href}
-      className="flex items-center gap-2 sm:gap-3 lg:gap-4 shrink-0 min-w-0"
+      className="flex items-center gap-2 sm:gap-3 lg:gap-4 shrink-0 min-w-0 group"
       aria-label="Keynetic home"
     >
-      <div
-        className="
-          relative
-          w-12 h-12
-          sm:w-16 sm:h-16
-          lg:w-20 lg:h-20
-          shrink-0
-        "
-      >
-        <Image
-          src="/logo.png"
-          alt=""
-          fill
-          className="object-contain"
-          priority
+      <div className="relative shrink-0">
+        <div
+          className="
+            relative
+            w-12 h-12
+            sm:w-16 sm:h-16
+            lg:w-20 lg:h-20
+          "
+        >
+          <Image
+            src="/logo.png"
+            alt=""
+            fill
+            className="object-contain"
+            priority
+            aria-hidden
+          />
+        </div>
+
+        <span
+          className={`absolute -bottom-0.5 left-0 right-0 h-1 rounded-full ${LOGO_ACCENT_BAR_CLASS} opacity-0 group-hover:opacity-100 transition-opacity hidden sm:block`}
           aria-hidden
         />
       </div>
@@ -52,7 +70,11 @@ export default function Logo({
             font-black
             tracking-tight
             truncate
-            ${isDarkBackground ? "text-white" : "text-slate-900"}
+            ${
+              isDarkBackground
+                ? LOGO_WORDMARK_DARK_CLASS
+                : LOGO_WORDMARK_LIGHT_CLASS
+            }
           `}
         >
           Keynetic
@@ -68,7 +90,11 @@ export default function Logo({
             sm:tracking-[0.24em]
             lg:tracking-[0.28em]
             font-medium
-            ${isDarkBackground ? "text-slate-400" : "text-slate-500"}
+            ${
+              isDarkBackground
+                ? LOGO_TAGLINE_DARK_CLASS
+                : LOGO_TAGLINE_LIGHT_CLASS
+            }
           `}
         >
           MOVING MADE CLEAR

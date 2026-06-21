@@ -13,6 +13,14 @@ export type OperationalProperty = {
   relationship_type: string | null;
   linked_property_id: number | null;
   members: OperationalPropertyMember[];
+  /** Participant view: role of the authenticated user on this property row */
+  currentUserRole?: string | null;
+  current_user_role?: string | null;
+  /** Participant view: user is a member of this property */
+  isOwnProperty?: boolean;
+  is_own_property?: boolean;
+  chainPosition?: number;
+  chain_position?: number;
 };
 
 export type OperationalBuyerReadyNode = {
@@ -55,14 +63,43 @@ export const OPERATIONAL_SALE_BANNER_MESSAGE =
 export const OPERATIONAL_BUYER_READY_BANNER_MESSAGE =
   "This is your Buyer Ready step in the chain. You can update progress here.";
 
-function isSellerHopForUser(
-  property: OperationalProperty,
-  userId: string
+function getPropertyCurrentUserRole(
+  property: Pick<
+    OperationalProperty,
+    "currentUserRole" | "current_user_role"
+  >
+): string | null {
+  return (
+    property.currentUserRole ??
+    property.current_user_role ??
+    null
+  );
+}
+
+function isParticipantOwnProperty(
+  property: Pick<
+    OperationalProperty,
+    "isOwnProperty" | "is_own_property"
+  >
 ): boolean {
-  return property.members.some(
-    (member) =>
-      member.user_id === userId &&
-      member.role === "seller"
+  return (
+    property.isOwnProperty ??
+    property.is_own_property ??
+    false
+  );
+}
+
+/**
+ * Seller hop for the authenticated user — uses participant view fields only.
+ * Requires own-property membership and seller role (never property.members).
+ */
+function isUserSellerHop(
+  property: OperationalProperty
+): boolean {
+  return (
+    getPropertyCurrentUserRole(property) ===
+      "seller" &&
+    isParticipantOwnProperty(property)
   );
 }
 
@@ -79,21 +116,27 @@ function findBuyerReadyNodeForUser(
   );
 }
 
-function findSellerHopPropertiesForUser(
+function findSellerHopPropertiesInChain(
   chainProperties: OperationalProperty[],
-  chainId: number,
-  userId: string
+  chainId: number
 ): OperationalProperty[] {
   return chainProperties.filter(
     (property) =>
-      Number(property.chainId) === Number(chainId) &&
-      isSellerHopForUser(property, userId)
+      Number(property.chainId) ===
+        Number(chainId) &&
+      isUserSellerHop(property)
   );
 }
 
-function resolveSellerHopProperty(
-  sellerHopProperties: OperationalProperty[]
-): OperationalProperty | null {
+function pickOperationalSaleProperty<
+  T extends Pick<
+    OperationalProperty,
+    | "id"
+    | "relationship_type"
+    | "chainPosition"
+    | "chain_position"
+  >
+>(sellerHopProperties: T[]): T | null {
   if (sellerHopProperties.length === 0) {
     return null;
   }
@@ -106,11 +149,35 @@ function resolveSellerHopProperty(
     (property) => property.relationship_type === "sale"
   );
 
-  if (saleTypeHops.length === 1) {
-    return saleTypeHops[0];
+  if (saleTypeHops.length >= 1) {
+    return [...saleTypeHops].sort(
+      (a, b) =>
+        (b.chainPosition ?? b.chain_position ?? 0) -
+        (a.chainPosition ?? a.chain_position ?? 0)
+    )[0];
   }
 
   return null;
+}
+
+/**
+ * Single source of truth for the operational sale property in a chain.
+ * Picks the user's seller hop, preferring relationship_type "sale" when ambiguous.
+ */
+export function resolveOperationalSalePropertyId(
+  chainId: number,
+  chainProperties: OperationalProperty[]
+): number | null {
+  const sellerHopProperties =
+    findSellerHopPropertiesInChain(
+      chainProperties,
+      chainId
+    );
+
+  const operationalProperty =
+    pickOperationalSaleProperty(sellerHopProperties);
+
+  return operationalProperty?.id ?? null;
 }
 
 /**
@@ -133,11 +200,11 @@ export function resolveOperationalPosition(
     userId
   );
 
-  const sellerHopProperties = findSellerHopPropertiesForUser(
-    chainProperties,
-    chainId,
-    userId
-  );
+  const sellerHopProperties =
+    findSellerHopPropertiesInChain(
+      chainProperties,
+      chainId
+    );
 
   if (buyerReadyNode && sellerHopProperties.length > 0) {
     return {
@@ -157,7 +224,7 @@ export function resolveOperationalPosition(
   }
 
   const sellerHopProperty =
-    resolveSellerHopProperty(sellerHopProperties);
+    pickOperationalSaleProperty(sellerHopProperties);
 
   if (
     sellerHopProperties.length > 1 &&
@@ -299,6 +366,7 @@ export function mapToOperationalProperties<
 }
 
 export const CHAIN_TILE_LABEL = {
+  awaitingBuyer: "Awaiting Buyer",
   buyerReady: "Buyer Ready",
   yourSale: "Your Sale",
   connectedBuyer: "Connected Buyer",
@@ -374,8 +442,8 @@ export function shouldShowHomeownerAddress(
 }
 
 /**
- * Dashboard operational sale hop from participant view fields (no property_members).
- * When the user is seller on multiple sale rows, the downstream hop (highest position) wins.
+ * Dashboard operational sale hop — delegates to the shared sale resolver.
+ * Accepts properties already scoped to a single chain.
  */
 export function resolveDashboardOperationalPropertyId<
   T extends Pick<
@@ -383,28 +451,52 @@ export function resolveDashboardOperationalPropertyId<
     | "id"
     | "relationship_type"
     | "currentUserRole"
+    | "isOwnProperty"
+    | "is_own_property"
     | "chainPosition"
     | "chain_position"
-  >
+  > & {
+    chainId?: number;
+    chain_id?: number;
+    current_user_role?: string | null;
+  }
 >(chainProperties: T[]): number | null {
-  const sellerSaleProperties = chainProperties.filter(
-    (property) =>
-      property.relationship_type === "sale" &&
-      property.currentUserRole === "seller" &&
-      property.id != null
-  );
-
-  if (sellerSaleProperties.length === 0) {
+  if (chainProperties.length === 0) {
     return null;
   }
 
-  const operationalProperty = sellerSaleProperties.sort(
-    (a, b) =>
-      (b.chainPosition ?? b.chain_position ?? 0) -
-      (a.chainPosition ?? a.chain_position ?? 0)
-  )[0];
+  const chainId =
+    chainProperties[0].chainId ??
+    chainProperties[0].chain_id;
 
-  return operationalProperty.id ?? null;
+  if (chainId != null && !Number.isNaN(Number(chainId))) {
+    return resolveOperationalSalePropertyId(
+      Number(chainId),
+      chainProperties as unknown as OperationalProperty[]
+    );
+  }
+
+  const sellerHopProperties = (
+    chainProperties as unknown as OperationalProperty[]
+  ).filter(isUserSellerHop);
+
+  return (
+    pickOperationalSaleProperty(sellerHopProperties)?.id ??
+    null
+  );
+}
+
+export function isOperationalSaleTile(
+  propertyId: number,
+  chainId: number,
+  chainProperties: OperationalProperty[]
+): boolean {
+  return (
+    resolveOperationalSalePropertyId(
+      chainId,
+      chainProperties
+    ) === propertyId
+  );
 }
 
 function getConnectedPeerLabel(

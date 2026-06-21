@@ -3,6 +3,10 @@ import Link from "next/link";
 import EaMarketingShell from "@/components/estate-agents/EaMarketingShell";
 import { MARKETING_SECTION_TITLE_CLASS } from "@/components/mobileStandards";
 import { ROUTES } from "@/lib/auth/routes";
+import {
+  BTN_PRIMARY_CLASS,
+  BTN_SECONDARY_OUTLINE_CLASS,
+} from "@/lib/theme/themeTokens";
 
 const benefits = [
   {
@@ -41,14 +45,14 @@ export default function EstateAgentsPage() {
           <div className="mt-10 flex flex-col sm:flex-row gap-4">
             <Link
               href={ROUTES.estateAgentSignup}
-              className="bg-slate-900 text-white px-8 py-4 rounded-2xl font-semibold text-center hover:bg-slate-800"
+              className={`${BTN_PRIMARY_CLASS} px-8 py-4 text-center`}
             >
               Sign Up
             </Link>
 
             <Link
               href={ROUTES.estateAgentLogin}
-              className="border border-slate-300 bg-white text-slate-900 px-8 py-4 rounded-2xl font-semibold text-center hover:bg-slate-50"
+              className={`${BTN_SECONDARY_OUTLINE_CLASS} px-8 py-4 text-center`}
             >
               Login
             </Link>

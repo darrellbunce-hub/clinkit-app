@@ -3,6 +3,7 @@ import {
   getChainTileDisplayTitle,
   getParticipantPropertyLabel,
   resolveDashboardOperationalPropertyId,
+  resolveOperationalPosition,
   CHAIN_TILE_LABEL,
 } from "../lib/operationalPosition";
 
@@ -13,6 +14,7 @@ type LabelRow = {
   address: string | null;
   currentUserRole: string;
   chainPosition: number;
+  isOwnProperty: boolean;
 };
 
 function assert(name: string, actual: string, expected: string) {
@@ -82,6 +84,7 @@ const sellerChainRows: LabelRow[] = [
     address: "999 Hidden Purchase",
     currentUserRole: "seller",
     chainPosition: 1,
+    isOwnProperty: true,
   },
   {
     id: 2,
@@ -90,6 +93,7 @@ const sellerChainRows: LabelRow[] = [
     address: "7777 Pickle Close",
     currentUserRole: "seller",
     chainPosition: 2,
+    isOwnProperty: true,
   },
   {
     id: 3,
@@ -98,6 +102,7 @@ const sellerChainRows: LabelRow[] = [
     address: null,
     currentUserRole: "buyer",
     chainPosition: 3,
+    isOwnProperty: true,
   },
 ];
 
@@ -115,6 +120,7 @@ const sellerPlusPurchaseRows: LabelRow[] = [
     address: "357 Jenni Place",
     currentUserRole: "seller",
     chainPosition: 1,
+    isOwnProperty: true,
   },
   {
     id: 11,
@@ -123,6 +129,7 @@ const sellerPlusPurchaseRows: LabelRow[] = [
     address: "888 Jo Lane",
     currentUserRole: "buyer",
     chainPosition: 2,
+    isOwnProperty: true,
   },
   {
     id: 12,
@@ -131,6 +138,7 @@ const sellerPlusPurchaseRows: LabelRow[] = [
     address: null,
     currentUserRole: "buyer",
     chainPosition: 3,
+    isOwnProperty: true,
   },
 ];
 
@@ -152,6 +160,7 @@ const bottomBuyerRows: LabelRow[] = [
     address: null,
     currentUserRole: "buyer",
     chainPosition: 1,
+    isOwnProperty: true,
   },
   {
     id: 21,
@@ -160,12 +169,13 @@ const bottomBuyerRows: LabelRow[] = [
     address: "4569 Coen Road",
     currentUserRole: "seller",
     chainPosition: 2,
+    isOwnProperty: true,
   },
 ];
 
 assertChainLabels("Bottom-of-chain buyer row labels", bottomBuyerRows, [
   CHAIN_TILE_LABEL.nextHomeSearch,
-  CHAIN_TILE_LABEL.connectedPurchase,
+  "4569 Coen Road",
 ]);
 
 assert(
@@ -175,9 +185,9 @@ assert(
 );
 
 assert(
-  "resolveDashboardOperationalPropertyId — bottom buyer",
+  "resolveDashboardOperationalPropertyId — bottom buyer seller hop",
   String(resolveDashboardOperationalPropertyId(bottomBuyerRows)),
-  "null"
+  "21"
 );
 
 assertNotAddress(
@@ -226,6 +236,40 @@ assertNotAddress(
     false
   ),
   "888 Jo Lane"
+);
+
+assert(
+  "Chain tile — Your Sale when operational",
+  getChainTileDisplayTitle(sellerChainRows[1], true),
+  CHAIN_TILE_LABEL.yourSale
+);
+
+const sellerOperationalPosition = resolveOperationalPosition(
+  "user-1",
+  1,
+  sellerChainRows.map((row) => ({
+    id: row.id,
+    chainId: 1,
+    stage: row.stage,
+    address: row.address,
+    relationship_type: row.relationship_type,
+    linked_property_id: null,
+    members: [],
+    currentUserRole: row.currentUserRole,
+    isOwnProperty: row.isOwnProperty,
+    chainPosition: row.chainPosition,
+  })),
+  []
+);
+
+assert(
+  "resolveOperationalPosition — seller chain resolves sale hop",
+  String(
+    sellerOperationalPosition.position?.kind === "sale"
+      ? sellerOperationalPosition.position.propertyId
+      : null
+  ),
+  "2"
 );
 
 assert(

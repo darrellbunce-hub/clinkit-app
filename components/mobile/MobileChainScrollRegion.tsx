@@ -8,11 +8,13 @@ import {
 } from "react";
 
 import {
-  CHAIN_SCROLL_FADE_LEFT_CLASS,
-  CHAIN_SCROLL_FADE_RIGHT_CLASS,
   CHAIN_SCROLL_HINT_CLASS,
   CHAIN_SCROLL_REGION_CLASS,
 } from "@/components/mobileStandards";
+import {
+  CHAIN_SCROLL_FADE_LEFT_CLASS,
+  CHAIN_SCROLL_FADE_RIGHT_CLASS,
+} from "@/lib/theme/themeTokens";
 
 type MobileChainScrollRegionProps = {
   children: ReactNode;

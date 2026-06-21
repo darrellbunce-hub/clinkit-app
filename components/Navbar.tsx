@@ -7,6 +7,12 @@ import Logo from "@/components/Logo";
 import { MENU_BUTTON_CLASS } from "@/components/mobileStandards";
 import { ROUTES } from "@/lib/auth/routes";
 import { useChain } from "@/context/ChainContext";
+import {
+  BTN_ACCENT_SM_CLASS,
+  NAV_HEADER_DARK_CLASS,
+  NAV_HEADER_MOBILE_DRAWER_CLASS,
+  NAV_LINK_DARK_CLASS,
+} from "@/lib/theme/themeTokens";
 
 export default function Navbar() {
 
@@ -22,17 +28,7 @@ export default function Navbar() {
 
   return (
 
-    <header
-      className="
-        sticky
-        top-0
-        z-50
-        backdrop-blur-xl
-        bg-slate-950/80
-        border-b
-        border-white/10
-      "
-    >
+    <header className={NAV_HEADER_DARK_CLASS}>
 
       <div
         className="
@@ -56,26 +52,14 @@ export default function Navbar() {
 
     <Link
       href="/dashboard"
-      className="
-        text-slate-300
-        hover:text-white
-        transition
-        px-4
-        py-2
-      "
+      className={`${NAV_LINK_DARK_CLASS} px-4 py-2`}
     >
       Dashboard
     </Link>
 
     <Link
       href={ROUTES.accountSettings}
-      className="
-        text-slate-300
-        hover:text-white
-        transition
-        px-4
-        py-2
-      "
+      className={`${NAV_LINK_DARK_CLASS} px-4 py-2`}
     >
       Account Settings
     </Link>
@@ -88,13 +72,7 @@ export default function Navbar() {
         window.location.href = "/";
 
       }}
-      className="
-        text-slate-300
-        hover:text-white
-        transition
-        px-4
-        py-2
-      "
+      className={`${NAV_LINK_DARK_CLASS} px-4 py-2`}
     >
       Logout
     </button>
@@ -107,44 +85,21 @@ export default function Navbar() {
 
     <Link
       href={ROUTES.estateAgentMarketing}
-      className="
-        text-slate-300
-        hover:text-white
-        transition
-        px-4
-        py-2
-      "
+      className={`${NAV_LINK_DARK_CLASS} px-4 py-2`}
     >
       Estate Agents
     </Link>
 
     <Link
       href="/login"
-      className="
-        text-slate-300
-        hover:text-white
-        transition
-        px-4
-        py-2
-      "
+      className={`${NAV_LINK_DARK_CLASS} px-4 py-2`}
     >
       Login
     </Link>
 
     <Link
       href="/login"
-      className="
-        bg-blue-600
-        hover:bg-blue-500
-        text-white
-        px-5
-        py-3
-        rounded-xl
-        font-semibold
-        transition
-        shadow-lg
-        shadow-blue-500/20
-      "
+      className={`${BTN_ACCENT_SM_CLASS} px-5 py-3`}
     >
       Create Account
     </Link>
@@ -179,15 +134,7 @@ export default function Navbar() {
       {/* Mobile Menu */}
       {mobileMenuOpen && (
 
-        <div
-          className="
-            md:hidden
-            border-t
-            border-white/10
-            bg-slate-950/95
-            backdrop-blur-xl
-          "
-        >
+        <div className={NAV_HEADER_MOBILE_DRAWER_CLASS}>
 
 <div className="px-6 py-6 flex flex-col gap-4">
 
@@ -197,12 +144,7 @@ export default function Navbar() {
 
     <Link
       href="/dashboard"
-      className="
-        text-slate-300
-        hover:text-white
-        transition
-        py-3
-      "
+      className={`${NAV_LINK_DARK_CLASS} py-3`}
       onClick={() =>
         setMobileMenuOpen(false)
       }
@@ -212,12 +154,7 @@ export default function Navbar() {
 
     <Link
       href={ROUTES.accountSettings}
-      className="
-        text-slate-300
-        hover:text-white
-        transition
-        py-3
-      "
+      className={`${NAV_LINK_DARK_CLASS} py-3`}
       onClick={() =>
         setMobileMenuOpen(false)
       }
@@ -235,13 +172,7 @@ export default function Navbar() {
 window.location.href = "/";
 
       }}
-      className="
-        text-left
-        text-slate-300
-        hover:text-white
-        transition
-        py-3
-      "
+      className={`text-left ${NAV_LINK_DARK_CLASS} py-3`}
     >
       Logout
     </button>
@@ -254,15 +185,7 @@ window.location.href = "/";
 
     <Link
       href={ROUTES.estateAgentMarketing}
-      className="
-        text-slate-300
-        hover:text-white
-        transition
-        py-3
-        min-h-11
-        inline-flex
-        items-center
-      "
+      className={`${NAV_LINK_DARK_CLASS} py-3 min-h-11 inline-flex items-center`}
       onClick={() =>
         setMobileMenuOpen(false)
       }
@@ -272,15 +195,7 @@ window.location.href = "/";
 
     <Link
       href="/login"
-      className="
-        text-slate-300
-        hover:text-white
-        transition
-        py-3
-        min-h-11
-        inline-flex
-        items-center
-      "
+      className={`${NAV_LINK_DARK_CLASS} py-3 min-h-11 inline-flex items-center`}
       onClick={() =>
         setMobileMenuOpen(false)
       }
@@ -290,17 +205,7 @@ window.location.href = "/";
 
     <Link
       href="/login"
-      className="
-        bg-blue-600
-        hover:bg-blue-500
-        text-white
-        px-5
-        py-5
-        rounded-xl
-        font-semibold
-        text-center
-        transition
-      "
+      className={`${BTN_ACCENT_SM_CLASS} px-5 py-5 text-center`}
       onClick={() =>
         setMobileMenuOpen(false)
       }
