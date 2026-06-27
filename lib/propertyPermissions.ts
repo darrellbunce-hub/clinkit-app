@@ -41,6 +41,25 @@ export {
   VIEW_ONLY_PURCHASE_MESSAGE,
 } from "@/lib/operationalPosition";
 
+export {
+  findBuyerReadyNodeForChain,
+  formatActivityUpdaterLabel,
+  getBuyerReadyActionMessage,
+  getBuyerReadyStatusDescription,
+  resolveWorkflowAccess,
+  WORKFLOW_EA_DELEGATED_BANNER_MESSAGE,
+  WORKFLOW_READ_ONLY_BANNER_MESSAGE,
+} from "@/lib/workflowPermissions";
+
+export type {
+  WorkflowAccess,
+  WorkflowAccessMode,
+  WorkflowKind,
+  WorkflowPermissionContext,
+  WorkflowTarget,
+  WorkflowViewerRole,
+} from "@/lib/workflowPermissions";
+
 export type {
   OperationalBuyerReadyNode,
   OperationalProperty,
@@ -60,13 +79,15 @@ export function canEditProperty(
   property: OperationalProperty | null | undefined,
   userId: string | null | undefined,
   chainProperties: OperationalProperty[],
-  chainNodes: OperationalBuyerReadyNode[]
+  chainNodes: OperationalBuyerReadyNode[],
+  mutationContext?: import("@/lib/mutationPermission").MutationPermissionContext
 ): boolean {
   return canMutatePropertyTarget(
     property,
     userId,
     chainProperties,
-    chainNodes
+    chainNodes,
+    mutationContext
   );
 }
 
@@ -75,13 +96,15 @@ export function canEditBuyerReady(
   chainId: number,
   userId: string | null | undefined,
   chainProperties: OperationalProperty[],
-  chainNodes: OperationalBuyerReadyNode[]
+  chainNodes: OperationalBuyerReadyNode[],
+  mutationContext?: import("@/lib/mutationPermission").MutationPermissionContext
 ): boolean {
   return canMutateBuyerReadyTarget(
     nodeId,
     chainId,
     userId,
     chainProperties,
-    chainNodes
+    chainNodes,
+    mutationContext
   );
 }

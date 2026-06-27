@@ -1,5 +1,7 @@
 export {
   ROUTES,
+  HOMEOWNER_ONLY_PREFIXES,
+  SHARED_OPERATIONAL_PREFIXES,
   HOMEOWNER_PROTECTED_PREFIXES,
   ESTATE_AGENT_PROTECTED_PREFIXES,
   PUBLIC_EXACT_PATHS,
@@ -7,6 +9,8 @@ export {
   normalizePathname,
   matchesPrefix,
   isPublicExactPath,
+  isHomeownerOnlyRoute,
+  isSharedOperationalRoute,
   isHomeownerProtectedRoute,
   isEstateAgentProtectedRoute,
   isEstateAgentOnboardingRoute,
@@ -32,6 +36,7 @@ export {
   requireEstateAgent,
   requireEstateAgentOnboarding,
   requireCompletedEstateAgentOnboarding,
+  requireSharedOperationalAccess,
   evaluateProtectedRouteAccess,
   type RouteGuardAllow,
   type RouteGuardRedirect,
@@ -41,6 +46,7 @@ export {
 export {
   parsePositiveIntParam,
   isUserChainParticipant,
+  isUserChainOperationalViewer,
   requireChainParticipantForRoute,
 } from "@/lib/auth/chainAccess";
 

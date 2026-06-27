@@ -7,6 +7,7 @@ import Logo from "@/components/Logo";
 import { MENU_BUTTON_CLASS } from "@/components/mobileStandards";
 import { ROUTES } from "@/lib/auth/routes";
 import { useChain } from "@/context/ChainContext";
+import { isEstateAgent } from "@/lib/accountType";
 import {
   BTN_ACCENT_SM_CLASS,
   NAV_HEADER_DARK_CLASS,
@@ -21,7 +22,20 @@ export default function Navbar() {
   const {
     isAuthenticated,
     authLoading,
+    accountType,
   } = useChain();
+
+  const homeHref = isEstateAgent({
+    account_type: accountType ?? "homeowner",
+  })
+    ? ROUTES.agentHome
+    : ROUTES.homeownerDashboard;
+
+  const homeLabel = isEstateAgent({
+    account_type: accountType ?? "homeowner",
+  })
+    ? "Agent Home"
+    : "Dashboard";
 
   const showAuthenticatedNav =
     !authLoading && isAuthenticated;
@@ -51,10 +65,10 @@ export default function Navbar() {
   <>
 
     <Link
-      href="/dashboard"
+      href={homeHref}
       className={`${NAV_LINK_DARK_CLASS} px-4 py-2`}
     >
-      Dashboard
+      {homeLabel}
     </Link>
 
     <Link
@@ -143,13 +157,13 @@ export default function Navbar() {
   <>
 
     <Link
-      href="/dashboard"
+      href={homeHref}
       className={`${NAV_LINK_DARK_CLASS} py-3`}
       onClick={() =>
         setMobileMenuOpen(false)
       }
     >
-      Dashboard
+      {homeLabel}
     </Link>
 
     <Link

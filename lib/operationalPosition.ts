@@ -1,4 +1,8 @@
 import { isSearchingPlaceholder } from "@/lib/buildChainTopology";
+import {
+  resolveMutationOperationalPosition,
+  type MutationPermissionContext,
+} from "@/lib/mutationPermission";
 
 export type OperationalPropertyMember = {
   user_id: string;
@@ -281,11 +285,14 @@ export function isNonOperationalPropertyTarget(
   return isSearchingPlaceholder(property);
 }
 
+export type { MutationPermissionContext } from "@/lib/mutationPermission";
+
 export function canMutatePropertyTarget(
   property: OperationalProperty | null | undefined,
   userId: string | null | undefined,
   chainProperties: OperationalProperty[],
-  chainNodes: OperationalBuyerReadyNode[]
+  chainNodes: OperationalBuyerReadyNode[],
+  mutationContext?: MutationPermissionContext
 ): boolean {
   if (!property || !userId) {
     return false;
@@ -295,12 +302,13 @@ export function canMutatePropertyTarget(
     return false;
   }
 
-  const { position } = resolveOperationalPosition(
-    userId,
-    property.chainId,
+  const { position } = resolveMutationOperationalPosition({
+    viewerUserId: userId,
+    chainId: property.chainId,
     chainProperties,
-    chainNodes
-  );
+    chainNodes,
+    mutationContext,
+  });
 
   return (
     position?.kind === "sale" &&
@@ -313,18 +321,20 @@ export function canMutateBuyerReadyTarget(
   chainId: number,
   userId: string | null | undefined,
   chainProperties: OperationalProperty[],
-  chainNodes: OperationalBuyerReadyNode[]
+  chainNodes: OperationalBuyerReadyNode[],
+  mutationContext?: MutationPermissionContext
 ): boolean {
   if (!userId) {
     return false;
   }
 
-  const { position } = resolveOperationalPosition(
-    userId,
+  const { position } = resolveMutationOperationalPosition({
+    viewerUserId: userId,
     chainId,
     chainProperties,
-    chainNodes
-  );
+    chainNodes,
+    mutationContext,
+  });
 
   return (
     position?.kind === "buyer_ready" &&
@@ -599,9 +609,9 @@ type ChainDisplayProperty = Pick<
 
 export function getPropertyPageHeadline(
   property: ChainDisplayProperty,
-  canEdit: boolean
+  isOperationalPosition: boolean
 ): string {
-  if (canEdit) {
+  if (isOperationalPosition) {
     return getOperationalSaleChainHeadline();
   }
 
@@ -616,10 +626,21 @@ export function getPropertyPageHeadline(
 
 export function getPropertyPageSubtitle(
   property: ChainDisplayProperty,
-  canEdit: boolean
+  isOperationalPosition: boolean,
+  canEdit = false
 ): string {
-  if (canEdit) {
-    return OPERATIONAL_SALE_BANNER_MESSAGE;
+  if (isOperationalPosition) {
+    if (canEdit) {
+      return OPERATIONAL_SALE_BANNER_MESSAGE;
+    }
+
+    if (property.relationship_type === "sale") {
+      return "This is your sale in the chain.";
+    }
+
+    if (property.relationship_type === "purchase") {
+      return "This is your purchase in the chain.";
+    }
   }
 
   if (isSearchingPlaceholder(property)) {

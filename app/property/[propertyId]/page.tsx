@@ -18,17 +18,28 @@ import {
   MobilePanelHeader,
 } from "@/components/mobile/MobileLayout";
 import Navbar from "@/components/Navbar";
+import OperationalContextStrip from "@/components/operational/OperationalContextStrip";
+import OperationalManagerBanner from "@/components/operational/OperationalManagerBanner";
+import WorkflowReadOnlyBanner from "@/components/WorkflowReadOnlyBanner";
+import { useOperationalWorkspaceLabels } from "@/hooks/useOperationalWorkspaceLabels";
 import { useChain } from "@/context/ChainContext";
 import { STAGES } from "@/data/stages";
+import { ROUTES } from "@/lib/auth/routes";
+import { isEstateAgent } from "@/lib/accountType";
 import {
-  canEditProperty,
-  canEditBuyerReady,
-  CONNECTED_POSITION_MESSAGE,
-  getOperationalSaleChainHeadline,
-  getPropertyPageHeadline,
-  getPropertyPageSubtitle,
-  OPERATIONAL_SALE_BANNER_MESSAGE,
+  resolveWorkflowAccess,
 } from "@/lib/propertyPermissions";
+import {
+  getOperationalEditingModeLabelForViewer,
+  getOperationalUpdateSuccessMessage,
+  getOperationalWorkspaceSubtitle,
+  getOperationalWorkspaceTitle,
+} from "@/lib/operationalPresentation";
+import {
+  applyOperationalSubjectLens,
+  resolveOperationalSubject,
+  resolveSubjectOperationalPosition,
+} from "@/lib/operationalSubject";
 import OperationalCompletionDatePanel from "@/components/OperationalCompletionDatePanel";
 import PropertyEstateAgentAssignment from "@/components/estate-agents/PropertyEstateAgentAssignment";
 import {
@@ -93,6 +104,8 @@ const [warningMessage, setWarningMessage] =
     addStructuredUpdate,
     breakChainConnection,
     currentUserId,
+    accountType,
+    estateAgentOperationalAssignments,
     recordChainCompletionDate,
     amendChainCompletionDate,
     confirmChainCompletion,
@@ -101,6 +114,37 @@ const [warningMessage, setWarningMessage] =
   const currentProperty = properties.find(
     (property) => property.id === propertyId
   );
+
+  const chainPropertiesForCompletion =
+    mapToOperationalProperties(
+      properties.filter(
+        (property) =>
+          currentProperty != null &&
+          property.chainId === currentProperty.chainId
+      )
+    );
+
+  const operationalSubject =
+    currentProperty && currentUserId
+      ? resolveOperationalSubject({
+          viewerUserId: currentUserId,
+          accountType,
+          chainId: currentProperty.chainId,
+          chainProperties: chainPropertiesForCompletion,
+          estateAgentAssignments:
+            estateAgentOperationalAssignments,
+        })
+      : null;
+
+  const workspaceLabels = useOperationalWorkspaceLabels({
+    assignedPropertyId:
+      operationalSubject?.assignedPropertyId ?? null,
+    subjectUserId:
+      operationalSubject?.subjectUserId ?? null,
+    accountType,
+    currentUserId,
+  });
+
   useEffect(() => {
 
     if (currentProperty) {
@@ -159,14 +203,62 @@ const [warningMessage, setWarningMessage] =
       </div>
     );
   }
-  const canEdit = canEditProperty(
-    currentProperty,
-    currentUserId,
-    properties,
-    chainNodes
+
+  const access = resolveWorkflowAccess(
+    {
+      kind: "property",
+      chainId: currentProperty.chainId,
+      propertyId: currentProperty.id,
+    },
+    {
+      userId: currentUserId,
+      chainProperties: chainPropertiesForCompletion,
+      chainNodes,
+      accountType,
+      estateAgentAssignments:
+        estateAgentOperationalAssignments,
+    }
   );
 
-  const viewOnlyMessage = CONNECTED_POSITION_MESSAGE;
+  const mutationContext = {
+    accountType,
+    estateAgentAssignments:
+      estateAgentOperationalAssignments,
+  };
+
+  const canEdit = access.canEdit;
+
+  const subjectChainProperties =
+    applyOperationalSubjectLens(
+      chainPropertiesForCompletion,
+      operationalSubject
+    );
+
+  const operationalDisplayPosition =
+    resolveSubjectOperationalPosition({
+      subject: operationalSubject,
+      chainId: currentProperty.chainId,
+      chainProperties: chainPropertiesForCompletion,
+      chainNodes,
+    }).position;
+
+  const isOperationalDisplay =
+    operationalDisplayPosition?.kind === "sale" &&
+    operationalDisplayPosition.propertyId ===
+      currentProperty.id;
+
+
+  const homeHref = isEstateAgent({
+    account_type: accountType ?? "homeowner",
+  })
+    ? ROUTES.agentHome
+    : ROUTES.homeownerDashboard;
+
+  const homeLabel = isEstateAgent({
+    account_type: accountType ?? "homeowner",
+  })
+    ? "Agent Home"
+    : "Dashboard";
 
   const currentChain = chains.find(
     (chain) =>
@@ -193,16 +285,8 @@ const [warningMessage, setWarningMessage] =
     isScheduledCompletionMode ||
     isCompletedCompletionMode;
 
-  const chainPropertiesForCompletion =
-    mapToOperationalProperties(
-      properties.filter(
-        (property) =>
-          property.chainId ===
-          currentProperty.chainId
-      )
-    );
-
   const showOperationalCompletionEntry =
+    access.canEdit &&
     canShowOperationalCompletionDateEntry({
       chainScheduledDate:
         currentChain?.completionScheduledDate,
@@ -211,6 +295,7 @@ const [warningMessage, setWarningMessage] =
       chainProperties:
         chainPropertiesForCompletion,
       chainNodes: chainNodes,
+      mutationContext,
     });
 
   const showOperationalCompletionPanel =
@@ -221,6 +306,7 @@ const [warningMessage, setWarningMessage] =
   const propertyChainId = currentProperty.chainId;
 
   const showAmendCompletionDate =
+    access.canEdit &&
     canAmendChainCompletionDate({
       chainScheduledDate:
         currentChain?.completionScheduledDate,
@@ -231,9 +317,11 @@ const [warningMessage, setWarningMessage] =
       chainProperties:
         chainPropertiesForCompletion,
       chainNodes: chainNodes,
+      mutationContext,
     });
 
   const showConfirmCompletion =
+    access.canEdit &&
     canConfirmChainCompletion({
       completionLifecycleStatus:
         currentChain?.completionLifecycleStatus,
@@ -244,6 +332,7 @@ const [warningMessage, setWarningMessage] =
       chainProperties:
         chainPropertiesForCompletion,
       chainNodes: chainNodes,
+      mutationContext,
     });
 
   async function handleRecordCompletionDate(
@@ -480,7 +569,10 @@ if (
         updateMessage
       );
       setSuccessMessage(
-        "Update shared with the chain."
+        getOperationalUpdateSuccessMessage(
+          accountType,
+          "structured_update"
+        )
       );
       
       setTimeout(() => {
@@ -537,7 +629,10 @@ if (
       );
     
       setSuccessMessage(
-        "Property status updated successfully."
+        getOperationalUpdateSuccessMessage(
+          accountType,
+          "property_stage"
+        )
       );
     
       setTimeout(() => {
@@ -547,6 +642,32 @@ if (
       }, 4000);
     
     }
+  const workspaceTitle = getOperationalWorkspaceTitle({
+    surface: "property",
+    isOperationalDisplay,
+    viewerRole: access.viewerRole,
+  });
+
+  const workspaceSubtitle = getOperationalWorkspaceSubtitle({
+    surface: "property",
+    isOperationalDisplay,
+    viewerRole: access.viewerRole,
+    canEdit,
+  });
+
+  const editingModeLabel =
+    getOperationalEditingModeLabelForViewer({
+      viewerRole: access.viewerRole,
+      mode: access.mode,
+    });
+
+  const showOperationalManager =
+    access.viewerRole === "estate_agent" && canEdit;
+
+  const showOperationalContextStrip =
+    isOperationalDisplay ||
+    access.viewerRole === "estate_agent";
+
   return (
     <main className={PAGE_BG_CLASS}>
 
@@ -577,8 +698,8 @@ if (
               label: "← Back to Chain",
             },
             {
-              href: "/dashboard",
-              label: "Dashboard",
+              href: homeHref,
+              label: homeLabel,
             },
           ]}
         />
@@ -589,17 +710,67 @@ if (
 
 <h1 className={PAGE_TITLE_CLASS}>
 
-  {getPropertyPageHeadline(currentProperty, canEdit)}
+  {workspaceTitle}
 
 </h1>
 
-<p className="text-slate-600 mt-3 text-lg">
+<p className="text-slate-600 mt-2 text-base">
 
-  {getPropertyPageSubtitle(currentProperty, canEdit)}
+  {workspaceSubtitle}
 
 </p>
 
+{showOperationalContextStrip && (
+  <OperationalContextStrip
+    labels={workspaceLabels}
+    editingMode={editingModeLabel}
+    showManager={
+      access.viewerRole === "estate_agent"
+    }
+  />
+)}
+
 </div>
+
+        {showOperationalManager && (
+          <OperationalManagerBanner />
+        )}
+
+        {access.canView &&
+          !access.canEdit &&
+          access.bannerMessage && (
+          <WorkflowReadOnlyBanner
+            message={access.bannerMessage}
+          />
+        )}
+
+        {!isCompletedCompletionMode && (
+          <div
+            className={`mt-8 bg-surface-card rounded-3xl shadow-sm border border-surface-card-border ${CARD_PADDING_CLASS}`}
+          >
+            <MobilePanelHeader
+              aside={
+                <div
+                  className={`${actionColour} px-5 py-3 rounded-2xl text-sm font-semibold whitespace-nowrap`}
+                >
+                  Operational Alert
+                </div>
+              }
+            >
+              <p className="text-sm font-medium text-slate-500">
+                Action Required
+              </p>
+
+              <h2 className={`mt-3 ${SECTION_TITLE_CLASS}`}>
+                {actionTitle}
+              </h2>
+
+              <p className="mt-4 text-slate-600 max-w-2xl">
+                {actionMessage}
+              </p>
+            </MobilePanelHeader>
+          </div>
+        )}
 
         <div
           className={`mt-8 bg-surface-card rounded-3xl shadow-sm border border-surface-card-border ${CARD_PADDING_CLASS}`}
@@ -758,63 +929,6 @@ if (
 
 </div>
 
-{/* Action Required */}
-{!isCompletedCompletionMode && (
-<div className={`mt-8 bg-surface-card rounded-3xl shadow-sm border border-surface-card-border ${CARD_PADDING_CLASS}`}>
-
-  <MobilePanelHeader
-    aside={
-      <div
-        className={`${actionColour} px-5 py-3 rounded-2xl text-sm font-semibold whitespace-nowrap`}
-      >
-        Operational Alert
-      </div>
-    }
-  >
-    <p className="text-sm font-medium text-slate-500">
-      Action Required
-    </p>
-
-    <h2 className={`mt-3 ${SECTION_TITLE_CLASS}`}>
-      {actionTitle}
-    </h2>
-
-    <p className="mt-4 text-slate-600 max-w-2xl">
-      {actionMessage}
-    </p>
-  </MobilePanelHeader>
-
-</div>
-)}
-
-{canEdit && !isCompletedCompletionMode && (
-
-<div className="mt-8 bg-blue-50 border border-blue-200 rounded-3xl p-6">
-
-  <p className="text-blue-800 font-semibold">
-    {getOperationalSaleChainHeadline()}
-  </p>
-
-  <p className="mt-2 text-blue-700">
-    {OPERATIONAL_SALE_BANNER_MESSAGE}
-  </p>
-
-</div>
-
-)}
-
-{!canEdit && (
-
-<div className="mt-8 bg-amber-50 border border-amber-200 rounded-3xl p-6">
-
-  <p className="text-amber-700 font-semibold">
-    {viewOnlyMessage}
-  </p>
-
-</div>
-
-)}
-
 {showOperationalCompletionPanel && (
   <OperationalCompletionDatePanel
     chainScheduledDate={
@@ -843,17 +957,16 @@ if (
   />
 )}
 
-        {!isCompletedCompletionMode && (
+        {access.canEdit && !isCompletedCompletionMode && (
         <>
         {/* Update Status */}
-        <div className={`mt-8 bg-surface-card rounded-3xl shadow-sm border border-surface-card-border ${CARD_PADDING_CLASS}`}>
+        <div className={`mt-10 bg-surface-card rounded-3xl shadow-sm border border-surface-card-border ${CARD_PADDING_CLASS}`}>
 
           <h2 className="text-3xl font-bold text-slate-900">
             Update Status
           </h2>
 
           <select
-          disabled={!canEdit}
           value={draftStage}
           onChange={(event) =>
             setDraftStage(event.target.value)
@@ -881,7 +994,6 @@ if (
 
           </select>
           <button
-  disabled={!canEdit}
   onClick={handlePropertyStageUpdate}
   className={`mt-4 ${BTN_PRIMARY_CLASS} rounded-xl px-6 py-3`}
 >
@@ -890,7 +1002,7 @@ if (
         </div>
 
         {/* Structured Updates */}
-        <div className={`mt-8 bg-surface-card rounded-3xl shadow-sm border border-surface-card-border ${CARD_PADDING_CLASS}`}>
+        <div className={`mt-10 bg-surface-card rounded-3xl shadow-sm border border-surface-card-border ${CARD_PADDING_CLASS}`}>
 
           <h2 className="text-3xl font-bold text-slate-900">
             Add Update
@@ -902,7 +1014,6 @@ if (
           </p>
 
           <select
-          disabled={!canEdit}
             value={updateType}
             onChange={(event) =>
               setUpdateType(event.target.value)
@@ -939,7 +1050,6 @@ if (
           {updateType === "delay" && (
 
             <select
-            disabled={!canEdit}
               value={delayReason}
               onChange={(event) =>
                 setDelayReason(
@@ -978,9 +1088,8 @@ if (
           )}
 
 <button
-  disabled={!canEdit}
   onClick={handleStructuredUpdate}
-            className={`mt-6 ${BTN_PRIMARY_CLASS} px-6 py-4 disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed`}
+            className={`mt-6 ${BTN_PRIMARY_CLASS} px-6 py-4`}
           >
             Add Update
           </button>
@@ -998,7 +1107,6 @@ if (
   </p>
 
   <select
-  disabled={!canEdit}
     value={breakReason}
     onChange={(event) =>
       setBreakReason(
@@ -1023,7 +1131,6 @@ if (
   </select>
 
   <button
-    disabled={!canEdit}
     onClick={() => {
 
       if (!breakReason || !canEdit) {
@@ -1035,7 +1142,7 @@ if (
         breakReason
       );
     }}
-    className="mt-6 bg-red-600 hover:bg-red-700 text-white px-6 py-4 rounded-2xl font-semibold transition disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed"
+    className="mt-6 bg-red-600 hover:bg-red-700 text-white px-6 py-4 rounded-2xl font-semibold transition"
   >
 
     Break Chain Connection

@@ -29,7 +29,6 @@ import {
 } from "@/lib/completionLifecycle";
 import {
   mapToOperationalProperties,
-  resolveOperationalPosition,
   type OperationalBuyerReadyNode,
   type OperationalProperty,
 } from "@/lib/operationalPosition";
@@ -51,6 +50,16 @@ import {
   sortActivitiesNewestFirst,
   type OperationalActivity,
 } from "@/lib/activityIntelligence";
+import {
+  getAccountType,
+  type AccountType,
+} from "@/lib/accountType";
+import { loadEstateAgentOperationalAssignments } from "@/lib/estateAgent/assignments";
+import type { EstateAgentOperationalAssignment } from "@/lib/operationalSubject";
+import {
+  resolveActivityUpdaterRole,
+  resolveMutationOperationalPosition,
+} from "@/lib/mutationPermission";
 type Activity = OperationalActivity;
 
 type Property = {
@@ -100,6 +109,8 @@ type ChainContextType = {
   chainNodes: any[];
   chains: Chain[];
   currentUserId: string | null;
+  accountType: AccountType | null;
+  estateAgentOperationalAssignments: EstateAgentOperationalAssignment[];
   authLoading: boolean;
   isAuthenticated: boolean;
   refreshParticipantData: () => Promise<void>;
@@ -388,11 +399,29 @@ async function loadParticipantDataset(
 function clearParticipantState(
   setProperties: (value: Property[]) => void,
   setChainNodes: (value: any[]) => void,
-  setChains: (value: Chain[]) => void
+  setChains: (value: Chain[]) => void,
+  setEstateAgentOperationalAssignments: (
+    value: EstateAgentOperationalAssignment[]
+  ) => void
 ) {
   setProperties([]);
   setChainNodes([]);
   setChains([]);
+  setEstateAgentOperationalAssignments([]);
+}
+
+async function loadAccountTypeForUser(
+  userId: string
+): Promise<AccountType> {
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("account_type")
+    .eq("id", userId)
+    .maybeSingle();
+
+  return getAccountType(
+    profile ?? { account_type: "homeowner" }
+  );
 }
 
 export function ChainProvider({
@@ -409,6 +438,12 @@ const [chains, setChains] =
   useState<Chain[]>([]);
   const [currentUserId, setCurrentUserId] =
     useState<string | null>(null);
+  const [accountType, setAccountType] =
+    useState<AccountType | null>(null);
+  const [
+    estateAgentOperationalAssignments,
+    setEstateAgentOperationalAssignments,
+  ] = useState<EstateAgentOperationalAssignment[]>([]);
   const [authLoading, setAuthLoading] =
     useState(true);
   const [isAuthenticated, setIsAuthenticated] =
@@ -471,7 +506,22 @@ const [chains, setChains] =
         return;
       }
 
+      const eaAssignments =
+        await loadEstateAgentOperationalAssignments(
+          supabase
+        );
+
+      if (
+        requestId !==
+        participantRequestIdRef.current
+      ) {
+        return;
+      }
+
       applyParticipantDataset(dataset);
+      setEstateAgentOperationalAssignments(
+        eaAssignments
+      );
       participantLoadedUserIdRef.current =
         currentUserIdRef.current;
     }, [applyParticipantDataset]);
@@ -532,6 +582,18 @@ const [chains, setChains] =
       currentUserIdRef.current = userId;
       setCurrentUserId(userId);
       setIsAuthenticated(userId !== null);
+
+      if (userId) {
+        const resolvedAccountType =
+          await loadAccountTypeForUser(userId);
+
+        if (!cancelled) {
+          setAccountType(resolvedAccountType);
+        }
+      } else {
+        setAccountType(null);
+      }
+
       setAuthLoading(false);
 
       if (!userId) {
@@ -540,7 +602,8 @@ const [chains, setChains] =
         clearParticipantState(
           setProperties,
           setChainNodes,
-          setChains
+          setChains,
+          setEstateAgentOperationalAssignments
         );
       }
     }
@@ -584,12 +647,14 @@ const [chains, setChains] =
               null;
             currentUserIdRef.current = null;
             setCurrentUserId(null);
+            setAccountType(null);
             setIsAuthenticated(false);
             setAuthLoading(false);
             clearParticipantState(
               setProperties,
               setChainNodes,
-              setChains
+              setChains,
+              setEstateAgentOperationalAssignments
             );
 
             return;
@@ -606,7 +671,8 @@ const [chains, setChains] =
             clearParticipantState(
               setProperties,
               setChainNodes,
-              setChains
+              setChains,
+              setEstateAgentOperationalAssignments
             );
           }
 
@@ -615,6 +681,12 @@ const [chains, setChains] =
           setCurrentUserId(decision.userId);
           setIsAuthenticated(true);
           setAuthLoading(false);
+
+          void loadAccountTypeForUser(
+            decision.userId
+          ).then((resolvedAccountType) => {
+            setAccountType(resolvedAccountType);
+          });
         }
       );
 
@@ -654,7 +726,8 @@ const [chains, setChains] =
       clearParticipantState(
         setProperties,
         setChainNodes,
-        setChains
+        setChains,
+        setEstateAgentOperationalAssignments
       );
 
       return;
@@ -671,6 +744,15 @@ const [chains, setChains] =
     runParticipantLoad,
   ]);
 
+  const getMutationContext = () => ({
+    accountType,
+    estateAgentAssignments:
+      estateAgentOperationalAssignments,
+  });
+
+  const getActivityUpdaterRole = () =>
+    resolveActivityUpdaterRole(accountType);
+
 async function updatePropertyStage(
   propertyId: number,
   newStage: string
@@ -686,7 +768,8 @@ if (
     property,
     currentUserId,
     mapToOperationalProperties(properties),
-    chainNodes
+    chainNodes,
+    getMutationContext()
   )
 ) {
   alert(OPERATIONAL_EDIT_DENIED_MESSAGE);
@@ -755,7 +838,7 @@ if (!stageGateResult.ok) {
 
       update: formattedUpdate,
 
-      updated_by: "homeowner",
+      updated_by: getActivityUpdaterRole(),
 
     });
     setProperties((previousProperties) =>
@@ -779,7 +862,7 @@ if (!stageGateResult.ok) {
     
                 update: formattedUpdate,
     
-                updated_by: "homeowner",
+                updated_by: getActivityUpdaterRole(),
     
               },
     
@@ -828,7 +911,8 @@ async function addStructuredUpdate(
         property,
         currentUserId,
         mapToOperationalProperties(properties),
-        chainNodes
+        chainNodes,
+        getMutationContext()
       )
     ) {
       alert(OPERATIONAL_EDIT_DENIED_MESSAGE);
@@ -848,7 +932,8 @@ async function addStructuredUpdate(
           buyerReadyNode.chain_id,
           currentUserId,
           mapToOperationalProperties(properties),
-          chainNodes
+          chainNodes,
+          getMutationContext()
         )
       ) {
         alert(OPERATIONAL_EDIT_DENIED_MESSAGE);
@@ -872,7 +957,7 @@ async function addStructuredUpdate(
   
       update: updateMessage,
   
-      updated_by: "homeowner",
+      updated_by: getActivityUpdaterRole(),
   
     });
 
@@ -897,7 +982,7 @@ async function addStructuredUpdate(
     
                   update: updateMessage,
     
-                  updated_by: "homeowner",
+                  updated_by: getActivityUpdaterRole(),
     
                 },
     
@@ -934,7 +1019,7 @@ async function addStructuredUpdate(
     
                   update: updateMessage,
     
-                  updated_by: "homeowner",
+                  updated_by: getActivityUpdaterRole(),
     
                 },
     
@@ -970,7 +1055,8 @@ if (
     property,
     currentUserId,
     mapToOperationalProperties(properties),
-    chainNodes
+    chainNodes,
+    getMutationContext()
   )
 ) {
   alert(OPERATIONAL_EDIT_DENIED_MESSAGE);
@@ -1056,7 +1142,7 @@ if (
 
     update: updateMessage,
 
-    updated_by: "homeowner",
+    updated_by: getActivityUpdaterRole(),
   };
 
   setProperties((previousProperties) =>
@@ -1117,6 +1203,7 @@ async function recordChainCompletionDate(
       chainProperties:
         mapToOperationalProperties(properties),
       chainNodes: chainNodes as OperationalBuyerReadyNode[],
+      mutationContext: getMutationContext(),
     }
   );
 
@@ -1124,12 +1211,14 @@ async function recordChainCompletionDate(
     return result;
   }
 
-  const { position } = resolveOperationalPosition(
-    currentUserId,
+  const { position } = resolveMutationOperationalPosition({
+    viewerUserId: currentUserId,
     chainId,
-    mapToOperationalProperties(properties),
-    chainNodes as OperationalBuyerReadyNode[]
-  );
+    chainProperties:
+      mapToOperationalProperties(properties),
+    chainNodes: chainNodes as OperationalBuyerReadyNode[],
+    mutationContext: getMutationContext(),
+  });
 
   setChains((previousChains) =>
     previousChains.map((chain) =>
@@ -1207,6 +1296,7 @@ async function amendChainCompletionDate(
           mapToOperationalProperties(properties),
         chainNodes:
           chainNodes as OperationalBuyerReadyNode[],
+        mutationContext: getMutationContext(),
       }
     );
 
@@ -1270,6 +1360,7 @@ async function confirmChainCompletion(
           mapToOperationalProperties(properties),
         chainNodes:
           chainNodes as OperationalBuyerReadyNode[],
+        mutationContext: getMutationContext(),
       }
     );
 
@@ -1321,6 +1412,8 @@ return (
         chainNodes,
         chains,
         currentUserId,
+        accountType,
+        estateAgentOperationalAssignments,
         authLoading,
         isAuthenticated,
         refreshParticipantData,

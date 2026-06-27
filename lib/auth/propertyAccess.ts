@@ -6,8 +6,9 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 /**
  * Server route guard for `/property/[propertyId]`.
  *
- * Authorizes when the property appears in `chain_properties_participant` for
- * the current user (chain participant with view access to that row).
+ * Authorizes when the property appears in `chain_properties_participant`
+ * (members and assignment-scoped estate agents) or when the user is assigned
+ * to the property via an active branch assignment.
  */
 export async function requirePropertyParticipantForRoute(
   propertyIdRaw: string | undefined
@@ -37,9 +38,19 @@ export async function requirePropertyParticipantForRoute(
     .eq("id", propertyId)
     .maybeSingle();
 
-  if (error || !data) {
-    notFound();
+  if (!error && data) {
+    return propertyId;
   }
 
-  return propertyId;
+  const { data: assigned, error: assignedError } =
+    await supabase.rpc(
+      "is_ea_assigned_to_property",
+      { p_property_id: propertyId }
+    );
+
+  if (!assignedError && assigned === true) {
+    return propertyId;
+  }
+
+  notFound();
 }

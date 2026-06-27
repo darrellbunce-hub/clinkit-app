@@ -45,6 +45,9 @@ export function canConfirmChainCompletion(params: {
   chainNodes: Parameters<
     typeof canOperationalParticipantManageChainCompletionDate
   >[0]["chainNodes"];
+  mutationContext?: Parameters<
+    typeof canOperationalParticipantManageChainCompletionDate
+  >[0]["mutationContext"];
 }): boolean {
   if (
     params.completionLifecycleStatus !==
@@ -81,6 +84,9 @@ export async function confirmChainCompletion(
     chainNodes: Parameters<
       typeof canOperationalParticipantManageChainCompletionDate
     >[0]["chainNodes"];
+    mutationContext?: Parameters<
+      typeof canOperationalParticipantManageChainCompletionDate
+    >[0]["mutationContext"];
   }
 ): Promise<ConfirmChainCompletionResult> {
   const managementAccess =
@@ -90,6 +96,7 @@ export async function confirmChainCompletion(
         chainId: params.chainId,
         chainProperties: params.chainProperties,
         chainNodes: params.chainNodes,
+        mutationContext: params.mutationContext,
       }
     );
 

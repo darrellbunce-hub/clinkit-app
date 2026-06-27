@@ -17,7 +17,8 @@ import {
   isAgentHomeRoute,
   isEstateAgentOnboardingRoute,
   isEstateAgentProtectedRoute,
-  isHomeownerProtectedRoute,
+  isHomeownerOnlyRoute,
+  isSharedOperationalRoute,
 } from "@/lib/auth/routes";
 
 export type RouteGuardAllow = {
@@ -177,6 +178,35 @@ export function requireCompletedEstateAgentOnboarding(
 }
 
 /**
+ * Shared operational workspace: homeowners or onboarded estate agents.
+ */
+export function requireSharedOperationalAccess(
+  context: CurrentUserContext | null
+): RouteGuardResult {
+  if (!context) {
+    return deny(
+      ROUTES.homeownerLogin,
+      "authentication_required"
+    );
+  }
+
+  if (isHomeowner(context.profile)) {
+    return allow();
+  }
+
+  if (isEstateAgent(context.profile)) {
+    return requireCompletedEstateAgentOnboarding(
+      context
+    );
+  }
+
+  return deny(
+    resolveHomeownerBlockedRedirect(context.profile),
+    "shared_operational_route_forbidden"
+  );
+}
+
+/**
  * Middleware entry point: evaluate account-type rules for a protected route.
  */
 export function evaluateProtectedRouteAccess(
@@ -199,8 +229,12 @@ export function evaluateProtectedRouteAccess(
     return allow();
   }
 
-  if (isHomeownerProtectedRoute(pathname)) {
+  if (isHomeownerOnlyRoute(pathname)) {
     return requireHomeowner(context);
+  }
+
+  if (isSharedOperationalRoute(pathname)) {
+    return requireSharedOperationalAccess(context);
   }
 
   if (isEstateAgentOnboardingRoute(pathname)) {

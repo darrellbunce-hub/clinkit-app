@@ -156,6 +156,7 @@ export async function convertSearchingPlaceholder(
     salePropertyId: number;
     address: string;
     postcode: string;
+    updatedBy?: "homeowner" | "estate_agent";
   }
 ): Promise<ConvertSearchingPlaceholderResult> {
   const placeholder =
@@ -228,7 +229,7 @@ export async function convertSearchingPlaceholder(
     await supabase.from("activities").insert({
       property_id: converted.id,
       update: "Onward purchase added",
-      updated_by: "homeowner",
+      updated_by: params.updatedBy ?? "homeowner",
     });
 
   if (activityError) {

@@ -15,10 +15,13 @@ import {
   canMutateBuyerReadyTarget,
   canMutatePropertyTarget,
   OPERATIONAL_EDIT_DENIED_MESSAGE,
-  resolveOperationalPosition,
   type OperationalBuyerReadyNode,
   type OperationalProperty,
 } from "@/lib/operationalPosition";
+import {
+  resolveMutationOperationalPosition,
+  type MutationPermissionContext,
+} from "@/lib/mutationPermission";
 
 export type RecordChainCompletionDateResult =
   | {
@@ -53,6 +56,7 @@ export function canOperationalParticipantManageChainCompletionDate(params: {
   chainId: number;
   chainProperties: OperationalProperty[];
   chainNodes: OperationalBuyerReadyNode[];
+  mutationContext?: MutationPermissionContext;
 }): OperationalCompletionManagementAccess {
   if (!params.userId) {
     return {
@@ -61,12 +65,13 @@ export function canOperationalParticipantManageChainCompletionDate(params: {
     };
   }
 
-  const { position } = resolveOperationalPosition(
-    params.userId,
-    params.chainId,
-    params.chainProperties,
-    params.chainNodes
-  );
+  const { position } = resolveMutationOperationalPosition({
+    viewerUserId: params.userId,
+    chainId: params.chainId,
+    chainProperties: params.chainProperties,
+    chainNodes: params.chainNodes,
+    mutationContext: params.mutationContext,
+  });
 
   if (!position) {
     return {
@@ -84,14 +89,16 @@ export function canOperationalParticipantManageChainCompletionDate(params: {
           ),
           params.userId,
           params.chainProperties,
-          params.chainNodes
+          params.chainNodes,
+          params.mutationContext
         )
       : canMutateBuyerReadyTarget(
           position.nodeId,
           params.chainId,
           params.userId,
           params.chainProperties,
-          params.chainNodes
+          params.chainNodes,
+          params.mutationContext
         );
 
   if (!canManage) {
@@ -115,6 +122,7 @@ export async function recordChainCompletionDate(
     scheduledDate: string;
     chainProperties: OperationalProperty[];
     chainNodes: OperationalBuyerReadyNode[];
+    mutationContext?: MutationPermissionContext;
   }
 ): Promise<RecordChainCompletionDateResult> {
   const managementAccess =
@@ -124,6 +132,7 @@ export async function recordChainCompletionDate(
         chainId: params.chainId,
         chainProperties: params.chainProperties,
         chainNodes: params.chainNodes,
+        mutationContext: params.mutationContext,
       }
     );
 
@@ -309,6 +318,7 @@ export function canShowCompletionSchedulingForm(params: {
   chainId: number;
   chainProperties: OperationalProperty[];
   chainNodes: OperationalBuyerReadyNode[];
+  mutationContext?: MutationPermissionContext;
 }): boolean {
   return canShowOperationalCompletionDateEntry(params);
 }
@@ -319,6 +329,7 @@ export function canShowOperationalCompletionDateEntry(params: {
   chainId: number;
   chainProperties: OperationalProperty[];
   chainNodes: OperationalBuyerReadyNode[];
+  mutationContext?: MutationPermissionContext;
 }): boolean {
   if (params.chainScheduledDate) {
     return false;

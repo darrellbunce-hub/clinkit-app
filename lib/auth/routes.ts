@@ -1,10 +1,8 @@
 /**
  * Route classification for account-type-aware middleware and guards.
  *
- * Homeowner-only routes cover operational participant workflows.
- * Estate agent routes are reserved for onboarding and the future agent product.
- * Public EA marketing/auth routes are listed for future PRs even though pages
- * are not implemented yet.
+ * Homeowner-only routes cover join/start/dashboard flows.
+ * Shared operational routes are used by homeowners and estate agents.
  */
 
 export const ROUTES = {
@@ -28,15 +26,31 @@ export const ACCOUNT_SETTINGS_PREFIXES = [
   "/account",
 ] as const;
 
-/** Prefixes for homeowner operational workflows — estate agents must not access these. */
-export const HOMEOWNER_PROTECTED_PREFIXES = [
+/** Homeowner-only operational flows — estate agents must not access these. */
+export const HOMEOWNER_ONLY_PREFIXES = [
   "/dashboard",
   "/start-move",
   "/join-chain",
   "/my-chains",
+] as const;
+
+/**
+ * Shared operational workspace — homeowners and onboarded estate agents.
+ * Same chain, property, and workflow pages for all operational roles.
+ */
+export const SHARED_OPERATIONAL_PREFIXES = [
   "/chain/",
   "/property/",
   "/buyer-ready/",
+] as const;
+
+/**
+ * @deprecated Use HOMEOWNER_ONLY_PREFIXES and SHARED_OPERATIONAL_PREFIXES.
+ * Kept for callers that still check the combined homeowner operational set.
+ */
+export const HOMEOWNER_PROTECTED_PREFIXES = [
+  ...HOMEOWNER_ONLY_PREFIXES,
+  ...SHARED_OPERATIONAL_PREFIXES,
 ] as const;
 
 /** Prefixes for estate agent product routes. */
@@ -105,6 +119,24 @@ export function isAccountSettingsRoute(
   );
 }
 
+export function isHomeownerOnlyRoute(
+  pathname: string
+): boolean {
+  return HOMEOWNER_ONLY_PREFIXES.some(
+    (prefix) =>
+      matchesPrefix(pathname, prefix)
+  );
+}
+
+export function isSharedOperationalRoute(
+  pathname: string
+): boolean {
+  return SHARED_OPERATIONAL_PREFIXES.some(
+    (prefix) =>
+      matchesPrefix(pathname, prefix)
+  );
+}
+
 export function isHomeownerProtectedRoute(
   pathname: string
 ): boolean {
@@ -146,7 +178,8 @@ export function isAccountGatedRoute(
 ): boolean {
   return (
     isAccountSettingsRoute(pathname) ||
-    isHomeownerProtectedRoute(pathname) ||
+    isHomeownerOnlyRoute(pathname) ||
+    isSharedOperationalRoute(pathname) ||
     isEstateAgentProtectedRoute(pathname)
   );
 }

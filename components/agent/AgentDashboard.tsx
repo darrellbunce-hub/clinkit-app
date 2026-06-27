@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
   useEffect,
   useMemo,
@@ -232,16 +233,21 @@ function SummaryRow({
         : "No access";
 
   return (
-    <tr className="border-b border-slate-100 last:border-b-0">
+    <tr className="border-b border-slate-100 last:border-b-0 hover:bg-slate-50/80">
       <td className="px-6 py-4">
-        <p className="font-semibold text-slate-900">
-          {summary.address ?? "Property"}
-        </p>
+        <Link
+          href={`/property/${summary.property_id}`}
+          className="block group"
+        >
+          <p className="font-semibold text-slate-900 group-hover:text-blue-700">
+            {summary.address ?? "Property"}
+          </p>
 
-        <p className="text-sm text-slate-500">
-          {summary.postcode ?? "—"} · Chain{" "}
-          {summary.chain_id}
-        </p>
+          <p className="text-sm text-slate-500">
+            {summary.postcode ?? "—"} · Chain{" "}
+            {summary.chain_id}
+          </p>
+        </Link>
       </td>
 
       <td className="px-6 py-4 text-slate-700">

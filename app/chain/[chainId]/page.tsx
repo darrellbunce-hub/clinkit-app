@@ -13,6 +13,8 @@ import { MobileChainScrollRegion } from "@/components/mobile/MobileChainScrollRe
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useChain } from "@/context/ChainContext";
+import { ROUTES } from "@/lib/auth/routes";
+import { isEstateAgent } from "@/lib/accountType";
 import { supabase } from "@/lib/supabase";
 import { STAGES } from "@/data/stages";
 import {
@@ -26,8 +28,12 @@ import {
   findSearchingPlaceholderLinkedFromSale,
   getChainTileDisplayTitle,
   mapToOperationalProperties,
-  resolveOperationalPosition,
 } from "@/lib/operationalPosition";
+import {
+  applyOperationalSubjectLens,
+  resolveOperationalSubject,
+  resolveSubjectOperationalPosition,
+} from "@/lib/operationalSubject";
 import PageHeaderBand from "@/components/theme/PageHeaderBand";
 import {
   chainAwaitingBuyerConnectorClasses,
@@ -50,6 +56,7 @@ import ChainCompletedBanner from "@/components/ChainCompletedBanner";
 import PropertyEstateAgentAssignment from "@/components/estate-agents/PropertyEstateAgentAssignment";
 import RecordCompletionDateForm from "@/components/RecordCompletionDateForm";
 import { canShowCompletionSchedulingForm } from "@/lib/recordChainCompletionDate";
+import { canEditProperty } from "@/lib/propertyPermissions";
 import { canAmendChainCompletionDate } from "@/lib/amendChainCompletionDate";
 import { canConfirmChainCompletion } from "@/lib/confirmChainCompletion";
 import type { CompletionAmendmentReasonCode } from "@/lib/completionLifecycle";
@@ -64,7 +71,10 @@ import {
   shouldRenderUpstreamPurchaserBeforeProperty,
 } from "@/lib/resolveUpstreamPurchaser";
 import { BUYER_READY_STAGES } from "@/data/buyerReadyStages";
-import type { OperationalPosition } from "@/lib/operationalPosition";
+import type {
+  OperationalBuyerReadyNode,
+  OperationalPosition,
+} from "@/lib/operationalPosition";
 
 function resolveOwnerBuyerReadyChainNode(
   operationalPosition: OperationalPosition | null,
@@ -129,10 +139,18 @@ export default function ChainPage() {
       chains,
       chainNodes,
       currentUserId,
+      accountType,
+      estateAgentOperationalAssignments,
       recordChainCompletionDate,
       amendChainCompletionDate,
       confirmChainCompletion,
     } = useChain();
+
+  const isEstateAgentViewer =
+    isEstateAgent({
+      account_type: accountType ?? "homeowner",
+    });
+
     const [
       buyerReadySummaries,
       setBuyerReadySummaries,
@@ -294,13 +312,32 @@ export default function ChainPage() {
     isScheduledCompletionMode ||
     isCompletedCompletionMode;
 
-  const operationalPositionResult =
-    resolveOperationalPosition(
-      currentUserId,
+  const chainOperationalProperties =
+    mapToOperationalProperties(chainProperties);
+
+  const operationalSubject =
+    resolveOperationalSubject({
+      viewerUserId: currentUserId,
+      accountType,
       chainId,
-      chainProperties,
-      chainNodes
+      chainProperties: chainOperationalProperties,
+      estateAgentAssignments:
+        estateAgentOperationalAssignments,
+    });
+
+  const subjectChainProperties =
+    applyOperationalSubjectLens(
+      chainOperationalProperties,
+      operationalSubject
     );
+
+  const operationalPositionResult =
+    resolveSubjectOperationalPosition({
+      subject: operationalSubject,
+      chainId,
+      chainProperties: chainOperationalProperties,
+      chainNodes: chainNodes as OperationalBuyerReadyNode[],
+    });
 
   console.log(
     "OPERATIONAL_POSITION_RESULT",
@@ -504,6 +541,12 @@ export default function ChainPage() {
       chainProperties
     );
 
+  const mutationContext = {
+    accountType,
+    estateAgentAssignments:
+      estateAgentOperationalAssignments,
+  };
+
   const showCompletionScheduledBanner =
     isScheduledCompletionMode;
 
@@ -522,6 +565,7 @@ export default function ChainPage() {
       chainProperties:
         chainPropertiesForCompletion,
       chainNodes: chainNodes,
+      mutationContext,
     });
 
   const showAmendCompletionDate =
@@ -535,6 +579,7 @@ export default function ChainPage() {
       chainProperties:
         chainPropertiesForCompletion,
       chainNodes: chainNodes,
+      mutationContext,
     });
 
   const showConfirmCompletion =
@@ -548,6 +593,7 @@ export default function ChainPage() {
       chainProperties:
         chainPropertiesForCompletion,
       chainNodes: chainNodes,
+      mutationContext,
     });
 
   async function handleRecordCompletionDate(
@@ -630,6 +676,28 @@ export default function ChainPage() {
       return;
     }
 
+    const saleProperty =
+      chainOperationalProperties.find(
+        (property) =>
+          property.id === saleOperationalPropertyId
+      );
+
+    if (
+      !canEditProperty(
+        saleProperty,
+        currentUserId,
+        chainOperationalProperties,
+        chainNodes as OperationalBuyerReadyNode[],
+        mutationContext
+      )
+    ) {
+      alert(
+        "You do not have permission to add an onward purchase for this chain position."
+      );
+
+      return;
+    }
+
     const result =
       await convertSearchingPlaceholder(
         supabase,
@@ -638,6 +706,10 @@ export default function ChainPage() {
           salePropertyId: saleOperationalPropertyId,
           address: newAddress,
           postcode: newPostcode,
+          updatedBy:
+            accountType === "estate_agent"
+              ? "estate_agent"
+              : "homeowner",
         }
       );
 
@@ -1098,6 +1170,11 @@ export default function ChainPage() {
         isOperationalPosition
       );
 
+    const subjectProperty =
+      subjectChainProperties.find(
+        (row) => row.id === property.id
+      ) ?? property;
+
     const displayTitle =
       ownerBuyerReadyLinkedPropertyId !=
         null &&
@@ -1105,7 +1182,7 @@ export default function ChainPage() {
         Number(ownerBuyerReadyLinkedPropertyId)
         ? CHAIN_TILE_LABEL.connectedPurchase
         : getChainTileDisplayTitle(
-            property,
+            subjectProperty,
             isOperationalPosition
           );
 
@@ -1186,6 +1263,11 @@ export default function ChainPage() {
             aria-label="Buyer ready, ready to proceed"
           >
 
+            <Link
+              href={`/buyer-ready/${chainId}`}
+              className="hover:scale-105 transition"
+            >
+
             <ChainNode
               propertyNumber={0}
               displayTitle={
@@ -1204,6 +1286,8 @@ export default function ChainPage() {
               seller_connected={true}
               positionKind="buyer_ready"
             />
+
+            </Link>
 
             <div className="flex items-center mx-5">
 
@@ -1449,7 +1533,8 @@ export default function ChainPage() {
   </div>
 
 </div>
-        {activeSearchingPlaceholder && (
+        {activeSearchingPlaceholder &&
+          !isEstateAgentViewer && (
         <div className={`mt-10 ${CARD_CLASS_NO_PADDING} ${CARD_PADDING_CLASS}`}>
 
           <h2 className="text-2xl font-bold text-slate-900">
@@ -1493,6 +1578,7 @@ export default function ChainPage() {
 
         </div>
         )}
+        {!isEstateAgentViewer && (
           <div className="mt-8">
             {saleOperationalPropertyId ? (
               <PropertyEstateAgentAssignment
@@ -1514,6 +1600,7 @@ export default function ChainPage() {
               </div>
             )}
           </div>
+        )}
 
       </div>
 

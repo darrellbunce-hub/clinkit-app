@@ -31,7 +31,6 @@ export function parsePositiveIntParam(
 
 /**
  * True when the authenticated user is a member of any property in the chain.
- * Uses `is_chain_participant(p_chain_id)` — no schema changes required.
  */
 export async function isUserChainParticipant(
   supabase: SupabaseClient,
@@ -50,14 +49,33 @@ export async function isUserChainParticipant(
 }
 
 /**
+ * True when the user may view operational chain data (member or assigned EA).
+ */
+export async function isUserChainOperationalViewer(
+  supabase: SupabaseClient,
+  chainId: number
+): Promise<boolean> {
+  const { data, error } = await supabase.rpc(
+    "is_chain_operational_viewer",
+    { p_chain_id: chainId }
+  );
+
+  if (error) {
+    return false;
+  }
+
+  return data === true;
+}
+
+/**
  * Server route guard for chain-scoped pages.
  *
  * Used by:
  * - `/chain/[chainId]`
  * - `/buyer-ready/[chainId]`
  *
- * Calls `notFound()` for invalid IDs, unauthenticated users, and non-participants
- * so unauthorized and non-existent chains receive the same response.
+ * Calls `notFound()` for invalid IDs, unauthenticated users, and users
+ * without assignment-scoped operational visibility.
  */
 export async function requireChainParticipantForRoute(
   chainIdRaw: string | undefined
@@ -79,13 +97,13 @@ export async function requireChainParticipantForRoute(
     notFound();
   }
 
-  const isParticipant =
-    await isUserChainParticipant(
+  const canView =
+    await isUserChainOperationalViewer(
       supabase,
       chainId
     );
 
-  if (!isParticipant) {
+  if (!canView) {
     notFound();
   }
 

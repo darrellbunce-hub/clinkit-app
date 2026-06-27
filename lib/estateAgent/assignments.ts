@@ -103,6 +103,59 @@ export async function loadPropertyEaAssignment(
   return data as PropertyEaAssignment;
 }
 
+export async function loadEstateAgentOperationalAssignments(
+  supabase: SupabaseClient
+): Promise<
+  Array<{
+    propertyId: number;
+    chainId: number;
+    subjectUserId: string;
+    homeownerOnlyUpdates: boolean;
+  }>
+> {
+  const { data, error } = await supabase
+    .from("property_ea_assignments")
+    .select(
+      `
+      property_id,
+      assigned_by_user_id,
+      homeowner_only_updates,
+      properties!inner (
+        chain_id
+      )
+    `
+    )
+    .eq("status", "active");
+
+  if (error || !data) {
+    if (error) {
+      console.error(error);
+    }
+
+    return [];
+  }
+
+  return data.flatMap((row) => {
+    const chainId = (
+      row.properties as { chain_id?: number } | null
+    )?.chain_id;
+
+    if (chainId == null) {
+      return [];
+    }
+
+    return [
+      {
+        propertyId: row.property_id,
+        chainId,
+        subjectUserId: row.assigned_by_user_id,
+        homeownerOnlyUpdates:
+          row.homeowner_only_updates ?? true,
+      },
+    ];
+  });
+}
+
 export type AssignPropertyToBranchInput = {
   propertyId: number;
   branchId: string;

@@ -45,6 +45,9 @@ export function canAmendChainCompletionDate(params: {
   chainNodes: Parameters<
     typeof canOperationalParticipantManageChainCompletionDate
   >[0]["chainNodes"];
+  mutationContext?: Parameters<
+    typeof canOperationalParticipantManageChainCompletionDate
+  >[0]["mutationContext"];
 }): boolean {
   if (!params.chainScheduledDate) {
     return false;
@@ -75,6 +78,9 @@ export async function amendChainCompletionDate(
     chainNodes: Parameters<
       typeof canOperationalParticipantManageChainCompletionDate
     >[0]["chainNodes"];
+    mutationContext?: Parameters<
+      typeof canOperationalParticipantManageChainCompletionDate
+    >[0]["mutationContext"];
   }
 ): Promise<AmendChainCompletionDateResult> {
   if (
@@ -106,6 +112,7 @@ export async function amendChainCompletionDate(
         chainId: params.chainId,
         chainProperties: params.chainProperties,
         chainNodes: params.chainNodes,
+        mutationContext: params.mutationContext,
       }
     );
 
