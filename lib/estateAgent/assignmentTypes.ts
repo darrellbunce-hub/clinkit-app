@@ -45,6 +45,23 @@ export type AgentBranchPropertySummary = {
   completion_lifecycle_status: string | null;
   completion_scheduled_date: string | null;
   completed_at: string | null;
+  needs_attention?: boolean | null;
+  stale_update?: boolean | null;
+  days_since_last_update?: number | null;
+  operational_alerts?:
+    | {
+        code: string;
+        severity: string;
+      }[]
+    | null;
+  next_recommended_action?: {
+    code: string;
+    severity: string;
+  } | null;
+  confidence_score?: number | null;
+  health_status?: string | null;
+  claim_status?: string | null;
+  origin_type?: string | null;
 };
 
 export type AgentDashboardTab = "active" | "archived";

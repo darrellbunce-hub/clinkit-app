@@ -25,7 +25,6 @@ import {
 import { computeChainIntelligence } from "@/lib/chainIntelligence";
 import {
   CHAIN_TILE_LABEL,
-  findSearchingPlaceholderLinkedFromSale,
   getChainTileDisplayTitle,
   mapToOperationalProperties,
 } from "@/lib/operationalPosition";
@@ -525,17 +524,6 @@ export default function ChainPage() {
     topology
   );
 
-  const searchingPlaceholderLinkedFromSale =
-    saleOperationalPropertyId
-      ? findSearchingPlaceholderLinkedFromSale(
-          chainProperties,
-          saleOperationalPropertyId
-        )
-      : null;
-
-  const activeSearchingPlaceholder =
-    searchingPlaceholderLinkedFromSale !== null;
-
   const chainPropertiesForCompletion =
     mapToOperationalProperties(
       chainProperties
@@ -546,6 +534,26 @@ export default function ChainPage() {
     estateAgentAssignments:
       estateAgentOperationalAssignments,
   };
+
+  const salePropertyForOnwardPurchase =
+    saleOperationalPropertyId != null
+      ? chainOperationalProperties.find(
+          (property) =>
+            property.id ===
+            saleOperationalPropertyId
+        ) ?? null
+      : null;
+
+  const canAddOnwardPurchase =
+    salePropertyForOnwardPurchase != null &&
+    currentUserId != null &&
+    canEditProperty(
+      salePropertyForOnwardPurchase,
+      currentUserId,
+      chainOperationalProperties,
+      chainNodes as OperationalBuyerReadyNode[],
+      mutationContext
+    );
 
   const showCompletionScheduledBanner =
     isScheduledCompletionMode;
@@ -1533,8 +1541,7 @@ export default function ChainPage() {
   </div>
 
 </div>
-        {activeSearchingPlaceholder &&
-          !isEstateAgentViewer && (
+        {canAddOnwardPurchase && (
         <div className={`mt-10 ${CARD_CLASS_NO_PADDING} ${CARD_PADDING_CLASS}`}>
 
           <h2 className="text-2xl font-bold text-slate-900">

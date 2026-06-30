@@ -5,6 +5,7 @@ import type {
   EaBranchDirectoryEntry,
   PropertyEaAssignment,
 } from "@/lib/estateAgent/assignmentTypes";
+import type { PropertyClaimStatus } from "@/lib/propertyClaim/types";
 
 export async function loadEaBranchDirectory(
   supabase: SupabaseClient
@@ -109,23 +110,16 @@ export async function loadEstateAgentOperationalAssignments(
   Array<{
     propertyId: number;
     chainId: number;
-    subjectUserId: string;
+    subjectUserId: string | null;
     homeownerOnlyUpdates: boolean;
+    claimStatus: PropertyClaimStatus | null;
   }>
 > {
   const { data, error } = await supabase
-    .from("property_ea_assignments")
+    .from("ea_operational_assignments")
     .select(
-      `
-      property_id,
-      assigned_by_user_id,
-      homeowner_only_updates,
-      properties!inner (
-        chain_id
-      )
-    `
-    )
-    .eq("status", "active");
+      "property_id, chain_id, subject_user_id, homeowner_only_updates, claim_status"
+    );
 
   if (error || !data) {
     if (error) {
@@ -135,25 +129,16 @@ export async function loadEstateAgentOperationalAssignments(
     return [];
   }
 
-  return data.flatMap((row) => {
-    const chainId = (
-      row.properties as { chain_id?: number } | null
-    )?.chain_id;
-
-    if (chainId == null) {
-      return [];
-    }
-
-    return [
-      {
-        propertyId: row.property_id,
-        chainId,
-        subjectUserId: row.assigned_by_user_id,
-        homeownerOnlyUpdates:
-          row.homeowner_only_updates ?? true,
-      },
-    ];
-  });
+  return data.map((row) => ({
+    propertyId: row.property_id,
+    chainId: row.chain_id,
+    subjectUserId: row.subject_user_id,
+    homeownerOnlyUpdates:
+      row.homeowner_only_updates ?? true,
+    claimStatus:
+      (row.claim_status as PropertyClaimStatus | null) ??
+      null,
+  }));
 }
 
 export type AssignPropertyToBranchInput = {

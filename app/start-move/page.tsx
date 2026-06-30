@@ -9,7 +9,7 @@ import {
 } from "@/components/mobileStandards";
 import { createChainForOnboarding } from "@/lib/createChainForOnboarding";
 import { ensurePropertyMembership } from "@/lib/ensurePropertyMembership";
-import { getNextChainPosition } from "@/lib/searchingPlaceholder";
+import { attachSearchingPlaceholderToSale } from "@/lib/searchingPlaceholder";
 
 export default function StartMovePage() {
  
@@ -405,99 +405,23 @@ export default function StartMovePage() {
         // SEARCHING PLACEHOLDER (stage-authoritative; no buying address)
         if (
           searchingForProperty &&
-          !buyingAddress
+          !buyingAddress &&
+          sellingPropertyId
         ) {
-
-          const nextChainPosition =
-            await getNextChainPosition(
+          const attachResult =
+            await attachSearchingPlaceholderToSale(
               supabase,
-              chainId
+              {
+                chainId,
+                salePropertyId: sellingPropertyId,
+                userId: user.id,
+              }
             );
 
-          const {
-            data: searchingPlaceholder,
-            error: searchingError,
-          } = await supabase
-            .from("properties")
-            .insert({
-              chain_id: chainId,
-
-              chain_position:
-                nextChainPosition,
-
-              stage: "searching",
-
-              address: null,
-
-              postcode: null,
-
-              relationship_type:
-                "purchase",
-
-              status:
-                "pending_connection",
-
-              created_by_user_id:
-                user.id,
-
-              linked_property_id: null,
-
-              awaiting_buyer: false,
-
-              buyer_connected: false,
-
-              seller_connected: true,
-
-              is_searching: true,
-
-              is_current_user: true,
-
-              last_updated_days: 0,
-            })
-            .select()
-            .single();
-
-          if (searchingError) {
-
-            console.error(searchingError);
-
+          if (!attachResult.ok) {
+            console.error(attachResult.error);
             return;
-
           }
-
-          if (searchingPlaceholder) {
-
-            const { error: searchingMemberError } =
-              await ensurePropertyMembership(
-                supabase,
-                {
-                  propertyId: searchingPlaceholder.id,
-                  role: "buyer",
-                }
-              );
-
-            if (searchingMemberError) {
-              console.error(searchingMemberError);
-              return;
-            }
-
-            if (sellingPropertyId) {
-
-              await supabase
-                .from("properties")
-                .update({
-                  linked_property_id:
-                    searchingPlaceholder.id,
-                })
-                .eq(
-                  "id",
-                  sellingPropertyId
-                );
-
-            }
-
-          }
-
         }
 
         if (notSelling) {

@@ -60,6 +60,7 @@ import {
   resolveActivityUpdaterRole,
   resolveMutationOperationalPosition,
 } from "@/lib/mutationPermission";
+import { refreshOperationalSummary } from "@/lib/operationalSummary/refreshOperationalSummary";
 type Activity = OperationalActivity;
 
 type Property = {
@@ -753,6 +754,23 @@ const [chains, setChains] =
   const getActivityUpdaterRole = () =>
     resolveActivityUpdaterRole(accountType);
 
+  async function refreshOperationalSummariesForChain(
+    chainId: number
+  ) {
+    const result =
+      await refreshOperationalSummary(
+        supabase,
+        { chainId }
+      );
+
+    if (!result.ok) {
+      console.error(
+        "Operational summary refresh failed:",
+        result.error
+      );
+    }
+  }
+
 async function updatePropertyStage(
   propertyId: number,
   newStage: string
@@ -841,6 +859,11 @@ if (!stageGateResult.ok) {
       updated_by: getActivityUpdaterRole(),
 
     });
+
+    await refreshOperationalSummariesForChain(
+      Number(property!.chainId)
+    );
+
     setProperties((previousProperties) =>
       previousProperties.map((property) => {
     
@@ -1037,6 +1060,20 @@ async function addStructuredUpdate(
     
     }
 
+  const refreshChainId =
+    targetType === "property"
+      ? properties.find(
+          (entry) => entry.id === targetId
+        )?.chainId
+      : chainNodes.find(
+          (node) => node.id === targetId
+        )?.chain_id;
+
+  if (refreshChainId != null) {
+    await refreshOperationalSummariesForChain(
+      Number(refreshChainId)
+    );
+  }
 }
 
 async function breakChainConnection(
@@ -1180,6 +1217,10 @@ if (
       return updatedProperty;
     })
   );
+
+  await refreshOperationalSummariesForChain(
+    property.chainId
+  );
 }
 
 async function recordChainCompletionDate(
@@ -1266,6 +1307,10 @@ async function recordChainCompletionDate(
           }
         : node
     )
+  );
+
+  await refreshOperationalSummariesForChain(
+    chainId
   );
 
   return result;

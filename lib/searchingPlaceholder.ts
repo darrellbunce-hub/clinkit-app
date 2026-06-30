@@ -138,6 +138,108 @@ export async function insertSearchingPlaceholder(
   };
 }
 
+export async function linkSaleToSearchingPlaceholder(
+  supabase: SupabaseClient,
+  params: {
+    salePropertyId: number;
+    searchingPropertyId: number;
+  }
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { data, error } = await supabase.rpc(
+    "link_sale_to_searching_placeholder",
+    {
+      p_sale_property_id: params.salePropertyId,
+      p_searching_property_id:
+        params.searchingPropertyId,
+    }
+  );
+
+  if (error) {
+    return {
+      ok: false,
+      error: error.message,
+    };
+  }
+
+  const result = data as { ok?: boolean; error?: string } | null;
+
+  if (!result?.ok) {
+    return {
+      ok: false,
+      error: result?.error ?? "link_failed",
+    };
+  }
+
+  return { ok: true };
+}
+
+export type AttachSearchingPlaceholderResult =
+  | { ok: true; placeholderId: number }
+  | { ok: false; error: string };
+
+/**
+ * Inserts a searching placeholder and links it from the sale — shared by
+ * Start Move and EA sale origination.
+ */
+export async function attachSearchingPlaceholderToSale(
+  supabase: SupabaseClient,
+  params: {
+    chainId: number;
+    salePropertyId: number;
+    userId: string;
+  }
+): Promise<AttachSearchingPlaceholderResult> {
+  const existingPlaceholder =
+    await findSearchingPlaceholderBySaleProperty(
+      supabase,
+      params.chainId,
+      params.salePropertyId
+    );
+
+  if (existingPlaceholder) {
+    return {
+      ok: true,
+      placeholderId: existingPlaceholder.id,
+    };
+  }
+
+  const {
+    placeholder,
+    error: insertError,
+  } = await insertSearchingPlaceholder(supabase, {
+    chainId: params.chainId,
+    userId: params.userId,
+  });
+
+  if (insertError || !placeholder) {
+    return {
+      ok: false,
+      error:
+        insertError instanceof Error
+          ? insertError.message
+          : "searching_placeholder_insert_failed",
+    };
+  }
+
+  const linkResult =
+    await linkSaleToSearchingPlaceholder(supabase, {
+      salePropertyId: params.salePropertyId,
+      searchingPropertyId: placeholder.id,
+    });
+
+  if (!linkResult.ok) {
+    return {
+      ok: false,
+      error: linkResult.error,
+    };
+  }
+
+  return {
+    ok: true,
+    placeholderId: placeholder.id,
+  };
+}
+
 export type ConvertSearchingPlaceholderResult =
   | { ok: true; propertyId: number }
   | {

@@ -19,6 +19,7 @@ export const ROUTES = {
   estateAgentPricing: "/estate-agents/pricing",
   estateAgentOnboarding: "/estate-agents/onboarding",
   agentHome: "/agent",
+  agentOriginate: "/agent/originate",
 } as const;
 
 /** Prefixes for account settings — any authenticated account type. */

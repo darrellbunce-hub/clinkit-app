@@ -1,5 +1,6 @@
 import type { AccountType } from "@/lib/accountType";
 import { isEstateAgent } from "@/lib/accountType";
+import type { PropertyClaimStatus } from "@/lib/propertyClaim/types";
 import type { OperationalProperty } from "@/lib/operationalPosition";
 import {
   resolveOperationalPosition,
@@ -13,17 +14,17 @@ export type OperationalSubjectViewerRole =
   | "estate_agent";
 
 export type OperationalSubject = {
-  subjectUserId: string;
+  subjectUserId: string | null;
   assignedPropertyId: number | null;
   viewerRole: OperationalSubjectViewerRole;
 };
 
-/** Active EA assignment row used for operational topology and delegation. */
 export type EstateAgentOperationalAssignment = {
   propertyId: number;
   chainId: number;
-  subjectUserId: string;
+  subjectUserId: string | null;
   homeownerOnlyUpdates: boolean;
+  claimStatus?: PropertyClaimStatus | null;
 };
 
 export type ResolveOperationalSubjectParams = {

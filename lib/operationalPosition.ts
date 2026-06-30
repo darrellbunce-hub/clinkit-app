@@ -194,21 +194,19 @@ export function resolveOperationalPosition(
   chainProperties: OperationalProperty[],
   chainNodes: OperationalBuyerReadyNode[]
 ): ResolveOperationalPositionResult {
-  if (!userId) {
-    return { position: null };
-  }
-
-  const buyerReadyNode = findBuyerReadyNodeForUser(
-    chainNodes,
-    chainId,
-    userId
-  );
-
   const sellerHopProperties =
     findSellerHopPropertiesInChain(
       chainProperties,
       chainId
     );
+
+  const buyerReadyNode = userId
+    ? findBuyerReadyNodeForUser(
+        chainNodes,
+        chainId,
+        userId
+      )
+    : undefined;
 
   if (buyerReadyNode && sellerHopProperties.length > 0) {
     return {
