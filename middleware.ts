@@ -158,6 +158,7 @@ export const config = {
     "/start-move/:path*",
     "/join-chain/:path*",
     "/my-chains/:path*",
+    "/claim/:path*",
     "/chain/:path*",
     "/property/:path*",
     "/buyer-ready/:path*",

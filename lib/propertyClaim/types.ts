@@ -26,6 +26,33 @@ export type PropertyClaimMetadata = {
   claimed_by_user_id: string | null;
 };
 
+/** Privacy-safe row returned by discover_claimable_properties RPC. */
+export type ClaimablePropertySummary = {
+  property_id: number;
+  address: string | null;
+  postcode: string | null;
+  branch_name: string;
+  in_chain: boolean;
+  claim_status: Extract<
+    PropertyClaimStatus,
+    "unclaimed" | "claim_invited"
+  >;
+};
+
+export type ClaimOperationalPropertyResult =
+  | {
+      ok: true;
+      propertyId: number;
+      chainId: number;
+      error: null;
+    }
+  | {
+      ok: false;
+      propertyId: null;
+      chainId: null;
+      error: string;
+    };
+
 export function resolveClaimStatusFromEmail(
   inviteEmail: string | null | undefined
 ): Extract<PropertyClaimStatus, "unclaimed" | "claim_invited"> {

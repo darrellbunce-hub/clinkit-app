@@ -10,6 +10,7 @@ import {
   PAGE_TITLE_CLASS,
 } from "@/components/mobileStandards";
 import { ROUTES } from "@/lib/auth/routes";
+import { completeEaManagedPropertyOrigination } from "@/lib/estateAgent/completeEaManagedPropertyOrigination";
 import type { AgentHomeContext } from "@/lib/estateAgent/loadAgentHomeContext";
 import { loadAgentHomeContext } from "@/lib/estateAgent/loadAgentHomeContext";
 import {
@@ -18,7 +19,12 @@ import {
   generateOperationalAccessCode,
   joinEaOperationalChain,
 } from "@/lib/estateAgent/originateOperationalProperty";
-import { finalizeOperationalSaleCreation } from "@/lib/estateAgent/finalizeOperationalSaleCreation";
+import {
+  DEFAULT_SELLER_ONWARD_PLAN,
+  requiresOnwardPurchaseAddress,
+  saleAwaitingBuyerForOnwardPlan,
+  type SellerOnwardPlan,
+} from "@/lib/estateAgent/sellerOnwardPlan";
 import {
   BTN_PRIMARY_CLASS,
   SURFACE_PANEL_HOVER_CLASS,
@@ -26,7 +32,24 @@ import {
 import { supabase } from "@/lib/supabase";
 
 type OriginateMode = "new_chain" | "join_chain";
-type PropertyKind = "sale" | "purchase";
+
+const ONWARD_PLAN_OPTIONS: {
+  value: SellerOnwardPlan;
+  label: string;
+}[] = [
+  {
+    value: "searching",
+    label: "Searching for next property",
+  },
+  {
+    value: "purchase_agreed",
+    label: "Purchase agreed",
+  },
+  {
+    value: "no_onward",
+    label: "No onward purchase",
+  },
+];
 
 export default function AgentOriginatePage() {
   const router = useRouter();
@@ -40,18 +63,24 @@ export default function AgentOriginatePage() {
     useState("");
   const [mode, setMode] =
     useState<OriginateMode>("new_chain");
-  const [propertyKind, setPropertyKind] =
-    useState<PropertyKind>("sale");
-  const [address, setAddress] = useState("");
-  const [postcode, setPostcode] = useState("");
+  const [saleAddress, setSaleAddress] =
+    useState("");
+  const [salePostcode, setSalePostcode] =
+    useState("");
+  const [onwardAddress, setOnwardAddress] =
+    useState("");
+  const [onwardPostcode, setOnwardPostcode] =
+    useState("");
   const [accessCode, setAccessCode] =
     useState("");
   const [inviteEmail, setInviteEmail] =
     useState("");
   const [delegatedUpdates, setDelegatedUpdates] =
     useState(false);
-  const [awaitingBuyer, setAwaitingBuyer] =
-    useState(false);
+  const [onwardPlan, setOnwardPlan] =
+    useState<SellerOnwardPlan>(
+      DEFAULT_SELLER_ONWARD_PLAN
+    );
   const [createdAccessCode, setCreatedAccessCode] =
     useState<string | null>(null);
 
@@ -88,6 +117,17 @@ export default function AgentOriginatePage() {
       return;
     }
 
+    if (
+      requiresOnwardPurchaseAddress(onwardPlan) &&
+      (!onwardAddress.trim() ||
+        !onwardPostcode.trim())
+    ) {
+      setErrorMessage(
+        "Enter the onward purchase address and postcode."
+      );
+      return;
+    }
+
     setIsSubmitting(true);
     setErrorMessage("");
     setCreatedAccessCode(null);
@@ -104,43 +144,24 @@ export default function AgentOriginatePage() {
       return;
     }
 
-    async function completeSaleOrigination(
-      chainId: number,
-      propertyId: number,
-      relationshipType: PropertyKind,
-      saleEndOfChain: boolean
-    ) {
-      if (relationshipType !== "sale") {
-        return { ok: true as const };
-      }
-
-      return finalizeOperationalSaleCreation(
-        supabase,
-        {
-          chainId,
-          salePropertyId: propertyId,
-          userId: user!.id,
-          endOfChain: saleEndOfChain,
-          refreshSummaries: true,
-        }
-      );
-    }
+    let chainId: number | null = null;
+    let propertyId: number | null = null;
 
     if (mode === "join_chain") {
       const result = await joinEaOperationalChain(
         supabase,
         {
           accessCode,
-          relationshipType: propertyKind,
-          address,
-          postcode,
+          relationshipType: "sale",
+          address: saleAddress,
+          postcode: salePostcode,
           branchId: context.branch.id,
           homeownerOnlyUpdates,
           inviteEmail: inviteEmail || null,
           awaitingBuyer:
-            propertyKind === "sale"
-              ? awaitingBuyer
-              : false,
+            saleAwaitingBuyerForOnwardPlan(
+              onwardPlan
+            ),
         }
       );
 
@@ -153,123 +174,106 @@ export default function AgentOriginatePage() {
         return;
       }
 
-      const finalizeResult =
-        await completeSaleOrigination(
-          result.chainId,
-          result.propertyId,
-          propertyKind,
-          propertyKind === "sale" && awaitingBuyer
-        );
+      chainId = result.chainId;
+      propertyId = result.propertyId;
+    } else {
+      let chainAccessCode =
+        generateOperationalAccessCode();
 
-      setIsSubmitting(false);
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        const chainResult =
+          await createEaOperationalChain(supabase, {
+            name: `EA-CHAIN-${Date.now()}`,
+            accessCode: chainAccessCode,
+          });
 
-      if (!finalizeResult.ok) {
+        if (
+          chainResult.error ===
+            "duplicate_access_code" &&
+          attempt < 4
+        ) {
+          chainAccessCode =
+            generateOperationalAccessCode();
+          continue;
+        }
+
+        if (chainResult.error || chainResult.chainId == null) {
+          setIsSubmitting(false);
+          setErrorMessage(
+            chainResult.error ??
+              "Could not create the chain."
+          );
+          return;
+        }
+
+        chainId = chainResult.chainId;
+        chainAccessCode =
+          chainResult.accessCode ?? chainAccessCode;
+        break;
+      }
+
+      if (chainId == null) {
+        setIsSubmitting(false);
         setErrorMessage(
-          finalizeResult.error ??
-            "Could not set up onward search for this sale."
+          "Could not create the chain."
         );
         return;
       }
 
-      router.push(
-        `/property/${result.propertyId}`
-      );
-      return;
-    }
-
-    let chainId: number | null = null;
-    let chainAccessCode = generateOperationalAccessCode();
-
-    for (let attempt = 0; attempt < 5; attempt += 1) {
-      const chainResult =
-        await createEaOperationalChain(supabase, {
-          name: `EA-CHAIN-${Date.now()}`,
-          accessCode: chainAccessCode,
+      const propertyResult =
+        await createEaOperationalProperty(supabase, {
+          chainId,
+          relationshipType: "sale",
+          address: saleAddress,
+          postcode: salePostcode,
+          branchId: context.branch.id,
+          homeownerOnlyUpdates,
+          inviteEmail: inviteEmail || null,
+          awaitingBuyer:
+            saleAwaitingBuyerForOnwardPlan(
+              onwardPlan
+            ),
         });
 
       if (
-        chainResult.error ===
-          "duplicate_access_code" &&
-        attempt < 4
+        propertyResult.error ||
+        propertyResult.propertyId == null
       ) {
-        chainAccessCode =
-          generateOperationalAccessCode();
-        continue;
-      }
-
-      if (chainResult.error || chainResult.chainId == null) {
         setIsSubmitting(false);
         setErrorMessage(
-          chainResult.error ??
-            "Could not create the chain."
+          propertyResult.error ??
+            "Could not create the property."
         );
         return;
       }
 
-      chainId = chainResult.chainId;
-      chainAccessCode =
-        chainResult.accessCode ?? chainAccessCode;
-      break;
+      propertyId = propertyResult.propertyId;
+      setCreatedAccessCode(chainAccessCode);
     }
 
-    if (chainId == null) {
-      setIsSubmitting(false);
-      setErrorMessage(
-        "Could not create the chain."
-      );
-      return;
-    }
-
-    const propertyResult =
-      await createEaOperationalProperty(supabase, {
-        chainId,
-        relationshipType: propertyKind,
-        address,
-        postcode,
-        branchId: context.branch.id,
-        homeownerOnlyUpdates,
-        inviteEmail: inviteEmail || null,
-        awaitingBuyer:
-          propertyKind === "sale"
-            ? awaitingBuyer
-            : false,
-      });
-
-    if (
-      propertyResult.error ||
-      propertyResult.propertyId == null
-    ) {
-      setIsSubmitting(false);
-      setErrorMessage(
-        propertyResult.error ??
-          "Could not create the property."
-      );
-      return;
-    }
-
-    const finalizeResult =
-      await completeSaleOrigination(
-        chainId,
-        propertyResult.propertyId,
-        propertyKind,
-        propertyKind === "sale" && awaitingBuyer
+    const completionResult =
+      await completeEaManagedPropertyOrigination(
+        supabase,
+        {
+          chainId: chainId!,
+          salePropertyId: propertyId!,
+          userId: user.id,
+          branchId: context.branch.id,
+          homeownerOnlyUpdates,
+          onwardPlan,
+          onwardAddress,
+          onwardPostcode,
+        }
       );
 
     setIsSubmitting(false);
 
-    if (!finalizeResult.ok) {
-      setErrorMessage(
-        finalizeResult.error ??
-          "Could not set up onward search for this sale."
-      );
+    if (!completionResult.ok) {
+      setErrorMessage(completionResult.error);
       return;
     }
 
-    setCreatedAccessCode(chainAccessCode);
-
-    router.push(
-      `/property/${propertyResult.propertyId}`
-    );
+    router.push(`/property/${propertyId}`);
   }
 
   return (
@@ -351,26 +355,6 @@ export default function AgentOriginatePage() {
               onSubmit={handleSubmit}
               className={`rounded-3xl border border-slate-200 bg-white shadow-sm ${CARD_PADDING_CLASS} space-y-6`}
             >
-              <div className="grid gap-3 sm:grid-cols-2">
-                <ModeButton
-                  active={propertyKind === "sale"}
-                  label="Sale property"
-                  onClick={() =>
-                    setPropertyKind("sale")
-                  }
-                />
-
-                <ModeButton
-                  active={
-                    propertyKind === "purchase"
-                  }
-                  label="Purchase property"
-                  onClick={() =>
-                    setPropertyKind("purchase")
-                  }
-                />
-              </div>
-
               {mode === "join_chain" ? (
                 <Field
                   label="Chain access code"
@@ -381,16 +365,16 @@ export default function AgentOriginatePage() {
               ) : null}
 
               <Field
-                label="Property address"
-                value={address}
-                onChange={setAddress}
+                label="Sale address"
+                value={saleAddress}
+                onChange={setSaleAddress}
                 required
               />
 
               <Field
                 label="Postcode"
-                value={postcode}
-                onChange={setPostcode}
+                value={salePostcode}
+                onChange={setSalePostcode}
                 required
               />
 
@@ -428,23 +412,65 @@ export default function AgentOriginatePage() {
                 </span>
               </label>
 
-              {propertyKind === "sale" ? (
-                <label className="flex items-start gap-3 rounded-2xl border border-slate-200 px-4 py-4">
-                  <input
-                    type="checkbox"
-                    checked={awaitingBuyer}
-                    onChange={(event) =>
-                      setAwaitingBuyer(
-                        event.target.checked
-                      )
-                    }
-                    className="mt-1"
+              <fieldset className="space-y-3 rounded-2xl border border-slate-200 px-4 py-4">
+                <legend className="px-1 text-sm font-medium text-slate-900">
+                  Seller&apos;s onward plans
+                </legend>
+
+                {ONWARD_PLAN_OPTIONS.map((option) => (
+                  <label
+                    key={option.value}
+                    className="flex items-start gap-3"
+                  >
+                    <input
+                      type="radio"
+                      name="onwardPlan"
+                      value={option.value}
+                      checked={
+                        onwardPlan === option.value
+                      }
+                      onChange={() => {
+                        setOnwardPlan(option.value);
+                        if (
+                          option.value !==
+                          "purchase_agreed"
+                        ) {
+                          setOnwardAddress("");
+                          setOnwardPostcode("");
+                        }
+                      }}
+                      className="mt-1"
+                    />
+
+                    <span className="text-sm text-slate-700">
+                      {option.label}
+                    </span>
+                  </label>
+                ))}
+              </fieldset>
+
+              {requiresOnwardPurchaseAddress(
+                onwardPlan
+              ) ? (
+                <div className="space-y-6 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+                  <p className="text-sm font-medium text-slate-900">
+                    Onward purchase address
+                  </p>
+
+                  <Field
+                    label="Address"
+                    value={onwardAddress}
+                    onChange={setOnwardAddress}
+                    required
                   />
 
-                  <span className="text-sm text-slate-700">
-                    Awaiting buyer connection
-                  </span>
-                </label>
+                  <Field
+                    label="Postcode"
+                    value={onwardPostcode}
+                    onChange={setOnwardPostcode}
+                    required
+                  />
+                </div>
               ) : null}
 
               {errorMessage ? (

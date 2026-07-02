@@ -20,6 +20,7 @@ export const ROUTES = {
   estateAgentOnboarding: "/estate-agents/onboarding",
   agentHome: "/agent",
   agentOriginate: "/agent/originate",
+  claimProperty: "/claim",
 } as const;
 
 /** Prefixes for account settings — any authenticated account type. */
@@ -33,6 +34,7 @@ export const HOMEOWNER_ONLY_PREFIXES = [
   "/start-move",
   "/join-chain",
   "/my-chains",
+  "/claim",
 ] as const;
 
 /**
@@ -194,6 +196,7 @@ export const MIDDLEWARE_MATCHER = [
   "/start-move/:path*",
   "/join-chain/:path*",
   "/my-chains/:path*",
+  "/claim/:path*",
   "/chain/:path*",
   "/property/:path*",
   "/buyer-ready/:path*",

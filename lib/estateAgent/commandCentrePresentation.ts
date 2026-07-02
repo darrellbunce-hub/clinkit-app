@@ -3,6 +3,11 @@ import { STAGES } from "@/data/stages";
 import type { AgentBranchPropertySummary } from "@/lib/estateAgent/assignmentTypes";
 import { classifyAgentDashboardTab } from "@/lib/estateAgent/classifyAgentDashboard";
 import { mapChainHealthSlugToLabel } from "@/lib/operationalSummary/mapHealthStatus";
+import {
+  getInvitationLifecycleStatus,
+  isAwaitingClaimPriority,
+  isInvitationExpiredPriority,
+} from "@/lib/propertyClaim/invitationPresentation";
 
 export type OperationalPriorityTier =
   | "healthy"
@@ -20,6 +25,13 @@ export type TodaysOperationsKpis = {
   critical: number;
   averageConfidence: number | null;
   completingThisWeek: number;
+};
+
+export type ClaimOverviewKpis = {
+  awaitingClaim: number;
+  invitationActive: number;
+  invitationExpired: number;
+  claimed: number;
 };
 
 export type BranchHealthOverview = {
@@ -114,7 +126,10 @@ export function filterActionRequiredSummaries(
   summaries: AgentBranchPropertySummary[]
 ): AgentBranchPropertySummary[] {
   return filterActiveSummaries(summaries).filter(
-    (summary) => summary.needs_attention === true
+    (summary) =>
+      summary.needs_attention === true ||
+      isInvitationExpiredPriority(summary) ||
+      isAwaitingClaimPriority(summary)
   );
 }
 
@@ -122,6 +137,24 @@ export function sortActionRequiredSummaries(
   summaries: AgentBranchPropertySummary[]
 ): AgentBranchPropertySummary[] {
   return [...summaries].sort((left, right) => {
+    const leftExpired =
+      isInvitationExpiredPriority(left);
+    const rightExpired =
+      isInvitationExpiredPriority(right);
+
+    if (leftExpired !== rightExpired) {
+      return leftExpired ? -1 : 1;
+    }
+
+    const leftAwaiting =
+      isAwaitingClaimPriority(left);
+    const rightAwaiting =
+      isAwaitingClaimPriority(right);
+
+    if (leftAwaiting !== rightAwaiting) {
+      return leftAwaiting ? -1 : 1;
+    }
+
     const leftCritical = countAlertsBySeverity(
       getSummaryAlerts(left),
       "critical"
@@ -252,6 +285,63 @@ export function computeTodaysOperationsKpis(
     averageConfidence,
     completingThisWeek,
   };
+}
+
+export function computeClaimOverviewKpis(
+  summaries: AgentBranchPropertySummary[]
+): ClaimOverviewKpis {
+  const eaSummaries = filterActiveSummaries(
+    summaries
+  ).filter(
+    (summary) =>
+      summary.origin_type === "estate_agent"
+  );
+
+  const counts = {
+    awaitingClaim: 0,
+    invitationActive: 0,
+    invitationExpired: 0,
+    claimed: 0,
+  };
+
+  for (const summary of eaSummaries) {
+    const status =
+      getInvitationLifecycleStatus(summary);
+
+    switch (status) {
+      case "claimed":
+        counts.claimed += 1;
+        break;
+      case "invitation_active":
+        counts.invitationActive += 1;
+        break;
+      case "invitation_expired":
+        counts.invitationExpired += 1;
+        break;
+      case "invitation_deferred":
+      case "awaiting_claim":
+        counts.awaitingClaim += 1;
+        break;
+      default:
+        counts.awaitingClaim += 1;
+        break;
+    }
+  }
+
+  return counts;
+}
+
+export function countAwaitingHomeowners(
+  summaries: AgentBranchPropertySummary[]
+): number {
+  const claimKpis =
+    computeClaimOverviewKpis(summaries);
+
+  return (
+    claimKpis.awaitingClaim +
+    claimKpis.invitationActive +
+    claimKpis.invitationExpired
+  );
 }
 
 export function computeBranchHealthOverview(

@@ -62,6 +62,15 @@ export type AgentBranchPropertySummary = {
   health_status?: string | null;
   claim_status?: string | null;
   origin_type?: string | null;
+  invitation_lifecycle_status?:
+    | "claimed"
+    | "awaiting_claim"
+    | "invitation_active"
+    | "invitation_expired"
+    | "invitation_deferred"
+    | null;
+  invitation_expires_at?: string | null;
+  invitation_version?: number | null;
 };
 
 export type AgentDashboardTab = "active" | "archived";

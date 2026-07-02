@@ -1,0 +1,84 @@
+export const INVITATION_LIFECYCLE_STATUSES = [
+  "claimed",
+  "awaiting_claim",
+  "invitation_active",
+  "invitation_expired",
+  "invitation_deferred",
+] as const;
+
+export type InvitationLifecycleStatus =
+  (typeof INVITATION_LIFECYCLE_STATUSES)[number];
+
+export type PropertyInvitationStatus =
+  | {
+      ok: true;
+      state: "none";
+      hasInviteEmail: boolean;
+    }
+  | {
+      ok: true;
+      state: "active";
+      expiresAt: string;
+      hoursRemaining: number;
+      invitationVersion: number;
+      hasInviteEmail: boolean;
+    }
+  | {
+      ok: true;
+      state: "expired";
+      expiredAt: string;
+      invitationVersion: number;
+      hasInviteEmail: boolean;
+    }
+  | {
+      ok: true;
+      state: "deferred";
+      hasInviteEmail: boolean;
+    }
+  | {
+      ok: true;
+      state: "claimed";
+      hasInviteEmail: boolean;
+    }
+  | {
+      ok: false;
+      error: string;
+    };
+
+export type GenerateInvitationResult =
+  | {
+      ok: true;
+      token: string;
+      expiresAt: string;
+      invitationVersion: number;
+      error: null;
+    }
+  | {
+      ok: false;
+      token: null;
+      expiresAt: null;
+      invitationVersion: null;
+      error: string;
+    };
+
+export type ResolveInvitationTokenResult =
+  | {
+      ok: true;
+      error: null;
+      property: import("@/lib/propertyClaim/types").ClaimablePropertySummary;
+    }
+  | {
+      ok: false;
+      error: string;
+      property: null;
+    };
+
+export type ClaimTokenResolutionError =
+  | "invalid_token"
+  | "expired"
+  | "already_used"
+  | "already_claimed"
+  | "email_mismatch"
+  | "not_authenticated"
+  | "homeowner_only"
+  | "email_required";

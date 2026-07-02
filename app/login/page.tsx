@@ -9,6 +9,8 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { AUTH_TITLE_CLASS } from "@/components/mobileStandards";
 import { ROUTES } from "@/lib/auth/routes";
+import { getAccountType } from "@/lib/accountType";
+import { resolveHomeownerPostAuthDestination } from "@/lib/propertyClaim/resolveHomeownerPostAuthDestination";
 import { useRouter } from "next/navigation";
 
 function readCredentials(form: HTMLFormElement) {
@@ -81,7 +83,26 @@ export default function LoginPage() {
         return;
       }
 
-      window.location.href = "/dashboard";
+      const userId = result.data.user?.id;
+
+      let destination: string =
+        ROUTES.homeownerDashboard;
+
+      if (userId) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("account_type")
+          .eq("id", userId)
+          .maybeSingle();
+
+        destination =
+          await resolveHomeownerPostAuthDestination(
+            supabase,
+            getAccountType(profile)
+          );
+      }
+
+      window.location.href = destination;
     } catch (error) {
       setErrorMessage(
         error instanceof Error
@@ -135,9 +156,18 @@ export default function LoginPage() {
             id: data.user.id,
             role: "homeowner",
           });
+
+        const destination =
+          await resolveHomeownerPostAuthDestination(
+            supabase,
+            "homeowner"
+          );
+
+        router.push(destination);
+        return;
       }
 
-      router.push("/dashboard");
+      router.push(ROUTES.homeownerDashboard);
     } catch (error) {
       setErrorMessage(
         error instanceof Error
