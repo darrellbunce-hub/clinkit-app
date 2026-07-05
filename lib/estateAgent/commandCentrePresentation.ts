@@ -6,7 +6,9 @@ import { mapChainHealthSlugToLabel } from "@/lib/operationalSummary/mapHealthSta
 import {
   getInvitationLifecycleStatus,
   isAwaitingClaimPriority,
+  isInvitationActivePriority,
   isInvitationExpiredPriority,
+  isReadyToInvitePriority,
 } from "@/lib/propertyClaim/invitationPresentation";
 
 export type OperationalPriorityTier =
@@ -129,7 +131,8 @@ export function filterActionRequiredSummaries(
     (summary) =>
       summary.needs_attention === true ||
       isInvitationExpiredPriority(summary) ||
-      isAwaitingClaimPriority(summary)
+      isInvitationActivePriority(summary) ||
+      isReadyToInvitePriority(summary)
   );
 }
 
@@ -146,13 +149,22 @@ export function sortActionRequiredSummaries(
       return leftExpired ? -1 : 1;
     }
 
-    const leftAwaiting =
-      isAwaitingClaimPriority(left);
-    const rightAwaiting =
-      isAwaitingClaimPriority(right);
+    const leftActive =
+      isInvitationActivePriority(left);
+    const rightActive =
+      isInvitationActivePriority(right);
 
-    if (leftAwaiting !== rightAwaiting) {
-      return leftAwaiting ? -1 : 1;
+    if (leftActive !== rightActive) {
+      return leftActive ? -1 : 1;
+    }
+
+    const leftReady =
+      isReadyToInvitePriority(left);
+    const rightReady =
+      isReadyToInvitePriority(right);
+
+    if (leftReady !== rightReady) {
+      return leftReady ? -1 : 1;
     }
 
     const leftCritical = countAlertsBySeverity(

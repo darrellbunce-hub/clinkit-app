@@ -122,6 +122,41 @@ export function isInvitationExpiredPriority(
   );
 }
 
+export function isInvitationActivePriority(
+  summary: Pick<
+    AgentBranchPropertySummary,
+    "origin_type" | "invitation_lifecycle_status" | "claim_status"
+  >
+): boolean {
+  return (
+    summary.origin_type === "estate_agent" &&
+    summary.claim_status !== "claimed" &&
+    summary.invitation_lifecycle_status ===
+      "invitation_active"
+  );
+}
+
+export function isReadyToInvitePriority(
+  summary: Pick<
+    AgentBranchPropertySummary,
+    "origin_type" | "invitation_lifecycle_status" | "claim_status"
+  >
+): boolean {
+  return (
+    summary.origin_type === "estate_agent" &&
+    summary.claim_status !== "claimed" &&
+    summary.invitation_lifecycle_status !==
+      "invitation_active" &&
+    summary.invitation_lifecycle_status !==
+      "invitation_expired" &&
+    summary.invitation_lifecycle_status !==
+      "invitation_deferred" &&
+    (summary.invitation_lifecycle_status ===
+      "awaiting_claim" ||
+      summary.invitation_lifecycle_status == null)
+  );
+}
+
 export function isInvitationDeferred(
   summary: Pick<
     AgentBranchPropertySummary,
@@ -143,10 +178,7 @@ export function isAwaitingClaimPriority(
   >
 ): boolean {
   return (
-    summary.origin_type === "estate_agent" &&
-    summary.claim_status !== "claimed" &&
-    (summary.invitation_lifecycle_status ===
-      "awaiting_claim" ||
-      summary.invitation_lifecycle_status == null)
+    isReadyToInvitePriority(summary) ||
+    isInvitationActivePriority(summary)
   );
 }

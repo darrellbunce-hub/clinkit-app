@@ -1,7 +1,6 @@
 import OperationalActionButton from "@/components/agent/commandCentre/OperationalActionButton";
 import ConfidenceBar from "@/components/agent/commandCentre/ConfidenceBar";
-import HomeownerStatusBadge from "@/components/agent/commandCentre/HomeownerStatusBadge";
-import PropertyInvitationControls from "@/components/agent/commandCentre/PropertyInvitationControls";
+import HomeownerInvitationPanel from "@/components/agent/commandCentre/HomeownerInvitationPanel";
 import type { AgentBranchPropertySummary } from "@/lib/estateAgent/assignmentTypes";
 import {
   formatDaysSinceLastUpdate,
@@ -133,7 +132,10 @@ export default function OperationalPropertyCard({
         ) : null}
 
         {summary.origin_type === "estate_agent" ? (
-          <HomeownerStatusBadge summary={summary} />
+          <HomeownerInvitationPanel
+            propertyId={summary.property_id}
+            onChanged={onInvitationChanged}
+          />
         ) : null}
 
         {variant === "action" &&
@@ -143,14 +145,6 @@ export default function OperationalPropertyCard({
               <li key={reason}>{reason}</li>
             ))}
           </ul>
-        ) : null}
-
-        {summary.origin_type === "estate_agent" &&
-        summary.claim_status !== "claimed" ? (
-          <PropertyInvitationControls
-            propertyId={summary.property_id}
-            onChanged={onInvitationChanged}
-          />
         ) : null}
 
         <div className="flex flex-col gap-2 border-t border-surface-card-border pt-4 sm:flex-row">

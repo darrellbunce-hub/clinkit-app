@@ -5,6 +5,7 @@ import type {
   GenerateInvitationResult,
   PropertyInvitationStatus,
   ResolveInvitationTokenResult,
+  UpdateInviteEmailResult,
 } from "@/lib/propertyClaim/invitationTypes";
 import type { ClaimablePropertySummary } from "@/lib/propertyClaim/types";
 import { refreshOperationalSummaryForProperty } from "@/lib/operationalSummary/refreshOperationalSummary";
@@ -13,6 +14,9 @@ type InvitationStatusRpc = {
   ok?: boolean;
   error?: string;
   state?: "none" | "active" | "expired" | "claimed" | "deferred";
+  invite_email?: string | null;
+  sent_at?: string;
+  claimed_at?: string | null;
   expires_at?: string;
   expired_at?: string;
   hours_remaining?: number;
@@ -72,14 +76,18 @@ export async function loadPropertyInvitationStatus(
     };
   }
 
+  const inviteEmail = result.invite_email ?? null;
   const hasInviteEmail =
-    result.has_invite_email === true;
+    result.has_invite_email === true ||
+    Boolean(inviteEmail?.trim());
 
   switch (result.state) {
     case "active":
       return {
         ok: true,
         state: "active",
+        inviteEmail,
+        sentAt: result.sent_at ?? "",
         expiresAt: result.expires_at ?? "",
         hoursRemaining: result.hours_remaining ?? 0,
         invitationVersion:
@@ -90,6 +98,8 @@ export async function loadPropertyInvitationStatus(
       return {
         ok: true,
         state: "expired",
+        inviteEmail,
+        sentAt: result.sent_at ?? "",
         expiredAt: result.expired_at ?? "",
         invitationVersion:
           result.invitation_version ?? 1,
@@ -99,21 +109,64 @@ export async function loadPropertyInvitationStatus(
       return {
         ok: true,
         state: "deferred",
+        inviteEmail,
         hasInviteEmail,
       };
     case "claimed":
       return {
         ok: true,
         state: "claimed",
+        inviteEmail,
+        claimedAt: result.claimed_at ?? null,
         hasInviteEmail,
       };
     default:
       return {
         ok: true,
         state: "none",
+        inviteEmail,
         hasInviteEmail,
       };
   }
+}
+
+export async function updatePropertyClaimInviteEmail(
+  supabase: SupabaseClient,
+  propertyId: number,
+  inviteEmail: string
+): Promise<UpdateInviteEmailResult> {
+  const { data, error } = await supabase.rpc(
+    "update_property_claim_invite_email",
+    {
+      p_property_id: propertyId,
+      p_invite_email: inviteEmail,
+    }
+  );
+
+  if (error) {
+    return {
+      ok: false,
+      error: error.message,
+    };
+  }
+
+  const result = data as {
+    ok?: boolean;
+    error?: string;
+    invite_email?: string | null;
+  } | null;
+
+  if (!result?.ok) {
+    return {
+      ok: false,
+      error: result?.error ?? "update_failed",
+    };
+  }
+
+  return {
+    ok: true,
+    inviteEmail: result.invite_email ?? null,
+  };
 }
 
 async function refreshSummaryAfterInvitationMutation(

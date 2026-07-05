@@ -11,9 +11,10 @@ import {
 import type { InvitationLifecycleStatus } from "@/lib/propertyClaim/invitationTypes";
 import {
   getInvitationLifecycleStatus,
-  isAwaitingClaimPriority,
+  isInvitationActivePriority,
   isInvitationDeferred,
   isInvitationExpiredPriority,
+  isReadyToInvitePriority,
 } from "@/lib/propertyClaim/invitationPresentation";
 
 export type OperationalHealthLevel =
@@ -304,7 +305,11 @@ function buildReasonCandidates(
     reasons.push("Invitation expired");
   }
 
-  if (isAwaitingClaimPriority(summary)) {
+  if (isInvitationActivePriority(summary)) {
+    reasons.push("Awaiting homeowner claim");
+  }
+
+  if (isReadyToInvitePriority(summary)) {
     reasons.push("Invite homeowner");
   }
 
@@ -350,6 +355,7 @@ export function getPrimaryActionRequiredReason(
 
   const priorityOrder = [
     "Invitation expired",
+    "Awaiting homeowner claim",
     "Completion awaiting confirmation",
     "Buyer Ready requires attention",
     "Invite homeowner",
@@ -408,42 +414,6 @@ export function getActionRequiredReasons(
       summary
     ),
   ];
-}
-
-export function formatInvitationExpiryCountdown(
-  hoursRemaining: number | null | undefined
-): string {
-  if (hoursRemaining == null) {
-    return "Expiry unavailable";
-  }
-
-  if (hoursRemaining <= 1) {
-    return "Expires within 1 hour";
-  }
-
-  return `${hoursRemaining} hours remaining`;
-}
-
-export function getInvitationPanelStatusLabel(
-  state:
-    | "none"
-    | "active"
-    | "expired"
-    | "claimed"
-    | "deferred"
-): string {
-  switch (state) {
-    case "active":
-      return "Invitation active";
-    case "expired":
-      return "Invitation expired";
-    case "claimed":
-      return "Homeowner connected";
-    case "deferred":
-      return "Invitation deferred";
-    default:
-      return "No invitation sent";
-  }
 }
 
 export function formatScheduledCompletionDate(
@@ -636,17 +606,21 @@ export function getConfidenceLabel(score: number): string {
 export function getManagedPropertyOperationalState(
   summary: AgentBranchPropertySummary
 ): string {
-  const homeownerStatus =
-    getHomeownerStatusForSummary(summary);
+  if (summary.origin_type === "estate_agent") {
+    const topAlert = getHighestPriorityAlert(summary);
 
-  if (
-    summary.origin_type === "estate_agent" &&
-    homeownerStatus &&
-    homeownerStatus !== "claimed"
-  ) {
-    return getHomeownerConnectionStatusLabel(
-      homeownerStatus
-    );
+    if (topAlert) {
+      return getWorkspaceAlertReason(
+        topAlert.code,
+        summary.days_since_last_update
+      );
+    }
+
+    if (summary.needs_attention) {
+      return "Needs attention";
+    }
+
+    return "Progressing normally";
   }
 
   const topAlert = getHighestPriorityAlert(summary);

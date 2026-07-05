@@ -13,11 +13,14 @@ export type PropertyInvitationStatus =
   | {
       ok: true;
       state: "none";
+      inviteEmail: string | null;
       hasInviteEmail: boolean;
     }
   | {
       ok: true;
       state: "active";
+      inviteEmail: string | null;
+      sentAt: string;
       expiresAt: string;
       hoursRemaining: number;
       invitationVersion: number;
@@ -26,6 +29,8 @@ export type PropertyInvitationStatus =
   | {
       ok: true;
       state: "expired";
+      inviteEmail: string | null;
+      sentAt: string;
       expiredAt: string;
       invitationVersion: number;
       hasInviteEmail: boolean;
@@ -33,11 +38,14 @@ export type PropertyInvitationStatus =
   | {
       ok: true;
       state: "deferred";
+      inviteEmail: string | null;
       hasInviteEmail: boolean;
     }
   | {
       ok: true;
       state: "claimed";
+      inviteEmail: string | null;
+      claimedAt: string | null;
       hasInviteEmail: boolean;
     }
   | {
@@ -82,3 +90,13 @@ export type ClaimTokenResolutionError =
   | "not_authenticated"
   | "homeowner_only"
   | "email_required";
+
+export type UpdateInviteEmailResult =
+  | {
+      ok: true;
+      inviteEmail: string | null;
+    }
+  | {
+      ok: false;
+      error: string;
+    };
