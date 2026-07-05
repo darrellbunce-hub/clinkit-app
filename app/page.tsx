@@ -472,7 +472,7 @@ export default function HomePage() {
 
     <div>
 
-      <Logo />
+      <Logo variant="dark" />
 
       <p className="mt-3 text-slate-400 max-w-md">
         Shared operational visibility for modern residential property chains.

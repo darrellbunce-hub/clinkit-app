@@ -55,7 +55,7 @@ export default function Navbar() {
           justify-between
         "
       >
-<Logo />
+<Logo variant="dark" priority />
         
         {/* Desktop Nav */}
 <nav className="hidden md:flex items-center gap-3">

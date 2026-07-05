@@ -46,7 +46,7 @@ export default function LightShellHeader({
   return (
     <header className="border-b border-slate-200 bg-white sticky top-0 z-50">
       <div className="max-w-6xl mx-auto px-6 py-4 sm:py-5 flex items-center justify-between gap-4">
-        <Logo href={logoHref} variant="light" />
+        <Logo href={logoHref} variant="light" priority />
 
         <nav className="hidden md:flex items-center gap-1 sm:gap-3 text-sm font-semibold">
           {links.map((link) => (
