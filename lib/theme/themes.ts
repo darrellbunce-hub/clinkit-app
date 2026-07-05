@@ -9,10 +9,10 @@ export const BRAND_THEMES: Record<
 > = {
   keynetic: {
     id: "keynetic",
-    label: "Current",
-    description: "Existing Keynetic palette (slate product + blue marketing)",
-    primary: "#0f172a",
-    secondary: "#2563eb",
+    label: "Keynetic",
+    description: "Locked Teal & Mimosa brand identity",
+    primary: "#0E7C7B",
+    secondary: "#FFC62F",
   },
   "teal-mimosa": {
     id: "teal-mimosa",

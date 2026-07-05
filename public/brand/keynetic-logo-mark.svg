@@ -1,0 +1,14 @@
+<svg viewBox="0 0 138 76" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <!--
+    Keynetic logo mark  traced from approved brand sheet (Phase 8C.1).
+    Do not alter geometry; update only from a new approved brand asset.
+  -->
+  <path
+    d="M 75 73.5 L 5 57 L 5 22 C 5 11.5 5 8.5 14 6.5 L 65 4.5 L 126 7.5"
+    stroke="#0E7C7B"
+    stroke-width="10"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  <circle cx="132" cy="7.5" r="5.5" fill="#FFC62F" />
+</svg>

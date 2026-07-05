@@ -1,5 +1,5 @@
+import BranchHealthSummary from "@/components/agent/commandCentre/BranchHealthSummary";
 import CommandCentreSectionHeader from "@/components/agent/commandCentre/CommandCentreSectionHeader";
-import HealthSummaryGrid from "@/components/agent/commandCentre/HealthSummaryGrid";
 import type { BranchHealthOverview } from "@/lib/estateAgent/commandCentrePresentation";
 
 export default function BranchHealthSection({
@@ -13,13 +13,12 @@ export default function BranchHealthSection({
     <section className="space-y-5">
       <CommandCentreSectionHeader
         title="Branch health"
-        description="Operational health across active managed properties."
+        description="Concise operational health across active managed properties."
+        icon="operationalHealth"
       />
 
-      <HealthSummaryGrid
-        healthy={overview.healthy}
-        attention={overview.attention}
-        critical={overview.critical}
+      <BranchHealthSummary
+        overview={overview}
         averageConfidence={averageConfidence}
       />
     </section>

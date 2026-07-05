@@ -1,4 +1,5 @@
 import type { AgentBranchPropertySummary } from "@/lib/estateAgent/assignmentTypes";
+import type { OperationalPriorityTier } from "@/lib/estateAgent/commandCentrePresentation";
 import {
   computeBranchHealthOverview,
   computeTodaysOperationsKpis,
@@ -34,36 +35,87 @@ export type OperationalBriefKpi = {
 
 export type OperationalBriefModel = {
   healthLevel: OperationalHealthLevel;
+  healthStatusLabel: string;
   healthHeadline: string;
   summarySentence: string;
+  reassuranceSentence: string;
   activeTransactions: number;
   kpis: OperationalBriefKpi[];
 };
+
+export function getOperationalHealthStatusLabel(
+  level: OperationalHealthLevel
+): string {
+  switch (level) {
+    case "critical":
+      return "IMMEDIATE ACTION REQUIRED";
+    case "attention":
+      return "ATTENTION REQUIRED";
+    default:
+      return "OPERATING NORMALLY";
+  }
+}
 
 export function getOperationalHealthHeadline(
   level: OperationalHealthLevel
 ): string {
   switch (level) {
     case "critical":
-      return "Critical operational issues detected";
+      return "Immediate operational action required";
     case "attention":
-      return "Operational attention required";
+      return "Attention required";
     default:
       return "Branch operating normally";
   }
 }
 
+function formatTransactionCount(count: number): string {
+  return `${count} transaction${count === 1 ? "" : "s"}`;
+}
+
 export function getOperationalHealthSummarySentence(
-  level: OperationalHealthLevel
+  level: OperationalHealthLevel,
+  actionRequiredCount: number,
+  activeTransactions: number
 ): string {
   switch (level) {
     case "critical":
-      return "Several transactions need immediate operational review.";
+      return `${formatTransactionCount(actionRequiredCount)} need immediate review`;
     case "attention":
-      return "Several transactions would benefit from operational attention.";
+      return `${formatTransactionCount(actionRequiredCount)} require${actionRequiredCount === 1 ? "s" : ""} attention`;
     default:
-      return "Most managed properties are progressing normally.";
+      return `${formatTransactionCount(activeTransactions)} progressing normally`;
   }
+}
+
+export function getOperationalHealthReassuranceSentence(
+  level: OperationalHealthLevel,
+  actionRequiredCount: number,
+  activeTransactions: number
+): string {
+  if (
+    level === "normal" &&
+    actionRequiredCount === 0
+  ) {
+    return "Nothing requires your attention today.";
+  }
+
+  if (
+    actionRequiredCount > 0 &&
+    actionRequiredCount < activeTransactions
+  ) {
+    return "Everything else is operating normally.";
+  }
+
+  if (
+    level === "critical" &&
+    actionRequiredCount > 0 &&
+    actionRequiredCount < activeTransactions
+  ) {
+    return "Review critical items first, then check remaining transactions.";
+  }
+
+  return "";
 }
 
 export function resolveOperationalHealthLevel(
@@ -117,11 +169,21 @@ export function buildOperationalBriefModel(
 
   return {
     healthLevel,
+    healthStatusLabel:
+      getOperationalHealthStatusLabel(healthLevel),
     healthHeadline:
       getOperationalHealthHeadline(healthLevel),
     summarySentence:
       getOperationalHealthSummarySentence(
-        healthLevel
+        healthLevel,
+        actionRequired.length,
+        operationsKpis.activeChains
+      ),
+    reassuranceSentence:
+      getOperationalHealthReassuranceSentence(
+        healthLevel,
+        actionRequired.length,
+        operationsKpis.activeChains
       ),
     activeTransactions:
       operationsKpis.activeChains,
@@ -181,15 +243,15 @@ export function getHomeownerConnectionStatusClasses(
 ): string {
   switch (status) {
     case "claimed":
-      return "text-green-700 bg-green-50 ring-1 ring-green-200/60";
+      return "bg-status-success-soft text-status-success-text ring-1 ring-status-success/20";
     case "invitation_active":
-      return "text-amber-800 bg-amber-50 ring-1 ring-amber-200/60";
+      return "bg-status-warning-soft text-status-warning-text ring-1 ring-status-warning/20";
     case "invitation_expired":
-      return "text-red-800 bg-red-50 ring-1 ring-red-200/60";
+      return "bg-status-critical-soft text-status-critical-text ring-1 ring-status-critical/20";
     case "invitation_deferred":
-      return "text-slate-700 bg-slate-100 ring-1 ring-slate-200/60";
+      return "bg-status-unknown-soft text-text-muted ring-1 ring-surface-card-border";
     default:
-      return "text-slate-700 bg-slate-100 ring-1 ring-slate-200/60";
+      return "bg-surface-mist text-text-charcoal ring-1 ring-surface-card-border";
   }
 }
 
@@ -243,9 +305,7 @@ function buildReasonCandidates(
   }
 
   if (isAwaitingClaimPriority(summary)) {
-    reasons.push(
-      "No homeowner invitation has been sent"
-    );
+    reasons.push("Invite homeowner");
   }
 
   for (const alert of summary.operational_alerts ??
@@ -292,7 +352,7 @@ export function getPrimaryActionRequiredReason(
     "Invitation expired",
     "Completion awaiting confirmation",
     "Buyer Ready requires attention",
-    "No homeowner invitation has been sent",
+    "Invite homeowner",
   ];
 
   for (const preferred of priorityOrder) {
@@ -443,11 +503,48 @@ export function getBriefHealthIndicatorClasses(
 ): string {
   switch (level) {
     case "critical":
-      return "bg-red-500";
+      return "bg-status-critical";
     case "attention":
-      return "bg-amber-500";
+      return "bg-status-warning";
     default:
-      return "bg-green-500";
+      return "bg-status-success";
+  }
+}
+
+export function getBriefHealthHeroClasses(
+  level: OperationalHealthLevel
+): {
+  panel: string;
+  accent: string;
+  icon: string;
+  headline: string;
+  indicator: string;
+} {
+  switch (level) {
+    case "critical":
+      return {
+        panel: "bg-status-critical-soft/55",
+        accent: "border-status-critical",
+        icon: "text-status-critical",
+        headline: "text-status-critical-text",
+        indicator: "bg-status-critical",
+      };
+    case "attention":
+      return {
+        panel: "bg-status-warning-soft/60",
+        accent: "border-status-warning",
+        icon: "text-status-warning",
+        headline: "text-status-warning-text",
+        indicator: "bg-status-warning",
+      };
+    default:
+      return {
+        panel: "bg-status-success-soft/55",
+        accent: "border-status-success",
+        icon: "text-status-success",
+        headline: "text-status-success-text",
+        indicator: "bg-status-success",
+      };
   }
 }
 
@@ -456,13 +553,13 @@ export function getBriefKpiToneClasses(
 ): string {
   switch (tone) {
     case "critical":
-      return "text-red-700";
+      return "text-status-critical";
     case "attention":
-      return "text-amber-700";
+      return "text-status-warning";
     case "positive":
-      return "text-green-700";
+      return "text-status-success";
     default:
-      return "text-slate-900";
+      return "text-text-charcoal";
   }
 }
 
@@ -471,14 +568,69 @@ export function getBriefKpiIndicatorClasses(
 ): string {
   switch (tone) {
     case "critical":
-      return "bg-red-500";
+      return "bg-status-critical";
     case "attention":
-      return "bg-amber-500";
+      return "bg-status-warning";
     case "positive":
-      return "bg-green-500";
+      return "bg-status-success";
     default:
-      return "bg-slate-400";
+      return "bg-status-unknown";
   }
+}
+
+export function getActionReasonBannerClasses(
+  tier: OperationalPriorityTier
+): {
+  container: string;
+  icon: string;
+  text: string;
+} {
+  switch (tier) {
+    case "critical":
+      return {
+        container: "bg-status-critical-soft ring-1 ring-status-critical/15",
+        icon: "text-status-critical",
+        text: "text-status-critical-text",
+      };
+    case "attention":
+      return {
+        container: "bg-status-warning-soft ring-1 ring-status-warning/15",
+        icon: "text-status-warning",
+        text: "text-status-warning-text",
+      };
+    default:
+      return {
+        container: "bg-surface-mist ring-1 ring-surface-card-border",
+        icon: "text-brand-primary",
+        text: "text-text-charcoal",
+      };
+  }
+}
+
+export function getConfidenceBarFillClass(
+  score: number
+): string {
+  if (score >= 70) {
+    return "bg-status-success";
+  }
+
+  if (score >= 40) {
+    return "bg-status-warning";
+  }
+
+  return "bg-status-critical";
+}
+
+export function getConfidenceLabel(score: number): string {
+  if (score >= 70) {
+    return "Healthy";
+  }
+
+  if (score >= 40) {
+    return "Progress slowing";
+  }
+
+  return "Needs attention";
 }
 
 export function getManagedPropertyOperationalState(
@@ -507,7 +659,7 @@ export function getManagedPropertyOperationalState(
   }
 
   if (summary.needs_attention) {
-    return "Operational attention required";
+    return "Needs attention";
   }
 
   return "Progressing normally";

@@ -1,4 +1,5 @@
 import CommandCentreSectionHeader from "@/components/agent/commandCentre/CommandCentreSectionHeader";
+import WorkspaceEmptyState from "@/components/agent/commandCentre/WorkspaceEmptyState";
 import type { AgentBranchPropertySummary } from "@/lib/estateAgent/assignmentTypes";
 import {
   formatPropertyAddress,
@@ -8,6 +9,8 @@ import {
   formatScheduledCompletionDate,
   getCompletionConfirmationLabel,
 } from "@/lib/estateAgent/workspacePresentation";
+import { WORKSPACE_CARD_CLASS } from "@/lib/theme/themeTokens";
+import { WorkspaceIcon } from "@/lib/theme/workspaceIcons";
 
 function CompletionRow({
   summary,
@@ -18,27 +21,29 @@ function CompletionRow({
     getCompletionConfirmationLabel(summary);
 
   return (
-    <li className="flex items-start justify-between gap-4 rounded-xl bg-white px-4 py-3 shadow-sm ring-1 ring-slate-200/60">
+    <li
+      className={`${WORKSPACE_CARD_CLASS} flex items-start justify-between gap-4 px-4 py-3`}
+    >
       <div className="min-w-0">
-        <p className="truncate font-medium text-slate-900">
+        <p className="truncate font-medium text-text-charcoal">
           {formatPropertyAddress(summary)}
         </p>
 
-        <p className="mt-0.5 text-sm text-slate-500">
+        <p className="mt-0.5 text-sm text-text-muted">
           {formatPropertyLocationLine(summary)}
         </p>
       </div>
 
       <div className="shrink-0 text-right text-sm">
         {summary.completion_scheduled_date ? (
-          <p className="font-medium text-slate-900">
+          <p className="font-medium text-text-charcoal">
             {formatScheduledCompletionDate(
               summary.completion_scheduled_date
             )}
           </p>
         ) : null}
 
-        <p className="mt-0.5 text-slate-600">
+        <p className="mt-0.5 text-text-muted">
           {confirmationLabel}
         </p>
       </div>
@@ -62,24 +67,28 @@ export default function UpcomingCompletionsSection({
       <CommandCentreSectionHeader
         title="Upcoming completions"
         description="Scheduled completions and those awaiting confirmation."
+        icon="completion"
       />
 
       {!hasItems ? (
-        <div className="rounded-2xl bg-white px-6 py-8 shadow-sm ring-1 ring-slate-200/70">
-          <p className="text-sm text-slate-600">
-            No upcoming completions recorded for
-            active managed properties.
-          </p>
-        </div>
+        <WorkspaceEmptyState
+          icon="success"
+          title="No completions are currently scheduled"
+          description="Everything is up to date."
+        />
       ) : (
         <div className="space-y-6">
           {scheduled.length > 0 ? (
             <div>
-              <h3 className="text-sm font-medium text-slate-500">
+              <div className="mb-3 flex items-center gap-2 text-sm font-medium text-text-muted">
+                <WorkspaceIcon
+                  name="completion"
+                  className="h-4 w-4 text-brand-primary"
+                />
                 Scheduled
-              </h3>
+              </div>
 
-              <ul className="mt-3 space-y-2">
+              <ul className="space-y-2">
                 {scheduled.map((summary) => (
                   <CompletionRow
                     key={summary.assignment_id}
@@ -92,11 +101,15 @@ export default function UpcomingCompletionsSection({
 
           {awaitingConfirmation.length > 0 ? (
             <div>
-              <h3 className="text-sm font-medium text-slate-500">
+              <div className="mb-3 flex items-center gap-2 text-sm font-medium text-status-warning-text">
+                <WorkspaceIcon
+                  name="attention"
+                  className="h-4 w-4"
+                />
                 Awaiting confirmation
-              </h3>
+              </div>
 
-              <ul className="mt-3 space-y-2">
+              <ul className="space-y-2">
                 {awaitingConfirmation.map(
                   (summary) => (
                     <CompletionRow

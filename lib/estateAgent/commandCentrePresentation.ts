@@ -509,15 +509,15 @@ export function getHealthStatusClasses(
 ): string {
   switch (healthStatus) {
     case "stable":
-      return "bg-green-100 text-green-700";
+      return "bg-status-success-soft text-status-success-text";
     case "active":
-      return "bg-amber-100 text-amber-800";
+      return "bg-status-warning-soft text-status-warning-text";
     case "at_risk":
-      return "bg-amber-100 text-amber-800";
+      return "bg-status-warning-soft text-status-warning-text";
     case "replacement_buyer_required":
-      return "bg-red-100 text-red-800";
+      return "bg-status-critical-soft text-status-critical-text";
     default:
-      return "bg-slate-100 text-slate-700";
+      return "bg-status-unknown-soft text-text-muted";
   }
 }
 

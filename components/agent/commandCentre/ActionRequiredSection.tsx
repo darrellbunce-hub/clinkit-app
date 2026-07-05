@@ -1,5 +1,6 @@
 import OperationalPropertyCard from "@/components/agent/commandCentre/OperationalPropertyCard";
 import CommandCentreSectionHeader from "@/components/agent/commandCentre/CommandCentreSectionHeader";
+import WorkspaceEmptyState from "@/components/agent/commandCentre/WorkspaceEmptyState";
 import type { AgentBranchPropertySummary } from "@/lib/estateAgent/assignmentTypes";
 
 export default function ActionRequiredSection({
@@ -13,20 +14,16 @@ export default function ActionRequiredSection({
     <section className="space-y-5">
       <CommandCentreSectionHeader
         title="Requires action"
-        description="Transactions that need attention, with the reason each one appears here."
+        description="Operational reasons appear first so you know what to do next."
+        icon="attention"
       />
 
       {summaries.length === 0 ? (
-        <div className="rounded-2xl bg-green-50/60 px-6 py-8 ring-1 ring-green-200/60">
-          <p className="font-medium text-green-900">
-            Nothing requires action right now
-          </p>
-
-          <p className="mt-1.5 text-sm text-green-800">
-            All managed properties are within normal
-            operational thresholds.
-          </p>
-        </div>
+        <WorkspaceEmptyState
+          icon="success"
+          title="Nothing requires action right now"
+          description="Everything is up to date across your managed properties."
+        />
       ) : (
         <div className="grid gap-4 lg:grid-cols-2">
           {summaries.map((summary) => (

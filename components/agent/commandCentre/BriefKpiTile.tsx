@@ -13,14 +13,14 @@ export default function BriefKpiTile({
   kpi: OperationalBriefKpi;
 }) {
   return (
-    <div className="rounded-xl bg-slate-50/80 px-4 py-4 ring-1 ring-slate-200/60">
+    <div className="rounded-xl bg-surface-card px-4 py-4 ring-1 ring-surface-card-border">
       <div className="flex items-center gap-2">
         <span
           className={`h-2 w-2 shrink-0 rounded-full ${getBriefKpiIndicatorClasses(kpi.tone)}`}
           aria-hidden="true"
         />
 
-        <p className="text-sm text-slate-600">
+        <p className="text-sm text-text-muted">
           {kpi.label}
         </p>
       </div>

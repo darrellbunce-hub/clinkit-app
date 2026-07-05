@@ -16,7 +16,11 @@ import {
   formatInvitationExpiryCountdown,
   getInvitationPanelStatusLabel,
 } from "@/lib/estateAgent/workspacePresentation";
-import { BTN_PRIMARY_SM_CLASS } from "@/lib/theme/themeTokens";
+import {
+  BTN_PRIMARY_SM_CLASS,
+  BTN_SECONDARY_OUTLINE_SM_CLASS,
+} from "@/lib/theme/themeTokens";
+import { WorkspaceIcon } from "@/lib/theme/workspaceIcons";
 import { supabase } from "@/lib/supabase";
 
 const isDeveloperCopyEnabled =
@@ -241,7 +245,7 @@ export default function PropertyInvitationControls({
 
   if (!status.hasInviteEmail) {
     return (
-      <p className="text-sm text-slate-500">
+      <p className="text-sm text-text-muted">
         Add an invitation email on the property to
         enable homeowner invitations.
       </p>
@@ -249,21 +253,28 @@ export default function PropertyInvitationControls({
   }
 
   return (
-    <div className="rounded-xl bg-slate-50 px-4 py-3">
+    <div className="rounded-xl bg-surface-mist px-4 py-3 ring-1 ring-surface-card-border">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-xs text-slate-500">
-            Invitation
-          </p>
+          <div className="flex items-center gap-2">
+            <WorkspaceIcon
+              name="invitations"
+              className="h-4 w-4 text-brand-primary"
+            />
 
-          <p className="mt-0.5 text-sm font-medium text-slate-900">
+            <p className="text-xs font-medium uppercase tracking-wide text-text-muted">
+              Invitation
+            </p>
+          </div>
+
+          <p className="mt-1 text-sm font-medium text-text-charcoal">
             {getInvitationPanelStatusLabel(
               status.state
             )}
           </p>
 
           {status.state === "active" ? (
-            <p className="mt-1 text-sm text-slate-600">
+            <p className="mt-1 text-sm text-text-muted">
               {formatInvitationExpiryCountdown(
                 status.hoursRemaining
               )}
@@ -289,7 +300,7 @@ export default function PropertyInvitationControls({
                 type="button"
                 disabled={isWorking}
                 onClick={() => void handleDefer()}
-                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-800 disabled:opacity-60"
+                className="rounded-lg border border-brand-primary bg-surface-card px-3 py-2 text-sm font-medium text-brand-primary disabled:opacity-60"
               >
                 Defer invitation
               </button>
@@ -318,7 +329,7 @@ export default function PropertyInvitationControls({
                   onClick={() =>
                     void handleCopyActiveLink()
                   }
-                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-800 disabled:opacity-60"
+                  className="rounded-lg border border-brand-primary bg-surface-card px-3 py-2 text-sm font-medium text-brand-primary disabled:opacity-60"
                 >
                   Copy link
                 </button>
@@ -328,7 +339,7 @@ export default function PropertyInvitationControls({
                 type="button"
                 disabled={isWorking}
                 onClick={() => void handleRevoke()}
-                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-800 disabled:opacity-60"
+                className="rounded-lg border border-brand-primary bg-surface-card px-3 py-2 text-sm font-medium text-brand-primary disabled:opacity-60"
               >
                 Revoke
               </button>

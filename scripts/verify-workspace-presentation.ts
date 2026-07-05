@@ -60,8 +60,16 @@ function testOperationalBriefHero() {
     "brief includes four KPI tiles"
   );
   assert(
+    brief.healthStatusLabel.length > 0,
+    "brief health status label"
+  );
+  assert(
     brief.healthHeadline.length > 0,
     "brief health headline"
+  );
+  assert(
+    brief.summarySentence.includes("transaction"),
+    "brief summary uses transaction count"
   );
 }
 
@@ -112,8 +120,7 @@ function testPrimaryActionReason() {
   );
 
   assert(
-    reason ===
-      "No homeowner invitation has been sent",
+    reason === "Invite homeowner",
     "invitation reason takes priority over stale"
   );
 

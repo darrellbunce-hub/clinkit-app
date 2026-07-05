@@ -85,7 +85,27 @@ export const BTN_ACCENT_SM_CLASS =
   "bg-brand-accent text-brand-on-accent rounded-xl font-semibold hover:bg-brand-accent-hover transition shadow-lg shadow-brand-accent/20";
 
 export const BTN_SECONDARY_OUTLINE_CLASS =
-  "border border-surface-card-border bg-surface-card text-slate-900 rounded-2xl font-semibold hover:bg-surface-muted transition";
+  "border border-brand-primary bg-surface-card text-brand-primary rounded-2xl font-semibold hover:bg-surface-mist transition";
+
+export const BTN_SECONDARY_OUTLINE_SM_CLASS =
+  "border border-brand-primary bg-surface-card text-brand-primary rounded-xl font-semibold hover:bg-surface-mist transition";
+
+export const BTN_DANGER_SM_CLASS =
+  "border border-status-critical bg-surface-card text-status-critical rounded-xl font-semibold hover:bg-status-critical-soft transition";
+
+export const BTN_SUCCESS_SM_CLASS =
+  "border border-status-success bg-surface-card text-status-success rounded-xl font-semibold hover:bg-status-success-soft transition";
+
+export const FONT_HEADING_CLASS =
+  "font-[family-name:var(--font-heading)]";
+
+export const WORKSPACE_CARD_CLASS =
+  "rounded-2xl bg-surface-card shadow-sm ring-1 ring-surface-card-border";
+
+export const WORKSPACE_SECTION_TITLE_CLASS = `text-xl font-semibold text-text-charcoal ${FONT_HEADING_CLASS}`;
+
+export const WORKSPACE_HERO_PANEL_CLASS =
+  "overflow-hidden rounded-2xl bg-surface-card shadow-md ring-1 ring-surface-card-border";
 
 export const BTN_GHOST_DARK_CLASS =
   "border border-white/20 bg-white/10 backdrop-blur-xl text-white rounded-2xl font-semibold hover:bg-white/20 transition";
