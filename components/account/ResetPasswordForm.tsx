@@ -20,6 +20,7 @@ import {
   mapPasswordUpdateError,
   validateNewPassword,
 } from "@/lib/auth/passwordPolicy";
+import { resolvePasswordRecoveryQueryError } from "@/lib/auth/authConfirm";
 import { resolvePostLoginRedirect } from "@/lib/auth/redirects";
 import { ROUTES } from "@/lib/auth/routes";
 import { fetchProfileAccountFields } from "@/lib/currentUserContext";
@@ -33,7 +34,11 @@ type ResetState =
 
 export default function ResetPasswordForm() {
   const searchParams = useSearchParams();
-  const errorCode = searchParams.get("error");
+  const recoveryErrorCode =
+    resolvePasswordRecoveryQueryError(
+      searchParams.get("error"),
+      searchParams.get("error_code")
+    );
 
   const [state, setState] =
     useState<ResetState>("loading");
@@ -51,9 +56,11 @@ export default function ResetPasswordForm() {
 
   useEffect(() => {
     async function verifyRecoverySession() {
-      if (errorCode) {
+      if (recoveryErrorCode) {
         setErrorMessage(
-          mapPasswordRecoveryError(errorCode)
+          mapPasswordRecoveryError(
+            recoveryErrorCode
+          )
         );
         setState("error");
 
@@ -89,7 +96,7 @@ export default function ResetPasswordForm() {
     }
 
     void verifyRecoverySession();
-  }, [errorCode]);
+  }, [recoveryErrorCode]);
 
   async function handleSubmit(
     event: FormEvent<HTMLFormElement>

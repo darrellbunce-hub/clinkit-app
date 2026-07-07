@@ -76,12 +76,20 @@ export function mapPasswordRecoveryError(
   code: string | null
 ): string {
   switch (code) {
+    case "missing_token":
+      return "This reset link is incomplete. Request a new link from the forgot password page.";
+    case "unsupported_type":
+      return "This link cannot be used for password recovery. Request a new reset link.";
+    case "expired":
+      return "This reset link has expired. Request a new link from the forgot password page.";
     case "invalid_or_expired":
       return "This reset link is invalid or has expired. Request a new link from the forgot password page.";
     case "reused":
       return "This reset link has already been used. Request a new link if you still need to change your password.";
     case "no_session":
       return "We could not verify your reset session. Request a new password reset link.";
+    case "provider_error":
+      return "We could not verify your reset link. Request a new link and try again.";
     default:
       return "We could not reset your password. Request a new link and try again.";
   }
