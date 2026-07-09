@@ -22,6 +22,8 @@ export {
   resolvePostLoginRedirect,
   resolveLoginPathForAccountType,
   resolveLoginPathForProtectedRoute,
+  buildProtectedRouteNextDestination,
+  resolveLoginNextDestination,
   buildLoginRedirectUrl,
   resolveEstateAgentDestination,
   resolveHomeownerBlockedRedirect,

@@ -5,6 +5,7 @@ import {
   loadActiveInvitationExpiresAt,
   loadHomeownerInvitationEmailContext,
 } from "@/lib/communications/invitationContext";
+import { recordPropertyClaimInvitationSent } from "@/lib/propertyClaim/propertyInvitations";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 type HomeownerInvitationRequestBody = {
@@ -98,6 +99,20 @@ export async function POST(request: Request) {
       sentBy: user.id,
       propertyId,
     });
+
+    if (result.ok && result.sent) {
+      const recordResult = await recordPropertyClaimInvitationSent(
+        supabase,
+        propertyId
+      );
+
+      if (!recordResult.ok) {
+        console.error(
+          "[communications] Failed to record invitation sent:",
+          recordResult.error
+        );
+      }
+    }
 
     if (!result.ok) {
       console.error(

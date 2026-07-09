@@ -7,6 +7,7 @@ import {
   type AccountType,
 } from "@/lib/accountType";
 import type { ProfileAccountFields } from "@/lib/estateAgent/types";
+import { ensureUserProfile } from "@/lib/profile/ensureUserProfile";
 
 export type CurrentUserContext = {
   user: User;
@@ -40,18 +41,6 @@ export function buildCurrentUserContext(
   };
 }
 
-/** Used when auth succeeds but profiles row is missing (legacy accounts). */
-export function buildFallbackHomeownerContext(
-  user: User
-): CurrentUserContext {
-  return buildCurrentUserContext(user, {
-    account_type: "homeowner",
-    contact_name: null,
-    onboarding_completed_at: null,
-    email_domain: null,
-  });
-}
-
 export async function fetchProfileAccountFields(
   supabase: SupabaseClient,
   userId: string
@@ -76,12 +65,43 @@ export async function fetchProfileAccountFields(
   };
 }
 
+/**
+ * Ensures the authenticated caller has a profiles row, then loads it.
+ * Use for the current session user only.
+ */
+export async function fetchAuthenticatedProfileAccountFields(
+  supabase: SupabaseClient,
+  userId: string
+): Promise<ProfileAccountFields | null> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user || user.id !== userId) {
+    return fetchProfileAccountFields(
+      supabase,
+      userId
+    );
+  }
+
+  const ensured = await ensureUserProfile(supabase);
+
+  if (!ensured.ok) {
+    return null;
+  }
+
+  return fetchProfileAccountFields(
+    supabase,
+    userId
+  );
+}
+
 export async function fetchCurrentUserContextFromUser(
   supabase: SupabaseClient,
   user: User
 ): Promise<CurrentUserContext | null> {
   const profile =
-    await fetchProfileAccountFields(
+    await fetchAuthenticatedProfileAccountFields(
       supabase,
       user.id
     );

@@ -6,14 +6,9 @@ import { evaluateProtectedRouteAccess } from "@/lib/auth/routeGuards";
 import {
   isAccountGatedRoute,
   normalizePathname,
+  ROUTES,
 } from "@/lib/auth/routes";
-import {
-  buildFallbackHomeownerContext,
-  fetchCurrentUserContextFromUser,
-} from "@/lib/currentUserContext";
-
-const isAuthDebugEnabled =
-  process.env.NODE_ENV === "development";
+import { fetchCurrentUserContextFromUser } from "@/lib/currentUserContext";
 
 export async function middleware(
   request: NextRequest
@@ -60,17 +55,7 @@ export async function middleware(
 
   const {
     data: { user },
-    error: authError,
   } = await supabase.auth.getUser();
-
-  if (isAuthDebugEnabled) {
-    console.log("[middleware auth]", {
-      pathname,
-      hasUser: Boolean(user),
-      authError: authError?.message ?? null,
-      cookieCount: request.cookies.getAll().length,
-    });
-  }
 
   if (!user) {
     const guardResult =
@@ -79,18 +64,6 @@ export async function middleware(
         request.nextUrl,
         pathname
       );
-
-    if (isAuthDebugEnabled) {
-      console.log("[middleware redirect]", {
-        pathname,
-        reason: guardResult.allowed
-          ? null
-          : guardResult.reason,
-        redirectTo: guardResult.allowed
-          ? null
-          : guardResult.redirectTo,
-      });
-    }
 
     if (!guardResult.allowed) {
       return NextResponse.redirect(
@@ -104,23 +77,23 @@ export async function middleware(
     return response;
   }
 
-  const resolvedContext =
+  const context =
     await fetchCurrentUserContextFromUser(
       supabase,
       user
     );
 
-  const context =
-    resolvedContext ??
-    buildFallbackHomeownerContext(user);
+  if (!context) {
+    const loginUrl = new URL(
+      ROUTES.homeownerLogin,
+      request.url
+    );
+    loginUrl.searchParams.set(
+      "error",
+      "profile_setup_failed"
+    );
 
-  if (isAuthDebugEnabled) {
-    console.log("[middleware profile]", {
-      pathname,
-      userId: user.id,
-      profileLoaded: Boolean(resolvedContext),
-      accountType: context.accountType,
-    });
+    return NextResponse.redirect(loginUrl);
   }
 
   const guardResult =
@@ -129,15 +102,6 @@ export async function middleware(
       request.nextUrl,
       pathname
     );
-
-  if (isAuthDebugEnabled && !guardResult.allowed) {
-    console.log("[middleware redirect]", {
-      pathname,
-      reason: guardResult.reason,
-      redirectTo: guardResult.redirectTo,
-      accountType: context.accountType,
-    });
-  }
 
   if (!guardResult.allowed) {
     return NextResponse.redirect(

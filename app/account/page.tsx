@@ -13,7 +13,7 @@ import PageHeaderBand from "@/components/theme/PageHeaderBand";
 import AgentShell from "@/components/agent/AgentShell";
 import { getAccountType } from "@/lib/accountType";
 import { isEstateAgent } from "@/lib/accountType";
-import { fetchProfileAccountFields } from "@/lib/currentUserContext";
+import { fetchAuthenticatedProfileAccountFields } from "@/lib/currentUserContext";
 import { supabase } from "@/lib/supabase";
 
 const SECTION_LINKS = [
@@ -49,17 +49,22 @@ export default function AccountSettingsPage() {
       setEmail(user.email ?? null);
 
       const profile =
-        await fetchProfileAccountFields(
+        await fetchAuthenticatedProfileAccountFields(
           supabase,
           user.id
         );
 
-      if (profile) {
-        setContactName(profile.contact_name);
-        setAccountType(
-          getAccountType(profile)
-        );
+      if (!profile) {
+        window.location.href =
+          "/login?error=profile_setup_failed&next=/account";
+
+        return;
       }
+
+      setContactName(profile.contact_name);
+      setAccountType(
+        getAccountType(profile)
+      );
 
       setIsLoading(false);
     }

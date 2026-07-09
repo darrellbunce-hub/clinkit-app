@@ -8,8 +8,11 @@ import {
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { AUTH_TITLE_CLASS } from "@/components/mobileStandards";
+import { resolveLoginNextDestination } from "@/lib/auth/redirects";
 import { ROUTES } from "@/lib/auth/routes";
 import { getAccountType } from "@/lib/accountType";
+import { fetchAuthenticatedProfileAccountFields } from "@/lib/currentUserContext";
+import { ensureUserProfile } from "@/lib/profile/ensureUserProfile";
 import { resolveHomeownerPostAuthDestination } from "@/lib/propertyClaim/resolveHomeownerPostAuthDestination";
 import { useRouter } from "next/navigation";
 
@@ -60,15 +63,6 @@ export default function LoginPage() {
           password,
         });
 
-      if (process.env.NODE_ENV === "development") {
-        console.log("[login signInWithPassword]", {
-          hasError: Boolean(result.error),
-          error: result.error?.message ?? null,
-          hasSession: Boolean(result.data.session),
-          hasUser: Boolean(result.data.user),
-        });
-      }
-
       if (result.error) {
         setErrorMessage(result.error.message);
 
@@ -83,23 +77,46 @@ export default function LoginPage() {
         return;
       }
 
-      const userId = result.data.user?.id;
+      const profileEnsure =
+        await ensureUserProfile(supabase);
 
-      let destination: string =
-        ROUTES.homeownerDashboard;
+      if (!profileEnsure.ok) {
+        setErrorMessage(
+          "Your account is signed in but we could not finish profile setup. Try again or contact support."
+        );
 
-      if (userId) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("account_type")
-          .eq("id", userId)
-          .maybeSingle();
+        return;
+      }
 
-        destination =
-          await resolveHomeownerPostAuthDestination(
-            supabase,
-            getAccountType(profile)
-          );
+      const nextParam = new URLSearchParams(
+        window.location.search
+      ).get("next");
+
+      let destination: string;
+
+      if (nextParam) {
+        destination = resolveLoginNextDestination(
+          nextParam,
+          ROUTES.homeownerDashboard
+        );
+      } else {
+        const userId = result.data.user?.id;
+
+        destination = ROUTES.homeownerDashboard;
+
+        if (userId) {
+          const profile =
+            await fetchAuthenticatedProfileAccountFields(
+              supabase,
+              userId
+            );
+
+          destination =
+            await resolveHomeownerPostAuthDestination(
+              supabase,
+              getAccountType(profile)
+            );
+        }
       }
 
       window.location.href = destination;
@@ -150,12 +167,22 @@ export default function LoginPage() {
       }
 
       if (data.user) {
-        await supabase
-          .from("profiles")
-          .insert({
-            id: data.user.id,
-            role: "homeowner",
-          });
+        if (!data.session) {
+          router.push("/verify-email");
+
+          return;
+        }
+
+        const profileEnsure =
+          await ensureUserProfile(supabase);
+
+        if (!profileEnsure.ok) {
+          setErrorMessage(
+            "Your account was created but profile setup failed. Try signing in again."
+          );
+
+          return;
+        }
 
         const destination =
           await resolveHomeownerPostAuthDestination(

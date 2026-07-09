@@ -22,6 +22,7 @@ import {
   loadPropertyInvitationStatus,
   resendPropertyClaimInvitation,
   revokePropertyClaimInvitation,
+  rotatePropertyClaimInvitationForDelivery,
   updatePropertyClaimInviteEmail,
 } from "@/lib/propertyClaim/propertyInvitations";
 import {
@@ -119,31 +120,63 @@ export default function HomeownerInvitationPanel({
     setIsWorking(true);
     setNotice(null);
 
-    const result = await generatePropertyClaimInvitation(
-      supabase,
-      propertyId
-    );
+    const currentStatus =
+      status?.ok === true
+        ? status
+        : await loadPropertyInvitationStatus(
+            supabase,
+            propertyId
+          );
 
-    if (!result.ok) {
+    if (!currentStatus.ok) {
       setIsWorking(false);
       setNotice({
         variant: "warning",
-        message: mapInvitationError(result.error),
+        message: "Could not load invitation status.",
       });
       return;
     }
 
-    rememberInvitationToken(result.token);
+    if (currentStatus.state === "expired") {
+      setIsWorking(false);
+      void handleResendInvitationPeriod();
+      return;
+    }
+
+    if (currentStatus.state === "claimed") {
+      setIsWorking(false);
+      return;
+    }
+
+    const resolved = await resolveInvitationForDelivery(
+      currentStatus
+    );
+
+    if (!resolved.ok) {
+      setIsWorking(false);
+      setNotice({
+        variant: "warning",
+        message: mapInvitationError(resolved.error),
+      });
+      return;
+    }
 
     const emailStatus = await dispatchInvitationEmail(
-      result.token,
-      result.expiresAt
+      resolved.delivery.token,
+      resolved.delivery.expiresAt,
+      {
+        resendExisting: resolved.delivery.resendExisting,
+      }
     );
 
     setIsWorking(false);
     await reloadStatus();
     await onChanged?.();
-    setDeliveryNotice(emailStatus, status?.ok ? status.inviteEmail : null);
+    setDeliveryNotice(
+      emailStatus,
+      resolved.inviteEmail,
+      resolved.delivery.rotated
+    );
   }
 
   async function handleResendInvitationPeriod() {
@@ -182,28 +215,36 @@ export default function HomeownerInvitationPanel({
       return;
     }
 
-    const token = getActiveInvitationToken();
+    setIsWorking(true);
+    setNotice(null);
 
-    if (!token) {
+    const resolved = await resolveInvitationForDelivery(status);
+
+    if (!resolved.ok) {
+      setIsWorking(false);
       setNotice({
         variant: "warning",
-        message:
-          "This invitation was sent from another browser. Revoke and send a new invitation, or open this property on the device where it was originally sent.",
+        message: mapInvitationError(resolved.error),
       });
       return;
     }
 
-    setIsWorking(true);
-    setNotice(null);
-
     const emailStatus = await dispatchInvitationEmail(
-      token,
-      status.expiresAt,
-      { resendExisting: true }
+      resolved.delivery.token,
+      resolved.delivery.expiresAt,
+      {
+        resendExisting: resolved.delivery.resendExisting,
+      }
     );
 
     setIsWorking(false);
-    setDeliveryNotice(emailStatus, status.inviteEmail);
+    await reloadStatus();
+    await onChanged?.();
+    setDeliveryNotice(
+      emailStatus,
+      resolved.inviteEmail,
+      resolved.delivery.rotated
+    );
   }
 
   async function handleDefer() {
@@ -255,15 +296,37 @@ export default function HomeownerInvitationPanel({
   }
 
   async function handleCopyLink() {
-    const token = getActiveInvitationToken();
+    if (!status?.ok || status.state !== "active") {
+      return;
+    }
+
+    setIsWorking(true);
+    setNotice(null);
+
+    let token = getActiveInvitationToken();
+    let rotated = false;
 
     if (!token) {
-      setNotice({
-        variant: "warning",
-        message:
-          "The invitation link is not available in this browser. Send or resend an invitation here first.",
-      });
-      return;
+      const rotatedResult =
+        await rotatePropertyClaimInvitationForDelivery(
+          supabase,
+          propertyId
+        );
+
+      if (!rotatedResult.ok) {
+        setIsWorking(false);
+        setNotice({
+          variant: "warning",
+          message: mapInvitationError(rotatedResult.error),
+        });
+        return;
+      }
+
+      rememberInvitationToken(rotatedResult.token);
+      token = rotatedResult.token;
+      rotated = true;
+      await reloadStatus();
+      await onChanged?.();
     }
 
     const url = buildClaimInvitationUrl(token);
@@ -272,7 +335,9 @@ export default function HomeownerInvitationPanel({
       await navigator.clipboard.writeText(url);
       setNotice({
         variant: "neutral",
-        message: "Invitation link copied.",
+        message: rotated
+          ? "A new invitation link was generated and copied."
+          : "Invitation link copied.",
       });
     } catch {
       setNotice({
@@ -280,6 +345,119 @@ export default function HomeownerInvitationPanel({
         message: "Could not copy the invitation link.",
       });
     }
+
+    setIsWorking(false);
+  }
+
+  async function resolveInvitationForDelivery(
+    currentStatus: Extract<PropertyInvitationStatus, { ok: true }>
+  ): Promise<
+    | {
+        ok: true;
+        delivery: {
+          token: string;
+          expiresAt: string;
+          resendExisting: boolean;
+          rotated: boolean;
+        };
+        inviteEmail: string | null;
+      }
+    | { ok: false; error: string }
+  > {
+    if (currentStatus.state === "active") {
+      const storedToken = getActiveInvitationToken();
+
+      if (storedToken) {
+        return {
+          ok: true,
+          delivery: {
+            token: storedToken,
+            expiresAt: currentStatus.expiresAt,
+            resendExisting: true,
+            rotated: false,
+          },
+          inviteEmail: currentStatus.inviteEmail,
+        };
+      }
+
+      const rotatedResult =
+        await rotatePropertyClaimInvitationForDelivery(
+          supabase,
+          propertyId
+        );
+
+      if (!rotatedResult.ok) {
+        return {
+          ok: false,
+          error: rotatedResult.error,
+        };
+      }
+
+      rememberInvitationToken(rotatedResult.token);
+
+      return {
+        ok: true,
+        delivery: {
+          token: rotatedResult.token,
+          expiresAt: rotatedResult.expiresAt,
+          resendExisting: false,
+          rotated: true,
+        },
+        inviteEmail: currentStatus.inviteEmail,
+      };
+    }
+
+    if (
+      currentStatus.state === "none" ||
+      currentStatus.state === "deferred"
+    ) {
+      const generated = await generatePropertyClaimInvitation(
+        supabase,
+        propertyId
+      );
+
+      if (
+        !generated.ok &&
+        generated.error === "invitation_already_active"
+      ) {
+        const refreshedStatus = await loadPropertyInvitationStatus(
+          supabase,
+          propertyId
+        );
+
+        if (
+          refreshedStatus.ok &&
+          refreshedStatus.state === "active"
+        ) {
+          return resolveInvitationForDelivery(refreshedStatus);
+        }
+      }
+
+      if (!generated.ok) {
+        return {
+          ok: false,
+          error: generated.error,
+        };
+      }
+
+      rememberInvitationToken(generated.token);
+
+      return {
+        ok: true,
+        delivery: {
+          token: generated.token,
+          expiresAt: generated.expiresAt,
+          resendExisting: false,
+          rotated: false,
+        },
+        inviteEmail: currentStatus.inviteEmail,
+      };
+    }
+
+    return {
+      ok: false,
+      error: "invalid_invitation_state",
+    };
   }
 
   async function dispatchInvitationEmail(
@@ -330,14 +508,17 @@ export default function HomeownerInvitationPanel({
 
   function setDeliveryNotice(
     emailStatus: "sent" | "skipped" | "failed",
-    inviteEmail: string | null | undefined
+    inviteEmail: string | null | undefined,
+    rotated = false
   ) {
     const recipient = inviteEmail?.trim();
 
     if (emailStatus === "sent" && recipient) {
       setNotice({
         variant: "success",
-        message: `Invitation email sent to ${recipient}`,
+        message: rotated
+          ? `A fresh invitation was issued and emailed to ${recipient}.`
+          : `Invitation email sent to ${recipient}`,
       });
       return;
     }
@@ -345,7 +526,9 @@ export default function HomeownerInvitationPanel({
     if (emailStatus === "sent") {
       setNotice({
         variant: "success",
-        message: "Invitation email sent.",
+        message: rotated
+          ? "A fresh invitation was issued and emailed."
+          : "Invitation email sent.",
       });
       return;
     }
@@ -353,16 +536,18 @@ export default function HomeownerInvitationPanel({
     if (emailStatus === "skipped") {
       setNotice({
         variant: "warning",
-        message:
-          "Email sending is not configured. You can copy the invitation link and share it manually.",
+        message: rotated
+          ? "A fresh invitation was issued, but email sending is not configured. You can copy the invitation link and share it manually."
+          : "Email sending is not configured. You can copy the invitation link and share it manually.",
       });
       return;
     }
 
     setNotice({
       variant: "warning",
-      message:
-        "Email couldn't be sent. The invitation remains active. You can copy the invitation link and share it manually.",
+      message: rotated
+        ? "A fresh invitation was issued, but the email could not be sent. You can copy the invitation link and share it manually."
+        : "Email couldn't be sent. The invitation remains active. You can copy the invitation link and share it manually.",
     });
   }
 
@@ -404,8 +589,13 @@ export default function HomeownerInvitationPanel({
       : null;
 
   const sentLabel =
-    status.state === "active"
-      ? formatRelativePast(status.sentAt, "Sent")
+    status.state === "active" && status.emailSent
+      ? formatRelativePast(status.emailSentAt, "Email sent")
+      : null;
+
+  const createdLabel =
+    status.state === "active" && !status.emailSent
+      ? formatRelativePast(status.createdAt, "Created")
       : null;
 
   return (
@@ -438,7 +628,7 @@ export default function HomeownerInvitationPanel({
             </div>
 
             <p className="text-sm font-medium text-text-charcoal">
-              {getHomeownerInvitationHeadline(phase)}
+              {getHomeownerInvitationHeadline(status)}
             </p>
 
             {isConnected && joinedLabel ? (
@@ -468,7 +658,10 @@ export default function HomeownerInvitationPanel({
           {status.state === "active" ? (
             <ActiveInvitationMeta
               sentLabel={sentLabel}
-              sentAt={status.sentAt}
+              createdLabel={createdLabel}
+              emailSent={status.emailSent}
+              emailSentAt={status.emailSentAt}
+              createdAt={status.createdAt}
               expiresAt={status.expiresAt}
             />
           ) : null}
@@ -477,6 +670,9 @@ export default function HomeownerInvitationPanel({
         {!isConnected ? (
           <ActionSection
             phase={phase}
+            emailSent={
+              status.state === "active" ? status.emailSent : false
+            }
             hasInviteEmail={hasInviteEmail}
             isWorking={isWorking}
             onSend={() => void handleSendInvitation()}
@@ -591,24 +787,36 @@ function EmailSection({
 
 function ActiveInvitationMeta({
   sentLabel,
-  sentAt,
+  createdLabel,
+  emailSent,
+  emailSentAt,
+  createdAt,
   expiresAt,
 }: {
   sentLabel: string | null;
-  sentAt: string;
+  createdLabel: string | null;
+  emailSent: boolean;
+  emailSentAt: string | null;
+  createdAt: string;
   expiresAt: string;
 }) {
   return (
     <dl className="grid gap-2 text-sm sm:grid-cols-2">
       <div>
         <dt className="text-xs font-medium text-text-muted">
-          Sent
+          {emailSent ? "Email sent" : "Created"}
         </dt>
         <dd
           className="text-text-charcoal"
-          title={formatFullTimestamp(sentAt)}
+          title={formatFullTimestamp(
+            emailSent ? emailSentAt ?? "" : createdAt
+          )}
         >
-          {sentLabel ?? formatFullTimestamp(sentAt)}
+          {emailSent
+            ? (sentLabel ??
+              formatFullTimestamp(emailSentAt ?? ""))
+            : (createdLabel ??
+              formatFullTimestamp(createdAt))}
         </dd>
       </div>
 
@@ -629,6 +837,7 @@ function ActiveInvitationMeta({
 
 function ActionSection({
   phase,
+  emailSent,
   hasInviteEmail,
   isWorking,
   onSend,
@@ -639,6 +848,7 @@ function ActionSection({
   onResendPeriod,
 }: {
   phase: ReturnType<typeof getHomeownerInvitationPanelPhase>;
+  emailSent: boolean;
   hasInviteEmail: boolean;
   isWorking: boolean;
   onSend: () => void;
@@ -697,7 +907,11 @@ function ActionSection({
             onClick={onResendEmail}
             className={`w-full rounded-lg px-3 py-2 text-sm font-semibold disabled:opacity-60 ${BTN_PRIMARY_SM_CLASS}`}
           >
-            {isWorking ? "Sending…" : "Resend email"}
+            {isWorking
+              ? "Sending…"
+              : emailSent
+                ? "Resend email"
+                : "Send invitation email"}
           </button>
 
           <button
@@ -750,6 +964,10 @@ function mapInvitationError(error: string): string {
       return "There is no previous invitation to resend.";
     case "not_deferred":
       return "This invitation is not currently deferred.";
+    case "invalid_invitation_state":
+      return "This invitation cannot be sent in its current state.";
+    case "rotate_failed":
+      return "Could not issue a fresh invitation link.";
     default:
       return "Could not update the invitation. Please try again.";
   }

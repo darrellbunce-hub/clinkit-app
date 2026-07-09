@@ -20,7 +20,9 @@ export type PropertyInvitationStatus =
       ok: true;
       state: "active";
       inviteEmail: string | null;
-      sentAt: string;
+      createdAt: string;
+      emailSentAt: string | null;
+      emailSent: boolean;
       expiresAt: string;
       hoursRemaining: number;
       invitationVersion: number;
@@ -30,7 +32,9 @@ export type PropertyInvitationStatus =
       ok: true;
       state: "expired";
       inviteEmail: string | null;
-      sentAt: string;
+      createdAt: string;
+      emailSentAt: string | null;
+      emailSent: boolean;
       expiredAt: string;
       invitationVersion: number;
       hasInviteEmail: boolean;

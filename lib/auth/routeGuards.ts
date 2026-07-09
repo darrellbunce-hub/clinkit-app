@@ -8,6 +8,7 @@ import {
 import type { CurrentUserContext } from "@/lib/currentUserContext";
 import {
   buildLoginRedirectUrl,
+  buildProtectedRouteNextDestination,
   resolveHomeownerBlockedRedirect,
   resolveLoginPathForProtectedRoute,
 } from "@/lib/auth/redirects";
@@ -69,7 +70,10 @@ export function requireAuthenticatedForRequest(
     buildLoginRedirectUrl(
       requestUrl,
       loginPath,
-      pathname
+      buildProtectedRouteNextDestination(
+        requestUrl,
+        pathname
+      )
     );
 
   return deny(

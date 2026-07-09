@@ -14,7 +14,7 @@ import {
   type EstateAgentOnboardingSummary,
 } from "@/lib/estateAgent/completeOnboarding";
 import {
-  fetchProfileAccountFields,
+  fetchAuthenticatedProfileAccountFields,
 } from "@/lib/currentUserContext";
 import { supabase } from "@/lib/supabase";
 
@@ -71,10 +71,17 @@ export default function EstateAgentOnboardingPage() {
       }
 
       const profile =
-        await fetchProfileAccountFields(
+        await fetchAuthenticatedProfileAccountFields(
           supabase,
           user.id
         );
+
+      if (!profile) {
+        window.location.href =
+          `${ROUTES.estateAgentLogin}?error=profile_setup_failed`;
+
+        return;
+      }
 
       if (
         profile?.onboarding_completed_at

@@ -11,7 +11,8 @@ import EaMarketingShell from "@/components/estate-agents/EaMarketingShell";
 import { AUTH_TITLE_CLASS } from "@/components/mobileStandards";
 import { resolvePostLoginRedirect } from "@/lib/auth/redirects";
 import { ROUTES } from "@/lib/auth/routes";
-import { fetchProfileAccountFields } from "@/lib/currentUserContext";
+import { fetchAuthenticatedProfileAccountFields } from "@/lib/currentUserContext";
+import { ensureUserProfile } from "@/lib/profile/ensureUserProfile";
 import { supabase } from "@/lib/supabase";
 
 const inputClassName =
@@ -37,19 +38,35 @@ export default function EstateAgentLoginPage() {
         return;
       }
 
+      const profileEnsure =
+        await ensureUserProfile(supabase);
+
+      if (!profileEnsure.ok) {
+        setIsCheckingSession(false);
+        setErrorMessage(
+          "We could not finish profile setup for your account. Try again or contact support."
+        );
+
+        return;
+      }
+
       const profile =
-        await fetchProfileAccountFields(
+        await fetchAuthenticatedProfileAccountFields(
           supabase,
           user.id
         );
 
-      window.location.href =
-        resolvePostLoginRedirect(
-          profile ?? {
-            account_type: "homeowner",
-            onboarding_completed_at: null,
-          }
+      if (!profile) {
+        setIsCheckingSession(false);
+        setErrorMessage(
+          "We could not load your profile. Try again or contact support."
         );
+
+        return;
+      }
+
+      window.location.href =
+        resolvePostLoginRedirect(profile);
     }
 
     redirectIfAuthenticated();
@@ -103,19 +120,33 @@ export default function EstateAgentLoginPage() {
         return;
       }
 
+      const profileEnsure =
+        await ensureUserProfile(supabase);
+
+      if (!profileEnsure.ok) {
+        setErrorMessage(
+          "Your account is signed in but we could not finish profile setup. Try again or contact support."
+        );
+
+        return;
+      }
+
       const profile =
-        await fetchProfileAccountFields(
+        await fetchAuthenticatedProfileAccountFields(
           supabase,
           result.data.user.id
         );
 
-      window.location.href =
-        resolvePostLoginRedirect(
-          profile ?? {
-            account_type: "homeowner",
-            onboarding_completed_at: null,
-          }
+      if (!profile) {
+        setErrorMessage(
+          "We could not load your profile. Try again or contact support."
         );
+
+        return;
+      }
+
+      window.location.href =
+        resolvePostLoginRedirect(profile);
     } catch (error) {
       setErrorMessage(
         error instanceof Error

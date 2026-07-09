@@ -3,6 +3,11 @@ import {
   hasClaimableProperties,
 } from "../lib/propertyClaim/discoverClaimableProperties";
 import {
+  getHomeownerInvitationHeadline,
+  getHomeownerInvitationPanelPhase,
+  getHomeownerInvitationPillLabel,
+} from "../lib/propertyClaim/invitationPanelPresentation";
+import {
   getInvitationLifecycleStatus,
   getInvitationStatusBadgeLabel,
   isInvitationExpiredPriority,
@@ -101,6 +106,49 @@ function testClaimDiscoveryHelpers() {
   );
 }
 
+function testInvitationPanelPresentation() {
+  const activeWithoutEmail = {
+    ok: true as const,
+    state: "active" as const,
+    inviteEmail: "owner@example.com",
+    createdAt: "2026-07-01T10:00:00.000Z",
+    emailSentAt: null,
+    emailSent: false,
+    expiresAt: "2026-07-03T10:00:00.000Z",
+    hoursRemaining: 12,
+    invitationVersion: 1,
+    hasInviteEmail: true,
+  };
+
+  assert(
+    getHomeownerInvitationPanelPhase(activeWithoutEmail) ===
+      "awaiting_claim",
+    "active invitation maps to awaiting_claim phase"
+  );
+  assert(
+    getHomeownerInvitationPillLabel("awaiting_claim") ===
+      "INVITATION ACTIVE",
+    "active invitation pill label"
+  );
+  assert(
+    getHomeownerInvitationHeadline(activeWithoutEmail) ===
+      "Invitation active — email not yet sent.",
+    "active invitation without email headline"
+  );
+
+  const activeWithEmail = {
+    ...activeWithoutEmail,
+    emailSent: true,
+    emailSentAt: "2026-07-01T11:00:00.000Z",
+  };
+
+  assert(
+    getHomeownerInvitationHeadline(activeWithEmail) ===
+      "Waiting for homeowner to claim.",
+    "active invitation with email headline"
+  );
+}
+
 function testInvitationLifecyclePresentation() {
   const expiredSummary = {
     origin_type: "estate_agent",
@@ -130,6 +178,10 @@ const tests = [
   ["claim status from email", testClaimStatusFromEmail],
   ["claim badge labels", testClaimBadgeLabels],
   ["claim discovery helpers", testClaimDiscoveryHelpers],
+  [
+    "invitation panel presentation",
+    testInvitationPanelPresentation,
+  ],
   [
     "invitation lifecycle presentation",
     testInvitationLifecyclePresentation,

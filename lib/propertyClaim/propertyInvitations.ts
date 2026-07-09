@@ -15,7 +15,9 @@ type InvitationStatusRpc = {
   error?: string;
   state?: "none" | "active" | "expired" | "claimed" | "deferred";
   invite_email?: string | null;
-  sent_at?: string;
+  created_at?: string;
+  email_sent_at?: string | null;
+  email_sent?: boolean;
   claimed_at?: string | null;
   expires_at?: string;
   expired_at?: string;
@@ -87,7 +89,9 @@ export async function loadPropertyInvitationStatus(
         ok: true,
         state: "active",
         inviteEmail,
-        sentAt: result.sent_at ?? "",
+        createdAt: result.created_at ?? "",
+        emailSentAt: result.email_sent_at ?? null,
+        emailSent: result.email_sent === true,
         expiresAt: result.expires_at ?? "",
         hoursRemaining: result.hours_remaining ?? 0,
         invitationVersion:
@@ -99,7 +103,9 @@ export async function loadPropertyInvitationStatus(
         ok: true,
         state: "expired",
         inviteEmail,
-        sentAt: result.sent_at ?? "",
+        createdAt: result.created_at ?? "",
+        emailSentAt: result.email_sent_at ?? null,
+        emailSent: result.email_sent === true,
         expiredAt: result.expired_at ?? "",
         invitationVersion:
           result.invitation_version ?? 1,
@@ -196,6 +202,88 @@ async function refreshSummaryAfterInvitationMutation(
       refreshResult.error
     );
   }
+}
+
+export async function rotatePropertyClaimInvitationForDelivery(
+  supabase: SupabaseClient,
+  propertyId: number
+): Promise<GenerateInvitationResult> {
+  const { data, error } = await supabase.rpc(
+    "rotate_active_property_claim_invitation_for_delivery",
+    {
+      p_property_id: propertyId,
+    }
+  );
+
+  if (error) {
+    return {
+      ok: false,
+      token: null,
+      expiresAt: null,
+      invitationVersion: null,
+      error: error.message,
+    };
+  }
+
+  const result = data as GenerateInvitationRpc | null;
+
+  if (
+    !result?.ok ||
+    !result.token ||
+    !result.expires_at
+  ) {
+    return {
+      ok: false,
+      token: null,
+      expiresAt: null,
+      invitationVersion: null,
+      error: result?.error ?? "rotate_failed",
+    };
+  }
+
+  await refreshSummaryAfterInvitationMutation(
+    supabase,
+    propertyId
+  );
+
+  return {
+    ok: true,
+    token: result.token,
+    expiresAt: result.expires_at,
+    invitationVersion:
+      result.invitation_version ?? 1,
+    error: null,
+  };
+}
+
+export async function recordPropertyClaimInvitationSent(
+  supabase: SupabaseClient,
+  propertyId: number
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { data, error } = await supabase.rpc(
+    "record_property_claim_invitation_sent",
+    {
+      p_property_id: propertyId,
+    }
+  );
+
+  if (error) {
+    return {
+      ok: false,
+      error: error.message,
+    };
+  }
+
+  const result = data as { ok?: boolean; error?: string } | null;
+
+  if (!result?.ok) {
+    return {
+      ok: false,
+      error: result?.error ?? "record_sent_failed",
+    };
+  }
+
+  return { ok: true };
 }
 
 export async function generatePropertyClaimInvitation(

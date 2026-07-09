@@ -58,20 +58,55 @@ export function resolveLoginPathForProtectedRoute(
   return ROUTES.homeownerLogin;
 }
 
+/**
+ * Full post-login destination for a protected route, including query string.
+ */
+export function buildProtectedRouteNextDestination(
+  requestUrl: URL,
+  pathname: string
+): string {
+  return `${pathname}${requestUrl.search}`;
+}
+
+/**
+ * Resolve a safe internal redirect from the login page `next` query parameter.
+ * Rejects open redirects; preserves pathname and search when valid.
+ */
+export function resolveLoginNextDestination(
+  nextDestination: string | null | undefined,
+  fallback: string
+): string {
+  const candidate = nextDestination?.trim();
+
+  if (!candidate) {
+    return fallback;
+  }
+
+  if (
+    !candidate.startsWith("/") ||
+    candidate.startsWith("//") ||
+    candidate.includes("://")
+  ) {
+    return fallback;
+  }
+
+  return candidate;
+}
+
 export function buildLoginRedirectUrl(
   requestUrl: URL,
   loginPath: string,
-  nextPath?: string
+  nextDestination?: string
 ): URL {
   const loginUrl = new URL(
     loginPath,
     requestUrl.origin
   );
 
-  if (nextPath) {
+  if (nextDestination) {
     loginUrl.searchParams.set(
       "next",
-      nextPath
+      nextDestination
     );
   }
 

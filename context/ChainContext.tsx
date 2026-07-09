@@ -54,6 +54,7 @@ import {
   getAccountType,
   type AccountType,
 } from "@/lib/accountType";
+import { fetchAuthenticatedProfileAccountFields } from "@/lib/currentUserContext";
 import { loadEstateAgentOperationalAssignments } from "@/lib/estateAgent/assignments";
 import type { EstateAgentOperationalAssignment } from "@/lib/operationalSubject";
 import {
@@ -414,15 +415,13 @@ function clearParticipantState(
 async function loadAccountTypeForUser(
   userId: string
 ): Promise<AccountType> {
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("account_type")
-    .eq("id", userId)
-    .maybeSingle();
+  const profile =
+    await fetchAuthenticatedProfileAccountFields(
+      supabase,
+      userId
+    );
 
-  return getAccountType(
-    profile ?? { account_type: "homeowner" }
-  );
+  return getAccountType(profile);
 }
 
 export function ChainProvider({

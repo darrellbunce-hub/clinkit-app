@@ -23,7 +23,8 @@ import {
 import { resolvePasswordRecoveryQueryError } from "@/lib/auth/authConfirm";
 import { resolvePostLoginRedirect } from "@/lib/auth/redirects";
 import { ROUTES } from "@/lib/auth/routes";
-import { fetchProfileAccountFields } from "@/lib/currentUserContext";
+import { fetchAuthenticatedProfileAccountFields } from "@/lib/currentUserContext";
+import { ensureUserProfile } from "@/lib/profile/ensureUserProfile";
 import { supabase } from "@/lib/supabase";
 
 type ResetState =
@@ -80,8 +81,20 @@ export default function ResetPasswordForm() {
         return;
       }
 
+      const profileEnsure =
+        await ensureUserProfile(supabase);
+
+      if (!profileEnsure.ok) {
+        setErrorMessage(
+          "We could not finish profile setup for your account. Try signing in again."
+        );
+        setState("error");
+
+        return;
+      }
+
       const profile =
-        await fetchProfileAccountFields(
+        await fetchAuthenticatedProfileAccountFields(
           supabase,
           user.id
         );

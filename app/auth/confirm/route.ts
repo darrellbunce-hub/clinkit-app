@@ -93,6 +93,8 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  await supabase.rpc("ensure_user_profile");
+
   return redirectToAuthConfirmDestination(
     request,
     destination

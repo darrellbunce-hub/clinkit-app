@@ -31,7 +31,7 @@ export function getHomeownerInvitationPillLabel(
     case "ready":
       return "READY TO INVITE";
     case "awaiting_claim":
-      return "AWAITING CLAIM";
+      return "INVITATION ACTIVE";
     case "expired":
       return "EXPIRED";
     case "not_ready":
@@ -59,13 +59,19 @@ export function getHomeownerInvitationPillClasses(
 }
 
 export function getHomeownerInvitationHeadline(
-  phase: HomeownerInvitationPanelPhase
+  status: Extract<PropertyInvitationStatus, { ok: true }>
 ): string {
+  const phase = getHomeownerInvitationPanelPhase(status);
+
   switch (phase) {
     case "ready":
       return "Ready to invite this homeowner.";
     case "awaiting_claim":
-      return "Invitation sent — waiting for homeowner to join.";
+      if (status.state === "active" && !status.emailSent) {
+        return "Invitation active — email not yet sent.";
+      }
+
+      return "Waiting for homeowner to claim.";
     case "expired":
       return "Invitation expired.";
     case "not_ready":
