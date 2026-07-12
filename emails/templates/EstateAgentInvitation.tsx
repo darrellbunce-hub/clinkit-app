@@ -48,8 +48,9 @@ export default function EstateAgentInvitationEmail(
               lineHeight: "26px",
             }}
           >
-            You have been invited to join {props.branchName} at {props.companyName}
-            on Keynetic — the shared workspace for property moves and chain visibility.
+            You&apos;ve been invited to join {props.companyName} on Keynetic.
+            You&apos;ll work from the shared {props.branchName} operational
+            dashboard.
           </Text>
         </EmailSection>
 
@@ -115,5 +116,5 @@ export default function EstateAgentInvitationEmail(
 export function getEstateAgentInvitationSubject(
   props: Pick<EstateAgentInvitationEmailParams, "companyName">
 ): string {
-  return `Join ${props.companyName} on Keynetic`;
+  return `You've been invited to join ${props.companyName} on Keynetic`;
 }

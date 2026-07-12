@@ -1,15 +1,17 @@
 "use client";
 
-import {
-  useState,
-  type FormEvent,
-} from "react";
+import { Suspense, useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 
 import EaMarketingShell from "@/components/estate-agents/EaMarketingShell";
 import { AUTH_TITLE_CLASS } from "@/components/mobileStandards";
 import { ROUTES } from "@/lib/auth/routes";
 import { validateBusinessEmail } from "@/lib/businessEmail";
+import {
+  formatEaBranchInvitationError,
+  previewEaBranchInvitation,
+} from "@/lib/estateAgent/branchTeam";
 import { createEstateAgentProfile } from "@/lib/estateAgent/createEstateAgentProfile";
 import { supabase } from "@/lib/supabase";
 
@@ -17,10 +19,65 @@ const inputClassName =
   "mt-2 w-full border border-slate-300 text-base text-slate-900 rounded-2xl px-4 py-3 disabled:bg-slate-100";
 
 export default function EstateAgentSignupPage() {
+  return (
+    <Suspense
+      fallback={
+        <EaMarketingShell>
+          <section className="max-w-xl mx-auto px-6 py-16">
+            <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-8 text-center text-slate-600">
+              Loading sign up...
+            </div>
+          </section>
+        </EaMarketingShell>
+      }
+    >
+      <EstateAgentSignupContent />
+    </Suspense>
+  );
+}
+
+function EstateAgentSignupContent() {
+  const searchParams = useSearchParams();
+  const inviteToken = searchParams.get("token");
+
   const [errorMessage, setErrorMessage] =
     useState("");
   const [isSubmitting, setIsSubmitting] =
     useState(false);
+  const [prefillEmail, setPrefillEmail] =
+    useState("");
+  const [inviteCompanyName, setInviteCompanyName] =
+    useState<string | null>(null);
+
+  useEffect(() => {
+    async function loadInvitePreview() {
+      if (!inviteToken) {
+        return;
+      }
+
+      const previewResult =
+        await previewEaBranchInvitation(
+          supabase,
+          inviteToken
+        );
+
+      if (!previewResult.ok) {
+        setErrorMessage(
+          formatEaBranchInvitationError(
+            previewResult.error
+          )
+        );
+        return;
+      }
+
+      setPrefillEmail(previewResult.preview.inviteEmail);
+      setInviteCompanyName(
+        previewResult.preview.companyName
+      );
+    }
+
+    void loadInvitePreview();
+  }, [inviteToken]);
 
   async function handleSubmit(
     event: FormEvent<HTMLFormElement>
@@ -127,13 +184,16 @@ export default function EstateAgentSignupPage() {
 
       if (!data.session) {
         window.location.href =
-          "/verify-email";
+          inviteToken
+            ? `${ROUTES.estateAgentJoin}?token=${encodeURIComponent(inviteToken)}`
+            : "/verify-email";
 
         return;
       }
 
-      window.location.href =
-        ROUTES.estateAgentOnboarding;
+      window.location.href = inviteToken
+        ? `${ROUTES.estateAgentJoin}?token=${encodeURIComponent(inviteToken)}`
+        : ROUTES.estateAgentOnboarding;
     } catch (error) {
       setErrorMessage(
         error instanceof Error
@@ -154,7 +214,9 @@ export default function EstateAgentSignupPage() {
           </h1>
 
           <p className="mt-2 text-slate-600">
-            Create your agency account using your business email address.
+            {inviteCompanyName
+              ? `Create your account to join ${inviteCompanyName}.`
+              : "Create your agency account using your business email address."}
           </p>
 
           <form
@@ -194,6 +256,8 @@ export default function EstateAgentSignupPage() {
                 type="email"
                 autoComplete="email"
                 inputMode="email"
+                defaultValue={prefillEmail}
+                readOnly={Boolean(prefillEmail)}
                 disabled={isSubmitting}
                 className={inputClassName}
               />
@@ -258,7 +322,11 @@ export default function EstateAgentSignupPage() {
           <p className="mt-6 text-sm text-slate-600">
             Already registered?{" "}
             <Link
-              href={ROUTES.estateAgentLogin}
+              href={
+                inviteToken
+                  ? `${ROUTES.estateAgentLogin}?next=${encodeURIComponent(`${ROUTES.estateAgentJoin}?token=${encodeURIComponent(inviteToken)}`)}`
+                  : ROUTES.estateAgentLogin
+              }
               className="font-semibold text-slate-900 underline"
             >
               Log in

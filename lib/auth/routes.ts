@@ -18,6 +18,7 @@ export const ROUTES = {
   estateAgentMarketing: "/estate-agents",
   estateAgentPricing: "/estate-agents/pricing",
   estateAgentOnboarding: "/estate-agents/onboarding",
+  estateAgentJoin: "/estate-agents/join",
   agentHome: "/agent",
   agentOriginate: "/agent/originate",
   claimProperty: "/claim",
@@ -73,6 +74,7 @@ export const PUBLIC_EXACT_PATHS = [
   ROUTES.estateAgentPricing,
   ROUTES.estateAgentSignup,
   ROUTES.estateAgentLogin,
+  ROUTES.estateAgentJoin,
 ] as const;
 
 export function normalizePathname(

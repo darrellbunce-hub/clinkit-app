@@ -1,6 +1,12 @@
+"use client";
+
+import { useState } from "react";
+
+import InvitationDeclinedActionDetails from "@/components/agent/commandCentre/InvitationDeclinedActionDetails";
 import OperationalActionButton from "@/components/agent/commandCentre/OperationalActionButton";
 import ConfidenceBar from "@/components/agent/commandCentre/ConfidenceBar";
 import HomeownerInvitationPanel from "@/components/agent/commandCentre/HomeownerInvitationPanel";
+import EstateAgentManagementModeBadge from "@/components/estate-agents/EstateAgentManagementModeBadge";
 import type { AgentBranchPropertySummary } from "@/lib/estateAgent/assignmentTypes";
 import {
   formatDaysSinceLastUpdate,
@@ -14,6 +20,7 @@ import {
 import {
   FONT_HEADING_CLASS,
   WORKSPACE_CARD_CLASS,
+  BTN_SECONDARY_OUTLINE_SM_CLASS,
 } from "@/lib/theme/themeTokens";
 import {
   getActionReasonBannerClasses,
@@ -21,7 +28,11 @@ import {
   getPrimaryActionRequiredReason,
   getSupportingActionRequiredReasons,
 } from "@/lib/estateAgent/workspacePresentation";
+import { getEstateAgentManagementModePresentationFromSummary } from "@/lib/estateAgent/managementModePresentation";
+import { acknowledgePropertyClaimInvitationDecline } from "@/lib/propertyClaim/propertyInvitations";
+import { shouldShowInvitationDeclinedActionDetails } from "@/lib/propertyClaim/invitationDeclinedPresentation";
 import { WorkspaceIcon } from "@/lib/theme/workspaceIcons";
+import { supabase } from "@/lib/supabase";
 
 type OperationalPropertyCardProps = {
   summary: AgentBranchPropertySummary;
@@ -34,6 +45,8 @@ export default function OperationalPropertyCard({
   variant = "managed",
   onInvitationChanged,
 }: OperationalPropertyCardProps) {
+  const [isDismissing, setIsDismissing] =
+    useState(false);
   const tier = getOperationalPriorityTier(summary);
   const primaryReason =
     variant === "action"
@@ -49,6 +62,35 @@ export default function OperationalPropertyCard({
       : [];
   const operationalState =
     getManagedPropertyOperationalState(summary);
+  const managementMode =
+    getEstateAgentManagementModePresentationFromSummary(
+      summary
+    );
+  const showDeclinedActionDetails =
+    variant === "action" &&
+    shouldShowInvitationDeclinedActionDetails(summary);
+
+  async function handleDismissDecline() {
+    if (isDismissing) {
+      return;
+    }
+
+    setIsDismissing(true);
+
+    const result =
+      await acknowledgePropertyClaimInvitationDecline(
+        supabase,
+        summary.property_id
+      );
+
+    setIsDismissing(false);
+
+    if (!result.ok) {
+      return;
+    }
+
+    await onInvitationChanged?.();
+  }
 
   return (
     <article className={`${WORKSPACE_CARD_CLASS} p-5`}>
@@ -100,6 +142,12 @@ export default function OperationalPropertyCard({
           </div>
         )}
 
+        {showDeclinedActionDetails ? (
+          <InvitationDeclinedActionDetails
+            summary={summary}
+          />
+        ) : null}
+
         <div className="flex flex-wrap items-center gap-2">
           <span
             className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${getHealthStatusClasses(summary.health_status)}`}
@@ -124,6 +172,11 @@ export default function OperationalPropertyCard({
           </span>
         </div>
 
+        <EstateAgentManagementModeBadge
+          presentation={managementMode}
+          showDescription
+        />
+
         {typeof summary.confidence_score ===
         "number" ? (
           <ConfidenceBar
@@ -147,7 +200,7 @@ export default function OperationalPropertyCard({
           </ul>
         ) : null}
 
-        <div className="flex flex-col gap-2 border-t border-surface-card-border pt-4 sm:flex-row">
+        <div className="flex flex-col gap-2 border-t border-surface-card-border pt-4 sm:flex-row sm:flex-wrap">
           <OperationalActionButton
             href={`/property/${summary.property_id}`}
             label="Open Property"
@@ -159,6 +212,17 @@ export default function OperationalPropertyCard({
               label="Open Chain"
               variant="secondary"
             />
+          ) : null}
+
+          {showDeclinedActionDetails ? (
+            <button
+              type="button"
+              disabled={isDismissing}
+              onClick={() => void handleDismissDecline()}
+              className={`inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-60 ${BTN_SECONDARY_OUTLINE_SM_CLASS}`}
+            >
+              {isDismissing ? "Dismissing…" : "Dismiss"}
+            </button>
           ) : null}
         </div>
       </div>

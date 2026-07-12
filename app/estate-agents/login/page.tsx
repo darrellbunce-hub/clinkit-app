@@ -1,15 +1,17 @@
 "use client";
 
 import {
+  Suspense,
   useEffect,
   useState,
   type FormEvent,
 } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 
 import EaMarketingShell from "@/components/estate-agents/EaMarketingShell";
 import { AUTH_TITLE_CLASS } from "@/components/mobileStandards";
-import { resolvePostLoginRedirect } from "@/lib/auth/redirects";
+import { resolveLoginNextDestination, resolvePostLoginRedirect } from "@/lib/auth/redirects";
 import { ROUTES } from "@/lib/auth/routes";
 import { fetchAuthenticatedProfileAccountFields } from "@/lib/currentUserContext";
 import { ensureUserProfile } from "@/lib/profile/ensureUserProfile";
@@ -19,6 +21,27 @@ const inputClassName =
   "mt-2 w-full border border-slate-300 text-base text-slate-900 rounded-2xl px-4 py-3 disabled:bg-slate-100";
 
 export default function EstateAgentLoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <EaMarketingShell>
+          <section className="max-w-xl mx-auto px-6 py-16">
+            <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-8 text-center text-slate-600">
+              Loading login...
+            </div>
+          </section>
+        </EaMarketingShell>
+      }
+    >
+      <EstateAgentLoginContent />
+    </Suspense>
+  );
+}
+
+function EstateAgentLoginContent() {
+  const searchParams = useSearchParams();
+  const nextDestination = searchParams.get("next");
+
   const [errorMessage, setErrorMessage] =
     useState("");
   const [isLoggingIn, setIsLoggingIn] =
@@ -66,11 +89,14 @@ export default function EstateAgentLoginPage() {
       }
 
       window.location.href =
-        resolvePostLoginRedirect(profile);
+        resolveLoginNextDestination(
+          nextDestination,
+          resolvePostLoginRedirect(profile)
+        );
     }
 
     redirectIfAuthenticated();
-  }, []);
+  }, [nextDestination]);
 
   async function handleSubmit(
     event: FormEvent<HTMLFormElement>
@@ -146,7 +172,10 @@ export default function EstateAgentLoginPage() {
       }
 
       window.location.href =
-        resolvePostLoginRedirect(profile);
+        resolveLoginNextDestination(
+          nextDestination,
+          resolvePostLoginRedirect(profile)
+        );
     } catch (error) {
       setErrorMessage(
         error instanceof Error

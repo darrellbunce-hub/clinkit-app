@@ -76,7 +76,7 @@ export default function AgentOriginatePage() {
   const [inviteEmail, setInviteEmail] =
     useState("");
   const [delegatedUpdates, setDelegatedUpdates] =
-    useState(false);
+    useState(true);
   const [onwardPlan, setOnwardPlan] =
     useState<SellerOnwardPlan>(
       DEFAULT_SELLER_ONWARD_PLAN
@@ -400,14 +400,14 @@ export default function AgentOriginatePage() {
 
                 <span>
                   <span className="block font-medium text-slate-900">
-                    Enable delegated operational updates
+                    Operational editing enabled
                   </span>
 
                   <span className="mt-1 block text-sm text-slate-600">
-                    When enabled, your branch can update
-                    the shared operational workspace on
-                    behalf of the homeowner until they
-                    claim operational ownership.
+                    Enabled by default so your branch can
+                    manage this transaction immediately.
+                    Uncheck only if you want view-only
+                    access until the homeowner claims.
                   </span>
                 </span>
               </label>

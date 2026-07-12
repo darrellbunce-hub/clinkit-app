@@ -43,6 +43,9 @@ function findActiveAssignmentInChain(
  *
  * Homeowners: viewer membership (unchanged).
  * Estate agents: subject position only when delegation is enabled.
+ * Pre-claim EA-originated properties use the assigned-property lens even when
+ * subject_user_id is null; seller-hop topology still resolves via
+ * applyOperationalSubjectLens.
  */
 export function resolveMutationOperationalPosition(params: {
   viewerUserId: string | null | undefined;

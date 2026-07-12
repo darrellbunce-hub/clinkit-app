@@ -5,8 +5,16 @@ import { PAGE_BG_CLASS } from "@/lib/theme/themeTokens";
 
 const marketingNavLinks = [
   {
-    href: ROUTES.estateAgentMarketing,
-    label: "Estate Agents",
+    href: `${ROUTES.estateAgentMarketing}#how-it-works`,
+    label: "How it works",
+  },
+  {
+    href: `${ROUTES.estateAgentMarketing}#pricing`,
+    label: "Pricing",
+  },
+  {
+    href: `${ROUTES.estateAgentMarketing}#faq`,
+    label: "FAQ",
   },
   {
     href: ROUTES.estateAgentLogin,

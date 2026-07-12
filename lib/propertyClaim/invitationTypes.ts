@@ -4,6 +4,7 @@ export const INVITATION_LIFECYCLE_STATUSES = [
   "invitation_active",
   "invitation_expired",
   "invitation_deferred",
+  "invitation_declined",
 ] as const;
 
 export type InvitationLifecycleStatus =
@@ -43,6 +44,15 @@ export type PropertyInvitationStatus =
       ok: true;
       state: "deferred";
       inviteEmail: string | null;
+      hasInviteEmail: boolean;
+    }
+  | {
+      ok: true;
+      state: "declined";
+      inviteEmail: string | null;
+      rejectedAt: string;
+      rejectionReason: string | null;
+      invitationVersion: number;
       hasInviteEmail: boolean;
     }
   | {
@@ -91,9 +101,20 @@ export type ClaimTokenResolutionError =
   | "already_used"
   | "already_claimed"
   | "email_mismatch"
+  | "invitation_declined"
   | "not_authenticated"
   | "homeowner_only"
   | "email_required";
+
+export type RejectInvitationResult =
+  | {
+      ok: true;
+      propertyId: number;
+    }
+  | {
+      ok: false;
+      error: string;
+    };
 
 export type UpdateInviteEmailResult =
   | {

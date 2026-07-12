@@ -4,6 +4,7 @@ import { ROUTES } from "@/lib/auth/routes";
 import type {
   GenerateInvitationResult,
   PropertyInvitationStatus,
+  RejectInvitationResult,
   ResolveInvitationTokenResult,
   UpdateInviteEmailResult,
 } from "@/lib/propertyClaim/invitationTypes";
@@ -13,12 +14,14 @@ import { refreshOperationalSummaryForProperty } from "@/lib/operationalSummary/r
 type InvitationStatusRpc = {
   ok?: boolean;
   error?: string;
-  state?: "none" | "active" | "expired" | "claimed" | "deferred";
+  state?: "none" | "active" | "expired" | "claimed" | "deferred" | "declined";
   invite_email?: string | null;
   created_at?: string;
   email_sent_at?: string | null;
   email_sent?: boolean;
   claimed_at?: string | null;
+  rejected_at?: string;
+  rejection_reason?: string | null;
   expires_at?: string;
   expired_at?: string;
   hours_remaining?: number;
@@ -116,6 +119,17 @@ export async function loadPropertyInvitationStatus(
         ok: true,
         state: "deferred",
         inviteEmail,
+        hasInviteEmail,
+      };
+    case "declined":
+      return {
+        ok: true,
+        state: "declined",
+        inviteEmail,
+        rejectedAt: result.rejected_at ?? "",
+        rejectionReason: result.rejection_reason ?? null,
+        invitationVersion:
+          result.invitation_version ?? 1,
         hasInviteEmail,
       };
     case "claimed":
@@ -484,6 +498,85 @@ export async function resumePropertyClaimInvitation(
     return {
       ok: false,
       error: result?.error ?? "resume_failed",
+    };
+  }
+
+  await refreshSummaryAfterInvitationMutation(
+    supabase,
+    propertyId
+  );
+
+  return { ok: true };
+}
+
+export async function rejectPropertyClaimInvitation(
+  supabase: SupabaseClient,
+  invitationToken: string,
+  rejectionReason?: string | null
+): Promise<RejectInvitationResult> {
+  const { data, error } = await supabase.rpc(
+    "reject_property_claim_invitation",
+    {
+      p_invitation_token: invitationToken,
+      p_rejection_reason: rejectionReason ?? null,
+    }
+  );
+
+  if (error) {
+    return {
+      ok: false,
+      error: error.message,
+    };
+  }
+
+  const result = data as {
+    ok?: boolean;
+    error?: string;
+    property_id?: number;
+  } | null;
+
+  if (!result?.ok || result.property_id == null) {
+    return {
+      ok: false,
+      error: result?.error ?? "reject_failed",
+    };
+  }
+
+  await refreshSummaryAfterInvitationMutation(
+    supabase,
+    result.property_id
+  );
+
+  return {
+    ok: true,
+    propertyId: result.property_id,
+  };
+}
+
+export async function acknowledgePropertyClaimInvitationDecline(
+  supabase: SupabaseClient,
+  propertyId: number
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { data, error } = await supabase.rpc(
+    "acknowledge_property_claim_invitation_decline",
+    {
+      p_property_id: propertyId,
+    }
+  );
+
+  if (error) {
+    return {
+      ok: false,
+      error: error.message,
+    };
+  }
+
+  const result = data as { ok?: boolean; error?: string } | null;
+
+  if (!result?.ok) {
+    return {
+      ok: false,
+      error: result?.error ?? "acknowledge_failed",
     };
   }
 

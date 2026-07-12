@@ -37,9 +37,11 @@ import {
 } from "@/lib/operationalPresentation";
 import {
   applyOperationalSubjectLens,
+  pickEstateAgentAssignmentInChain,
   resolveOperationalSubject,
   resolveSubjectOperationalPosition,
 } from "@/lib/operationalSubject";
+import { getEstateAgentManagementModeForOperationalAssignment } from "@/lib/estateAgent/managementModePresentation";
 import OperationalCompletionDatePanel from "@/components/OperationalCompletionDatePanel";
 import PropertyEstateAgentAssignment from "@/components/estate-agents/PropertyEstateAgentAssignment";
 import {
@@ -661,6 +663,20 @@ if (
       mode: access.mode,
     });
 
+  const chainAssignment =
+    access.viewerRole === "estate_agent"
+      ? pickEstateAgentAssignmentInChain(
+          estateAgentOperationalAssignments,
+          currentProperty.chainId,
+          chainPropertiesForCompletion
+        )
+      : null;
+
+  const managementMode =
+    getEstateAgentManagementModeForOperationalAssignment(
+      chainAssignment
+    );
+
   const showOperationalManager =
     access.viewerRole === "estate_agent" && canEdit;
 
@@ -727,6 +743,7 @@ if (
     showManager={
       access.viewerRole === "estate_agent"
     }
+    managementMode={managementMode}
   />
 )}
 

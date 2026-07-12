@@ -5,10 +5,10 @@ import { classifyAgentDashboardTab } from "@/lib/estateAgent/classifyAgentDashbo
 import { mapChainHealthSlugToLabel } from "@/lib/operationalSummary/mapHealthStatus";
 import {
   getInvitationLifecycleStatus,
-  isAwaitingClaimPriority,
   isInvitationActivePriority,
   isInvitationExpiredPriority,
   isReadyToInvitePriority,
+  isUnacknowledgedInvitationDeclinedPriority,
 } from "@/lib/propertyClaim/invitationPresentation";
 
 export type OperationalPriorityTier =
@@ -33,6 +33,7 @@ export type ClaimOverviewKpis = {
   awaitingClaim: number;
   invitationActive: number;
   invitationExpired: number;
+  invitationDeclined: number;
   claimed: number;
 };
 
@@ -132,7 +133,8 @@ export function filterActionRequiredSummaries(
       summary.needs_attention === true ||
       isInvitationExpiredPriority(summary) ||
       isInvitationActivePriority(summary) ||
-      isReadyToInvitePriority(summary)
+      isReadyToInvitePriority(summary) ||
+      isUnacknowledgedInvitationDeclinedPriority(summary)
   );
 }
 
@@ -147,6 +149,15 @@ export function sortActionRequiredSummaries(
 
     if (leftExpired !== rightExpired) {
       return leftExpired ? -1 : 1;
+    }
+
+    const leftDeclined =
+      isUnacknowledgedInvitationDeclinedPriority(left);
+    const rightDeclined =
+      isUnacknowledgedInvitationDeclinedPriority(right);
+
+    if (leftDeclined !== rightDeclined) {
+      return leftDeclined ? -1 : 1;
     }
 
     const leftActive =
@@ -313,6 +324,7 @@ export function computeClaimOverviewKpis(
     awaitingClaim: 0,
     invitationActive: 0,
     invitationExpired: 0,
+    invitationDeclined: 0,
     claimed: 0,
   };
 
@@ -329,6 +341,9 @@ export function computeClaimOverviewKpis(
         break;
       case "invitation_expired":
         counts.invitationExpired += 1;
+        break;
+      case "invitation_declined":
+        counts.invitationDeclined += 1;
         break;
       case "invitation_deferred":
       case "awaiting_claim":

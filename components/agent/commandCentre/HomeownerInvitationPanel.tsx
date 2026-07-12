@@ -14,6 +14,7 @@ import {
   getHomeownerInvitationPillClasses,
   getHomeownerInvitationPillLabel,
 } from "@/lib/propertyClaim/invitationPanelPresentation";
+import { formatInvitationRejectionReason } from "@/lib/propertyClaim/invitationRejection";
 import type { PropertyInvitationStatus } from "@/lib/propertyClaim/invitationTypes";
 import {
   buildClaimInvitationUrl,
@@ -409,7 +410,8 @@ export default function HomeownerInvitationPanel({
 
     if (
       currentStatus.state === "none" ||
-      currentStatus.state === "deferred"
+      currentStatus.state === "deferred" ||
+      currentStatus.state === "declined"
     ) {
       const generated = await generatePropertyClaimInvitation(
         supabase,
@@ -598,6 +600,18 @@ export default function HomeownerInvitationPanel({
       ? formatRelativePast(status.createdAt, "Created")
       : null;
 
+  const declinedLabel =
+    status.state === "declined"
+      ? formatRelativePast(status.rejectedAt, "Declined")
+      : null;
+
+  const declinedReasonLabel =
+    status.state === "declined"
+      ? formatInvitationRejectionReason(
+          status.rejectionReason
+        )
+      : null;
+
   return (
     <section
       className={panelPadding}
@@ -663,6 +677,14 @@ export default function HomeownerInvitationPanel({
               emailSentAt={status.emailSentAt}
               createdAt={status.createdAt}
               expiresAt={status.expiresAt}
+            />
+          ) : null}
+
+          {status.state === "declined" ? (
+            <DeclinedInvitationMeta
+              declinedLabel={declinedLabel}
+              rejectedAt={status.rejectedAt}
+              rejectionReason={declinedReasonLabel}
             />
           ) : null}
         </div>
@@ -835,6 +857,44 @@ function ActiveInvitationMeta({
   );
 }
 
+function DeclinedInvitationMeta({
+  declinedLabel,
+  rejectedAt,
+  rejectionReason,
+}: {
+  declinedLabel: string | null;
+  rejectedAt: string;
+  rejectionReason: string | null;
+}) {
+  return (
+    <dl className="grid gap-2 text-sm sm:grid-cols-2">
+      <div>
+        <dt className="text-xs font-medium text-text-muted">
+          Declined
+        </dt>
+        <dd
+          className="text-text-charcoal"
+          title={formatFullTimestamp(rejectedAt)}
+        >
+          {declinedLabel ??
+            formatFullTimestamp(rejectedAt)}
+        </dd>
+      </div>
+
+      {rejectionReason ? (
+        <div>
+          <dt className="text-xs font-medium text-text-muted">
+            Reason
+          </dt>
+          <dd className="text-text-charcoal">
+            {rejectionReason}
+          </dd>
+        </div>
+      ) : null}
+    </dl>
+  );
+}
+
 function ActionSection({
   phase,
   emailSent,
@@ -944,6 +1004,19 @@ function ActionSection({
           {isWorking
             ? "Sending…"
             : "Send invitation email"}
+        </button>
+      ) : null}
+
+      {phase === "declined" ? (
+        <button
+          type="button"
+          disabled={primaryDisabled}
+          onClick={onSend}
+          className={`w-full rounded-lg px-3 py-2 text-sm font-semibold disabled:opacity-60 ${BTN_PRIMARY_SM_CLASS}`}
+        >
+          {isWorking
+            ? "Sending…"
+            : "Send new invitation"}
         </button>
       ) : null}
     </div>

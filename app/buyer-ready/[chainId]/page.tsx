@@ -37,8 +37,10 @@ import {
 } from "@/lib/operationalPresentation";
 import {
   resolveOperationalSubject,
+  pickEstateAgentAssignmentInChain,
   resolveSubjectOperationalPosition,
 } from "@/lib/operationalSubject";
+import { getEstateAgentManagementModeForOperationalAssignment } from "@/lib/estateAgent/managementModePresentation";
 import { ROUTES } from "@/lib/auth/routes";
 import { isEstateAgent } from "@/lib/accountType";
 import {
@@ -257,6 +259,20 @@ export default function BuyerReadyPage() {
       viewerRole: access.viewerRole,
       mode: access.mode,
     });
+
+  const chainAssignment =
+    access.viewerRole === "estate_agent"
+      ? pickEstateAgentAssignmentInChain(
+          estateAgentOperationalAssignments,
+          chainId,
+          chainPropertiesForAccess
+        )
+      : null;
+
+  const managementMode =
+    getEstateAgentManagementModeForOperationalAssignment(
+      chainAssignment
+    );
 
   const showOperationalManager =
     access.viewerRole === "estate_agent" && access.canEdit;
@@ -674,6 +690,7 @@ export default function BuyerReadyPage() {
               showManager={
                 access.viewerRole === "estate_agent"
               }
+              managementMode={managementMode}
             />
           )}
         </div>

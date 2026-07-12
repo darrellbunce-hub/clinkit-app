@@ -10,7 +10,9 @@ import {
 import {
   getInvitationLifecycleStatus,
   getInvitationStatusBadgeLabel,
+  isInvitationDeclinedPriority,
   isInvitationExpiredPriority,
+  isUnacknowledgedInvitationDeclinedPriority,
 } from "../lib/propertyClaim/invitationPresentation";
 import type { AgentBranchPropertySummary } from "../lib/estateAgent/assignmentTypes";
 import {
@@ -147,6 +149,32 @@ function testInvitationPanelPresentation() {
       "Waiting for homeowner to claim.",
     "active invitation with email headline"
   );
+
+  const declinedStatus = {
+    ok: true as const,
+    state: "declined" as const,
+    inviteEmail: "owner@example.com",
+    rejectedAt: "2026-07-02T14:00:00.000Z",
+    rejectionReason: "not_my_property",
+    invitationVersion: 2,
+    hasInviteEmail: true,
+  };
+
+  assert(
+    getHomeownerInvitationPanelPhase(declinedStatus) ===
+      "declined",
+    "declined invitation maps to declined phase"
+  );
+  assert(
+    getHomeownerInvitationPillLabel("declined") ===
+      "INVITATION DECLINED",
+    "declined invitation pill label"
+  );
+  assert(
+    getHomeownerInvitationHeadline(declinedStatus) ===
+      "Homeowner declined this invitation.",
+    "declined invitation headline"
+  );
 }
 
 function testInvitationLifecyclePresentation() {
@@ -171,6 +199,48 @@ function testInvitationLifecyclePresentation() {
   assert(
     isInvitationExpiredPriority(expiredSummary),
     "expired should be action priority"
+  );
+
+  const declinedSummary = {
+    origin_type: "estate_agent",
+    claim_status: "unclaimed",
+    invitation_lifecycle_status:
+      "invitation_declined",
+  } as AgentBranchPropertySummary;
+
+  assert(
+    getInvitationLifecycleStatus(declinedSummary) ===
+      "invitation_declined",
+    "declined lifecycle status"
+  );
+  assert(
+    getInvitationStatusBadgeLabel(
+      "invitation_declined"
+    ) === "Invitation Declined",
+    "declined badge label"
+  );
+  assert(
+    isInvitationDeclinedPriority(declinedSummary),
+    "declined should be detectable"
+  );
+
+  const acknowledgedDeclined = {
+    ...declinedSummary,
+    invitation_rejection_acknowledged_at:
+      "2026-07-12T12:00:00.000Z",
+  } as AgentBranchPropertySummary;
+
+  assert(
+    isUnacknowledgedInvitationDeclinedPriority(
+      declinedSummary
+    ),
+    "unacknowledged declined is actionable"
+  );
+  assert(
+    !isUnacknowledgedInvitationDeclinedPriority(
+      acknowledgedDeclined
+    ),
+    "acknowledged declined is not actionable"
   );
 }
 

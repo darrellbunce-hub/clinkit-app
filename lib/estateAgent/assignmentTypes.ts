@@ -68,9 +68,14 @@ export type AgentBranchPropertySummary = {
     | "invitation_active"
     | "invitation_expired"
     | "invitation_deferred"
+    | "invitation_declined"
     | null;
   invitation_expires_at?: string | null;
   invitation_version?: number | null;
+  invitation_rejected_at?: string | null;
+  invitation_rejection_reason?: string | null;
+  invitation_rejection_acknowledged_at?: string | null;
+  invite_email?: string | null;
 };
 
 export type AgentDashboardTab = "active" | "archived";

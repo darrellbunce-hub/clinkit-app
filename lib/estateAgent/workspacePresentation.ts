@@ -9,12 +9,15 @@ import {
   getHighestPriorityAlert,
 } from "@/lib/estateAgent/commandCentrePresentation";
 import type { InvitationLifecycleStatus } from "@/lib/propertyClaim/invitationTypes";
+import { INVITATION_DECLINED_ACTION_REASON } from "@/lib/propertyClaim/invitationDeclinedPresentation";
 import {
   getInvitationLifecycleStatus,
   isInvitationActivePriority,
+  isInvitationDeclinedPriority,
   isInvitationDeferred,
   isInvitationExpiredPriority,
   isReadyToInvitePriority,
+  isUnacknowledgedInvitationDeclinedPriority,
 } from "@/lib/propertyClaim/invitationPresentation";
 
 export type OperationalHealthLevel =
@@ -234,6 +237,8 @@ export function getHomeownerConnectionStatusLabel(
       return "Invitation expired";
     case "invitation_deferred":
       return "Invitation deferred";
+    case "invitation_declined":
+      return "Invitation declined";
     default:
       return "Awaiting homeowner";
   }
@@ -250,6 +255,8 @@ export function getHomeownerConnectionStatusClasses(
     case "invitation_expired":
       return "bg-status-critical-soft text-status-critical-text ring-1 ring-status-critical/20";
     case "invitation_deferred":
+      return "bg-status-unknown-soft text-text-muted ring-1 ring-surface-card-border";
+    case "invitation_declined":
       return "bg-status-unknown-soft text-text-muted ring-1 ring-surface-card-border";
     default:
       return "bg-surface-mist text-text-charcoal ring-1 ring-surface-card-border";
@@ -305,6 +312,10 @@ function buildReasonCandidates(
     reasons.push("Invitation expired");
   }
 
+  if (isUnacknowledgedInvitationDeclinedPriority(summary)) {
+    reasons.push(INVITATION_DECLINED_ACTION_REASON);
+  }
+
   if (isInvitationActivePriority(summary)) {
     reasons.push("Awaiting homeowner claim");
   }
@@ -355,6 +366,7 @@ export function getPrimaryActionRequiredReason(
 
   const priorityOrder = [
     "Invitation expired",
+    INVITATION_DECLINED_ACTION_REASON,
     "Awaiting homeowner claim",
     "Completion awaiting confirmation",
     "Buyer Ready requires attention",
@@ -606,6 +618,13 @@ export function getConfidenceLabel(score: number): string {
 export function getManagedPropertyOperationalState(
   summary: AgentBranchPropertySummary
 ): string {
+  if (
+    summary.origin_type === "estate_agent" &&
+    isInvitationDeclinedPriority(summary)
+  ) {
+    return "Homeowner declined invitation";
+  }
+
   if (summary.origin_type === "estate_agent") {
     const topAlert = getHighestPriorityAlert(summary);
 

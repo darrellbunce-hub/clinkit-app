@@ -4,6 +4,7 @@ export type HomeownerInvitationPanelPhase =
   | "ready"
   | "awaiting_claim"
   | "expired"
+  | "declined"
   | "not_ready"
   | "connected";
 
@@ -17,6 +18,8 @@ export function getHomeownerInvitationPanelPhase(
       return "awaiting_claim";
     case "expired":
       return "expired";
+    case "declined":
+      return "declined";
     case "deferred":
       return "not_ready";
     default:
@@ -33,7 +36,9 @@ export function getHomeownerInvitationPillLabel(
     case "awaiting_claim":
       return "INVITATION ACTIVE";
     case "expired":
-      return "EXPIRED";
+      return "INVITATION EXPIRED";
+    case "declined":
+      return "INVITATION DECLINED";
     case "not_ready":
       return "NOT READY";
     case "connected":
@@ -51,6 +56,8 @@ export function getHomeownerInvitationPillClasses(
       return "bg-status-warning-soft text-status-warning-text ring-1 ring-status-warning/20";
     case "expired":
       return "bg-status-critical-soft text-status-critical-text ring-1 ring-status-critical/20";
+    case "declined":
+      return "bg-status-unknown-soft text-text-muted ring-1 ring-surface-card-border";
     case "not_ready":
       return "bg-status-unknown-soft text-text-muted ring-1 ring-surface-card-border";
     default:
@@ -74,6 +81,8 @@ export function getHomeownerInvitationHeadline(
       return "Waiting for homeowner to claim.";
     case "expired":
       return "Invitation expired.";
+    case "declined":
+      return "Homeowner declined this invitation.";
     case "not_ready":
       return "Invitation paused.";
     case "connected":

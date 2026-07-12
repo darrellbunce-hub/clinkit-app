@@ -6,7 +6,8 @@ export type InvitationStatusBadgeVariant =
   | "awaiting_claim"
   | "invitation_active"
   | "invitation_expired"
-  | "invitation_deferred";
+  | "invitation_deferred"
+  | "invitation_declined";
 
 export function getInvitationLifecycleStatus(
   summary: Pick<
@@ -34,6 +35,8 @@ export function getInvitationLifecycleStatus(
       return "invitation_expired";
     case "invitation_deferred":
       return "invitation_deferred";
+    case "invitation_declined":
+      return "invitation_declined";
     case "awaiting_claim":
       return "awaiting_claim";
     default:
@@ -59,6 +62,8 @@ export function getInvitationStatusBadgeLabel(
       return "Invitation Expired";
     case "invitation_deferred":
       return "Invitation Deferred";
+    case "invitation_declined":
+      return "Invitation Declined";
     default:
       return "Awaiting Claim";
   }
@@ -76,6 +81,8 @@ export function getInvitationStatusBadgeClasses(
       return "bg-red-100 text-red-800";
     case "invitation_deferred":
       return "bg-slate-100 text-slate-700";
+    case "invitation_declined":
+      return "bg-slate-100 text-slate-700";
     default:
       return "bg-orange-100 text-orange-800";
   }
@@ -92,6 +99,8 @@ export function getInvitationStatusEmoji(
     case "invitation_expired":
       return "🔴";
     case "invitation_deferred":
+      return "⚪";
+    case "invitation_declined":
       return "⚪";
     default:
       return "🟠";
@@ -136,6 +145,35 @@ export function isInvitationActivePriority(
   );
 }
 
+export function isInvitationDeclinedPriority(
+  summary: Pick<
+    AgentBranchPropertySummary,
+    "origin_type" | "invitation_lifecycle_status" | "claim_status"
+  >
+): boolean {
+  return (
+    summary.origin_type === "estate_agent" &&
+    summary.claim_status !== "claimed" &&
+    summary.invitation_lifecycle_status ===
+      "invitation_declined"
+  );
+}
+
+export function isUnacknowledgedInvitationDeclinedPriority(
+  summary: Pick<
+    AgentBranchPropertySummary,
+    | "origin_type"
+    | "invitation_lifecycle_status"
+    | "claim_status"
+    | "invitation_rejection_acknowledged_at"
+  >
+): boolean {
+  return (
+    isInvitationDeclinedPriority(summary) &&
+    summary.invitation_rejection_acknowledged_at == null
+  );
+}
+
 export function isReadyToInvitePriority(
   summary: Pick<
     AgentBranchPropertySummary,
@@ -151,6 +189,8 @@ export function isReadyToInvitePriority(
       "invitation_expired" &&
     summary.invitation_lifecycle_status !==
       "invitation_deferred" &&
+    summary.invitation_lifecycle_status !==
+      "invitation_declined" &&
     (summary.invitation_lifecycle_status ===
       "awaiting_claim" ||
       summary.invitation_lifecycle_status == null)

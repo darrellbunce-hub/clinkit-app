@@ -27,6 +27,8 @@ function getTitle(error: string): string {
   switch (error) {
     case "expired":
       return "Invitation expired";
+    case "invitation_declined":
+      return "Invitation declined";
     case "already_used":
     case "already_claimed":
       return "Invitation already used";
@@ -41,6 +43,8 @@ function getMessage(error: string): string {
   switch (error) {
     case "expired":
       return "Please contact your estate agent for a new invitation.";
+    case "invitation_declined":
+      return "You previously declined this invitation. Your estate agent can send a new one if needed.";
     case "already_used":
       return "This invitation has already been used.";
     case "already_claimed":

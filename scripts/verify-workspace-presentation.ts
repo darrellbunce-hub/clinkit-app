@@ -3,6 +3,7 @@ import { filterActionRequiredSummaries } from "../lib/estateAgent/commandCentreP
 import {
   buildOperationalBriefModel,
   getHomeownerConnectionStatusLabel,
+  getManagedPropertyOperationalState,
   getPrimaryActionRequiredReason,
   getWorkspaceAlertReason,
   resolveOperationalHealthLevel,
@@ -182,6 +183,23 @@ function testWorkspaceAlertReasons() {
   );
 }
 
+function testManagedDeclinedState() {
+  const declined = summary({
+    assignment_id: "declined",
+    property_id: 3,
+    chain_id: 12,
+    origin_type: "estate_agent",
+    claim_status: "unclaimed",
+    invitation_lifecycle_status: "invitation_declined",
+  });
+
+  assert(
+    getManagedPropertyOperationalState(declined) ===
+      "Homeowner declined invitation",
+    "managed tile shows declined state"
+  );
+}
+
 const tests = [
   ["operational brief hero", testOperationalBriefHero],
   [
@@ -197,6 +215,7 @@ const tests = [
     "workspace alert reasons",
     testWorkspaceAlertReasons,
   ],
+  ["managed declined state", testManagedDeclinedState],
 ] as const;
 
 for (const [name, run] of tests) {

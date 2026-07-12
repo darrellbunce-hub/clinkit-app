@@ -8,6 +8,7 @@ import { PAGE_BG_CLASS } from "@/lib/theme/themeTokens";
 import LegalPrivacySection from "@/components/account/LegalPrivacySection";
 import ProfileSection from "@/components/account/ProfileSection";
 import SecuritySection from "@/components/account/SecuritySection";
+import TeamMembersSection from "@/components/account/TeamMembersSection";
 import Navbar from "@/components/Navbar";
 import PageHeaderBand from "@/components/theme/PageHeaderBand";
 import AgentShell from "@/components/agent/AgentShell";
@@ -19,6 +20,7 @@ import { supabase } from "@/lib/supabase";
 const SECTION_LINKS = [
   { href: "#profile", label: "Profile" },
   { href: "#security", label: "Security" },
+  { href: "#team", label: "Team Members" },
   { href: "#legal", label: "Legal & Privacy" },
 ] as const;
 
@@ -33,6 +35,9 @@ export default function AccountSettingsPage() {
   const [accountType, setAccountType] = useState<
     ReturnType<typeof getAccountType>
   >("homeowner");
+  const [userId, setUserId] = useState<string | null>(
+    null
+  );
 
   useEffect(() => {
     async function loadAccount() {
@@ -47,6 +52,7 @@ export default function AccountSettingsPage() {
       }
 
       setEmail(user.email ?? null);
+      setUserId(user.id);
 
       const profile =
         await fetchAuthenticatedProfileAccountFields(
@@ -91,7 +97,15 @@ export default function AccountSettingsPage() {
         aria-label="Account sections"
         className="mt-8 flex flex-wrap gap-2"
       >
-        {SECTION_LINKS.map((link) => (
+        {(
+          isEstateAgent({
+            account_type: accountType,
+          })
+            ? SECTION_LINKS
+            : SECTION_LINKS.filter(
+                (link) => link.href !== "#team"
+              )
+        ).map((link) => (
           <a
             key={link.href}
             href={link.href}
@@ -117,6 +131,13 @@ export default function AccountSettingsPage() {
           {email && (
             <SecuritySection email={email} />
           )}
+
+          {isEstateAgent({
+            account_type: accountType,
+          }) &&
+            userId && (
+              <TeamMembersSection userId={userId} />
+            )}
 
           <LegalPrivacySection />
         </div>

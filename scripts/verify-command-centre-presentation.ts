@@ -1,11 +1,15 @@
 import type { AgentBranchPropertySummary } from "../lib/estateAgent/assignmentTypes";
 import {
   computeTodaysOperationsKpis,
+  computeClaimOverviewKpis,
   filterActionRequiredSummaries,
   getOperationalPriorityTier,
   sortActionRequiredSummaries,
   sortManagedPropertySummaries,
 } from "../lib/estateAgent/commandCentrePresentation";
+import { isUnacknowledgedInvitationDeclinedPriority } from "../lib/propertyClaim/invitationPresentation";
+import { INVITATION_DECLINED_ACTION_REASON } from "../lib/propertyClaim/invitationDeclinedPresentation";
+import { getPrimaryActionRequiredReason } from "../lib/estateAgent/workspacePresentation";
 
 function assert(condition: boolean, message: string) {
   if (!condition) {
@@ -164,9 +168,72 @@ function testPriorityTierFromSummaryAlerts() {
   assert(tier === "attention", "warning alerts map to attention tier");
 }
 
+function testDeclinedInvitationActionRequired() {
+  const unacknowledged = summary({
+    assignment_id: "declined",
+    property_id: 3,
+    chain_id: 12,
+    origin_type: "estate_agent",
+    claim_status: "unclaimed",
+    invitation_lifecycle_status: "invitation_declined",
+    invitation_rejected_at: "2026-07-12T10:00:00.000Z",
+    invitation_rejection_reason: "not_my_property",
+    invite_email: "owner@example.com",
+    invitation_rejection_acknowledged_at: null,
+  });
+
+  const acknowledged = summary({
+    ...unacknowledged,
+    assignment_id: "declined-ack",
+    property_id: 4,
+    invitation_rejection_acknowledged_at:
+      "2026-07-12T11:00:00.000Z",
+  });
+
+  assert(
+    isUnacknowledgedInvitationDeclinedPriority(
+      unacknowledged
+    ),
+    "unacknowledged decline is actionable"
+  );
+  assert(
+    filterActionRequiredSummaries([unacknowledged])
+      .length === 1,
+    "unacknowledged decline appears in requires action"
+  );
+  assert(
+    filterActionRequiredSummaries([acknowledged])
+      .length === 0,
+    "acknowledged decline is excluded from requires action"
+  );
+  assert(
+    getPrimaryActionRequiredReason(unacknowledged) ===
+      INVITATION_DECLINED_ACTION_REASON,
+    "declined reason headline"
+  );
+
+  const kpis = computeClaimOverviewKpis([
+    unacknowledged,
+    acknowledged,
+  ]);
+
+  assert(
+    kpis.invitationDeclined === 2,
+    "declined KPI counts all declined properties"
+  );
+  assert(
+    kpis.awaitingClaim === 0,
+    "declined should not inflate awaiting claim KPI"
+  );
+}
+
 const tests = [
   ["action required filter", testActionRequiredFilter],
   ["action required sorting", testActionRequiredSorting],
+  [
+    "declined invitation action required",
+    testDeclinedInvitationActionRequired,
+  ],
   ["managed sorting", testManagedSorting],
   ["kpi aggregation", testKpiAggregation],
   ["priority tier mapping", testPriorityTierFromSummaryAlerts],
