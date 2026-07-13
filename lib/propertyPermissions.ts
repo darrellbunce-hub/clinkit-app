@@ -15,7 +15,6 @@ export {
   canMutatePropertyTarget,
   CHAIN_TILE_LABEL,
   CONNECTED_POSITION_MESSAGE,
-  findSearchingPlaceholderLinkedFromSale,
   getChainTileDisplayTitle,
   getDashboardChainTitle,
   getDashboardPropertyLabel,

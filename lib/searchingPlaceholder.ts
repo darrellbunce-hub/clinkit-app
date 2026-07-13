@@ -1,37 +1,96 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { PostgrestError, SupabaseClient } from "@supabase/supabase-js";
 
+import {
+  isSearchingPlaceholder,
+  walkLinkedPropertySegment,
+} from "@/lib/buildChainTopology";
 import { ensurePropertyMembership } from "@/lib/ensurePropertyMembership";
 
 export type SearchingPlaceholderRef = {
   id: number;
 };
 
-export async function findSearchingPlaceholderBySaleProperty(
-  supabase: SupabaseClient,
-  chainId: number,
-  salePropertyId: number
-): Promise<SearchingPlaceholderRef | null> {
-  const { data: saleProperty } = await supabase
-    .from("properties")
-    .select("linked_property_id")
-    .eq("id", salePropertyId)
-    .eq("chain_id", chainId)
-    .maybeSingle();
+export type ConvertibleSearchingPlaceholderProperty = {
+  id: number;
+  linked_property_id: number | null;
+  stage: string;
+  address: string | null;
+};
 
-  if (!saleProperty?.linked_property_id) {
+const PLACEHOLDER_RESOLUTION_SELECT =
+  "id, chain_id, stage, address, postcode, linked_property_id, relationship_type";
+
+/**
+ * Canonical in-memory resolver: walk the operational sale's linked_property_id
+ * graph using the same renderable property pool as buildChainTopology, then
+ * return the first active searching placeholder in that segment.
+ *
+ * Self-healing: an unlinked user-owned searching placeholder (orphan root) is
+ * intentionally not repaired here — the sale→placeholder link is ambiguous when
+ * multiple purchases or segments exist. Orphans require explicit relinking.
+ */
+export function resolveConvertibleSearchingPlaceholder<
+  T extends ConvertibleSearchingPlaceholderProperty
+>(
+  chainProperties: T[],
+  salePropertyId: number
+): SearchingPlaceholderRef | null {
+  const saleProperty = chainProperties.find(
+    (property) => property.id === salePropertyId
+  );
+
+  if (!saleProperty) {
     return null;
   }
 
-  const { data } = await supabase
-    .from("properties")
-    .select("id")
-    .eq("id", saleProperty.linked_property_id)
-    .eq("chain_id", chainId)
-    .eq("stage", "searching")
-    .is("address", null)
-    .maybeSingle();
+  const renderableProperties = chainProperties.filter(
+    (property) =>
+      !!property.address ||
+      isSearchingPlaceholder(property)
+  );
 
-  return data;
+  const saleInRenderable = renderableProperties.find(
+    (property) => property.id === salePropertyId
+  );
+
+  if (!saleInRenderable) {
+    return null;
+  }
+
+  const segment = walkLinkedPropertySegment(
+    saleInRenderable,
+    renderableProperties
+  );
+
+  const placeholder = segment.find((property) =>
+    isSearchingPlaceholder(property)
+  );
+
+  return placeholder ? { id: placeholder.id } : null;
+}
+
+export async function resolveConvertibleSearchingPlaceholderForChain(
+  supabase: SupabaseClient,
+  params: {
+    chainId: number;
+    salePropertyId: number;
+  }
+): Promise<SearchingPlaceholderRef | null> {
+  const { data: chainProperties, error } =
+    await supabase
+      .from("properties")
+      .select(PLACEHOLDER_RESOLUTION_SELECT)
+      .eq("chain_id", params.chainId);
+
+  if (error || !chainProperties) {
+    console.error(error);
+    return null;
+  }
+
+  return resolveConvertibleSearchingPlaceholder(
+    chainProperties,
+    params.salePropertyId
+  );
 }
 
 export async function findSearchingPlaceholderForUser(
@@ -190,10 +249,12 @@ export async function attachSearchingPlaceholderToSale(
   }
 ): Promise<AttachSearchingPlaceholderResult> {
   const existingPlaceholder =
-    await findSearchingPlaceholderBySaleProperty(
+    await resolveConvertibleSearchingPlaceholderForChain(
       supabase,
-      params.chainId,
-      params.salePropertyId
+      {
+        chainId: params.chainId,
+        salePropertyId: params.salePropertyId,
+      }
     );
 
   if (existingPlaceholder) {
@@ -247,10 +308,126 @@ export type ConvertSearchingPlaceholderResult =
       reason:
         | "not_found"
         | "duplicate_address"
-        | "update_failed";
+        | "update_failed"
+        | "not_authorized";
       error?: unknown;
     };
 
+type ConvertSearchingPlaceholderRpcResult = {
+  ok?: boolean;
+  error?: string;
+  property_id?: number;
+  chain_id?: number;
+};
+
+const CONVERT_SEARCHING_PLACEHOLDER_RPC =
+  "convert_searching_placeholder_for_sale";
+
+type ConvertRpcRequestContext = {
+  chainId: number;
+  salePropertyId: number;
+  address: string;
+  postcode: string;
+};
+
+function logConvertRpcTransportError(
+  request: ConvertRpcRequestContext,
+  error: PostgrestError
+) {
+  console.error(
+    `[${CONVERT_SEARCHING_PLACEHOLDER_RPC}] Supabase RPC transport error`,
+    {
+      request,
+      code: error.code ?? null,
+      message: error.message ?? null,
+      details: error.details ?? null,
+      hint: error.hint ?? null,
+      error,
+    }
+  );
+}
+
+function logConvertRpcApplicationPayload(
+  request: ConvertRpcRequestContext,
+  payload: unknown
+) {
+  console.error(
+    `[${CONVERT_SEARCHING_PLACEHOLDER_RPC}] RPC application payload`,
+    {
+      request,
+      payload,
+    }
+  );
+}
+
+function buildConvertFailureError(
+  request: ConvertRpcRequestContext,
+  options: {
+    transportError?: PostgrestError;
+    applicationPayload?: unknown;
+  }
+) {
+  return {
+    rpc: CONVERT_SEARCHING_PLACEHOLDER_RPC,
+    request,
+    transportError: options.transportError
+      ? {
+          code: options.transportError.code ?? null,
+          message: options.transportError.message ?? null,
+          details: options.transportError.details ?? null,
+          hint: options.transportError.hint ?? null,
+        }
+      : undefined,
+    applicationPayload: options.applicationPayload ?? null,
+  };
+}
+
+function mapConvertRpcError(
+  request: ConvertRpcRequestContext,
+  payload: ConvertSearchingPlaceholderRpcResult | null
+): ConvertSearchingPlaceholderResult {
+  logConvertRpcApplicationPayload(request, payload);
+
+  switch (payload?.error) {
+    case "not_found":
+      return {
+        ok: false,
+        reason: "not_found",
+        error: buildConvertFailureError(request, {
+          applicationPayload: payload,
+        }),
+      };
+    case "duplicate_address":
+      return {
+        ok: false,
+        reason: "duplicate_address",
+        error: buildConvertFailureError(request, {
+          applicationPayload: payload,
+        }),
+      };
+    case "not_authorized":
+      return {
+        ok: false,
+        reason: "not_authorized",
+        error: buildConvertFailureError(request, {
+          applicationPayload: payload,
+        }),
+      };
+    default:
+      return {
+        ok: false,
+        reason: "update_failed",
+        error: buildConvertFailureError(request, {
+          applicationPayload: payload,
+        }),
+      };
+  }
+}
+
+/**
+ * Transaction-scoped onward purchase conversion via server RPC.
+ * UI gating uses resolveConvertibleSearchingPlaceholder (participant topology).
+ */
 export async function convertSearchingPlaceholder(
   supabase: SupabaseClient,
   params: {
@@ -261,85 +438,43 @@ export async function convertSearchingPlaceholder(
     updatedBy?: "homeowner" | "estate_agent";
   }
 ): Promise<ConvertSearchingPlaceholderResult> {
-  const placeholder =
-    await findSearchingPlaceholderBySaleProperty(
-      supabase,
-      params.chainId,
-      params.salePropertyId
-    );
+  void params.updatedBy;
 
-  if (!placeholder) {
-    return { ok: false, reason: "not_found" };
-  }
+  const request: ConvertRpcRequestContext = {
+    chainId: params.chainId,
+    salePropertyId: params.salePropertyId,
+    address: params.address,
+    postcode: params.postcode,
+  };
 
-  const {
-    data: addressExists,
-    error: existsError,
-  } = await supabase.rpc(
-    "property_exists_for_onboarding",
+  const { data, error } = await supabase.rpc(
+    CONVERT_SEARCHING_PLACEHOLDER_RPC,
     {
+      p_sale_property_id: params.salePropertyId,
       p_address: params.address,
       p_postcode: params.postcode,
-      p_exclude_property_id: placeholder.id,
     }
   );
 
-  if (existsError) {
-    console.error(existsError);
-  }
-
-  if (addressExists) {
-    return {
-      ok: false,
-      reason: "duplicate_address",
-    };
-  }
-
-  const {
-    data: converted,
-    error: updateError,
-  } = await supabase
-    .from("properties")
-    .update({
-      stage: "offer_accepted",
-      address: params.address,
-      postcode: params.postcode,
-      status: "pending_connection",
-      relationship_type: "purchase",
-      buyer_connected: true,
-      seller_connected: false,
-      is_searching: false,
-      is_current_user: true,
-      awaiting_buyer: false,
-    })
-    .eq("id", placeholder.id)
-    .eq("stage", "searching")
-    .is("address", null)
-    .is("postcode", null)
-    .select("id")
-    .single();
-
-  if (updateError || !converted) {
+  if (error) {
+    logConvertRpcTransportError(request, error);
     return {
       ok: false,
       reason: "update_failed",
-      error: updateError,
+      error: buildConvertFailureError(request, {
+        transportError: error,
+      }),
     };
   }
 
-  const { error: activityError } =
-    await supabase.from("activities").insert({
-      property_id: converted.id,
-      update: "Onward purchase added",
-      updated_by: params.updatedBy ?? "homeowner",
-    });
+  const result = data as ConvertSearchingPlaceholderRpcResult | null;
 
-  if (activityError) {
-    console.error(activityError);
+  if (!result?.ok || result.property_id == null) {
+    return mapConvertRpcError(request, result);
   }
 
   return {
     ok: true,
-    propertyId: converted.id,
+    propertyId: Number(result.property_id),
   };
 }

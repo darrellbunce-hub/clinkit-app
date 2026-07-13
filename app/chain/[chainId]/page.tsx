@@ -49,7 +49,10 @@ import {
 import {
   type ChainNodesChainSummary,
 } from "@/lib/chainNodesSummary";
-import { convertSearchingPlaceholder } from "@/lib/searchingPlaceholder";
+import {
+  convertSearchingPlaceholder,
+  resolveConvertibleSearchingPlaceholder,
+} from "@/lib/searchingPlaceholder";
 import CompletionScheduledBanner from "@/components/CompletionScheduledBanner";
 import ChainCompletedBanner from "@/components/ChainCompletedBanner";
 import PropertyEstateAgentAssignment from "@/components/estate-agents/PropertyEstateAgentAssignment";
@@ -544,9 +547,18 @@ export default function ChainPage() {
         ) ?? null
       : null;
 
+  const convertibleSearchingPlaceholder =
+    saleOperationalPropertyId != null
+      ? resolveConvertibleSearchingPlaceholder(
+          topology.renderableProperties,
+          saleOperationalPropertyId
+        )
+      : null;
+
   const canAddOnwardPurchase =
     salePropertyForOnwardPurchase != null &&
     currentUserId != null &&
+    convertibleSearchingPlaceholder != null &&
     canEditProperty(
       salePropertyForOnwardPurchase,
       currentUserId,
@@ -734,13 +746,25 @@ export default function ChainPage() {
         result.reason === "not_found"
       ) {
         alert(
-          "No active searching placeholder found on this chain."
+          "We couldn't save your onward purchase right now. Please refresh the page and try again."
+        );
+      } else if (
+        result.reason === "not_authorized"
+      ) {
+        alert(
+          "You do not have permission to add an onward purchase for this chain position."
         );
       } else {
         alert(
           "Could not add your onward purchase. Please try again."
         );
-        console.error(result.error);
+        console.error(
+          "convertSearchingPlaceholder failed",
+          {
+            reason: result.reason,
+            diagnostics: result.error,
+          }
+        );
       }
 
       return;

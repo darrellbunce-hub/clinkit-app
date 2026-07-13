@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { isDeveloperEmailToolsEnabled } from "@/lib/communications/config";
 import { listRecentEmailEvents } from "@/lib/communications/emailEvents";
 import type { EmailEventStatus } from "@/lib/communications/types";
+import { createServiceRoleSupabaseClient } from "@/lib/supabase/serviceRole";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 function parseStatusFilter(
@@ -37,7 +38,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const events = await listRecentEmailEvents(supabase, {
+  const serviceSupabase = createServiceRoleSupabaseClient();
+  const events = await listRecentEmailEvents(serviceSupabase, {
     status,
     limit: Number.isFinite(limit) ? limit : 50,
   });

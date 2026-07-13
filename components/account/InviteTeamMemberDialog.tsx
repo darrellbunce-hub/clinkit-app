@@ -15,7 +15,6 @@ import {
 } from "@/components/account/accountStyles";
 import {
   createEaBranchInvitation,
-  buildEaBranchInvitationUrl,
   formatEaBranchInvitationError,
   type EaBranchInviteRoleOption,
 } from "@/lib/estateAgent/branchTeam";
@@ -87,10 +86,6 @@ export default function InviteTeamMemberDialog({
         return;
       }
 
-      const invitationLink = buildEaBranchInvitationUrl(
-        invitationResult.token
-      );
-
       const emailResponse = await fetch(
         "/api/communications/estate-agent-invitation",
         {
@@ -99,9 +94,8 @@ export default function InviteTeamMemberDialog({
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            invitationId:
-              invitationResult.invitationId,
-            invitationLink,
+            invitationId: invitationResult.invitationId,
+            invitationToken: invitationResult.token,
           }),
         }
       );

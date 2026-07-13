@@ -340,33 +340,6 @@ export function canMutateBuyerReadyTarget(
   );
 }
 
-export function findSearchingPlaceholderLinkedFromSale(
-  chainProperties: OperationalProperty[],
-  salePropertyId: number
-): OperationalProperty | null {
-  const saleProperty = chainProperties.find(
-    (property) => property.id === salePropertyId
-  );
-
-  if (!saleProperty?.linked_property_id) {
-    return null;
-  }
-
-  const linkedProperty = chainProperties.find(
-    (property) =>
-      property.id === saleProperty.linked_property_id
-  );
-
-  if (
-    linkedProperty &&
-    isSearchingPlaceholder(linkedProperty)
-  ) {
-    return linkedProperty;
-  }
-
-  return null;
-}
-
 export function mapToOperationalProperties<
   T extends OperationalProperty
 >(properties: T[]): OperationalProperty[] {

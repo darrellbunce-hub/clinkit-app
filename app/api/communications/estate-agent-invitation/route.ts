@@ -2,12 +2,19 @@ import { NextResponse } from "next/server";
 
 import { loadEaBranchInvitationEmailContext } from "@/lib/communications/branchInvitationContext";
 import { sendEstateAgentInvitation } from "@/lib/communications/email";
+import { buildServerEaBranchInvitationUrl } from "@/lib/communications/invitationLinks";
+import {
+  buildIdempotentSendSuccess,
+  buildRateLimitedSendFailure,
+  evaluateInvitationSendGuards,
+  validateEaBranchInvitationForEmailSend,
+} from "@/lib/communications/invitationSendSecurity";
 import { recordEaBranchInvitationSent } from "@/lib/estateAgent/branchTeam";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 type EstateAgentInvitationRequestBody = {
   invitationId?: string;
-  invitationLink?: string;
+  invitationToken?: string;
 };
 
 export async function POST(request: Request) {
@@ -16,9 +23,9 @@ export async function POST(request: Request) {
       (await request.json()) as EstateAgentInvitationRequestBody;
 
     const invitationId = body.invitationId?.trim();
-    const invitationLink = body.invitationLink?.trim();
+    const invitationToken = body.invitationToken?.trim();
 
-    if (!invitationId || !invitationLink) {
+    if (!invitationId || !invitationToken) {
       return NextResponse.json(
         {
           ok: false,
@@ -45,12 +52,41 @@ export async function POST(request: Request) {
       );
     }
 
-    const emailContext =
-      await loadEaBranchInvitationEmailContext(
-        supabase,
-        invitationId,
-        invitationLink
-      );
+    const validation = await validateEaBranchInvitationForEmailSend(
+      supabase,
+      invitationId,
+      invitationToken
+    );
+
+    if (!validation.ok) {
+      return NextResponse.json({
+        ok: false,
+        sent: false,
+        error: validation.error,
+      });
+    }
+
+    const guard = await evaluateInvitationSendGuards({
+      template: "estate-agent-invitation",
+      recipientEmail: validation.inviteEmail,
+    });
+
+    if (guard.action === "rate_limited") {
+      return NextResponse.json(buildRateLimitedSendFailure());
+    }
+
+    if (guard.action === "idempotent_success") {
+      return NextResponse.json(buildIdempotentSendSuccess());
+    }
+
+    const invitationLink =
+      buildServerEaBranchInvitationUrl(invitationToken);
+
+    const emailContext = await loadEaBranchInvitationEmailContext(
+      supabase,
+      invitationId,
+      invitationLink
+    );
 
     if (!emailContext) {
       return NextResponse.json({
@@ -60,20 +96,16 @@ export async function POST(request: Request) {
       });
     }
 
-    const result = await sendEstateAgentInvitation(
-      emailContext,
-      {
-        sentBy: user.id,
-        invitationId,
-      }
-    );
+    const result = await sendEstateAgentInvitation(emailContext, {
+      sentBy: user.id,
+      invitationId,
+    });
 
     if (result.ok && result.sent) {
-      const recordResult =
-        await recordEaBranchInvitationSent(
-          supabase,
-          invitationId
-        );
+      const recordResult = await recordEaBranchInvitationSent(
+        supabase,
+        invitationId
+      );
 
       if (!recordResult.ok) {
         console.error(

@@ -251,26 +251,31 @@ function getRootProperties<
 
 /**
  * Walk linked_property_id from a root until the chain ends, producing one
- * ordered property segment.
+ * ordered property segment. Shared by topology rendering and placeholder
+ * resolution — do not duplicate this graph walk elsewhere.
  */
-function buildPropertySegment<
-  T extends TopologyProperty
->(
-  root: T,
-  renderableProperties: T[]
-): T[] {
+export function walkLinkedPropertySegment<
+  T extends Pick<
+    TopologyProperty,
+    "id" | "linked_property_id"
+  >
+>(root: T, properties: T[]): T[] {
   const segment: T[] = [];
   let current: T | undefined = root;
+  const visited = new Set<number>();
 
   while (current) {
+    if (visited.has(current.id)) {
+      break;
+    }
+
+    visited.add(current.id);
     segment.push(current);
 
-    const linkedProperty =
-      renderableProperties.find(
-        (candidate) =>
-          candidate.id ===
-          current!.linked_property_id
-      );
+    const linkedProperty = properties.find(
+      (candidate) =>
+        candidate.id === current!.linked_property_id
+    );
 
     if (!linkedProperty) {
       break;
@@ -280,6 +285,18 @@ function buildPropertySegment<
   }
 
   return segment;
+}
+
+function buildPropertySegment<
+  T extends TopologyProperty
+>(
+  root: T,
+  renderableProperties: T[]
+): T[] {
+  return walkLinkedPropertySegment(
+    root,
+    renderableProperties
+  );
 }
 
 /**

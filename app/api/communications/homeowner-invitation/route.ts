@@ -1,18 +1,20 @@
 import { NextResponse } from "next/server";
 
 import { sendHomeownerInvitation } from "@/lib/communications/email";
+import { buildServerClaimInvitationUrl } from "@/lib/communications/invitationLinks";
+import { loadHomeownerInvitationEmailContext } from "@/lib/communications/invitationContext";
 import {
-  loadActiveInvitationExpiresAt,
-  loadHomeownerInvitationEmailContext,
-} from "@/lib/communications/invitationContext";
+  buildIdempotentSendSuccess,
+  buildRateLimitedSendFailure,
+  evaluateInvitationSendGuards,
+  validateHomeownerInvitationForEmailSend,
+} from "@/lib/communications/invitationSendSecurity";
 import { recordPropertyClaimInvitationSent } from "@/lib/propertyClaim/propertyInvitations";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 type HomeownerInvitationRequestBody = {
   propertyId?: number;
-  claimUrl?: string;
-  expiresAt?: string;
-  resendExisting?: boolean;
+  invitationToken?: string;
 };
 
 export async function POST(request: Request) {
@@ -21,11 +23,13 @@ export async function POST(request: Request) {
       (await request.json()) as HomeownerInvitationRequestBody;
 
     const propertyId = Number(body.propertyId);
-    const claimUrl = body.claimUrl?.trim();
-    const resendExisting = body.resendExisting === true;
-    let expiresAt = body.expiresAt?.trim();
+    const invitationToken = body.invitationToken?.trim();
 
-    if (!Number.isFinite(propertyId) || propertyId <= 0 || !claimUrl) {
+    if (
+      !Number.isFinite(propertyId) ||
+      propertyId <= 0 ||
+      !invitationToken
+    ) {
       return NextResponse.json(
         {
           ok: false,
@@ -52,39 +56,40 @@ export async function POST(request: Request) {
       );
     }
 
-    if (resendExisting) {
-      const activeExpiresAt = await loadActiveInvitationExpiresAt(
-        supabase,
-        propertyId
-      );
+    const validation = await validateHomeownerInvitationForEmailSend(
+      supabase,
+      propertyId,
+      invitationToken
+    );
 
-      if (!activeExpiresAt) {
-        return NextResponse.json({
-          ok: false,
-          sent: false,
-          error: "invitation_not_active",
-        });
-      }
-
-      expiresAt = activeExpiresAt;
+    if (!validation.ok) {
+      return NextResponse.json({
+        ok: false,
+        sent: false,
+        error: validation.error,
+      });
     }
 
-    if (!expiresAt) {
-      return NextResponse.json(
-        {
-          ok: false,
-          sent: false,
-          error: "invalid_request",
-        },
-        { status: 400 }
-      );
+    const guard = await evaluateInvitationSendGuards({
+      template: "homeowner-invitation",
+      propertyId,
+    });
+
+    if (guard.action === "rate_limited") {
+      return NextResponse.json(buildRateLimitedSendFailure());
     }
+
+    if (guard.action === "idempotent_success") {
+      return NextResponse.json(buildIdempotentSendSuccess());
+    }
+
+    const invitationLink = buildServerClaimInvitationUrl(invitationToken);
 
     const emailContext = await loadHomeownerInvitationEmailContext(
       supabase,
       propertyId,
-      claimUrl,
-      expiresAt
+      invitationLink,
+      validation.expiresAt
     );
 
     if (!emailContext) {
@@ -98,6 +103,7 @@ export async function POST(request: Request) {
     const result = await sendHomeownerInvitation(emailContext, {
       sentBy: user.id,
       propertyId,
+      invitationId: validation.invitationId,
     });
 
     if (result.ok && result.sent) {

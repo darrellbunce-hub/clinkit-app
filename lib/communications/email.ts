@@ -24,7 +24,7 @@ import type {
   SendEmailResult,
   WelcomeEmailParams,
 } from "@/lib/communications/types";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createServiceRoleSupabaseClient } from "@/lib/supabase/serviceRole";
 
 let activeProvider: EmailProvider | null = null;
 
@@ -63,7 +63,7 @@ async function deliverEmail(
   let eventId: string | null = null;
 
   try {
-    const supabase = await createServerSupabaseClient();
+    const supabase = createServiceRoleSupabaseClient();
     eventId = await queueEmailEvent(supabase, {
       template: options.template,
       recipientEmail: payload.to,
@@ -81,7 +81,7 @@ async function deliverEmail(
 
   if (eventId) {
     try {
-      const supabase = await createServerSupabaseClient();
+      const supabase = createServiceRoleSupabaseClient();
 
       if (result.ok && result.sent) {
         await markEmailEventSent(

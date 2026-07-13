@@ -163,11 +163,7 @@ export default function HomeownerInvitationPanel({
     }
 
     const emailStatus = await dispatchInvitationEmail(
-      resolved.delivery.token,
-      resolved.delivery.expiresAt,
-      {
-        resendExisting: resolved.delivery.resendExisting,
-      }
+      resolved.delivery.token
     );
 
     setIsWorking(false);
@@ -201,8 +197,7 @@ export default function HomeownerInvitationPanel({
     rememberInvitationToken(result.token);
 
     const emailStatus = await dispatchInvitationEmail(
-      result.token,
-      result.expiresAt
+      result.token
     );
 
     setIsWorking(false);
@@ -231,11 +226,7 @@ export default function HomeownerInvitationPanel({
     }
 
     const emailStatus = await dispatchInvitationEmail(
-      resolved.delivery.token,
-      resolved.delivery.expiresAt,
-      {
-        resendExisting: resolved.delivery.resendExisting,
-      }
+      resolved.delivery.token
     );
 
     setIsWorking(false);
@@ -463,12 +454,8 @@ export default function HomeownerInvitationPanel({
   }
 
   async function dispatchInvitationEmail(
-    token: string,
-    expiresAt: string,
-    options?: { resendExisting?: boolean }
+    token: string
   ): Promise<"sent" | "skipped" | "failed"> {
-    const claimUrl = buildClaimInvitationUrl(token);
-
     try {
       const response = await fetch(
         "/api/communications/homeowner-invitation",
@@ -480,9 +467,7 @@ export default function HomeownerInvitationPanel({
           },
           body: JSON.stringify({
             propertyId,
-            claimUrl,
-            expiresAt,
-            resendExisting: options?.resendExisting ?? false,
+            invitationToken: token,
           }),
         }
       );
