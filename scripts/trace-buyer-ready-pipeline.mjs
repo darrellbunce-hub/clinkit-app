@@ -200,9 +200,9 @@ async function main() {
     .select("id")
     .single();
 
-  await seller.rpc("ensure_property_membership", {
+  await seller.rpc("establish_operational_homeowner", {
     p_property_id: saleProperty.id,
-    p_role: "seller",
+    p_granted_via: "start_move",
   });
 
   const { data: searching } = await seller
@@ -224,9 +224,9 @@ async function main() {
     .select("id")
     .single();
 
-  await seller.rpc("ensure_property_membership", {
+  await seller.rpc("establish_operational_homeowner", {
     p_property_id: searching.id,
-    p_role: "buyer",
+    p_granted_via: "start_move",
   });
 
   await seller
@@ -405,9 +405,9 @@ async function main() {
     })
     .select("id")
     .single();
-  await sellerB2.rpc("ensure_property_membership", {
+  await sellerB2.rpc("establish_operational_homeowner", {
     p_property_id: sale2.id,
-    p_role: "seller",
+    p_granted_via: "start_move",
   });
 
   const { data: purchase2 } = await sellerB2
@@ -427,9 +427,9 @@ async function main() {
     })
     .select("id")
     .single();
-  await sellerB2.rpc("ensure_property_membership", {
+  await sellerB2.rpc("establish_operational_homeowner", {
     p_property_id: purchase2.id,
-    p_role: "buyer",
+    p_granted_via: "start_move",
   });
 
   const { data: search2 } = await sellerB2
@@ -448,9 +448,9 @@ async function main() {
     })
     .select("id")
     .single();
-  await sellerB2.rpc("ensure_property_membership", {
+  await sellerB2.rpc("establish_operational_homeowner", {
     p_property_id: search2.id,
-    p_role: "buyer",
+    p_granted_via: "start_move",
   });
   await sellerB2
     .from("properties")

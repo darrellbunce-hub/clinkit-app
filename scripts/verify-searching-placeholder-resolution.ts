@@ -195,9 +195,9 @@ async function main() {
       })
       .select("id")
       .single();
-    await c.rpc("ensure_property_membership", {
+    await c.rpc("establish_operational_homeowner", {
       p_property_id: sale!.id,
-      p_role: "seller",
+      p_granted_via: "start_move",
     });
     const { data: search } = await c
       .from("properties")
@@ -216,9 +216,9 @@ async function main() {
       })
       .select("id")
       .single();
-    await c.rpc("ensure_property_membership", {
+    await c.rpc("establish_operational_homeowner", {
       p_property_id: search!.id,
-      p_role: "buyer",
+      p_granted_via: "start_move",
     });
     await c
       .from("properties")
@@ -250,9 +250,9 @@ async function main() {
         })
         .select("id")
         .single();
-      await c.rpc("ensure_property_membership", {
+      await c.rpc("establish_operational_homeowner", {
         p_property_id: sale!.id,
-        p_role: "seller",
+        p_granted_via: "start_move",
       });
       const { data: purchase } = await c
         .from("properties")
@@ -271,9 +271,9 @@ async function main() {
         })
         .select("id")
         .single();
-      await c.rpc("ensure_property_membership", {
+      await c.rpc("establish_operational_homeowner", {
         p_property_id: purchase!.id,
-        p_role: "buyer",
+        p_granted_via: "start_move",
       });
       const { data: search } = await c
         .from("properties")
@@ -292,9 +292,9 @@ async function main() {
         })
         .select("id")
         .single();
-      await c.rpc("ensure_property_membership", {
+      await c.rpc("establish_operational_homeowner", {
         p_property_id: search!.id,
-        p_role: "buyer",
+        p_granted_via: "start_move",
       });
       await c
         .from("properties")
@@ -330,9 +330,9 @@ async function main() {
       })
       .select("id")
       .single();
-    await c.rpc("ensure_property_membership", {
+    await c.rpc("establish_operational_homeowner", {
       p_property_id: sale!.id,
-      p_role: "seller",
+      p_granted_via: "start_move",
     });
     await c
       .from("properties")
@@ -390,9 +390,9 @@ async function main() {
     })
     .select("id")
     .single();
-  await convertClient.rpc("ensure_property_membership", {
+  await convertClient.rpc("establish_operational_homeowner", {
     p_property_id: convertSale!.id,
-    p_role: "seller",
+    p_granted_via: "start_move",
   });
   const { data: convertPurchase } = await convertClient
     .from("properties")
@@ -411,9 +411,9 @@ async function main() {
     })
     .select("id")
     .single();
-  await convertClient.rpc("ensure_property_membership", {
+  await convertClient.rpc("establish_operational_homeowner", {
     p_property_id: convertPurchase!.id,
-    p_role: "buyer",
+    p_granted_via: "start_move",
   });
   const { data: convertSearch } = await convertClient
     .from("properties")
@@ -432,9 +432,9 @@ async function main() {
     })
     .select("id")
     .single();
-  await convertClient.rpc("ensure_property_membership", {
+  await convertClient.rpc("establish_operational_homeowner", {
     p_property_id: convertSearch!.id,
-    p_role: "buyer",
+    p_granted_via: "start_move",
   });
   await convertClient
     .from("properties")

@@ -44,6 +44,7 @@ import {
 import { getEstateAgentManagementModeForOperationalAssignment } from "@/lib/estateAgent/managementModePresentation";
 import OperationalCompletionDatePanel from "@/components/OperationalCompletionDatePanel";
 import PropertyEstateAgentAssignment from "@/components/estate-agents/PropertyEstateAgentAssignment";
+import ParticipationDelinkPanel from "@/components/participation/ParticipationDelinkPanel";
 import {
   mapToOperationalProperties,
 } from "@/lib/operationalPosition";
@@ -107,6 +108,7 @@ const [warningMessage, setWarningMessage] =
     breakChainConnection,
     currentUserId,
     accountType,
+    refreshParticipantData,
     estateAgentOperationalAssignments,
     recordChainCompletionDate,
     amendChainCompletionDate,
@@ -1177,6 +1179,16 @@ if (
             />
           </div>
         )}
+
+        <div className="mt-8">
+          <ParticipationDelinkPanel
+            propertyId={currentProperty.id}
+            accountType={accountType}
+            onCompleted={async () => {
+              await refreshParticipantData();
+            }}
+          />
+        </div>
 
         {/* Activity Timeline */}
         <div className={`mt-8 bg-surface-card rounded-3xl shadow-sm border border-surface-card-border ${CARD_PADDING_CLASS}`}>

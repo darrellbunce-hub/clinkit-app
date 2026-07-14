@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import InvitationDeclinedActionDetails from "@/components/agent/commandCentre/InvitationDeclinedActionDetails";
 import OperationalActionButton from "@/components/agent/commandCentre/OperationalActionButton";
+import ParticipationDelinkQuickActions from "@/components/participation/ParticipationDelinkQuickActions";
 import ConfidenceBar from "@/components/agent/commandCentre/ConfidenceBar";
 import HomeownerInvitationPanel from "@/components/agent/commandCentre/HomeownerInvitationPanel";
 import EstateAgentManagementModeBadge from "@/components/estate-agents/EstateAgentManagementModeBadge";
@@ -225,6 +226,11 @@ export default function OperationalPropertyCard({
             </button>
           ) : null}
         </div>
+
+        <ParticipationDelinkQuickActions
+          propertyId={summary.property_id}
+          onCompleted={onInvitationChanged}
+        />
       </div>
     </article>
   );

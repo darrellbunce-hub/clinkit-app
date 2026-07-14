@@ -4,7 +4,10 @@ import {
   isSearchingPlaceholder,
   walkLinkedPropertySegment,
 } from "@/lib/buildChainTopology";
-import { ensurePropertyMembership } from "@/lib/ensurePropertyMembership";
+import {
+  establishOperationalHomeowner,
+  OPERATIONAL_IDENTITY_GRANT_VIA,
+} from "@/lib/ownership/grants";
 
 export type SearchingPlaceholderRef = {
   id: number;
@@ -178,16 +181,18 @@ export async function insertSearchingPlaceholder(
     };
   }
 
-  const { error: memberError } =
-    await ensurePropertyMembership(supabase, {
+  const { data: grant, error: memberError } =
+    await establishOperationalHomeowner(supabase, {
       propertyId: placeholder.id,
-      role: "buyer",
+      grantedVia: OPERATIONAL_IDENTITY_GRANT_VIA.startMove,
     });
 
-  if (memberError) {
+  if (memberError || !grant.ok) {
     return {
       placeholder: null,
-      error: memberError,
+      error:
+        memberError ??
+        new Error(!grant.ok ? grant.error : "grant_failed"),
     };
   }
 

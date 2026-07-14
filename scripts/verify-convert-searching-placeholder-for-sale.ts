@@ -2,7 +2,7 @@
  * Verifies convert_searching_placeholder_for_sale across product scenarios A–E.
  * Requires migrations applied:
  *   20260713120000_convert_searching_placeholder_for_sale.sql
- *   20260713130000_fix_convert_rpc_delegated_editor_helper.sql
+ *   20260714150000_operational_identity_enforcement.sql
  */
 import { createClient } from "@supabase/supabase-js";
 import { readFileSync } from "fs";
@@ -166,9 +166,9 @@ async function main() {
     })
     .select("id")
     .single();
-  await hoA.rpc("ensure_property_membership", {
+  await hoA.rpc("establish_operational_homeowner", {
     p_property_id: saleA!.id,
-    p_role: "seller",
+    p_granted_via: "start_move",
   });
   const attachA = await attachSearchingPlaceholderToSale(hoA, {
     chainId: chainAId,

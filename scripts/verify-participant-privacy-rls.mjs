@@ -126,10 +126,10 @@ async function createSharedChain(clientA) {
   }
 
   const { error: memberAError } = await clientA.rpc(
-    "ensure_property_membership",
+    "establish_operational_homeowner",
     {
       p_property_id: propertyA.id,
-      p_role: "seller",
+      p_granted_via: "start_move",
     }
   );
 

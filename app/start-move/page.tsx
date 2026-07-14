@@ -8,7 +8,10 @@ import {
   PAGE_TITLE_CLASS,
 } from "@/components/mobileStandards";
 import { createChainForOnboarding } from "@/lib/createChainForOnboarding";
-import { ensurePropertyMembership } from "@/lib/ensurePropertyMembership";
+import {
+  establishOperationalHomeowner,
+  OPERATIONAL_IDENTITY_GRANT_VIA,
+} from "@/lib/ownership/grants";
 import { attachSearchingPlaceholderToSale } from "@/lib/searchingPlaceholder";
 
 export default function StartMovePage() {
@@ -258,17 +261,14 @@ export default function StartMovePage() {
             sellingPropertyId =
               sellingProperty.id;
     
-            const { error: sellerMemberError } =
-              await ensurePropertyMembership(
-                supabase,
-                {
-                  propertyId: sellingProperty.id,
-                  role: "seller",
-                }
-              );
+            const { data: sellerGrant, error: sellerMemberError } =
+              await establishOperationalHomeowner(supabase, {
+                propertyId: sellingProperty.id,
+                grantedVia: OPERATIONAL_IDENTITY_GRANT_VIA.startMove,
+              });
 
-            if (sellerMemberError) {
-              console.error(sellerMemberError);
+            if (sellerMemberError || !sellerGrant.ok) {
+              console.error(sellerMemberError ?? sellerGrant);
               return;
             }
           }
@@ -385,17 +385,14 @@ export default function StartMovePage() {
           if (buyingProperty) {
             buyerReadyPropertyId =
             buyingProperty.id;
-            const { error: buyerMemberError } =
-              await ensurePropertyMembership(
-                supabase,
-                {
-                  propertyId: buyingProperty.id,
-                  role: "buyer",
-                }
-              );
+            const { data: buyerGrant, error: buyerMemberError } =
+              await establishOperationalHomeowner(supabase, {
+                propertyId: buyingProperty.id,
+                grantedVia: OPERATIONAL_IDENTITY_GRANT_VIA.startMove,
+              });
 
-            if (buyerMemberError) {
-              console.error(buyerMemberError);
+            if (buyerMemberError || !buyerGrant.ok) {
+              console.error(buyerMemberError ?? buyerGrant);
               return;
             }
           }

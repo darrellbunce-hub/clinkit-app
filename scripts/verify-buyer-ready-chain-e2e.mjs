@@ -255,9 +255,9 @@ async function runEphemeralE2E() {
     .single();
   if (saleError) throw saleError;
 
-  await seller.rpc("ensure_property_membership", {
+  await seller.rpc("establish_operational_homeowner", {
     p_property_id: saleProperty.id,
-    p_role: "seller",
+    p_granted_via: "start_move",
   });
 
   const { data: joinResult, error: joinError } = await buyer.rpc(
