@@ -1,6 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { ClaimOperationalPropertyResult } from "@/lib/propertyClaim/types";
+import {
+  mapTransactionParticipationError,
+} from "@/lib/auth/emailVerificationGate";
 import { refreshOperationalSummary } from "@/lib/operationalSummary/refreshOperationalSummary";
 
 type ClaimRpcResult = {
@@ -43,7 +46,10 @@ export async function claimOperationalProperty(
       ok: false,
       propertyId: null,
       chainId: null,
-      error: result?.error ?? "claim_failed",
+      error:
+        mapTransactionParticipationError(
+          result?.error ?? null
+        ) ?? result?.error ?? "claim_failed",
     };
   }
 

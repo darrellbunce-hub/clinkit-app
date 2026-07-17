@@ -13,6 +13,14 @@ import { ROUTES } from "@/lib/auth/routes";
 import { getAccountType } from "@/lib/accountType";
 import { fetchAuthenticatedProfileAccountFields } from "@/lib/currentUserContext";
 import { ensureUserProfile } from "@/lib/profile/ensureUserProfile";
+import PasswordRequirementsChecklist from "@/components/auth/PasswordRequirementsChecklist";
+import {
+  mapAuthSignInError,
+  mapAuthSignUpError,
+} from "@/lib/auth/authErrors";
+import {
+  validatePasswordForSignUp,
+} from "@/lib/auth/passwordPolicy";
 import { resolveHomeownerPostAuthDestination } from "@/lib/propertyClaim/resolveHomeownerPostAuthDestination";
 import { useRouter } from "next/navigation";
 
@@ -36,6 +44,8 @@ export default function LoginPage() {
     useState(false);
   const [isSigningUp, setIsSigningUp] =
     useState(false);
+  const [passwordValue, setPasswordValue] =
+    useState("");
 
   async function handleLogin(
     event: FormEvent<HTMLFormElement>
@@ -64,7 +74,9 @@ export default function LoginPage() {
         });
 
       if (result.error) {
-        setErrorMessage(result.error.message);
+        setErrorMessage(
+          mapAuthSignInError(result.error.message)
+        );
 
         return;
       }
@@ -149,6 +161,15 @@ export default function LoginPage() {
       return;
     }
 
+    const passwordValidation =
+      validatePasswordForSignUp(password);
+
+    if (!passwordValidation.valid) {
+      setErrorMessage(passwordValidation.message);
+
+      return;
+    }
+
     setIsSigningUp(true);
 
     try {
@@ -161,7 +182,9 @@ export default function LoginPage() {
       });
 
       if (error) {
-        setErrorMessage(error.message);
+        setErrorMessage(
+          mapAuthSignUpError(error.message)
+        );
 
         return;
       }
@@ -275,7 +298,16 @@ export default function LoginPage() {
               autoComplete="current-password"
               enterKeyHint="go"
               disabled={isBusy}
+              value={passwordValue}
+              onChange={(event) =>
+                setPasswordValue(event.target.value)
+              }
               className="mt-2 w-full border border-slate-300 text-base text-slate-900 rounded-2xl px-4 py-3 disabled:bg-slate-100"
+            />
+
+            <PasswordRequirementsChecklist
+              password={passwordValue}
+              className="mt-3"
             />
 
           </div>

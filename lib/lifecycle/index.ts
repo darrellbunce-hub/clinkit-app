@@ -33,6 +33,16 @@ export {
 } from "@/lib/lifecycle/scenarios";
 
 export {
+  evaluateConnectedDormantScenario,
+  evaluateIsolatedDormantScenario,
+} from "@/lib/lifecycle/dormancyScenarios";
+
+export {
+  confirmTransactionStillActive,
+  STILL_ACTIVE_CONFIRMATION_CODE,
+} from "@/lib/lifecycle/confirmStillActive";
+
+export {
   canTransitionOperationalState,
   assertTransitionAllowed,
   scenarioForState,
@@ -47,3 +57,15 @@ export {
 export {
   PropertyLifecycleService,
 } from "@/lib/lifecycle/service";
+
+export {
+  applyLifecyclePlan,
+  executeLifecycleAction,
+  runPropertyLifecycleWorkerBatch,
+  type ApplyLifecyclePlanResult,
+  type LifecycleWorkerBatchResult,
+} from "@/lib/lifecycle/worker";
+
+export {
+  isAuthorizedLifecycleCronRequest,
+} from "@/lib/lifecycle/cronAuth";

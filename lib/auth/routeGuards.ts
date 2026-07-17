@@ -5,6 +5,12 @@ import {
   isSolicitor,
   requiresEstateAgentOnboarding,
 } from "@/lib/accountType";
+import {
+  isEmailVerified,
+} from "@/lib/auth/emailVerification";
+import {
+  buildVerifyEmailRedirectPath,
+} from "@/lib/auth/emailVerificationGate";
 import type { CurrentUserContext } from "@/lib/currentUserContext";
 import {
   buildLoginRedirectUrl,
@@ -13,13 +19,14 @@ import {
   resolveLoginPathForProtectedRoute,
 } from "@/lib/auth/redirects";
 import {
-  ROUTES,
   isAccountSettingsRoute,
   isAgentHomeRoute,
   isEstateAgentOnboardingRoute,
   isEstateAgentProtectedRoute,
   isHomeownerOnlyRoute,
   isSharedOperationalRoute,
+  isTransactionParticipationRoute,
+  ROUTES,
 } from "@/lib/auth/routes";
 
 export type RouteGuardAllow = {
@@ -79,6 +86,34 @@ export function requireAuthenticatedForRequest(
   return deny(
     `${redirectUrl.pathname}${redirectUrl.search}`,
     "authentication_required"
+  );
+}
+
+export function requireVerifiedEmailForTransactionParticipation(
+  context: CurrentUserContext | null,
+  requestUrl: URL,
+  pathname: string
+): RouteGuardResult {
+  if (!context) {
+    return deny(
+      ROUTES.homeownerLogin,
+      "authentication_required"
+    );
+  }
+
+  if (isEmailVerified(context.user)) {
+    return allow();
+  }
+
+  const nextDestination =
+    buildProtectedRouteNextDestination(
+      requestUrl,
+      pathname
+    );
+
+  return deny(
+    buildVerifyEmailRedirectPath(nextDestination),
+    "email_verification_required"
   );
 }
 
@@ -210,6 +245,34 @@ export function requireSharedOperationalAccess(
   );
 }
 
+function resolveAccountTypeGuard(
+  context: CurrentUserContext | null,
+  pathname: string
+): RouteGuardResult {
+  if (isHomeownerOnlyRoute(pathname)) {
+    return requireHomeowner(context);
+  }
+
+  if (isSharedOperationalRoute(pathname)) {
+    return requireSharedOperationalAccess(context);
+  }
+
+  if (isEstateAgentOnboardingRoute(pathname)) {
+    return requireEstateAgentOnboarding(context);
+  }
+
+  if (
+    isAgentHomeRoute(pathname) ||
+    isEstateAgentProtectedRoute(pathname)
+  ) {
+    return requireCompletedEstateAgentOnboarding(
+      context
+    );
+  }
+
+  return allow();
+}
+
 /**
  * Middleware entry point: evaluate account-type rules for a protected route.
  */
@@ -233,26 +296,18 @@ export function evaluateProtectedRouteAccess(
     return allow();
   }
 
-  if (isHomeownerOnlyRoute(pathname)) {
-    return requireHomeowner(context);
+  const accountTypeGuard =
+    resolveAccountTypeGuard(context, pathname);
+
+  if (!accountTypeGuard.allowed) {
+    return accountTypeGuard;
   }
 
-  if (isSharedOperationalRoute(pathname)) {
-    return requireSharedOperationalAccess(context);
-  }
-
-  if (isEstateAgentOnboardingRoute(pathname)) {
-    return requireEstateAgentOnboarding(
-      context
-    );
-  }
-
-  if (
-    isAgentHomeRoute(pathname) ||
-    isEstateAgentProtectedRoute(pathname)
-  ) {
-    return requireCompletedEstateAgentOnboarding(
-      context
+  if (isTransactionParticipationRoute(pathname)) {
+    return requireVerifiedEmailForTransactionParticipation(
+      context,
+      requestUrl,
+      pathname
     );
   }
 

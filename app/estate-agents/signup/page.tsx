@@ -5,7 +5,10 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
 import EaMarketingShell from "@/components/estate-agents/EaMarketingShell";
+import PasswordRequirementsChecklist from "@/components/auth/PasswordRequirementsChecklist";
 import { AUTH_TITLE_CLASS } from "@/components/mobileStandards";
+import { mapAuthSignUpError } from "@/lib/auth/authErrors";
+import { validateNewPassword } from "@/lib/auth/passwordPolicy";
 import { ROUTES } from "@/lib/auth/routes";
 import { validateBusinessEmail } from "@/lib/businessEmail";
 import {
@@ -48,6 +51,10 @@ function EstateAgentSignupContent() {
     useState("");
   const [inviteCompanyName, setInviteCompanyName] =
     useState<string | null>(null);
+  const [passwordValue, setPasswordValue] =
+    useState("");
+  const [confirmPasswordValue, setConfirmPasswordValue] =
+    useState("");
 
   useEffect(() => {
     async function loadInvitePreview() {
@@ -127,18 +134,21 @@ function EstateAgentSignupContent() {
       return;
     }
 
-    if (password.length < 8) {
+    if (password !== confirmPassword) {
       setErrorMessage(
-        "Password must be at least 8 characters."
+        "Passwords do not match."
       );
 
       return;
     }
 
-    if (password !== confirmPassword) {
-      setErrorMessage(
-        "Passwords do not match."
-      );
+    const passwordValidation = validateNewPassword(
+      password,
+      confirmPassword
+    );
+
+    if (!passwordValidation.valid) {
+      setErrorMessage(passwordValidation.message);
 
       return;
     }
@@ -153,7 +163,9 @@ function EstateAgentSignupContent() {
         });
 
       if (error) {
-        setErrorMessage(error.message);
+        setErrorMessage(
+          mapAuthSignUpError(error.message)
+        );
 
         return;
       }
@@ -277,7 +289,16 @@ function EstateAgentSignupContent() {
                 type="password"
                 autoComplete="new-password"
                 disabled={isSubmitting}
+                value={passwordValue}
+                onChange={(event) =>
+                  setPasswordValue(event.target.value)
+                }
                 className={inputClassName}
+              />
+
+              <PasswordRequirementsChecklist
+                password={passwordValue}
+                className="mt-3"
               />
             </div>
 
@@ -295,6 +316,12 @@ function EstateAgentSignupContent() {
                 type="password"
                 autoComplete="new-password"
                 disabled={isSubmitting}
+                value={confirmPasswordValue}
+                onChange={(event) =>
+                  setConfirmPasswordValue(
+                    event.target.value
+                  )
+                }
                 className={inputClassName}
               />
             </div>

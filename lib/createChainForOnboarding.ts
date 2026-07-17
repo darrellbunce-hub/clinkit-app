@@ -1,5 +1,9 @@
 import type { PostgrestError, SupabaseClient } from "@supabase/supabase-js";
 
+import {
+  mapTransactionParticipationError,
+} from "@/lib/auth/emailVerificationGate";
+
 export type CreateChainForOnboardingError =
   | "not_authenticated"
   | "invalid_name"
@@ -56,7 +60,10 @@ export async function createChainForOnboarding(
     return {
       chainId: null,
       accessCode: null,
-      error: result?.error ?? "unknown",
+      error:
+        mapTransactionParticipationError(
+          result?.error ?? null
+        ) ?? result?.error ?? "unknown",
       rpcError: null,
     };
   }

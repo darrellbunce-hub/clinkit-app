@@ -13,6 +13,7 @@ export const ROUTES = {
   forgotPassword: "/forgot-password",
   resetPassword: "/reset-password",
   authConfirm: "/auth/confirm",
+  verifyEmail: "/verify-email",
   estateAgentLogin: "/estate-agents/login",
   estateAgentSignup: "/estate-agents/signup",
   estateAgentMarketing: "/estate-agents",
@@ -49,6 +50,19 @@ export const SHARED_OPERATIONAL_PREFIXES = [
 ] as const;
 
 /**
+ * Live property transaction participation — requires verified email.
+ * Account routes such as /dashboard and /account are intentionally excluded.
+ */
+export const TRANSACTION_PARTICIPATION_PREFIXES = [
+  "/start-move",
+  "/join-chain",
+  "/my-chains",
+  "/claim",
+  ...SHARED_OPERATIONAL_PREFIXES,
+  "/agent",
+] as const;
+
+/**
  * @deprecated Use HOMEOWNER_ONLY_PREFIXES and SHARED_OPERATIONAL_PREFIXES.
  * Kept for callers that still check the combined homeowner operational set.
  */
@@ -69,7 +83,7 @@ export const PUBLIC_EXACT_PATHS = [
   ROUTES.homeownerLogin,
   ROUTES.forgotPassword,
   ROUTES.resetPassword,
-  "/verify-email",
+  ROUTES.verifyEmail,
   ROUTES.estateAgentMarketing,
   ROUTES.estateAgentPricing,
   ROUTES.estateAgentSignup,
@@ -137,6 +151,15 @@ export function isSharedOperationalRoute(
   pathname: string
 ): boolean {
   return SHARED_OPERATIONAL_PREFIXES.some(
+    (prefix) =>
+      matchesPrefix(pathname, prefix)
+  );
+}
+
+export function isTransactionParticipationRoute(
+  pathname: string
+): boolean {
+  return TRANSACTION_PARTICIPATION_PREFIXES.some(
     (prefix) =>
       matchesPrefix(pathname, prefix)
   );

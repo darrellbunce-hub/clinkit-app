@@ -86,18 +86,29 @@ Operational lifecycle (`property_lifecycle_states.operational_state`):
 |-------|---------|
 | `active` | Normal operational relationship; users may act on the property |
 | `completed_grace` | Chain completion confirmed; grace period before operational cleanup (Scenario A) |
-| `dormant` | Inactivity criteria met; pending archival review (Scenario B) |
+| `dormancy_warning` | Connected transaction stale; awaiting structured still-active confirmation (Scenario B2) |
+| `dormant` | Inactivity criteria met; pending archival (Scenario B1 or B2 after confirmation) |
 | `archived` | Operational links removed; property prepared for release |
 | `released` | Address available for a future claim without support (Scenario C) |
-| `anonymised` | Operational PII cleared; only anonymised analytics snapshot retained (Scenario D) |
+| `anonymised` | **Property-level** operational PII cleared; analytics snapshot retained. **Not** full GDPR RTBF (Scenario D) |
 
 ### State flow (simplified)
 
 ```
 active ──completion confirmed──► completed_grace ──grace elapsed──► archived ──release──► released
-  │                                                                    │
-  └──inactivity criteria met──► dormant ──archive job──► archived      └──analytics job──► anonymised
+  │
+  ├── B1 isolated inactivity ──► dormant ──archive──► archived ──release──► released
+  │
+  └── B2 connected inactivity ──► dormancy_warning ──confirm OR expire──► dormant ──► archived ──release
+                                                                                              │
+                                                                                              └──analytics──► anonymised
 ```
+
+**B1 (isolated):** no chain connection, no meaningful progress, no valid invitation → release after 90 days (default).
+
+**B2 (connected):** chain connected but abandoned → warning at 150 days (default) → 30-day confirmation window → release if unconfirmed.
+
+Identity age alone does **not** count as meaningful activity.
 
 Transitions are **explicit**, **audited** (`property_lifecycle_events`), and **configurable**. No silent deletion.
 
@@ -116,16 +127,15 @@ Transitions are **explicit**, **audited** (`property_lifecycle_events`), and **c
 - Release property for future claims
 - Create anonymised analytics snapshot first
 
-### Scenario B — Dormant transaction
+### Scenario B — Dormant transaction (B1 isolated / B2 connected)
 
-**When all are true** (defaults):
+**B1 — Isolated:** No chain connection, no meaningful operational activity, no valid active invitation for **`LIFECYCLE_DORMANT_INACTIVITY_DAYS`** (default 90).
 
-- No connected counterparty (`buyer_connected` / `seller_connected` as applicable)
-- No meaningful activity within inactivity window (default 90 days)
-- No accepted claim / active operational relationship progressing
-- No pending accepted invitations driving progress
+**B2 — Connected:** Chain connected but no chain-level operational activity for **`LIFECYCLE_CONNECTED_DORMANT_DAYS`** (default 150) → `dormancy_warning` → **`LIFECYCLE_DORMANCY_CONFIRMATION_DAYS`** (default 30) confirmation window → release if unconfirmed.
 
-**Actions:** Unlink users, archive operational state, release property.
+Structured confirmation: `confirm_transaction_still_active()` — "My transaction is still active" (no free text).
+
+**Does NOT qualify as protection:** identity age alone, login recency alone, expired invitations, page views.
 
 ### Scenario C — Future owner
 
@@ -162,9 +172,10 @@ Environment variables (see `lib/lifecycle/config.ts`):
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `LIFECYCLE_COMPLETED_GRACE_DAYS` | `30` | Scenario A grace before archive |
-| `LIFECYCLE_DORMANT_INACTIVITY_DAYS` | `90` | Scenario B inactivity threshold |
-| `LIFECYCLE_MEANINGFUL_ACTIVITY_DAYS` | `14` | Activity window that resets dormancy clock |
-| `LIFECYCLE_EVALUATION_BATCH_SIZE` | `100` | Future worker batch size |
+| `LIFECYCLE_DORMANT_INACTIVITY_DAYS` | `90` | B1 isolated inactivity threshold |
+| `LIFECYCLE_CONNECTED_DORMANT_DAYS` | `150` | B2 connected inactivity before warning |
+| `LIFECYCLE_DORMANCY_CONFIRMATION_DAYS` | `30` | B2 confirmation window after warning |
+| `LIFECYCLE_EVALUATION_BATCH_SIZE` | `100` | Worker batch size |
 
 All periods are configurable — **never hardcode** in cleanup jobs.
 
@@ -183,13 +194,37 @@ All periods are configurable — **never hardcode** in cleanup jobs.
 
 **Not in Phase 1:** automated workers, membership deletion, address release, production hooks.
 
-### Phase 2 — Early production
+### Phase 2 — Automated production (implemented)
 
-- Scheduled lifecycle worker (Edge Function / cron)
-- Execute archive/release actions behind `PropertyLifecycleService.applyPlan()`
-- Harden `ensure_property_membership` with property-scoped authz
-- Global address dedup constraint (design + migration)
-- Hook chain completion → `completed_grace` transition
+- Scheduled worker: `GET /api/cron/property-lifecycle` (Vercel Cron, daily 03:00 UTC)
+- TypeScript evaluation + SQL execution via `runPropertyLifecycleWorkerBatch()`
+- Service-role RPCs: candidate selection, leases, snapshot persistence, archive/release/anonymise
+- Address reusability: `property_address_is_reserved()` + updated `property_exists_for_onboarding()`
+- Idempotent analytics snapshots (`source_property_id`, `snapshot_kind` unique)
+- Migration: `supabase/migrations/20260714190000_property_lifecycle_automation.sql`
+
+**Environment variables:**
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `LIFECYCLE_COMPLETED_GRACE_DAYS` | 30 | Post-completion grace before archival |
+| `LIFECYCLE_DORMANT_INACTIVITY_DAYS` | 90 | B1 isolated dormancy threshold |
+| `LIFECYCLE_CONNECTED_DORMANT_DAYS` | 150 | B2 connected dormancy before warning |
+| `LIFECYCLE_DORMANCY_CONFIRMATION_DAYS` | 30 | B2 confirmation window |
+| `LIFECYCLE_EVALUATION_BATCH_SIZE` | 100 | Worker batch size |
+| `LIFECYCLE_WORKER_LEASE_SECONDS` | 300 | Per-property processing lease |
+| `CRON_SECRET` | — | **Required** for cron route auth |
+
+**Manual configuration:**
+
+1. Apply migration `20260714190000_property_lifecycle_automation.sql`
+2. Set `CRON_SECRET` in Vercel (must match Authorization bearer token)
+3. Deploy with `vercel.json` cron schedule
+4. Optionally mirror retention in Postgres: `app.lifecycle_*` settings
+
+```bash
+npx tsx scripts/verify-property-lifecycle-automation.ts
+```
 
 ### Phase 3 — Analytics platform
 

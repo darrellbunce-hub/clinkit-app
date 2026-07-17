@@ -6,6 +6,7 @@ import {
   PAGE_TITLE_CLASS,
   SECTION_TITLE_CLASS,
 } from "@/components/mobileStandards";
+import EmailVerificationBanner from "@/components/auth/EmailVerificationBanner";
 import Navbar from "@/components/Navbar";
 import PageHeaderBand from "@/components/theme/PageHeaderBand";
 import { STAGES } from "@/data/stages";
@@ -69,6 +70,8 @@ export default function DashboardPage() {
       <PageHeaderBand />
 
       <div className="max-w-6xl mx-auto px-6 py-12">
+        <EmailVerificationBanner className="mb-8" />
+
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
           <div>
             <h1 className={PAGE_TITLE_CLASS}>

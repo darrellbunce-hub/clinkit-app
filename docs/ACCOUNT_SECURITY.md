@@ -60,11 +60,16 @@ Matcher (`middleware.ts`):
 
 Server layouts additionally enforce chain/property participant access (404 on failure).
 
-### Password handling (before this work)
+### Password handling
 
-- No password reset or change UI.
-- EA signup: min 8 characters + confirm match.
-- Homeowner signup: no strength rules.
+Keynetic password policy (see `lib/auth/passwordPolicy.ts` and `docs/AUTH_SECURITY_AUDIT.md`):
+
+- Minimum **10** characters
+- Uppercase, lowercase, number, and special character required
+- Enforced in app on all sign-up, reset, and change flows
+- **Supabase Dashboard must mirror these rules** — see `docs/SUPABASE_AUTH_DASHBOARD_CHECKLIST.md`
+
+Shared UI: `components/auth/PasswordRequirementsChecklist.tsx`
 
 ### Existing account pages (before this work)
 

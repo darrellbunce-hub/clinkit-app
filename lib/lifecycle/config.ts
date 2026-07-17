@@ -36,9 +36,14 @@ export function getLifecycleConfig(): LifecycleConfig {
     90
   );
 
-  const meaningfulActivityDays = readPositiveInt(
-    process.env.LIFECYCLE_MEANINGFUL_ACTIVITY_DAYS,
-    14
+  const connectedDormantDays = readPositiveInt(
+    process.env.LIFECYCLE_CONNECTED_DORMANT_DAYS,
+    150
+  );
+
+  const dormancyConfirmationDays = readPositiveInt(
+    process.env.LIFECYCLE_DORMANCY_CONFIRMATION_DAYS,
+    30
   );
 
   const evaluationBatchSize = readPositiveInt(
@@ -46,14 +51,22 @@ export function getLifecycleConfig(): LifecycleConfig {
     100
   );
 
+  const workerLeaseSeconds = readPositiveInt(
+    process.env.LIFECYCLE_WORKER_LEASE_SECONDS,
+    300
+  );
+
   return {
     completedGraceDays,
     dormantInactivityDays,
-    meaningfulActivityDays,
+    connectedDormantDays,
+    dormancyConfirmationDays,
     evaluationBatchSize,
+    workerLeaseSeconds,
     completedGraceMs: completedGraceDays * DAY_MS,
     dormantInactivityMs: dormantInactivityDays * DAY_MS,
-    meaningfulActivityMs: meaningfulActivityDays * DAY_MS,
+    connectedDormantMs: connectedDormantDays * DAY_MS,
+    dormancyConfirmationMs: dormancyConfirmationDays * DAY_MS,
   };
 }
 

@@ -11,6 +11,7 @@ import { useSearchParams } from "next/navigation";
 
 import EaMarketingShell from "@/components/estate-agents/EaMarketingShell";
 import { AUTH_TITLE_CLASS } from "@/components/mobileStandards";
+import { mapAuthSignInError } from "@/lib/auth/authErrors";
 import { resolveLoginNextDestination, resolvePostLoginRedirect } from "@/lib/auth/redirects";
 import { ROUTES } from "@/lib/auth/routes";
 import { fetchAuthenticatedProfileAccountFields } from "@/lib/currentUserContext";
@@ -133,7 +134,9 @@ function EstateAgentLoginContent() {
         });
 
       if (result.error) {
-        setErrorMessage(result.error.message);
+        setErrorMessage(
+          mapAuthSignInError(result.error.message)
+        );
 
         return;
       }

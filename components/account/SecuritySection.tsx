@@ -5,6 +5,7 @@ import {
   type FormEvent,
 } from "react";
 
+import PasswordRequirementsChecklist from "@/components/auth/PasswordRequirementsChecklist";
 import {
   accountAlertErrorClassName,
   accountAlertSuccessClassName,
@@ -179,6 +180,11 @@ export default function SecuritySection({
               }
               disabled={isSubmitting}
               className={accountInputClassName}
+            />
+
+            <PasswordRequirementsChecklist
+              password={newPassword}
+              className="mt-3"
             />
           </div>
 

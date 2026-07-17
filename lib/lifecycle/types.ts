@@ -2,10 +2,14 @@
  * Operational lifecycle states for a property.
  *
  * Distinct from chain completion lifecycle (`chains.completion_lifecycle_status`).
+ *
+ * Note: `anonymised` is property-level lifecycle anonymisation only.
+ * It does NOT fulfil UK GDPR Right to Erasure across all personal data stores.
  */
 export const PROPERTY_OPERATIONAL_STATE = {
   active: "active",
   completedGrace: "completed_grace",
+  dormancyWarning: "dormancy_warning",
   dormant: "dormant",
   archived: "archived",
   released: "released",
@@ -17,37 +21,41 @@ export type PropertyOperationalState =
 
 export const PROPERTY_LIFECYCLE_SCENARIO = {
   completedGrace: "completed_grace",
-  dormant: "dormant",
+  isolatedDormant: "isolated_dormant",
+  connectedDormant: "connected_dormant",
   futureClaim: "future_claim",
   analytics: "analytics",
+  /** @deprecated Use isolatedDormant or connectedDormant */
+  dormant: "dormant",
 } as const;
 
 export type PropertyLifecycleScenario =
   (typeof PROPERTY_LIFECYCLE_SCENARIO)[keyof typeof PROPERTY_LIFECYCLE_SCENARIO];
 
-/**
- * Actions the lifecycle engine may recommend or apply.
- * Phase 1 evaluates only — apply is Phase 2.
- */
 export const PROPERTY_LIFECYCLE_ACTION = {
   none: "none",
   enterCompletedGrace: "enter_completed_grace",
+  enterDormancyWarning: "enter_dormancy_warning",
   markDormant: "mark_dormant",
   createAnalyticsSnapshot: "create_analytics_snapshot",
   archiveOperational: "archive_operational",
   releaseProperty: "release_property",
+  /** Property-level lifecycle anonymisation — not full GDPR RTBF. */
   anonymiseHistorical: "anonymise_historical",
 } as const;
 
 export type PropertyLifecycleAction =
   (typeof PROPERTY_LIFECYCLE_ACTION)[keyof typeof PROPERTY_LIFECYCLE_ACTION];
 
+export const STILL_ACTIVE_CONFIRMATION_CODE = "still_active" as const;
+
 export type PropertyLifecycleTransitionTrigger =
   | "evaluation"
   | "chain_completion"
   | "worker"
   | "manual"
-  | "system";
+  | "system"
+  | "still_active_confirmation";
 
 /** Operational signals gathered for lifecycle evaluation. */
 export type PropertyLifecycleContext = {
@@ -60,16 +68,31 @@ export type PropertyLifecycleContext = {
   buyerConnected: boolean;
   sellerConnected: boolean;
   hasConnectedCounterparty: boolean;
+  isChainConnected: boolean;
   memberCount: number;
   chainCompletedAt: string | null;
   lastActivityAt: string | null;
   lastPropertyUpdateAt: string | null;
+  lastOperationalActivityAt: string | null;
+  chainLastOperationalActivityAt: string | null;
   hasAcceptedClaim: boolean;
-  hasPendingInvitation: boolean;
+  /** Non-expired, non-revoked, unused invitation. */
+  hasValidActiveInvitation: boolean;
+  hasExpiredInvitationOnly: boolean;
   graceEndsAt: string | null;
   enteredStateAt: string | null;
-  daysSinceLastActivity: number | null;
+  dormancyWarningAt: string | null;
+  dormancyConfirmationDeadlineAt: string | null;
+  daysSinceLastOperationalActivity: number | null;
+  daysSinceChainOperationalActivity: number | null;
   daysSinceChainCompleted: number | null;
+  hasActiveOperationalIdentity: boolean;
+  /** Durable transaction progress — identity age alone does NOT qualify. */
+  hasMeaningfulParticipation: boolean;
+  hasAnalyticsSnapshot: boolean;
+  manuallyReleased: boolean;
+  addressReserved: boolean;
+  chainReleaseSafe: boolean;
 };
 
 export type PropertyLifecycleRecommendation = {
@@ -77,7 +100,6 @@ export type PropertyLifecycleRecommendation = {
   action: PropertyLifecycleAction;
   reason: string;
   eligible: boolean;
-  /** ISO timestamp when the action becomes eligible (grace/inactivity). */
   eligibleAt: string | null;
 };
 
@@ -86,7 +108,6 @@ export type PropertyLifecycleEvaluation = {
   operationalState: PropertyOperationalState;
   context: PropertyLifecycleContext;
   recommendations: PropertyLifecycleRecommendation[];
-  /** Ordered plan for Phase 2 apply — empty when nothing to do. */
   plannedActions: PropertyLifecycleAction[];
   evaluatedAt: string;
 };
@@ -127,6 +148,10 @@ export type PropertyLifecycleStateRow = {
   grace_ends_at: string | null;
   archive_eligible_at: string | null;
   last_evaluated_at: string | null;
+  dormancy_warning_at: string | null;
+  dormancy_confirmation_deadline_at: string | null;
+  dormancy_warning_notified_at: string | null;
+  last_still_active_confirmed_at: string | null;
   metadata: Record<string, unknown>;
   created_at: string;
   updated_at: string;
@@ -148,9 +173,12 @@ export type PropertyLifecycleEvaluationRpcResult = {
 export type LifecycleConfig = {
   completedGraceDays: number;
   dormantInactivityDays: number;
-  meaningfulActivityDays: number;
+  connectedDormantDays: number;
+  dormancyConfirmationDays: number;
   evaluationBatchSize: number;
+  workerLeaseSeconds: number;
   completedGraceMs: number;
   dormantInactivityMs: number;
-  meaningfulActivityMs: number;
+  connectedDormantMs: number;
+  dormancyConfirmationMs: number;
 };

@@ -74,12 +74,16 @@ export function buildAnonymisedAnalyticsSnapshot(params: {
     memberCountAtSnapshot: context.memberCount,
     hadConnectedCounterparty: context.hasConnectedCounterparty,
     metrics: {
-      days_since_last_activity: context.daysSinceLastActivity,
+      days_since_last_operational_activity:
+        context.daysSinceLastOperationalActivity,
+      days_since_chain_operational_activity:
+        context.daysSinceChainOperationalActivity,
       days_since_chain_completed: context.daysSinceChainCompleted,
       buyer_connected: context.buyerConnected,
       seller_connected: context.sellerConnected,
       had_accepted_claim: context.hasAcceptedClaim,
-      had_pending_invitation: context.hasPendingInvitation,
+      had_valid_active_invitation: context.hasValidActiveInvitation,
+      is_chain_connected: context.isChainConnected,
     },
   };
 }

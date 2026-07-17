@@ -9,6 +9,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
 import { AUTH_TITLE_CLASS, CARD_PADDING_CLASS } from "@/components/mobileStandards";
+import PasswordRequirementsChecklist from "@/components/auth/PasswordRequirementsChecklist";
 import {
   accountAlertErrorClassName,
   accountAlertSuccessClassName,
@@ -241,6 +242,11 @@ export default function ResetPasswordForm() {
                   }
                   disabled={isSubmitting}
                   className={accountInputClassName}
+                />
+
+                <PasswordRequirementsChecklist
+                  password={newPassword}
+                  className="mt-3"
                 />
               </div>
 

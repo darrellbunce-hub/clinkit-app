@@ -1,5 +1,9 @@
 import type { PostgrestError, SupabaseClient } from "@supabase/supabase-js";
 
+import {
+  mapTransactionParticipationError,
+} from "@/lib/auth/emailVerificationGate";
+
 type RpcResult = {
   ok: boolean;
   error?: string;
@@ -35,11 +39,20 @@ function mapRpcError(
   error: PostgrestError | null,
   result: RpcResult | null
 ): string {
+  const rpcError =
+    mapTransactionParticipationError(
+      result?.error ?? null
+    ) ?? result?.error;
+
+  if (rpcError) {
+    return rpcError;
+  }
+
   if (error?.message) {
     return error.message;
   }
 
-  return result?.error ?? "unknown_error";
+  return "unknown_error";
 }
 
 export async function createEaOperationalChain(

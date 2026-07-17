@@ -4,6 +4,9 @@ import {
   OPERATIONAL_IDENTITY_GRANT_VIA,
   type OperationalIdentityGrantVia,
 } from "@/lib/ownership/types";
+import {
+  mapTransactionParticipationError,
+} from "@/lib/auth/emailVerificationGate";
 
 export type EstablishOperationalHomeownerResult =
   | { ok: true; propertyId: number; idempotent?: boolean }
@@ -45,7 +48,13 @@ export async function establishOperationalHomeowner(
 
   if (!row.ok) {
     return {
-      data: { ok: false, error: row.error ?? "establish_failed" },
+      data: {
+        ok: false,
+        error:
+          mapTransactionParticipationError(row.error) ??
+          row.error ??
+          "establish_failed",
+      },
       error: null,
     };
   }
@@ -77,7 +86,13 @@ export async function grantCounterpartyParticipation(
 
   if (!row.ok) {
     return {
-      data: { ok: false, error: row.error ?? "grant_failed" },
+      data: {
+        ok: false,
+        error:
+          mapTransactionParticipationError(row.error) ??
+          row.error ??
+          "grant_failed",
+      },
       error: null,
     };
   }
@@ -111,7 +126,13 @@ export async function invitePropertyDelegate(
   }
 
   const row = (data ?? {}) as GrantRpcRow;
-  return { ok: Boolean(row.ok), error: row.error ?? null };
+  return {
+    ok: Boolean(row.ok),
+    error:
+      mapTransactionParticipationError(
+        row.error ?? null
+      ) ?? row.error ?? null,
+  };
 }
 
 export async function acceptPropertyDelegate(
@@ -127,7 +148,13 @@ export async function acceptPropertyDelegate(
   }
 
   const row = (data ?? {}) as GrantRpcRow;
-  return { ok: Boolean(row.ok), error: row.error ?? null };
+  return {
+    ok: Boolean(row.ok),
+    error:
+      mapTransactionParticipationError(
+        row.error ?? null
+      ) ?? row.error ?? null,
+  };
 }
 
 export { OPERATIONAL_IDENTITY_GRANT_VIA };

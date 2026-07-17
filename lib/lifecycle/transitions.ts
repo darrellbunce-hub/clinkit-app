@@ -11,11 +11,16 @@ const ALLOWED_TRANSITIONS: Record<
 > = {
   [PROPERTY_OPERATIONAL_STATE.active]: [
     PROPERTY_OPERATIONAL_STATE.completedGrace,
+    PROPERTY_OPERATIONAL_STATE.dormancyWarning,
     PROPERTY_OPERATIONAL_STATE.dormant,
   ],
   [PROPERTY_OPERATIONAL_STATE.completedGrace]: [
     PROPERTY_OPERATIONAL_STATE.archived,
     PROPERTY_OPERATIONAL_STATE.active,
+  ],
+  [PROPERTY_OPERATIONAL_STATE.dormancyWarning]: [
+    PROPERTY_OPERATIONAL_STATE.active,
+    PROPERTY_OPERATIONAL_STATE.dormant,
   ],
   [PROPERTY_OPERATIONAL_STATE.dormant]: [
     PROPERTY_OPERATIONAL_STATE.archived,
@@ -61,6 +66,8 @@ export function targetStateForAction(
   switch (action) {
     case "enter_completed_grace":
       return PROPERTY_OPERATIONAL_STATE.completedGrace;
+    case "enter_dormancy_warning":
+      return PROPERTY_OPERATIONAL_STATE.dormancyWarning;
     case "mark_dormant":
       return PROPERTY_OPERATIONAL_STATE.dormant;
     case "archive_operational":
@@ -80,8 +87,10 @@ export function scenarioForState(
   switch (state) {
     case PROPERTY_OPERATIONAL_STATE.completedGrace:
       return PROPERTY_LIFECYCLE_SCENARIO.completedGrace;
+    case PROPERTY_OPERATIONAL_STATE.dormancyWarning:
+      return PROPERTY_LIFECYCLE_SCENARIO.connectedDormant;
     case PROPERTY_OPERATIONAL_STATE.dormant:
-      return PROPERTY_LIFECYCLE_SCENARIO.dormant;
+      return PROPERTY_LIFECYCLE_SCENARIO.isolatedDormant;
     case PROPERTY_OPERATIONAL_STATE.released:
       return PROPERTY_LIFECYCLE_SCENARIO.futureClaim;
     case PROPERTY_OPERATIONAL_STATE.anonymised:
