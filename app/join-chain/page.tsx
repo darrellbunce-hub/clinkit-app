@@ -54,11 +54,6 @@ function JoinChainContent() {
       return;
     }
 
-    console.log("BUYER_READY_DEBUG", {
-      nothingToSell,
-      phase: "pre_join_chain_property",
-    });
-
     const {
       data: joinResult,
       error: joinError,
@@ -69,26 +64,15 @@ function JoinChainContent() {
     });
 
     if (joinError) {
-      console.log("BUYER_READY_DEBUG", {
-        nothingToSell,
-        joinResult: null,
-        joinError: joinError.message,
-        joiningRole: null,
-        shouldCreateBuyerReady: false,
-      });
-      console.error(joinError);
+      console.error(
+        "[join-chain] join_chain_property failed:",
+        joinError.message
+      );
       alert("Could not join this chain.");
       return;
     }
 
     if (!joinResult?.ok) {
-      console.log("BUYER_READY_DEBUG", {
-        nothingToSell,
-        joinResult,
-        joiningRole: joinResult?.joining_role ?? null,
-        shouldCreateBuyerReady: false,
-      });
-
       if (joinResult?.error === "invalid_access_code") {
         alert("Invalid access code");
         return;
@@ -117,13 +101,6 @@ function JoinChainContent() {
     const shouldCreateBuyerReady =
       joiningRole === "buyer" && nothingToSell;
 
-    console.log("BUYER_READY_DEBUG", {
-      nothingToSell,
-      joinResult,
-      joiningRole,
-      shouldCreateBuyerReady,
-    });
-
     if (joinResult.joining_role === "seller") {
       await establishConnectedHopAfterSellerJoinsPurchase(
         supabase,
@@ -135,12 +112,6 @@ function JoinChainContent() {
       joinResult.joining_role === "buyer" &&
       nothingToSell
     ) {
-      console.log("BUYER_READY_CREATE_START", {
-        chainId: property.chain_id,
-        propertyId: property.id,
-        userId: user.id,
-      });
-
       let buyerReadyResult;
 
       try {
@@ -155,32 +126,17 @@ function JoinChainContent() {
           );
       } catch (error) {
         console.error(
-          "BUYER_READY_CREATE_EXCEPTION",
-          error
+          "[join-chain] buyer ready create exception:",
+          error instanceof Error ? error.message : "unknown_error"
         );
         throw error;
       }
 
-      console.log("BUYER_READY_CREATE_RESULT", {
-        ok: buyerReadyResult.ok,
-        created:
-          buyerReadyResult.ok
-            ? buyerReadyResult.created
-            : undefined,
-        nodeId:
-          buyerReadyResult.ok &&
-          buyerReadyResult.created
-            ? buyerReadyResult.nodeId
-            : undefined,
-        linkedPropertyId: property.id,
-        error:
-          buyerReadyResult.ok
-            ? undefined
-            : buyerReadyResult.error,
-      });
-
       if (!buyerReadyResult.ok) {
-        console.error(buyerReadyResult.error);
+        console.error(
+          "[join-chain] buyer ready create failed:",
+          buyerReadyResult.error
+        );
         alert(
           "Join completed, but Buyer Ready could not be recorded. Please contact support."
         );
@@ -273,7 +229,10 @@ function JoinChainContent() {
           alert(
             "Join completed, but the Searching placeholder could not be created. Please try again from the chain page or contact support."
           );
-          console.error(intentResult.error);
+          console.error(
+            "[join-chain] searching intent failed:",
+            intentResult.error
+          );
         }
 
         return;
@@ -289,7 +248,10 @@ function JoinChainContent() {
           );
 
         if (cleanupError) {
-          console.error(cleanupError);
+          console.error(
+            "[join-chain] onboarding cleanup failed:",
+            cleanupError.message
+          );
         }
       }
 
@@ -298,10 +260,9 @@ function JoinChainContent() {
         `/dashboard?refresh=${Date.now()}`;
     } catch (error) {
       console.error(
-        "BUYER_READY_JOIN_EXCEPTION",
-        error
+        "[join-chain] join completion failed:",
+        error instanceof Error ? error.message : "unknown_error"
       );
-      console.error(error);
 
       if (!joinCompleted) {
         alert(

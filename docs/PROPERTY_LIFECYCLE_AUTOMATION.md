@@ -13,7 +13,7 @@ released → active (re-claim / future transaction / still-active confirmation r
 
 Terminal state: `anonymised`
 
-**Important:** `anonymised` is **property-level lifecycle anonymisation only**. It redacts the property address/postcode and claim invite fields while retaining analytics snapshots. It does **not** fulfil UK GDPR Right to Erasure across activities, email_events, auth.users, invitation records, communication logs, or backups. RTBF is a separate architecture phase.
+**Important:** `anonymised` is **property-level lifecycle anonymisation only**. It redacts the property address/postcode and claim invite fields while retaining analytics snapshots. It does **not** fulfil UK GDPR Right to Erasure across activities, email_events, auth.users, invitation records, communication logs, or backups. RTBF is a separate architecture phase — see [GDPR Right to Erasure Architecture](./GDPR_RIGHT_TO_ERASURE_ARCHITECTURE.md).
 
 ## Dormancy paths
 
@@ -28,7 +28,7 @@ Actions: mark dormant → snapshot → archive → release.
 A connected transaction is **not** released at the first inactivity threshold. Instead:
 
 1. No meaningful **chain-level** operational activity for **`LIFECYCLE_CONNECTED_DORMANT_DAYS`** (default **150**)
-2. Enter **`dormancy_warning`** — notify participants (email integration deferred; `dormancy_warning_notified_at` persisted)
+2. Enter **`dormancy_warning`** — notify operational homeowners by email (`lifecycle-dormancy-warning` template)
 3. Structured confirmation only: **"My transaction is still active"** via `confirm_transaction_still_active()` (no free text)
 4. If nobody confirms within **`LIFECYCLE_DORMANCY_CONFIRMATION_DAYS`** (default **30**): mark dormant → snapshot → archive → release
 
@@ -96,15 +96,43 @@ Chain `completed_at` while lifecycle `active` → grace → snapshot → archive
 |-------|---------|
 | `dormancy_warning_at` | When warning issued |
 | `dormancy_confirmation_deadline_at` | Confirmation window end |
-| `dormancy_warning_notified_at` | Prevents duplicate worker notifications |
+| `dormancy_warning_notified_at` | Successful dormancy warning email delivery (null = pending or retryable) |
+| `dormancy_warning_notification_claimed_at` | In-flight send claim (concurrency / retry) |
 | `last_still_active_confirmed_at` | Last structured confirmation |
 | `property_lifecycle_still_active_confirmations` | Append-only audit (`confirmation_code = 'still_active'`) |
 
-RPC: `confirm_transaction_still_active(p_property_id)` — authenticated participants only.
+RPC: `confirm_transaction_still_active(p_property_id)` — **active operational homeowner only** (not counterparty, delegate, or EA). Idempotent when lifecycle is already `active`. Clears notification fields when resetting from `dormancy_warning`.
 
-TypeScript helper: `lib/lifecycle/confirmStillActive.ts`
+Homeowner UI: `/property/{id}?lifecycle=dormancy-warning` shows confirmation panel only when backend state is `dormancy_warning`. Query param alone does not mutate lifecycle.
 
-**Remaining notification work:** wire email template to `dormancy_warning_notified_at` lifecycle event (backend state ready).
+TypeScript helpers:
+
+- `lib/lifecycle/confirmStillActive.ts`
+- `lib/lifecycle/loadPropertyLifecycleState.ts`
+- `lib/lifecycle/stillActiveConfirmationEligibility.ts`
+- `components/lifecycle/PropertyLifecycleDormancySection.tsx`
+- `lib/lifecycle/dormancyWarningNotifications.ts` (worker integration)
+- `lib/communications/sendDormancyWarningEmail()` (Resend pipeline)
+
+See `docs/COMMUNICATIONS.md` for recipient rules, privacy, idempotency, and retry behaviour.
+
+### Dormancy warning email
+
+| Step | RPC / function |
+|------|----------------|
+| List pending targets | `list_dormancy_warning_notification_targets(p_source_property_id)` |
+| Resolve recipient | `get_dormancy_warning_email_recipient(p_property_id)` |
+| Claim send | `try_claim_dormancy_warning_notification(p_property_id, p_worker_run_id)` |
+| Mark sent | `mark_dormancy_warning_notification_sent(p_property_id, p_email_event_id)` |
+| Release claim (retry) | `release_dormancy_warning_notification_claim(p_property_id)` |
+
+CTA: `/property/{id}?lifecycle=dormancy-warning` — navigates to Keynetic; does not mutate lifecycle state. Homeowner confirms via in-app panel + modal calling `confirm_transaction_still_active()`.
+
+Verification:
+
+```bash
+npx tsx scripts/verify-lifecycle-still-active-confirmation.ts
+```
 
 ## Configuration
 
@@ -137,8 +165,7 @@ Query & Cost Governance: durable signals calculated on write; worker evaluates s
 
 ## Remaining before Right to Erasure
 
-- Per-user GDPR erase workflow (not lifecycle automation)
+- Per-user GDPR erase workflow (not lifecycle automation) — architecture audit: [GDPR Right to Erasure Architecture](./GDPR_RIGHT_TO_ERASURE_ARCHITECTURE.md)
 - Activity text PII review/redaction policy
 - Analytics platform ingestion from snapshots
-- Dormancy warning email notification integration
 - Optional chain-completion webhook for faster grace entry

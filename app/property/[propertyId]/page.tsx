@@ -45,6 +45,7 @@ import { getEstateAgentManagementModeForOperationalAssignment } from "@/lib/esta
 import OperationalCompletionDatePanel from "@/components/OperationalCompletionDatePanel";
 import PropertyEstateAgentAssignment from "@/components/estate-agents/PropertyEstateAgentAssignment";
 import ParticipationDelinkPanel from "@/components/participation/ParticipationDelinkPanel";
+import PropertyLifecycleDormancySection from "@/components/lifecycle/PropertyLifecycleDormancySection";
 import {
   mapToOperationalProperties,
 } from "@/lib/operationalPosition";
@@ -762,6 +763,13 @@ if (
             message={access.bannerMessage}
           />
         )}
+
+        <PropertyLifecycleDormancySection
+          propertyId={propertyId}
+          currentUserId={currentUserId}
+          onConfirmed={refreshParticipantData}
+          onSuccessMessage={setSuccessMessage}
+        />
 
         {!isCompletedCompletionMode && (
           <div

@@ -11,6 +11,9 @@ import HomeownerInvitationEmail, {
 import PasswordResetEmail, {
   getPasswordResetSubject,
 } from "@/emails/templates/PasswordReset";
+import DormancyWarningEmail, {
+  getDormancyWarningSubject,
+} from "@/emails/templates/DormancyWarning";
 import PropertyClaimedEmail, {
   getClaimSuccessfulSubject,
 } from "@/emails/templates/PropertyClaimed";
@@ -19,11 +22,13 @@ import WelcomeEmail, {
 } from "@/emails/templates/WelcomeEmail";
 import {
   getSampleClaimSuccessfulParams,
+  getSampleDormancyWarningParams,
   getSampleEstateAgentInvitationParams,
   getSampleHomeownerInvitationParams,
   getSamplePasswordResetParams,
   getSampleWelcomeEmailParams,
 } from "@/lib/communications/sampleData";
+import type { DormancyWarningEmailParams } from "@/lib/communications/types";
 
 export type RenderedEmail = {
   html: string;
@@ -90,6 +95,15 @@ export async function renderClaimSuccessful(
   );
 }
 
+export async function renderDormancyWarning(
+  props: DormancyWarningEmailParams = getSampleDormancyWarningParams()
+): Promise<RenderedEmail> {
+  return renderEmailTemplate(
+    DormancyWarningEmail(props),
+    getDormancyWarningSubject()
+  );
+}
+
 export async function renderEmailTemplateById(
   templateId: EmailTemplateId
 ): Promise<RenderedEmail> {
@@ -104,6 +118,8 @@ export async function renderEmailTemplateById(
       return renderWelcomeEmail();
     case "property-claimed":
       return renderClaimSuccessful();
+    case "lifecycle-dormancy-warning":
+      return renderDormancyWarning();
     default:
       throw new Error(`Unknown email template: ${templateId satisfies never}`);
   }

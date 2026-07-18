@@ -217,7 +217,7 @@ Update the **Reset password** email template to PKCE format (see Supabase docs):
 | **P1 — Post-launch** | Email verification resend on `/verify-email` | Complete signup UX |
 | **P1 — Post-launch** | Session list + device revocation | Supabase does not expose full session management UI; consider custom session tracking or periodic re-auth for sensitive actions |
 | **P2 — Growth** | TOTP MFA (Supabase supports MFA) | High-value for EA accounts first |
-| **P2 — Growth** | Account deletion workflow | GDPR / user trust; Legal section placeholder ready |
+| **P2 — Growth** | Account deletion workflow | GDPR / user trust; Legal section placeholder ready — see [GDPR Launch Checklist](./GDPR_LAUNCH_CHECKLIST.md) |
 | **P3 — Later** | WebAuthn / passkeys | Convenience after MFA baseline |
 | **P3 — Later** | Solicitor account type activation | Routing exists; product not built |
 

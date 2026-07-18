@@ -23,7 +23,14 @@ export const ROUTES = {
   agentHome: "/agent",
   agentOriginate: "/agent/originate",
   claimProperty: "/claim",
+  privacyAdmin: "/admin/privacy",
+  platformAdminMfaEnroll: "/admin/mfa/enroll",
+  platformAdminMfaChallenge: "/admin/mfa/challenge",
+  platformAdminMfa: "/admin/mfa",
 } as const;
+
+/** Keynetic platform-admin internal operations (not EA branch admin). */
+export const PLATFORM_ADMIN_PREFIXES = ["/admin"] as const;
 
 /** Prefixes for account settings — any authenticated account type. */
 export const ACCOUNT_SETTINGS_PREFIXES = [
@@ -201,6 +208,26 @@ export function isAgentHomeRoute(
   );
 }
 
+export function isPlatformAdminRoute(
+  pathname: string
+): boolean {
+  return PLATFORM_ADMIN_PREFIXES.some((prefix) =>
+    matchesPrefix(pathname, prefix)
+  );
+}
+
+export function isPlatformAdminMfaRoute(pathname: string): boolean {
+  return (
+    matchesPrefix(pathname, ROUTES.platformAdminMfaEnroll) ||
+    matchesPrefix(pathname, ROUTES.platformAdminMfaChallenge) ||
+    normalizePathname(pathname) === ROUTES.platformAdminMfa
+  );
+}
+
+export function isPlatformAdminPrivilegedRoute(pathname: string): boolean {
+  return isPlatformAdminRoute(pathname) && !isPlatformAdminMfaRoute(pathname);
+}
+
 export function isAccountGatedRoute(
   pathname: string
 ): boolean {
@@ -208,7 +235,8 @@ export function isAccountGatedRoute(
     isAccountSettingsRoute(pathname) ||
     isHomeownerOnlyRoute(pathname) ||
     isSharedOperationalRoute(pathname) ||
-    isEstateAgentProtectedRoute(pathname)
+    isEstateAgentProtectedRoute(pathname) ||
+    isPlatformAdminRoute(pathname)
   );
 }
 
@@ -227,4 +255,5 @@ export const MIDDLEWARE_MATCHER = [
   "/buyer-ready/:path*",
   "/agent/:path*",
   "/estate-agents/onboarding/:path*",
+  "/admin/:path*",
 ] as const;

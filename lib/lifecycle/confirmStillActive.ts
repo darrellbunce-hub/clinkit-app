@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { STILL_ACTIVE_CONFIRMATION_CODE } from "@/lib/lifecycle/types";
 
 type ConfirmStillActiveResult =
-  | { ok: true; propertyId: number; operationalState: string }
+  | { ok: true; propertyId: number; operationalState: string; idempotent?: boolean }
   | { ok: false; error: string };
 
 /**
@@ -28,6 +28,7 @@ export async function confirmTransactionStillActive(params: {
     error?: string;
     property_id?: number;
     operational_state?: string;
+    idempotent?: boolean;
   } | null;
 
   if (!payload?.ok) {
@@ -38,6 +39,7 @@ export async function confirmTransactionStillActive(params: {
     ok: true,
     propertyId: payload.property_id ?? params.propertyId,
     operationalState: payload.operational_state ?? "active",
+    idempotent: payload.idempotent === true,
   };
 }
 

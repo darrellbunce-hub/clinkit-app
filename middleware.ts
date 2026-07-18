@@ -59,10 +59,11 @@ export async function middleware(
 
   if (!user) {
     const guardResult =
-      evaluateProtectedRouteAccess(
+      await evaluateProtectedRouteAccess(
         null,
         request.nextUrl,
-        pathname
+        pathname,
+        supabase
       );
 
     if (!guardResult.allowed) {
@@ -97,10 +98,11 @@ export async function middleware(
   }
 
   const guardResult =
-    evaluateProtectedRouteAccess(
+    await evaluateProtectedRouteAccess(
       context,
       request.nextUrl,
-      pathname
+      pathname,
+      supabase
     );
 
   if (!guardResult.allowed) {
@@ -128,5 +130,6 @@ export const config = {
     "/buyer-ready/:path*",
     "/agent/:path*",
     "/estate-agents/onboarding/:path*",
+    "/admin/:path*",
   ],
 };

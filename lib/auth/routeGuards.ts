@@ -24,10 +24,20 @@ import {
   isEstateAgentOnboardingRoute,
   isEstateAgentProtectedRoute,
   isHomeownerOnlyRoute,
+  isPlatformAdminMfaRoute,
+  isPlatformAdminPrivilegedRoute,
+  isPlatformAdminRoute,
   isSharedOperationalRoute,
   isTransactionParticipationRoute,
   ROUTES,
 } from "@/lib/auth/routes";
+import { isPlatformAdminUserId } from "@/lib/auth/platformAdminCore";
+import { evaluatePlatformAdminAccess } from "@/lib/auth/platformAdminAccess";
+import {
+  buildAdminMfaChallengePath,
+  buildAdminMfaEnrollPath,
+} from "@/lib/auth/safeAdminRedirect";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 export type RouteGuardAllow = {
   allowed: true;
@@ -276,11 +286,119 @@ function resolveAccountTypeGuard(
 /**
  * Middleware entry point: evaluate account-type rules for a protected route.
  */
-export function evaluateProtectedRouteAccess(
+export async function evaluateProtectedRouteAccess(
   context: CurrentUserContext | null,
   requestUrl: URL,
-  pathname: string
-): RouteGuardResult {
+  pathname: string,
+  supabase?: SupabaseClient
+): Promise<RouteGuardResult> {
+  if (isPlatformAdminRoute(pathname)) {
+    if (!context) {
+      const loginUrl = buildLoginRedirectUrl(
+        requestUrl,
+        ROUTES.homeownerLogin,
+        buildProtectedRouteNextDestination(requestUrl, pathname)
+      );
+
+      return deny(
+        `${loginUrl.pathname}${loginUrl.search}`,
+        "platform_admin_authentication_required"
+      );
+    }
+
+    const isAdmin = await isPlatformAdminUserId(context.user.id);
+    if (!isAdmin) {
+      return deny("/404", "platform_admin_forbidden");
+    }
+
+    if (!supabase) {
+      return allow();
+    }
+
+    const access = await evaluatePlatformAdminAccess(supabase);
+    const nextDestination = buildProtectedRouteNextDestination(
+      requestUrl,
+      pathname
+    );
+
+    if (isPlatformAdminMfaRoute(pathname)) {
+      if (pathname.startsWith(ROUTES.platformAdminMfaEnroll)) {
+        if (access.kind === "privileged_allowed") {
+          return deny(
+            sanitizeAdminReturnPath(requestUrl) ?? ROUTES.privacyAdmin,
+            "mfa_already_satisfied"
+          );
+        }
+        if (access.kind === "mfa_challenge_required") {
+          return deny(
+            buildAdminMfaChallengePath(nextDestination),
+            "mfa_challenge_required"
+          );
+        }
+        return allow();
+      }
+
+      if (pathname.startsWith(ROUTES.platformAdminMfaChallenge)) {
+        if (access.kind === "privileged_allowed") {
+          return deny(
+            sanitizeAdminReturnPath(requestUrl) ?? ROUTES.privacyAdmin,
+            "mfa_already_satisfied"
+          );
+        }
+        if (access.kind === "mfa_enrollment_required") {
+          return deny(
+            buildAdminMfaEnrollPath(nextDestination),
+            "mfa_enrollment_required"
+          );
+        }
+        if (access.kind === "mfa_challenge_required") {
+          return allow();
+        }
+        return deny("/404", "platform_admin_mfa_forbidden");
+      }
+
+      if (normalizeAdminPathname(pathname) === ROUTES.platformAdminMfa) {
+        if (access.kind !== "privileged_allowed") {
+          if (access.kind === "mfa_enrollment_required") {
+            return deny(
+              buildAdminMfaEnrollPath(nextDestination),
+              "mfa_enrollment_required"
+            );
+          }
+          if (access.kind === "mfa_challenge_required") {
+            return deny(
+              buildAdminMfaChallengePath(nextDestination),
+              "mfa_challenge_required"
+            );
+          }
+          return deny("/404", "platform_admin_mfa_forbidden");
+        }
+        return allow();
+      }
+    }
+
+    if (isPlatformAdminPrivilegedRoute(pathname)) {
+      if (access.kind === "privileged_allowed") {
+        return allow();
+      }
+      if (access.kind === "mfa_enrollment_required") {
+        return deny(
+          buildAdminMfaEnrollPath(nextDestination),
+          "mfa_enrollment_required"
+        );
+      }
+      if (access.kind === "mfa_challenge_required") {
+        return deny(
+          buildAdminMfaChallengePath(nextDestination),
+          "mfa_challenge_required"
+        );
+      }
+      return deny("/404", "platform_admin_forbidden");
+    }
+
+    return allow();
+  }
+
   const authGuard =
     requireAuthenticatedForRequest(
       context,
@@ -312,6 +430,24 @@ export function evaluateProtectedRouteAccess(
   }
 
   return allow();
+}
+
+function normalizeAdminPathname(pathname: string): string {
+  if (pathname.length > 1 && pathname.endsWith("/")) {
+    return pathname.slice(0, -1);
+  }
+  return pathname;
+}
+
+function sanitizeAdminReturnPath(requestUrl: URL): string | null {
+  const next = requestUrl.searchParams.get("next");
+  if (!next) {
+    return null;
+  }
+  if (!next.startsWith("/") || next.startsWith("//")) {
+    return null;
+  }
+  return next;
 }
 
 /**

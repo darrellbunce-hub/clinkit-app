@@ -4,8 +4,10 @@ import {
   markEmailEventSent,
   queueEmailEvent,
 } from "@/lib/communications/emailEvents";
+import { buildDormancyWarningPropertyUrl } from "@/lib/communications/dormancyWarningLinks";
 import {
   renderClaimSuccessful,
+  renderDormancyWarning,
   renderEstateAgentInvitation,
   renderHomeownerInvitation,
   renderPasswordReset,
@@ -14,6 +16,7 @@ import {
 import { createResendProvider } from "@/lib/communications/resend";
 import type {
   ClaimSuccessfulEmailParams,
+  DormancyWarningEmailParams,
   EmailEventMetadata,
   EmailProvider,
   EmailTemplateId,
@@ -96,6 +99,14 @@ async function deliverEmail(
     } catch (error) {
       console.error("[communications] Email event update exception:", error);
     }
+  }
+
+  if (result.ok && result.sent) {
+    return { ...result, eventId };
+  }
+
+  if (!result.ok) {
+    return { ...result, eventId };
   }
 
   return result;
@@ -196,6 +207,36 @@ export async function sendClaimSuccessful(
     },
     {
       template: "property-claimed",
+      metadata,
+    }
+  );
+}
+
+export function buildDormancyWarningEmailParams(params: {
+  to: string;
+  propertyId: number;
+}): DormancyWarningEmailParams {
+  return {
+    to: params.to,
+    confirmationLink: buildDormancyWarningPropertyUrl(params.propertyId),
+  };
+}
+
+export async function sendDormancyWarningEmail(
+  params: DormancyWarningEmailParams,
+  metadata?: EmailEventMetadata
+): Promise<SendEmailResult> {
+  const rendered = await renderDormancyWarning(params);
+
+  return deliverEmail(
+    {
+      to: params.to,
+      subject: rendered.subject,
+      html: rendered.html,
+      text: rendered.text,
+    },
+    {
+      template: "lifecycle-dormancy-warning",
       metadata,
     }
   );

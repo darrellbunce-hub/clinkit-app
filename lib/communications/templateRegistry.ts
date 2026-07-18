@@ -45,6 +45,14 @@ export const EMAIL_TEMPLATE_REGISTRY: EmailTemplateDefinition[] = [
     available: true,
   },
   {
+    id: "lifecycle-dormancy-warning",
+    title: "Dormancy Warning",
+    description:
+      "Sent when a connected property transaction enters dormancy warning and needs still-active confirmation.",
+    category: "transactional",
+    available: true,
+  },
+  {
     id: "chain-update",
     title: "Chain Update",
     description: "Future template — chain progress updates.",

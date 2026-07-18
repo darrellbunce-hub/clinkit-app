@@ -4,10 +4,12 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { buildAnonymisedAnalyticsSnapshot } from "@/lib/lifecycle/analyticsSnapshot";
 import { getLifecycleConfig } from "@/lib/lifecycle/config";
+import { processDormancyWarningNotifications } from "@/lib/lifecycle/dormancyWarningNotifications";
 import { evaluatePropertyLifecycleFromContext } from "@/lib/lifecycle/evaluate";
 import {
   PROPERTY_LIFECYCLE_ACTION,
   PROPERTY_LIFECYCLE_SCENARIO,
+  PROPERTY_OPERATIONAL_STATE,
   type PropertyAnalyticsSnapshotPayload,
   type PropertyLifecycleAction,
   type PropertyLifecycleContext,
@@ -31,6 +33,9 @@ export type ApplyLifecyclePlanResult = {
   appliedActions: PropertyLifecycleAction[];
   skippedActions: PropertyLifecycleAction[];
   errors: Array<{ action: PropertyLifecycleAction; error: string }>;
+  dormancyWarningNotifications?: Awaited<
+    ReturnType<typeof processDormancyWarningNotifications>
+  >;
 };
 
 function scenarioForAction(
@@ -198,6 +203,33 @@ export async function applyLifecyclePlan(params: {
     appliedActions.push(action);
   }
 
+  let dormancyWarningNotifications:
+    | Awaited<ReturnType<typeof processDormancyWarningNotifications>>
+    | undefined;
+
+  const shouldProcessDormancyNotifications =
+    appliedActions.includes(PROPERTY_LIFECYCLE_ACTION.enterDormancyWarning) ||
+    params.evaluation.context.operationalState ===
+      PROPERTY_OPERATIONAL_STATE.dormancyWarning;
+
+  if (shouldProcessDormancyNotifications) {
+    try {
+      dormancyWarningNotifications = await processDormancyWarningNotifications({
+        supabase: params.supabase,
+        sourcePropertyId: params.evaluation.propertyId,
+        workerRunId,
+      });
+    } catch (error) {
+      errors.push({
+        action: PROPERTY_LIFECYCLE_ACTION.enterDormancyWarning,
+        error:
+          error instanceof Error
+            ? error.message
+            : "dormancy_warning_notification_failed",
+      });
+    }
+  }
+
   return {
     propertyId: params.evaluation.propertyId,
     workerRunId,
@@ -205,6 +237,7 @@ export async function applyLifecyclePlan(params: {
     appliedActions,
     skippedActions,
     errors,
+    dormancyWarningNotifications,
   };
 }
 
@@ -281,6 +314,25 @@ export async function runPropertyLifecycleWorkerBatch(
       );
 
       if (evaluation.plannedActions.length === 0) {
+        let dormancyWarningNotifications:
+          | Awaited<ReturnType<typeof processDormancyWarningNotifications>>
+          | undefined;
+
+        if (
+          context.operationalState === PROPERTY_OPERATIONAL_STATE.dormancyWarning
+        ) {
+          try {
+            dormancyWarningNotifications =
+              await processDormancyWarningNotifications({
+                supabase,
+                sourcePropertyId: propertyId,
+                workerRunId,
+              });
+          } catch (notificationError) {
+            errorCount += 1;
+          }
+        }
+
         skippedCount += 1;
         results.push({
           propertyId,
@@ -289,6 +341,7 @@ export async function runPropertyLifecycleWorkerBatch(
           appliedActions: [],
           skippedActions: [],
           errors: [],
+          dormancyWarningNotifications,
         });
         continue;
       }

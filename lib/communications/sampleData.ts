@@ -1,11 +1,13 @@
 import { buildAbsoluteAssetUrl } from "@/lib/communications/config";
 import type {
   ClaimSuccessfulEmailParams,
+  DormancyWarningEmailParams,
   EstateAgentInvitationEmailParams,
   HomeownerInvitationEmailParams,
   PasswordResetEmailParams,
   WelcomeEmailParams,
 } from "@/lib/communications/types";
+import { buildDormancyWarningPropertyUrl } from "@/lib/communications/dormancyWarningLinks";
 
 const SAMPLE_INVITATION_LINK =
   "https://app.keynetic.co.uk/claim?token=sample-invitation-token";
@@ -73,6 +75,13 @@ export function getSampleClaimSuccessfulParams(): ClaimSuccessfulEmailParams {
     branchName: EMAIL_SAMPLE_DATA.branchName,
     companyName: EMAIL_SAMPLE_DATA.companyName,
     dashboardLink: EMAIL_SAMPLE_DATA.dashboardLink,
+  };
+}
+
+export function getSampleDormancyWarningParams(): DormancyWarningEmailParams {
+  return {
+    to: EMAIL_SAMPLE_DATA.recipientEmail,
+    confirmationLink: buildDormancyWarningPropertyUrl(42),
   };
 }
 

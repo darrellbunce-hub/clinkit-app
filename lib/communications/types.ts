@@ -50,6 +50,7 @@ export type SendEmailResult =
       sent: true;
       provider: string;
       messageId?: string;
+      eventId?: string | null;
     }
   | {
       ok: true;
@@ -61,6 +62,7 @@ export type SendEmailResult =
       ok: false;
       sent: false;
       error: string;
+      eventId?: string | null;
     };
 
 export interface EmailProvider {
@@ -107,12 +109,18 @@ export type ClaimSuccessfulEmailParams = {
   dashboardLink: string;
 };
 
+export type DormancyWarningEmailParams = {
+  to: string;
+  confirmationLink: string;
+};
+
 export type EmailTemplateId =
   | "homeowner-invitation"
   | "estate-agent-invitation"
   | "password-reset"
   | "welcome"
-  | "property-claimed";
+  | "property-claimed"
+  | "lifecycle-dormancy-warning";
 
 export type FutureEmailTemplateId =
   | "chain-update"

@@ -63,31 +63,15 @@ export default function StartMovePage() {
 
       try {
     
-        console.log("START MOVE CLICKED");
-    
-        console.log({
-          sellingAddress,
-          sellingPostcode,
-          buyingAddress,
-          buyingPostcode,
-          notSelling,
-          notBuying,
-          searchingForProperty,
-        });
-    
         if (
           document.activeElement instanceof HTMLElement
         ) {
           document.activeElement.blur();
         }
     
-        console.log("ABOUT TO GET USER");
-    
         const {
           data: { user },
         } = await supabase.auth.getUser();
-    
-        console.log("USER RESULT", user);
     
         if (!user) {
     
@@ -97,8 +81,6 @@ export default function StartMovePage() {
     
         let accessCode =
           generateAccessCode();
-    
-        console.log("ABOUT TO CREATE CHAIN");
     
         let chainId: number | null = null;
 
@@ -124,8 +106,8 @@ export default function StartMovePage() {
 
           if (chainResult.error) {
             console.error(
-              chainResult.rpcError ??
-                chainResult.error
+              "[start-move] chain create failed:",
+              chainResult.error
             );
             return;
           }
@@ -137,25 +119,16 @@ export default function StartMovePage() {
 
         if (chainId == null) {
           console.error(
-            "Chain create failed after retries"
+            "[start-move] chain create failed after retries"
           );
           return;
         }
-    
-        console.log(
-          "CHAIN RESULT",
-          { id: chainId, accessCode }
-        );
     
         let sellingPropertyId =
           null;
 
         // SELLING PROPERTY
         if (!notSelling && sellingAddress) {
-          console.log(
-            "CHECKING EXISTING SELLING PROPERTY"
-          );
-    
           const {
             data: sellingExists,
           } = await supabase.rpc(
@@ -200,10 +173,6 @@ export default function StartMovePage() {
     
           }
     
-          console.log(
-            "ABOUT TO INSERT SELLING PROPERTY"
-          );
-    
           const {
             data: sellingProperty,
             error: sellingError,
@@ -241,15 +210,12 @@ export default function StartMovePage() {
             .select()
             .single();
     
-          console.log(
-            "SELLING RESULT",
-            sellingProperty,
-            sellingError
-          );
-    
           if (sellingError) {
     
-            console.error(sellingError);
+            console.error(
+              "[start-move] selling property insert failed:",
+              sellingError.message
+            );
     
     
             return;
@@ -268,7 +234,11 @@ export default function StartMovePage() {
               });
 
             if (sellerMemberError || !sellerGrant.ok) {
-              console.error(sellerMemberError ?? sellerGrant);
+              console.error(
+                "[start-move] operational homeowner grant failed:",
+                sellerMemberError?.message ??
+                  (!sellerGrant.ok ? sellerGrant.error : "unknown_error")
+              );
               return;
             }
           }
@@ -277,11 +247,6 @@ export default function StartMovePage() {
         let buyerReadyPropertyId = null;
         // BUYING PROPERTY
         if (!notBuying && buyingAddress) {
-          
-          console.log(
-            "CHECKING EXISTING BUYING PROPERTY"
-          );
-    
           const {
             data: buyingExists,
           } = await supabase.rpc(
@@ -326,10 +291,6 @@ export default function StartMovePage() {
     
           }
     
-          console.log(
-            "ABOUT TO INSERT BUYING PROPERTY"
-          );
-    
           const {
             data: buyingProperty,
             error: buyingError,
@@ -367,15 +328,12 @@ export default function StartMovePage() {
             .select()
             .single();
     
-          console.log(
-            "BUYING RESULT",
-            buyingProperty,
-            buyingError
-          );
-    
           if (buyingError) {
     
-            console.error(buyingError);
+            console.error(
+              "[start-move] buying property insert failed:",
+              buyingError.message
+            );
   
     
             return;
@@ -392,7 +350,11 @@ export default function StartMovePage() {
               });
 
             if (buyerMemberError || !buyerGrant.ok) {
-              console.error(buyerMemberError ?? buyerGrant);
+              console.error(
+                "[start-move] operational homeowner grant failed:",
+                buyerMemberError?.message ??
+                  (!buyerGrant.ok ? buyerGrant.error : "unknown_error")
+              );
               return;
             }
           }
@@ -416,7 +378,10 @@ export default function StartMovePage() {
             );
 
           if (!attachResult.ok) {
-            console.error(attachResult.error);
+            console.error(
+              "[start-move] searching placeholder attach failed:",
+              attachResult.error
+            );
             return;
           }
         }
@@ -447,16 +412,15 @@ export default function StartMovePage() {
   });
         
         }
-        console.log(
-          "REDIRECTING TO CHAIN"
-        );
-    
         window.location.href =
           `/chain/${chainId}?refresh=${Date.now()}`;
     
       } catch (error) {
     
-        console.error(error);
+        console.error(
+          "[start-move] unexpected error:",
+          error instanceof Error ? error.message : "unknown_error"
+        );
     
     
       }

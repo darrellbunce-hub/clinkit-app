@@ -2,6 +2,8 @@
 
 Controlled release of operational participation without deleting transaction history, analytics, or audit records.
 
+**This is not GDPR Right to Erasure.** See [GDPR Right to Erasure Architecture](./GDPR_RIGHT_TO_ERASURE_ARCHITECTURE.md).
+
 **Migration:** `supabase/migrations/20260714160000_participation_delink.sql`  
 **Service:** `lib/ownership/participationDelink.ts`  
 **UI:** Property page + Agent command centre cards

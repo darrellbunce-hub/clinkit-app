@@ -182,25 +182,11 @@ export default function ChainPage() {
           setBuyerReadySummaries([]);
     
         }
-    
-        console.log(
-          "BUYER READY SUMMARIES",
-          summaryData,
-          summaryError
-        );
       }
     
       loadBuyerReadySummaries();
     
     }, [chainId]);
-    console.log("CHAIN ID", chainId);
-
-    console.log(
-      "PROPERTY CHAIN IDS",
-      properties.map(
-        (property) => property.chainId
-      )
-    );
     
     const chainProperties =
 
@@ -215,44 +201,9 @@ export default function ChainPage() {
           b.chainPosition
       );
 
-  const chainPropertiesLooseMatch =
-    properties.filter(
-      (property) =>
-        Number(property.chainId) ===
-        Number(chainId)
-    );
-
-  console.log("OPERATIONAL_POSITION_TIMING", {
-    phase:
-      chainProperties.length > 0
-        ? "chainProperties_loaded"
-        : "chainProperties_empty",
-    propertiesCount: properties.length,
-    chainPropertiesCount: chainProperties.length,
-    chainPropertiesLooseMatchCount:
-      chainPropertiesLooseMatch.length,
-    chainIdStrictFilterMismatch:
-      chainPropertiesLooseMatch.length > 0 &&
-      chainProperties.length === 0,
-    chainId,
-    chainIdType: typeof chainId,
-    currentUserId: currentUserId ?? null,
-    buyerReadySummariesCount:
-      buyerReadySummaries.length,
-  });
-
-  console.log(
-    "CHAIN_PROPERTIES_COUNT",
-    chainProperties.length
-  );
   const topology = buildChainTopology(
     chainProperties,
     null
-  );
-
-  console.log(
-    "CHAIN PAGE BUYER READY SUMMARIES",
-    buyerReadySummaries
   );
 
       const recentActivities =
@@ -281,10 +232,6 @@ export default function ChainPage() {
         new Date(
           a.timestamp || 0
         ).getTime()
-    );
-    console.log(
-      "RECENT ACTIVITIES",
-      recentActivities
     );
 
   const currentChain =
@@ -341,17 +288,10 @@ export default function ChainPage() {
       chainNodes: chainNodes as OperationalBuyerReadyNode[],
     });
 
-  console.log(
-    "OPERATIONAL_POSITION_RESULT",
-    operationalPositionResult
-  );
-
   if (operationalPositionResult.ambiguity) {
     console.warn(
-      "Operational position ambiguity",
-      operationalPositionResult.ambiguity,
-      chainId,
-      currentUserId
+      "[chain] operational position ambiguity for chain",
+      chainId
     );
   }
 
@@ -399,85 +339,11 @@ export default function ChainPage() {
       ? operationalPosition.propertyId
       : null;
 
-  console.log(
-    "SALE_OPERATIONAL_PROPERTY_ID",
-    saleOperationalPropertyId
-  );
-
   const buyerReadyForAnchor =
     findBuyerReadySummaryForAnchor(
       buyerReadySummaries,
       saleOperationalPropertyId
     );
-
-  console.log("BUYER_READY_ANCHOR_DEBUG", {
-    phase:
-      chainProperties.length > 0
-        ? "chainProperties_loaded"
-        : "chainProperties_empty",
-    propertiesCount: properties.length,
-    chainPropertiesCount: chainProperties.length,
-    currentUserId: currentUserId ?? null,
-    insertedLinkedPropertyId:
-      buyerReadySummaries[0]?.linked_property_id ?? null,
-    insertedLinkedPropertyIdType:
-      buyerReadySummaries[0]?.linked_property_id != null
-        ? typeof buyerReadySummaries[0].linked_property_id
-        : null,
-    operationalSalePropertyId:
-      saleOperationalPropertyId,
-    operationalSalePropertyIdType:
-      saleOperationalPropertyId != null
-        ? typeof saleOperationalPropertyId
-        : null,
-    operationalPositionKind:
-      operationalPosition?.kind ?? null,
-    operationalPositionPropertyId:
-      operationalPosition?.kind === "sale"
-        ? operationalPosition.propertyId
-        : null,
-    summaryLinkedPropertyIds:
-      buyerReadySummaries.map(
-        (summary) => summary.linked_property_id
-      ),
-    strictComparisons:
-      buyerReadySummaries.map((summary) => ({
-        summaryLinkedPropertyId:
-          summary.linked_property_id,
-        operationalSalePropertyId:
-          saleOperationalPropertyId,
-        strictEquals:
-          summary.linked_property_id ===
-          saleOperationalPropertyId,
-        numberEquals:
-          Number(summary.linked_property_id) ===
-          Number(saleOperationalPropertyId),
-        typeofSummaryLinked:
-          typeof summary.linked_property_id,
-        typeofOperationalSale:
-          typeof saleOperationalPropertyId,
-      })),
-    buyerReadyForAnchorId:
-      buyerReadyForAnchor?.id ?? null,
-    sellerHopProperties:
-      chainProperties
-        .filter(
-          (property) =>
-            property.currentUserRole ===
-              "seller" &&
-            property.isOwnProperty
-        )
-        .map((property) => ({
-          id: property.id,
-          idType: typeof property.id,
-          relationship_type:
-            property.relationship_type,
-          chainPosition:
-            property.chainPosition,
-          buyer_connected:
-            property.buyer_connected,
-        })),
-  });
 
   const buyerReadySummaryForIntelligence =
     buyerReadyForAnchor ??
@@ -521,11 +387,6 @@ export default function ChainPage() {
     estimatedChainCompletion,
     bottleneckProperty,
   } = intelligence;
-  
-  console.log(
-    "CHAIN TOPOLOGY",
-    topology
-  );
 
   const chainPropertiesForCompletion =
     mapToOperationalProperties(
