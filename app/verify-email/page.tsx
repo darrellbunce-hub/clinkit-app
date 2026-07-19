@@ -179,7 +179,7 @@ function VerifyEmailContent() {
               <br />
               • Join existing transactions
               <br />
-              • Track progression in real time
+              • Follow your move with live shared updates
             </p>
           </div>
 

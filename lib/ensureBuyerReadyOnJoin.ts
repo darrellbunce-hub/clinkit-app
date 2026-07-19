@@ -1,7 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-/** Matches start-move buyer_ready defaults. */
-const BUYER_READY_DEFAULT_STAGE = "mortgage_preparation";
+import { BUYER_READY_STAGES } from "@/data/buyerReadyStages";
+import { stageTransitionTimestamp } from "@/lib/chainIntelligence/stageClock";
+
+/** New records use the first UI-visible Buyer Ready stage. */
+const BUYER_READY_DEFAULT_STAGE =
+  BUYER_READY_STAGES[0]?.value ?? "mortgage_in_principle";
 
 export type EnsureBuyerReadyOnJoinResult =
   | { ok: true; created: boolean; nodeId?: number }
@@ -64,7 +68,8 @@ export async function ensureBuyerReadyOnJoin(
         position: 0,
         stage: BUYER_READY_DEFAULT_STAGE,
         status: "healthy",
-        progress: 10,
+        progress: BUYER_READY_STAGES[0]?.progress ?? 10,
+        stage_entered_at: stageTransitionTimestamp(),
       })
       .select("id")
       .single();

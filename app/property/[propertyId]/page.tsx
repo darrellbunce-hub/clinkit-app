@@ -42,6 +42,9 @@ import {
   resolveSubjectOperationalPosition,
 } from "@/lib/operationalSubject";
 import { getEstateAgentManagementModeForOperationalAssignment } from "@/lib/estateAgent/managementModePresentation";
+import { computeScopeEstimatedCompletionWindow } from "@/lib/chainIntelligence/scopeEstimate";
+import { resolvePropertyStageClock } from "@/lib/chainIntelligence/stageClock";
+import { EstimatedCompletionWindowPanel } from "@/components/chainIntelligence/EstimatedCompletionWindowPanel";
 import OperationalCompletionDatePanel from "@/components/OperationalCompletionDatePanel";
 import PropertyEstateAgentAssignment from "@/components/estate-agents/PropertyEstateAgentAssignment";
 import ParticipationDelinkPanel from "@/components/participation/ParticipationDelinkPanel";
@@ -455,46 +458,28 @@ const completedStages =
   );
  
 
-let estimatedCompletion =
-  "16–20 weeks remaining";
+const propertyClock = resolvePropertyStageClock({
+  stage: currentProperty.stage,
+  persistedStageEnteredAt:
+    (currentProperty as { stage_entered_at?: string | null })
+      .stage_entered_at ?? null,
+  activities: currentProperty.activities,
+});
 
-const progress =
-  currentStage?.progress || 0;
-
-if (progress >= 20) {
-  estimatedCompletion =
-    "12–16 weeks remaining";
-}
-
-if (progress >= 40) {
-  estimatedCompletion =
-    "8–12 weeks remaining";
-}
-
-if (progress >= 60) {
-  estimatedCompletion =
-    "4–8 weeks remaining";
-}
-
-if (progress >= 80) {
-  estimatedCompletion =
-    "1–3 weeks remaining";
-}
-
-if (activeDelayReport) {
-
-  estimatedCompletion =
-    `${estimatedCompletion} (delay detected)`;
-}
-
-if (
-  !isCompletionLifecycleFrozen &&
-  propertyLastUpdatedDays > STALE_DAYS_PAGE_ALERT
-) {
-
-  estimatedCompletion =
-    `${estimatedCompletion} (stale activity)`;
-}
+const estimatedCompletion = computeScopeEstimatedCompletionWindow({
+  propertyStage: currentProperty.stage,
+  propertyStageEnteredAt: propertyClock.stageEnteredAt,
+  propertyClockQuality: propertyClock.clockQuality,
+  propertyOperationalState: activeDelayReport
+    ? "explicit_delay"
+    : currentProperty.status === "blocked"
+      ? "blocked"
+      : currentProperty.status === "broken_connection"
+        ? "broken_connection"
+        : currentProperty.status === "pending_connection"
+          ? "pending_connection"
+          : "normal",
+});
 async function handleStructuredUpdate() {
       if (!updateType) {
         return;
@@ -901,19 +886,11 @@ if (
 <>
 {/* Estimated Completion */}
 <div className="mt-10 bg-blue-50 border border-blue-200 rounded-3xl p-6">
-
-  <p className="text-sm font-medium text-blue-700">
-    Estimated Completion Window
-  </p>
-
-  <h3 className="mt-3 text-3xl font-bold text-slate-900">
-    {estimatedCompletion}
-  </h3>
-
-  <p className="mt-3 text-slate-600">
-    Estimated timelines are based on current transaction stage, reported delays and recent chain activity.
-  </p>
-
+  <EstimatedCompletionWindowPanel
+    rawWindow={estimatedCompletion}
+    title="Estimated Completion Window"
+    titleClassName="text-blue-700"
+  />
 </div>
 {/* Operational Info */}
 <div className="grid md:grid-cols-2 gap-8 mt-10">
@@ -1122,15 +1099,15 @@ if (
           </button>
 
         </div>
-{/* Break Chain Connection */}
+{/* Disconnect from chain */}
 <div className={`mt-8 bg-white rounded-3xl shadow-sm border border-red-200 ${CARD_PADDING_CLASS}`}>
 
   <h2 className="text-3xl font-bold text-slate-900">
-    Break Chain Connection
+    Disconnect from chain
   </h2>
 
   <p className="mt-4 text-slate-600 max-w-2xl">
-    This should only be used after discussions with estate agents or solicitors. Breaking a chain connection may impact confidence scoring and overall chain progression.
+    Use this only after discussions with estate agents or solicitors. Disconnecting affects the Keynetic connection between properties, not your real-world property transaction. It may impact confidence scoring and overall chain progression.
   </p>
 
   <select
@@ -1144,7 +1121,7 @@ if (
   >
 
     <option value="">
-      Select break reason
+      Select disconnect reason
     </option>
 
     <option value="buyer_side">
@@ -1172,7 +1149,7 @@ if (
     className="mt-6 bg-red-600 hover:bg-red-700 text-white px-6 py-4 rounded-2xl font-semibold transition"
   >
 
-    Break Chain Connection
+    Disconnect from chain
 
   </button>
 

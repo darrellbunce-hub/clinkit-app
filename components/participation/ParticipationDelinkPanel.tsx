@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import ParticipationDelinkConfirmModal from "@/components/participation/ParticipationDelinkConfirmModal";
@@ -18,6 +19,7 @@ import {
   PARTICIPATION_DELINK_PANEL_DESCRIPTION,
   PARTICIPATION_DELINK_PANEL_TITLE,
 } from "@/lib/ownership/participationDelinkPresentation";
+import { LEGAL_ROUTES, PRIVACY_EMAIL, PRIVACY_MAILTO } from "@/lib/legal/constants";
 import type { ParticipationDelinkOperation } from "@/lib/ownership/participationDelinkTypes";
 import type { ParticipationDelinkReasonCode } from "@/lib/ownership/participationDelinkReasonCodes";
 import { supabase } from "@/lib/supabase";
@@ -150,6 +152,25 @@ export default function ParticipationDelinkPanel({
 
         <p className="mt-2 text-slate-600">
           {PARTICIPATION_DELINK_PANEL_DESCRIPTION}
+        </p>
+
+        <p className="mt-3 text-sm text-slate-500">
+          Leaving a transaction is separate from requesting deletion of
+          personal data. See our{" "}
+          <Link
+            href={LEGAL_ROUTES.privacy}
+            className="font-medium text-slate-700 underline underline-offset-2"
+          >
+            Privacy Policy
+          </Link>{" "}
+          or email{" "}
+          <a
+            href={PRIVACY_MAILTO}
+            className="font-medium text-slate-700 underline underline-offset-2"
+          >
+            {PRIVACY_EMAIL}
+          </a>
+          .
         </p>
 
         {successMessage ? (

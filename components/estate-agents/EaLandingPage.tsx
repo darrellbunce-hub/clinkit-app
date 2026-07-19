@@ -18,6 +18,7 @@ import {
 import Link from "next/link";
 
 import Logo from "@/components/Logo";
+import { LegalFooterLinks } from "@/components/legal/LegalDocumentPage";
 import { MARKETING_SECTION_TITLE_CLASS } from "@/components/mobileStandards";
 import { ROUTES } from "@/lib/auth/routes";
 import {
@@ -49,7 +50,7 @@ const outcomes = [
   {
     icon: Clock3,
     title: "Reduce chasing",
-    text: "Stop repeating status calls. See what needs attention before the phone rings — whether your client started on Keynetic or your branch did.",
+    text: "Designed to help reduce routine status calls. See what may need attention before the phone rings — whether your client started on Keynetic or your branch did.",
   },
   {
     icon: MessageSquare,
@@ -78,6 +79,7 @@ const problems = [
   "Homeowners wait for updates while agents chase progress across email and spreadsheets",
   "No single operational view when collaboration depends on one side signing up first",
   "CRM records the deal — but not live, shared chain coordination with the client",
+  "Assuming the whole chain must connect before anyone benefits from visibility",
 ];
 
 const solutions = [
@@ -85,6 +87,7 @@ const solutions = [
   "Homeowners can use Keynetic independently and invite your branch when ready",
   "Your branch can create properties and invite clients — or join moves they started",
   "Everyone ends on the same shared operational workspace, alongside your CRM",
+  "Useful visibility begins with connected parts of the chain — and improves as more connects",
 ];
 
 const entryPaths = [
@@ -122,8 +125,8 @@ const comingSoon = [
   },
   {
     icon: Building2,
-    title: "Regional benchmarking",
-    text: "Compare progression pace against anonymised regional benchmarks.",
+    title: "Regional operational insights",
+    text: "Compare progression pace against regional operational insights — planned for a future release.",
   },
   {
     icon: ShieldCheck,
@@ -169,6 +172,10 @@ const faqs = [
   {
     title: "When does billing start?",
     text: "Register your branch now to be ready for client invitations and founding branch pricing. Billing will be enabled as subscriptions go live — founding rates are reserved for early adopters.",
+  },
+  {
+    title: "Does the whole chain need to be connected?",
+    text: "No. Keynetic can provide useful operational visibility before every participant is connected. Connected parts of a chain can share progress from day one, and visibility improves as more of the chain connects. Keynetic only shows information for properties and participants connected to the platform.",
   },
 ];
 
@@ -444,6 +451,23 @@ export default function EaLandingPage() {
         </div>
       </section>
 
+      {/* Partial chain value */}
+      <section className="relative overflow-hidden">
+        <div className={SECTION_CONTENT_CLASS}>
+          <SectionIntro
+            eyebrow="Partial chains"
+            title="Operational visibility before the full chain is connected"
+            description="Your branch can see progress across connected parts of a chain from day one. As more participants connect, the shared operational picture becomes more complete — without waiting for full-chain adoption."
+          />
+
+          <p className="mt-8 max-w-3xl mx-auto text-center text-lg text-slate-500 leading-relaxed">
+            Keynetic cannot show updates for participants or properties that are not
+            connected. That is normal — and connecting more of the chain over time
+            strengthens branch-level visibility.
+          </p>
+        </div>
+      </section>
+
       {/* Key benefits */}
       <section className="bg-surface-muted border-y border-surface-section-border">
         <div className={SECTION_CONTENT_CLASS}>
@@ -512,8 +536,10 @@ export default function EaLandingPage() {
               </p>
 
               <p className="mt-6 text-slate-600 leading-relaxed">
-                Limited to the first 20 paying branches. Founding branches
+                Limited to the first 20 founding branches. Founding branches
                 retain £79/month while their subscription remains active.
+                Automated billing is not yet live — registration is free while
+                commercial payment is finalised.
               </p>
 
               <ul className="mt-8 grid gap-3 sm:grid-cols-2">
@@ -533,7 +559,7 @@ export default function EaLandingPage() {
                   href={ROUTES.estateAgentSignup}
                   className={`${BTN_PRIMARY_CLASS} px-8 py-4 text-center text-lg`}
                 >
-                  Claim founding branch pricing
+                  Register your branch — free signup
                 </Link>
 
                 <Link
@@ -650,8 +676,8 @@ export default function EaLandingPage() {
           </div>
 
           <p className="mt-6 text-sm text-slate-500">
-            £79/month founding offer · Homeowners start free · Your CRM
-            stays in place
+            £79/month founding offer (billing not yet live) · Homeowners start
+            free · Your CRM stays in place
           </p>
         </div>
       </section>
@@ -706,6 +732,11 @@ export default function EaLandingPage() {
               </Link>
             </div>
           </div>
+
+          <LegalFooterLinks
+            className="mt-10 text-slate-400"
+            showEstateAgentTerms
+          />
 
           <p className="mt-10 text-sm text-slate-500">
             © {new Date().getFullYear()} Keynetic. Collaboration that

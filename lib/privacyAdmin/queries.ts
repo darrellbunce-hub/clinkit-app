@@ -4,6 +4,7 @@ import {
 } from "@/lib/gdpr";
 import type { ErasureRequestStatus } from "@/lib/gdpr/types";
 import { assertPrivacyAdminContextForRead } from "@/lib/privacyAdmin/auth";
+import { buildCompletionChecklist } from "@/lib/privacyAdmin/presentCompletionChecklist";
 import { sanitizeAuditEventDetail } from "@/lib/privacyAdmin/presentAuditEvent";
 import {
   buildImpactAssessmentFromReport,
@@ -40,6 +41,7 @@ function mapProcessorRows(
     processor: String(processor.processor ?? "unknown"),
     actionType: String(processor.action_type ?? "unknown"),
     status: String(processor.status ?? "unknown"),
+    statusCode: processor.status_code ? String(processor.status_code) : null,
     required: processor.required === true,
   }));
 }
@@ -70,7 +72,7 @@ function deriveNextRequiredSteps(params: {
       (processor) =>
         processor.required &&
         processor.processor !== "supabase_auth" &&
-        ["pending", "manual_review"].includes(processor.status)
+        ["pending", "manual_review", "processing", "failed"].includes(processor.status)
     )
   ) {
     steps.push("EXTERNAL_PROCESSOR_PENDING");
@@ -176,7 +178,7 @@ export async function listPrivacyErasureRequests(): Promise<PrivacyRequestListIt
       hasOutstandingProcessors: processors.some(
         (processor) =>
           processor.required &&
-          ["pending", "manual_review"].includes(processor.status)
+          ["pending", "manual_review", "processing", "failed"].includes(processor.status)
       ),
       completionState: deriveCompletionState(request.status as ErasureRequestStatus),
     });
@@ -263,6 +265,17 @@ export async function getPrivacyErasureRequestDetail(
     ),
   }));
 
+  const suppressionRecorded =
+    status.ok === true && status.suppression_recorded === true;
+
+  const completionChecklist = buildCompletionChecklist({
+    databaseProcessingCompletedAt: request.database_processing_completed_at,
+    suppressionRecorded,
+    authDeletionCompletedAt: request.auth_deletion_completed_at,
+    requestStatus: request.status,
+    processors,
+  });
+
   return {
     request: {
       id: request.id,
@@ -290,5 +303,7 @@ export async function getPrivacyErasureRequestDetail(
     }),
     capabilities,
     nextRequiredSteps,
+    completionChecklist,
+    suppressionRecorded,
   };
 }

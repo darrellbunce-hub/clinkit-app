@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 
 import EaMarketingShell from "@/components/estate-agents/EaMarketingShell";
 import PasswordRequirementsChecklist from "@/components/auth/PasswordRequirementsChecklist";
+import CollectionPointNotice from "@/components/legal/CollectionPointNotice";
 import { AUTH_TITLE_CLASS } from "@/components/mobileStandards";
 import { mapAuthSignUpError } from "@/lib/auth/authErrors";
 import { validateNewPassword } from "@/lib/auth/passwordPolicy";
@@ -334,6 +335,11 @@ function EstateAgentSignupContent() {
                 {errorMessage}
               </p>
             )}
+
+            <CollectionPointNotice
+              className="mt-2"
+              context="estate-agent"
+            />
 
             <button
               type="submit"

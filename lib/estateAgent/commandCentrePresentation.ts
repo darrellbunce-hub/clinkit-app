@@ -10,6 +10,7 @@ import {
   isReadyToInvitePriority,
   isUnacknowledgedInvitationDeclinedPriority,
 } from "@/lib/propertyClaim/invitationPresentation";
+import { toCustomerFacingConfidenceScore } from "@/lib/chainIntelligence/presentation";
 
 export type OperationalPriorityTier =
   | "healthy"
@@ -29,6 +30,21 @@ export type TodaysOperationsKpis = {
   completingThisWeek: number;
 };
 
+export function getCustomerFacingConfidenceScore(
+  summary: Pick<
+    AgentBranchPropertySummary,
+    "confidence_score" | "confidence_unavailable"
+  >
+): number | null {
+  if (summary.confidence_unavailable) {
+    return null;
+  }
+
+  return toCustomerFacingConfidenceScore(
+    summary.confidence_score ?? null
+  );
+}
+
 export type ClaimOverviewKpis = {
   awaitingClaim: number;
   invitationActive: number;
@@ -46,8 +62,8 @@ export type BranchHealthOverview = {
   confidenceLow: number;
 };
 
-const CONFIDENCE_HEALTHY_MIN = 70;
-const CONFIDENCE_SLOWING_MIN = 40;
+const CONFIDENCE_STRONG_MIN = 85;
+const CONFIDENCE_MONITOR_MIN = 50;
 
 const SEVERITY_RANK: Record<string, number> = {
   critical: 3,
@@ -278,8 +294,8 @@ export function computeTodaysOperationsKpis(
   ).length;
 
   const confidenceScores = activeSummaries
-    .map(
-      (summary) => summary.confidence_score
+    .map((summary) =>
+      getCustomerFacingConfidenceScore(summary)
     )
     .filter(
       (score): score is number =>
@@ -394,27 +410,34 @@ export function computeBranchHealthOverview(
         "critical"
     ).length,
     confidenceHealthy: activeSummaries.filter(
-      (summary) =>
-        typeof summary.confidence_score ===
-          "number" &&
-        summary.confidence_score >=
-          CONFIDENCE_HEALTHY_MIN
+      (summary) => {
+        const score =
+          getCustomerFacingConfidenceScore(summary);
+        return (
+          score != null &&
+          score >= CONFIDENCE_STRONG_MIN
+        );
+      }
     ).length,
     confidenceSlowing: activeSummaries.filter(
-      (summary) =>
-        typeof summary.confidence_score ===
-          "number" &&
-        summary.confidence_score >=
-          CONFIDENCE_SLOWING_MIN &&
-        summary.confidence_score <
-          CONFIDENCE_HEALTHY_MIN
+      (summary) => {
+        const score =
+          getCustomerFacingConfidenceScore(summary);
+        return (
+          score != null &&
+          score >= CONFIDENCE_MONITOR_MIN &&
+          score < CONFIDENCE_STRONG_MIN
+        );
+      }
     ).length,
     confidenceLow: activeSummaries.filter(
-      (summary) =>
-        typeof summary.confidence_score ===
-          "number" &&
-        summary.confidence_score <
-          CONFIDENCE_SLOWING_MIN
+      (summary) => {
+        const score =
+          getCustomerFacingConfidenceScore(summary);
+        return (
+          score != null && score < CONFIDENCE_MONITOR_MIN
+        );
+      }
     ).length,
   };
 }

@@ -1,32 +1,16 @@
-import { accountSectionClassName } from "@/components/account/accountStyles";
+import Link from "next/link";
 
-const PLACEHOLDER_POLICIES = [
-  {
-    title: "Terms of Service",
-    description:
-      "Platform terms governing use of Keynetic.",
-  },
-  {
-    title: "Privacy Policy",
-    description:
-      "How we collect, use, and protect your data.",
-  },
-  {
-    title: "Cookie Policy",
-    description:
-      "Information about cookies and similar technologies.",
-  },
-  {
-    title: "Data Retention Policy",
-    description:
-      "How long we retain transaction and account data.",
-  },
-  {
-    title: "Account Deletion Request",
-    description:
-      "Process for requesting permanent account removal.",
-  },
-] as const;
+import { accountSectionClassName } from "@/components/account/accountStyles";
+import {
+  LEGAL_NAV_ITEMS,
+  LEGAL_ROUTES,
+  PRIVACY_EMAIL,
+  PRIVACY_MAILTO,
+} from "@/lib/legal/constants";
+
+const POLICY_LINKS = LEGAL_NAV_ITEMS.filter(
+  (item) => item.href !== LEGAL_ROUTES.estateAgentTerms
+);
 
 export default function LegalPrivacySection() {
   return (
@@ -40,30 +24,73 @@ export default function LegalPrivacySection() {
         </h2>
 
         <p className="mt-2 text-sm text-slate-600">
-          Policy documents and account controls will be
-          published here before launch.
+          Policy documents and privacy information for Keynetic
+          users.
         </p>
 
-        <ul className="mt-6 space-y-4">
-          {PLACEHOLDER_POLICIES.map((policy) => (
-            <li
-              key={policy.title}
-              className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-4"
+        <ul className="mt-6 space-y-3">
+          {POLICY_LINKS.map((policy) => (
+            <li key={policy.href}>
+              <Link
+                href={policy.href}
+                className="block rounded-2xl border border-slate-200 bg-white px-4 py-4 transition hover:border-slate-300 hover:bg-slate-50"
+              >
+                <p className="font-medium text-slate-900">
+                  {policy.label}
+                </p>
+              </Link>
+            </li>
+          ))}
+
+          <li>
+            <Link
+              href={LEGAL_ROUTES.estateAgentTerms}
+              className="block rounded-2xl border border-slate-200 bg-white px-4 py-4 transition hover:border-slate-300 hover:bg-slate-50"
             >
               <p className="font-medium text-slate-900">
-                {policy.title}
+                Estate Agent Terms of Service
               </p>
 
               <p className="mt-1 text-sm text-slate-600">
-                {policy.description}
+                For estate agent branch subscriptions.
               </p>
-
-              <p className="mt-2 text-xs font-medium uppercase tracking-wide text-slate-400">
-                Coming soon
-              </p>
-            </li>
-          ))}
+            </Link>
+          </li>
         </ul>
+
+        <div className="mt-8 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-5">
+          <h3 className="font-semibold text-slate-900">
+            Request deletion of your personal data
+          </h3>
+
+          <p className="mt-2 text-sm text-slate-600 leading-relaxed">
+            You can request deletion of your personal data under
+            applicable data protection law. Requests are handled
+            through Keynetic&apos;s privacy process — this is not
+            instant self-service deletion.
+          </p>
+
+          <p className="mt-3 text-sm text-slate-600 leading-relaxed">
+            Leaving a transaction in the app is separate from
+            requesting erasure. See our{" "}
+            <Link
+              href={LEGAL_ROUTES.privacy}
+              className="font-medium text-slate-900 underline underline-offset-2"
+            >
+              Privacy Policy
+            </Link>{" "}
+            for details.
+          </p>
+
+          <p className="mt-4">
+            <a
+              href={PRIVACY_MAILTO}
+              className="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+            >
+              Email {PRIVACY_EMAIL}
+            </a>
+          </p>
+        </div>
       </div>
     </section>
   );

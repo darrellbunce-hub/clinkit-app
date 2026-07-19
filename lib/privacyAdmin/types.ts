@@ -1,3 +1,4 @@
+import type { CompletionChecklistView } from "@/lib/privacyAdmin/presentCompletionChecklist";
 import type { ErasureImpactReportSuccess, ErasureRequestStatus } from "@/lib/gdpr/types";
 
 export type PrivacyAdminErrorCode =
@@ -40,6 +41,7 @@ export type PrivacyProcessorActionRow = {
   processor: string;
   actionType: string;
   status: string;
+  statusCode: string | null;
   required: boolean;
 };
 
@@ -132,6 +134,8 @@ export type PrivacyRequestDetail = {
     isReadOnly: boolean;
   };
   nextRequiredSteps: string[];
+  completionChecklist: CompletionChecklistView;
+  suppressionRecorded: boolean;
 };
 
 export type PrivacyImpactReportSource = ErasureImpactReportSuccess;

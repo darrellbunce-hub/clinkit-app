@@ -97,8 +97,9 @@ const chainConfidenceLowRule: OperationalAlertRule = {
   code: "chain_confidence_low",
   evaluate: (context) => {
     if (
+      context.chainConfidenceScore == null ||
       context.chainConfidenceScore >=
-      CHAIN_CONFIDENCE_LOW_THRESHOLD
+        CHAIN_CONFIDENCE_LOW_THRESHOLD
     ) {
       return null;
     }

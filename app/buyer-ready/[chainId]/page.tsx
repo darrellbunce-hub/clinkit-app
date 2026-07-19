@@ -49,6 +49,9 @@ import {
   isChainInCompletedCompletionMode,
   isChainInScheduledCompletionMode,
 } from "@/lib/completionLifecycle";
+import { computeScopeEstimatedCompletionWindow } from "@/lib/chainIntelligence/scopeEstimate";
+import { resolveBuyerReadyStageClock } from "@/lib/chainIntelligence/stageClock";
+import { EstimatedCompletionWindowPanel } from "@/components/chainIntelligence/EstimatedCompletionWindowPanel";
 import OperationalCompletionDatePanel from "@/components/OperationalCompletionDatePanel";
 import PageHeaderBand from "@/components/theme/PageHeaderBand";
 import {
@@ -465,6 +468,9 @@ export default function BuyerReadyPage() {
       return;
     }
 
+    const stageChanged =
+      workflowNode.stage !== selectedStage.value;
+
     const { error } = await supabase
       .from("chain_nodes")
       .update({
@@ -474,6 +480,9 @@ export default function BuyerReadyPage() {
           selectedStage.progress >= 95
             ? "healthy"
             : "pending_connection",
+        ...(stageChanged
+          ? { stage_entered_at: new Date().toISOString() }
+          : {}),
       })
       .eq("id", workflowNode.id);
 
@@ -554,35 +563,31 @@ export default function BuyerReadyPage() {
       ? BUYER_READY_STAGES.slice(0, currentStageIndex + 1)
       : [];
 
-  let estimatedCompletion = "16–20 weeks remaining";
-  const progress = currentStage?.progress || 0;
+  const buyerReadyClock = resolveBuyerReadyStageClock({
+    stage: workflowNode.stage,
+    persistedStageEnteredAt:
+      (workflowNode as { stage_entered_at?: string | null })
+        .stage_entered_at ?? null,
+    activities: nodeActivities,
+  });
 
-  if (progress >= 20) {
-    estimatedCompletion = "12–16 weeks remaining";
-  }
-
-  if (progress >= 40) {
-    estimatedCompletion = "8–12 weeks remaining";
-  }
-
-  if (progress >= 60) {
-    estimatedCompletion = "4–8 weeks remaining";
-  }
-
-  if (progress >= 80) {
-    estimatedCompletion = "1–3 weeks remaining";
-  }
-
-  if (activeDelayReport) {
-    estimatedCompletion = `${estimatedCompletion} (delay detected)`;
-  }
-
-  if (
-    !isCompletionLifecycleFrozen &&
-    buyerLastUpdatedDays > 7
-  ) {
-    estimatedCompletion = `${estimatedCompletion} (stale activity)`;
-  }
+  const estimatedCompletion =
+    computeScopeEstimatedCompletionWindow({
+      propertyStage: "offer_accepted",
+      propertyStageEnteredAt: null,
+      propertyClockQuality: "unavailable",
+      includeBuyerReady: true,
+      buyerReadyStage: workflowNode.stage,
+      buyerReadyStageEnteredAt:
+        buyerReadyClock.stageEnteredAt,
+      buyerReadyClockQuality:
+        buyerReadyClock.clockQuality,
+      buyerReadyOperationalState: activeDelayReport
+        ? "explicit_delay"
+        : workflowNode.status === "blocked"
+          ? "blocked"
+          : "normal",
+    });
 
   async function handleStructuredUpdate() {
     if (!updateType || !access.canEdit) {
@@ -807,19 +812,11 @@ export default function BuyerReadyPage() {
           {!isCompletionLifecycleFrozen && (
             <>
               <div className="mt-10 bg-blue-50 border border-blue-200 rounded-3xl p-6">
-                <p className="text-sm font-medium text-blue-700">
-                  Estimated Completion Window
-                </p>
-
-                <h3 className="mt-3 text-3xl font-bold text-slate-900">
-                  {estimatedCompletion}
-                </h3>
-
-                <p className="mt-3 text-slate-600">
-                  Estimated timelines are based on current
-                  transaction stage, reported delays and recent
-                  chain activity.
-                </p>
+                <EstimatedCompletionWindowPanel
+                  rawWindow={estimatedCompletion}
+                  title="Estimated Completion Window"
+                  titleClassName="text-blue-700"
+                />
               </div>
 
               <div className="grid md:grid-cols-2 gap-8 mt-10">

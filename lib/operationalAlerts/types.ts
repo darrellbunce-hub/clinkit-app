@@ -26,7 +26,7 @@ export type PropertyAlertEvaluationContext = {
   buyerReadyDelayed: boolean;
   buyerReadyStale: boolean;
   completionAwaitingConfirmation: boolean;
-  chainConfidenceScore: number;
+  chainConfidenceScore: number | null;
   requiresReplacementBuyer: boolean;
   scheduledCompletionMode: boolean;
 };

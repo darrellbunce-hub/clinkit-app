@@ -13,7 +13,6 @@ import { MobileChainScrollRegion } from "@/components/mobile/MobileChainScrollRe
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useChain } from "@/context/ChainContext";
-import { ROUTES } from "@/lib/auth/routes";
 import { isEstateAgent } from "@/lib/accountType";
 import { supabase } from "@/lib/supabase";
 import { STAGES } from "@/data/stages";
@@ -24,8 +23,15 @@ import {
 } from "@/lib/buildChainTopology";
 import { computeChainIntelligence } from "@/lib/chainIntelligence";
 import {
+  CHAIN_CONFIDENCE_TOOLTIP,
+  CHAIN_PROGRESS_TOOLTIP,
+} from "@/lib/chainIntelligence/presentation";
+import { EstimatedCompletionWindowPanel } from "@/components/chainIntelligence/EstimatedCompletionWindowPanel";
+import { resolveBuyerReadyStageLabel } from "@/lib/chainIntelligence/buyerReadyLabels";
+import {
   CHAIN_TILE_LABEL,
   getChainTileDisplayTitle,
+  getDashboardChainTitle,
   mapToOperationalProperties,
 } from "@/lib/operationalPosition";
 import {
@@ -72,7 +78,6 @@ import {
   resolveUpstreamPurchaserState,
   shouldRenderUpstreamPurchaserBeforeProperty,
 } from "@/lib/resolveUpstreamPurchaser";
-import { BUYER_READY_STAGES } from "@/data/buyerReadyStages";
 import type {
   OperationalBuyerReadyNode,
   OperationalPosition,
@@ -105,27 +110,10 @@ function resolveOwnerBuyerReadyStageLabel(
   node: { stage?: string } | null,
   summary: ChainNodesChainSummary | null
 ): string {
-  if (summary?.public_stage_label) {
-    return summary.public_stage_label;
-  }
-
-  const stageDefinition = BUYER_READY_STAGES.find(
-    (stage) => stage.value === node?.stage
-  );
-
-  if (stageDefinition) {
-    return stageDefinition.label;
-  }
-
-  if (node?.stage) {
-    return node.stage
-      .replaceAll("_", " ")
-      .replace(/\b\w/g, (character) =>
-        character.toUpperCase()
-      );
-  }
-
-  return "Buyer Ready";
+  return resolveBuyerReadyStageLabel({
+    stage: node?.stage,
+    publicStageLabel: summary?.public_stage_label,
+  });
 }
 
 export default function ChainPage() {
@@ -370,6 +358,18 @@ export default function ChainPage() {
       buyerReadySummary:
         buyerReadySummaryForIntelligence,
       buyerReadyActivities,
+      buyerReadyNode: buyerReadyNode?.stage
+        ? {
+            id: Number(buyerReadyNode.id),
+            stage: buyerReadyNode.stage,
+            status:
+              buyerReadyNode.status ?? "healthy",
+            stageEnteredAt:
+              (buyerReadyNode as { stage_entered_at?: string | null })
+                .stage_entered_at ?? null,
+            activities: buyerReadyActivities,
+          }
+        : null,
       stages: STAGES,
       scheduledCompletionMode:
         isCompletionLifecycleFrozen,
@@ -384,6 +384,10 @@ export default function ChainPage() {
     confidenceLabel,
     confidenceColour,
     confidenceBg,
+    confidenceUnavailable,
+    confidenceUnavailableMessage,
+    coverageLabel,
+    dataCoverage,
     estimatedChainCompletion,
     bottleneckProperty,
   } = intelligence;
@@ -645,7 +649,10 @@ export default function ChainPage() {
         <div>
 
           <h1 className={PAGE_TITLE_CLASS}>
-            Chain #{chainId}
+            {getDashboardChainTitle(
+              chainId,
+              chainProperties
+            )}
           </h1>
 
         {showCompletedBanner &&
@@ -687,7 +694,11 @@ export default function ChainPage() {
           {!isCompletedCompletionMode && (
           <div className={`mt-8 ${CARD_CLASS_NO_PADDING} ${CARD_PADDING_CLASS}`}>
 
-<div className="flex items-center gap-4">
+<p className="text-sm font-medium text-slate-500">
+  Operational status
+</p>
+
+<div className="mt-3 flex items-center gap-4">
 
   <div
     className={`
@@ -705,11 +716,18 @@ export default function ChainPage() {
     `}
   >
 
-    Chain Health: {chainHealth}
+    {chainHealth}
 
   </div>
 
 </div>
+
+<p className="mt-3 text-xs text-slate-500 max-w-2xl leading-relaxed">
+  Highlights operational conditions such as stale updates, reported delays,
+  or broken connections that may require attention. Separate from Chain
+  Confidence, which reflects timing health for steps where reliable timing
+  data is available.
+</p>
 
 <p className="mt-4 text-slate-600">
   {chainHealthMessage}
@@ -764,7 +782,10 @@ export default function ChainPage() {
             </h2>
 
             <p className="text-slate-600 mt-2">
-              Overall chain completion estimate
+              How far the visible chain has moved through its tracked stages
+            </p>
+            <p className="text-xs text-slate-500 mt-2 max-w-xl">
+              {CHAIN_PROGRESS_TOOLTIP}
             </p>
           </MobilePanelHeader>
 
@@ -789,19 +810,40 @@ export default function ChainPage() {
               <div
                 className={`${confidenceBg} px-6 py-4 rounded-2xl`}
               >
-                <p className={`text-2xl sm:text-3xl font-bold ${confidenceColour}`}>
-                  {confidenceScore}%
-                </p>
+                {confidenceUnavailable ? (
+                  <>
+                    <p className="text-lg sm:text-xl font-semibold text-text-muted">
+                      Unavailable
+                    </p>
+                    <p className="text-sm mt-2 text-text-muted max-w-xs">
+                      {confidenceUnavailableMessage}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className={`text-2xl sm:text-3xl font-bold ${confidenceColour}`}>
+                      {confidenceScore}%
+                    </p>
 
-                <p className={`text-sm mt-1 ${confidenceColour}`}>
-                  {confidenceLabel}
-                </p>
+                    <p className={`text-sm mt-1 ${confidenceColour}`}>
+                      {confidenceLabel}
+                    </p>
+                  </>
+                )}
 
                 <p className="text-xs text-slate-500 mt-4 max-w-xs">
                   {isScheduledCompletionMode
                     ? COMPLETION_SCHEDULED_CONFIDENCE_NOTE
-                    : "Confidence is calculated using chain progress, recent activity, delayed updates and blocked transactions."}
+                    : CHAIN_CONFIDENCE_TOOLTIP}
                 </p>
+
+                {!confidenceUnavailable &&
+                  dataCoverage !== "full" &&
+                  coverageLabel && (
+                    <p className="text-xs text-slate-500 mt-2 max-w-xs">
+                      {coverageLabel}
+                    </p>
+                  )}
               </div>
             }
           >
@@ -815,27 +857,9 @@ export default function ChainPage() {
 <>
 {/* Estimated Chain Completion */}
 <div className={`mt-10 ${CARD_CLASS_NO_PADDING} ${CARD_PADDING_CLASS}`}>
-
-  <MobilePanelHeader
-    aside={
-      <div className="bg-blue-100 text-blue-700 px-5 py-3 rounded-2xl text-sm font-semibold whitespace-nowrap">
-        Forecast Engine
-      </div>
-    }
-  >
-    <p className="text-sm font-medium text-slate-500">
-      Estimated Chain Completion
-    </p>
-
-    <h2 className={`mt-3 ${SECTION_TITLE_CLASS}`}>
-      {estimatedChainCompletion}
-    </h2>
-
-    <p className="mt-4 text-slate-600 max-w-2xl">
-      Estimated completion is based on overall chain progression, delays, stale activity and blocked transactions.
-    </p>
-  </MobilePanelHeader>
-
+  <EstimatedCompletionWindowPanel
+    rawWindow={estimatedChainCompletion}
+  />
 </div>
 {/* Chain Bottleneck */}
 {bottleneckProperty && (
@@ -882,7 +906,8 @@ export default function ChainPage() {
           <div className="mt-10 bg-amber-100 border border-amber-300 rounded-3xl p-6">
 
             <p className="text-amber-700 font-semibold">
-              Property {staleProperties[0].id} has not updated for{" "}
+              A property at position{" "}
+              {staleProperties[0].chainPosition} has not updated for{" "}
               {staleProperties[0].lastUpdatedDays} days.
             </p>
 
@@ -1153,7 +1178,13 @@ export default function ChainPage() {
 
           <div
             className="flex items-center"
-            aria-label="Buyer ready, ready to proceed"
+            aria-label={`Buyer ready, ${resolveOwnerBuyerReadyStageLabel(
+              chainNodes.find(
+                (node) =>
+                  node.id === upstreamPurchaser.summary.id
+              ) ?? null,
+              upstreamPurchaser.summary
+            )}`}
           >
 
             <Link
@@ -1166,7 +1197,13 @@ export default function ChainPage() {
               displayTitle={
                 CHAIN_TILE_LABEL.buyerReady
               }
-              stageLabel="Ready to proceed"
+              stageLabel={resolveOwnerBuyerReadyStageLabel(
+                chainNodes.find(
+                  (node) =>
+                    node.id === upstreamPurchaser.summary.id
+                ) ?? null,
+                upstreamPurchaser.summary
+              )}
               progress={
                 upstreamPurchaser.summary.progress
               }

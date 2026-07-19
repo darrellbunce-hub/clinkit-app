@@ -815,11 +815,20 @@ if (!stageGateResult.ok) {
 
   return;
 }
+
+const stageChanged = property?.stage !== newStage;
+const stageEnteredAt = stageChanged
+  ? new Date().toISOString()
+  : undefined;
+
   const { error } =
     await supabase
       .from("properties")
       .update({
         stage: newStage,
+        ...(stageChanged
+          ? { stage_entered_at: stageEnteredAt }
+          : {}),
       })
       .eq("id", propertyId);
 

@@ -16,6 +16,7 @@ import {
   getParticipantPropertyLabel,
   resolveDashboardOperationalPropertyId,
 } from "@/lib/operationalPosition";
+import { formatConnectionStatusLabel } from "@/lib/legal/connectionStatusLabels";
 import { statusBadgeClasses } from "@/lib/theme/statusBadges";
 import {
   BTN_PRIMARY_SM_CLASS,
@@ -29,13 +30,7 @@ import {
 function formatConnectionStatus(
   status: string | null | undefined
 ): string {
-  if (!status) {
-    return "Unknown";
-  }
-
-  return status
-    .replaceAll("_", " ")
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+  return formatConnectionStatusLabel(status);
 }
 
 function formatChainState(
@@ -79,7 +74,8 @@ export default function DashboardPage() {
             </h1>
 
             <p className="text-slate-600 mt-3 text-lg">
-              Track and manage your active property chains.
+              Your active property chains — with a shared view of progress across
+              connected parts of each move.
             </p>
           </div>
 
@@ -265,7 +261,7 @@ export default function DashboardPage() {
             </h2>
 
             <p className="mt-2 text-slate-500">
-              Start a move to begin tracking your property chain progress.
+              Start a move to get a shared view of your property chain progress.
             </p>
 
             <p className="mt-4 text-slate-600">

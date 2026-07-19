@@ -14,6 +14,7 @@ import { getAccountType } from "@/lib/accountType";
 import { fetchAuthenticatedProfileAccountFields } from "@/lib/currentUserContext";
 import { ensureUserProfile } from "@/lib/profile/ensureUserProfile";
 import PasswordRequirementsChecklist from "@/components/auth/PasswordRequirementsChecklist";
+import CollectionPointNotice from "@/components/legal/CollectionPointNotice";
 import {
   mapAuthSignInError,
   mapAuthSignUpError,
@@ -342,6 +343,8 @@ export default function LoginPage() {
               : "Create Account"}
           </button>
         </form>
+
+        <CollectionPointNotice className="mt-6" context="homeowner" />
 
       </div>
 

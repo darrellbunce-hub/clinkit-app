@@ -7,6 +7,7 @@ import {
 } from "react";
 
 import EaMarketingShell from "@/components/estate-agents/EaMarketingShell";
+import CollectionPointNotice from "@/components/legal/CollectionPointNotice";
 import { AUTH_TITLE_CLASS } from "@/components/mobileStandards";
 import { ROUTES } from "@/lib/auth/routes";
 import {
@@ -339,6 +340,13 @@ export default function EstateAgentOnboardingPage() {
                   ? "Enter your agency company name. Signup is not complete until you also register your first branch in the next step."
                   : "Register the branch homeowners will assign to their properties. All fields are required."}
               </p>
+
+              {step === 1 ? (
+                <CollectionPointNotice
+                  className="mt-4"
+                  context="estate-agent"
+                />
+              ) : null}
 
               {step === 1 ? (
                 <form

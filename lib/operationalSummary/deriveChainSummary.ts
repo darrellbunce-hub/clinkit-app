@@ -67,6 +67,7 @@ function toIntelligenceProperty(
       property.activities
     ),
     activities: property.activities,
+    stageEnteredAt: property.stageEnteredAt,
   };
 }
 
@@ -99,6 +100,15 @@ export function deriveChainSummary(
     buyerReadySummary,
     buyerReadyActivities:
       buyerReadyNode?.activities ?? null,
+    buyerReadyNode: buyerReadyNode
+      ? {
+          id: buyerReadyNode.id,
+          stage: buyerReadyNode.stage,
+          status: buyerReadyNode.status,
+          stageEnteredAt: buyerReadyNode.stageEnteredAt,
+          activities: buyerReadyNode.activities,
+        }
+      : null,
     stages: STAGES,
     scheduledCompletionMode,
   });
@@ -111,7 +121,17 @@ export function deriveChainSummary(
 
   return {
     chain_id: dataset.chain.id,
-    confidence_score: intelligence.confidenceScore,
+    confidence_score: intelligence.internalConfidenceScore,
+    confidence_band: intelligence.confidenceBand,
+    confidence_unavailable: intelligence.confidenceUnavailable,
+    data_coverage_status: intelligence.dataCoverage,
+    coverage_label: intelligence.coverageLabel,
+    estimated_completion_window:
+      intelligence.estimatedChainCompletion || null,
+    next_recalculation_at: intelligence.nextRecalculationAt,
+    confidence_algorithm_version:
+      intelligence.confidenceAlgorithmVersion,
+    eta_algorithm_version: intelligence.etaAlgorithmVersion,
     health_status: mapChainHealthStatusToSlug(
       intelligence.chainHealth
     ),

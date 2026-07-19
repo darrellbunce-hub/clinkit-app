@@ -5,6 +5,8 @@
  * Shared operational routes are used by homeowners and estate agents.
  */
 
+import { PUBLIC_LEGAL_PATHS } from "@/lib/legal/constants";
+
 export const ROUTES = {
   home: "/",
   homeownerLogin: "/login",
@@ -96,6 +98,7 @@ export const PUBLIC_EXACT_PATHS = [
   ROUTES.estateAgentSignup,
   ROUTES.estateAgentLogin,
   ROUTES.estateAgentJoin,
+  ...PUBLIC_LEGAL_PATHS,
 ] as const;
 
 export function normalizePathname(

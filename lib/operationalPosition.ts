@@ -695,7 +695,7 @@ export function getDashboardChainTitle(
     }
   }
 
-  return `Chain #${chainId}`;
+  return `Property chain`;
 }
 
 export function getChainTileDisplayTitle(

@@ -98,8 +98,8 @@ function testChainSummaryMatchesIntelligence() {
 
   assert(
     chainSummary.confidence_score ===
-      intelligence.confidenceScore,
-    "confidence_score should match computeChainIntelligence"
+      intelligence.internalConfidenceScore,
+    "confidence_score should store internal timing score"
   );
 
   assert(

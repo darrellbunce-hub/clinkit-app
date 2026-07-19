@@ -10,7 +10,15 @@ export type OperationalRecommendedAction =
 
 export type ChainOperationalSummaryRecord = {
   chain_id: number;
-  confidence_score: number;
+  confidence_score: number | null;
+  confidence_band: string | null;
+  confidence_unavailable: boolean;
+  data_coverage_status: string | null;
+  coverage_label: string | null;
+  estimated_completion_window: string | null;
+  next_recalculation_at: string | null;
+  confidence_algorithm_version: string | null;
+  eta_algorithm_version: string | null;
   health_status: string;
   blocked_count: number;
   delay_count: number;
@@ -52,6 +60,7 @@ export type OperationalRefreshProperty = {
   stage: string;
   status: string;
   address: string | null;
+  stageEnteredAt: string | null;
   activities: {
     id?: number;
     timestamp: string;
@@ -68,6 +77,7 @@ export type OperationalRefreshChainNode = {
   stage: string | null;
   status: string;
   progress: number;
+  stageEnteredAt: string | null;
   activities: {
     id?: number;
     timestamp: string;

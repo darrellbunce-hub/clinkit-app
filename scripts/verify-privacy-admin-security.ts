@@ -50,6 +50,9 @@ const SENSITIVE_RPCS = [
   "get_gdpr_erasure_request_status",
   "complete_gdpr_erasure_auth_deletion",
   "update_gdpr_erasure_processor_action",
+  "record_gdpr_erasure_suppression_ledger",
+  "match_gdpr_suppression_ledger_identities",
+  "recompute_gdpr_erasure_completion",
 ] as const;
 
 type Result = { name: string; pass: boolean; detail?: string };
@@ -539,6 +542,19 @@ function sampleRpcArgs(rpcName: string, userId: string): Record<string, unknown>
         p_processor: "vercel",
         p_status: "completed",
       };
+    case "record_gdpr_erasure_suppression_ledger":
+      return {
+        p_request_id: "00000000-0000-0000-0000-000000000001",
+        p_subject_user_id_hash: "abc123",
+        p_email_identity_fingerprint: "def456",
+      };
+    case "match_gdpr_suppression_ledger_identities":
+      return {
+        p_subject_user_id_hash: "abc123",
+        p_email_identity_fingerprint: "def456",
+      };
+    case "recompute_gdpr_erasure_completion":
+      return { p_request_id: "00000000-0000-0000-0000-000000000001" };
     default:
       return {};
   }

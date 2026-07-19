@@ -1,7 +1,9 @@
 # GDPR Website & Content Review Register — Keynetic
 
-**Version:** Phase 1 — register only (no content rewrite)  
-**Related:** [Launch Checklist](./GDPR_LAUNCH_CHECKLIST.md) · [Erasure Runbook](./GDPR_ERASURE_OPERATIONAL_RUNBOOK.md)
+**Version:** Phase 1 register — cross-referenced with founder decisions  
+**Related:** [Launch Content Audit](./LAUNCH_CONTENT_AUDIT.md) · [Founder Decisions](./LAUNCH_CONTENT_FOUNDER_DECISIONS.md) · [Launch Checklist](./GDPR_LAUNCH_CHECKLIST.md)
+
+> **Note:** Founder review (FD-001–FD-037) and [Stage 2 consolidation](./LAUNCH_STAGE2_TECHNICAL_VALIDATION.md) supersede conflicting audit recommendations. **Stage 3.5** Chain Intelligence redesign required before confidence copy.
 
 ---
 

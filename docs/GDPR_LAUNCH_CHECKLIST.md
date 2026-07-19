@@ -16,6 +16,10 @@
 - [x] Phase 3 controlled execution (Development) — [GDPR_PHASE3_ERASURE_EXECUTION.md](./GDPR_PHASE3_ERASURE_EXECUTION.md)
 - [x] Phase 3B Privacy Admin UI (Development) — [GDPR_PHASE3B_PRIVACY_ADMIN.md](./GDPR_PHASE3B_PRIVACY_ADMIN.md)
 - [x] Phase 3B Privacy Admin MFA / AAL2 (Development) — [GDPR_PHASE3B_PRIVACY_ADMIN_SECURITY.md](./GDPR_PHASE3B_PRIVACY_ADMIN_SECURITY.md)
+- [x] Phase 4 suppression ledger + processor completion (Development) — [GDPR_PHASE4_BACKUP_PROCESSOR_ERASURE.md](./GDPR_PHASE4_BACKUP_PROCESSOR_ERASURE.md)
+- [ ] **Production: `GDPR_SUPPRESSION_HMAC_KEY` provisioned (secrets manager)**
+- [ ] **Production: authoritative suppression ledger export outside restored DB**
+- [ ] **Production: backup restore / re-erasure tabletop drill completed**
 - [ ] **Production: platform-admin TOTP enrolled for all operators**
 - [ ] **Production: Supabase MFA TOTP enabled; SMS MFA disabled; AAL1 session limits enabled**
 - [ ] **Production: Privacy Admin subject-lookup rate limiting (Upstash) verified**

@@ -15,6 +15,7 @@ import {
   formatManagedStageLabel,
   formatPropertyAddress,
   formatPropertyLocationLine,
+  getCustomerFacingConfidenceScore,
   getHealthStatusClasses,
   getOperationalPriorityTier,
 } from "@/lib/estateAgent/commandCentrePresentation";
@@ -178,10 +179,13 @@ export default function OperationalPropertyCard({
           showDescription
         />
 
-        {typeof summary.confidence_score ===
-        "number" ? (
+        {typeof getCustomerFacingConfidenceScore(
+          summary
+        ) === "number" ? (
           <ConfidenceBar
-            score={summary.confidence_score}
+            score={
+              getCustomerFacingConfidenceScore(summary)!
+            }
           />
         ) : null}
 

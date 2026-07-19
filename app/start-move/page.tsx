@@ -13,6 +13,7 @@ import {
   OPERATIONAL_IDENTITY_GRANT_VIA,
 } from "@/lib/ownership/grants";
 import { attachSearchingPlaceholderToSale } from "@/lib/searchingPlaceholder";
+import CollectionPointNotice from "@/components/legal/CollectionPointNotice";
 
 export default function StartMovePage() {
  
@@ -403,11 +404,13 @@ export default function StartMovePage() {
 
     position: 0,
 
-    stage: "mortgage_preparation",
+    stage: "mortgage_in_principle",
 
     status: "healthy",
 
     progress: 10,
+
+    stage_entered_at: new Date().toISOString(),
 
   });
         
@@ -446,8 +449,15 @@ export default function StartMovePage() {
         </h1>
 
         <p className="mt-3 text-lg text-slate-600">
-          Tell Keynetic about your move
+          Tell Keynetic about your move — free for homeowners. You&apos;ll get a
+          shared view of progress across connected parts of your chain as
+          participants share updates.
         </p>
+
+        <CollectionPointNotice
+          className="mt-4"
+          context="property-address"
+        />
       
  
         {/* Selling */}

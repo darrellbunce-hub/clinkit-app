@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState, useTransition } from "react";
 
+import PrivacyCompletionChecklist from "@/components/privacyAdmin/PrivacyCompletionChecklist";
 import PrivacyAuditTimeline from "@/components/privacyAdmin/PrivacyAuditTimeline";
 import PrivacyImpactReportPanel from "@/components/privacyAdmin/PrivacyImpactReportPanel";
 import PrivacyStatusBadge from "@/components/privacyAdmin/PrivacyStatusBadge";
@@ -104,6 +105,8 @@ export default function PrivacyRequestWorkspace({
         ) : null}
         <ActionMessage message={message} />
       </section>
+
+      <PrivacyCompletionChecklist checklist={detail.completionChecklist} />
 
       <section className={CARD_CLASS}>
         <h2 className="text-lg font-semibold text-slate-900">Workflow</h2>
@@ -250,22 +253,45 @@ export default function PrivacyRequestWorkspace({
               </p>
               {capabilities.canUpdateProcessors &&
               processor.processor !== "supabase_auth" &&
-              ["pending", "manual_review"].includes(processor.status) ? (
-                <ConfirmButton
-                  label={`Mark ${processor.processor} complete`}
-                  confirmText={`Confirm external ${processor.processor} erasure/review work has been completed manually.`}
-                  disabled={isPending}
-                  compact
-                  onConfirm={() =>
-                    runAction(async () =>
-                      updatePrivacyProcessorActionStatus({
-                        requestId: request.id,
-                        processor: processor.processor,
-                        status: "completed",
-                      })
-                    )
-                  }
-                />
+              ["pending", "manual_review", "processing", "failed"].includes(
+                processor.status
+              ) ? (
+                <div className="mt-3 flex flex-col gap-2">
+                  <ConfirmButton
+                    label={`Mark ${processor.processor} complete`}
+                    confirmText={`Confirm external ${processor.processor} erasure/review work has been completed manually.`}
+                    disabled={isPending}
+                    compact
+                    onConfirm={() =>
+                      runAction(async () =>
+                        updatePrivacyProcessorActionStatus({
+                          requestId: request.id,
+                          processor: processor.processor,
+                          status: "completed",
+                          statusCode: "manual_completion",
+                        })
+                      )
+                    }
+                  />
+                  {processor.processor === "vercel" ? (
+                    <ConfirmButton
+                      label="Mark Vercel covered by retention expiry"
+                      confirmText="Confirm Vercel log treatment is satisfied by provider retention expiry rather than per-user deletion."
+                      disabled={isPending}
+                      compact
+                      onConfirm={() =>
+                        runAction(async () =>
+                          updatePrivacyProcessorActionStatus({
+                            requestId: request.id,
+                            processor: processor.processor,
+                            status: "retention_expiry",
+                            statusCode: "retention_expiry",
+                          })
+                        )
+                      }
+                    />
+                  ) : null}
+                </div>
               ) : null}
             </div>
           ))}

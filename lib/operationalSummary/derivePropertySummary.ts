@@ -16,7 +16,6 @@ import {
   isChainInScheduledCompletionMode,
 } from "@/lib/completionLifecycle";
 import {
-  deriveChainSummary,
   findBuyerReadyNodeForProperty,
   getLatestActivityTimestamp,
 } from "@/lib/operationalSummary/deriveChainSummary";

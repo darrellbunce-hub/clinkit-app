@@ -11,6 +11,7 @@ import {
 import { MobileActionHeader } from "@/components/mobile/MobileLayout";
 import Navbar from "@/components/Navbar";
 import { useChain } from "@/context/ChainContext";
+import { getDashboardChainTitle } from "@/lib/operationalPosition";
 
 export default function MyChainsPage() {
   const { properties, chains } = useChain();
@@ -61,7 +62,10 @@ export default function MyChainsPage() {
                 <MobileActionHeader
                   title={
                     <h2 className={SECTION_TITLE_CLASS}>
-                      Chain #{chain.id}
+                      {getDashboardChainTitle(
+                        chain.id,
+                        chainProperties
+                      )}
                     </h2>
                   }
                   meta={

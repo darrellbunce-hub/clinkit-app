@@ -59,6 +59,9 @@ export type AgentBranchPropertySummary = {
     severity: string;
   } | null;
   confidence_score?: number | null;
+  confidence_band?: string | null;
+  confidence_unavailable?: boolean | null;
+  estimated_completion_window?: string | null;
   health_status?: string | null;
   claim_status?: string | null;
   origin_type?: string | null;

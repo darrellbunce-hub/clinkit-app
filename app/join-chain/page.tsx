@@ -284,7 +284,9 @@ function JoinChainContent() {
         </h1>
 
         <p className="mt-3 text-lg text-slate-600">
-          Enter your chain access details
+          Connect your property using the chain access code you received. You&apos;ll
+          see shared progress for connected parts of the chain — visibility improves
+          as more participants connect.
         </p>
 
         <div className={`mt-10 bg-white rounded-3xl border border-slate-200 ${CARD_PADDING_CLASS}`}>

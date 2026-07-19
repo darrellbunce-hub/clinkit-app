@@ -263,7 +263,16 @@ export async function completePrivacyAuthDeletionAction(
 export async function updatePrivacyProcessorActionStatus(input: {
   requestId: string;
   processor: string;
-  status: "pending" | "completed" | "failed" | "not_required" | "manual_review";
+  status:
+    | "pending"
+    | "manual_review"
+    | "processing"
+    | "completed"
+    | "failed"
+    | "not_required"
+    | "not_applicable"
+    | "retention_expiry";
+  statusCode?: string;
 }): Promise<PrivacyAdminActionResult<{ status: string }>> {
   const ctx = await requirePrivacyAdminContext();
   if (!ctx.ok) {
@@ -275,6 +284,8 @@ export async function updatePrivacyProcessorActionStatus(input: {
     requestId: input.requestId,
     processor: input.processor,
     status: input.status,
+    statusCode: input.statusCode ?? input.status,
+    operatorUserId: ctx.adminUserId,
   });
 
   if (result.ok !== true) {

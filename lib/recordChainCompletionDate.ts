@@ -284,6 +284,7 @@ export async function recordChainCompletionDate(
         .from("properties")
         .update({
           stage: COMPLETION_DATE_AGREED_STAGE,
+          stage_entered_at: new Date().toISOString(),
         })
         .eq("id", position.propertyId);
 
@@ -298,6 +299,7 @@ export async function recordChainCompletionDate(
           stage: COMPLETION_DATE_AGREED_STAGE,
           progress: 100,
           status: "healthy",
+          stage_entered_at: new Date().toISOString(),
         })
         .eq("id", position.nodeId);
 

@@ -589,30 +589,33 @@ export function getActionReasonBannerClasses(
   }
 }
 
+import { confidenceBand } from "@/lib/chainIntelligence/presentation";
+
 export function getConfidenceBarFillClass(
   score: number
 ): string {
-  if (score >= 70) {
-    return "bg-status-success";
-  }
+  const band = confidenceBand(score);
 
-  if (score >= 40) {
-    return "bg-status-warning";
+  switch (band) {
+    case "Strong":
+      return "bg-status-success";
+    case "Good":
+      return "bg-emerald-500";
+    case "Monitor":
+      return "bg-status-warning";
+    default:
+      return "bg-status-critical";
   }
-
-  return "bg-status-critical";
 }
 
 export function getConfidenceLabel(score: number): string {
-  if (score >= 70) {
-    return "Healthy";
+  const band = confidenceBand(score);
+
+  if (band === "Monitor") {
+    return "Monitor";
   }
 
-  if (score >= 40) {
-    return "Progress slowing";
-  }
-
-  return "Needs attention";
+  return band;
 }
 
 export function getManagedPropertyOperationalState(

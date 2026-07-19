@@ -8,6 +8,7 @@
  *   20260718130000_fix_gdpr_erasure_delink_audit.sql
  *   20260718140000_fix_gdpr_erasure_approval_and_auth_prep.sql
  *   20260718150000_fix_gdpr_redact_shared_safety_recheck.sql
+ *   20260719100000_gdpr_erasure_phase4.sql
  *
  * Usage:
  *   npx tsx scripts/verify-gdpr-erasure-execution.ts
@@ -192,6 +193,9 @@ async function advanceToApproved(admin: SupabaseClient, subjectUserId: string) {
 }
 
 loadEnvLocal();
+if (!process.env.GDPR_SUPPRESSION_HMAC_KEY?.trim()) {
+  process.env.GDPR_SUPPRESSION_HMAC_KEY = "dev-gdpr-erasure-verification-pepper";
+}
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
 const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
 const serviceRoleKey = resolveServiceRoleKey(process.env.SUPABASE_SERVICE_ROLE_KEY);
