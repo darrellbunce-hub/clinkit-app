@@ -424,6 +424,7 @@ alter table public.activities disable row level security;
 | Privacy script 11/11 | **10/11** | Not run | **Yes** |
 | EA flows tested | OK (user) | Unknown | Verify post-deploy |
 | Production Supabase probed | N/A | **Not done** | **Yes** — Phase A required |
+| Transactional email environment (§13) | Not verified | **Not done** | **Yes** — before Production launch |
 
 ### Verdict
 
@@ -433,6 +434,7 @@ alter table public.activities disable row level security;
 2. Production Supabase pre-flight + migrations applied (`10215000` → `10220000` minimum).
 3. `staging-test` (including route authorization) merged to `main` and deployed.
 4. Production verification script + manual privacy test complete.
+5. **Transactional email Pre-Launch checks complete (§13)** — including `NEXT_PUBLIC_APP_URL`, Resend configuration, Supabase Auth templates, and FD-004 legal review outcome.
 
 ---
 
@@ -444,6 +446,125 @@ alter table public.activities disable row level security;
 | Production | `main` | Production branch (**ref not in repo**) | Production |
 
 **To complete this audit:** Run §5 and §7 SQL on the Production Supabase branch in Dashboard and update the Unknown cells before go-live.
+
+---
+
+## 13. Transactional email & communications (Pre-Launch)
+
+**Recorded at Stage 5 founder sign-off (21 Jul 2026).** See also [Stage 5 report](./LAUNCH_STAGE5_COMPLETION_REPORT.md) · **FD-040** · **FD-004**.
+
+These are **configuration and legal verification** requirements — not Stage 5 implementation scope. Do **not** expose secret values in documentation.
+
+### 13.1 Application origin (`NEXT_PUBLIC_APP_URL`)
+
+| Check | Pass criteria |
+|-------|---------------|
+| Production Vercel env | `NEXT_PUBLIC_APP_URL` (or `APP_URL`) set to **approved Production Keynetic origin** (HTTPS, no trailing slash) |
+| Link generation | All Resend transactional emails use `getAppBaseUrl()` — invitation, dormancy, asset URLs |
+| Negative test | Send or render a sample invitation in Production-like config — **no** `localhost`, Development, or Preview hostnames in HTML/text links |
+| Fallback awareness | Unset env falls back to `http://localhost:3000` in code — **must not occur in Production** |
+
+### 13.2 Resend provider
+
+| Check | Pass criteria |
+|-------|---------------|
+| `RESEND_API_KEY` | Present in Production Vercel env (value not documented in repo) |
+| `EMAIL_SENDING_ENABLED` | Not set to `false` in Production unless intentionally disabled |
+| `EMAIL_FROM` | Approved sender identity (default `Keynetic <notifications@keynetic.co.uk>`) |
+| Resend domain | Sending domain verified in Resend Dashboard for Production |
+
+### 13.3 Supabase Auth email templates (manual Dashboard)
+
+Production Dashboard content must be verified **before launch** — not controlled by repository templates.
+
+| Template | Verification |
+|----------|--------------|
+| **Reset password** | Aligns with `docs/AUTH_ARCHITECTURE.md` — uses `RedirectTo` + `TokenHash` + `type=recovery` |
+| **Confirm signup** | Appropriate Keynetic branding and redirect when email verification enabled |
+
+Keynetic `emails/templates/PasswordReset.tsx` is a **reference template only**; Supabase sends production password reset.
+
+### 13.4 FD-004 — invitation address exposure (legal)
+
+| Item | Status |
+|------|--------|
+| Body — full property address | **Founder-approved** — retain |
+| Subject — full property address | **Retained for now** — **PENDING_LEGAL_REVIEW before Production launch** |
+| Action | Do **not** change body or subject automatically without legal review outcome |
+
+### 13.5 Active vs inactive templates
+
+| Status | Templates |
+|--------|-----------|
+| **Active (Production sends when enabled)** | `homeowner-invitation` · `estate-agent-invitation` · `lifecycle-dormancy-warning` |
+| **Inactive (unwired — do not describe as live)** | `welcome` · `property-claimed` (Property connected) |
+| **Future / marketing (not transactional today)** | Registry placeholders — `marketing-emails`, `invitation-reminder`, etc. |
+
+### 13.6 Pre-Production smoke (Development-safe)
+
+1. `npx tsx scripts/verify-transactional-email-content.ts`
+2. Dev preview: `/dev/emails` or `/api/dev/emails/render?template=homeowner-invitation`
+3. Confirm CTA links use configured `NEXT_PUBLIC_APP_URL` for that environment
+
+---
+
+## 14. Pre-Launch Operational Readiness programme
+
+**Recorded at Stage 6 founder sign-off (21 Jul 2026).**
+
+The **Launch Content programme** (Stages 3–6) is **FOUNDER_APPROVED_COMPLETE**. The **next programme** is **Pre-Launch Operational Readiness**.
+
+**Implementation status:** Workstream 1 (EA branch access) — **implementation complete, awaiting Development migration and founder sign-off**; other Pre-Launch items remain open.
+
+### 14.1 Launch Content programme — complete
+
+| Stage | Status |
+|-------|--------|
+| Stage 3 — Legal / privacy / content structure | **FOUNDER_APPROVED_COMPLETE** |
+| Stage 3.5 — Chain Intelligence redesign | **FOUNDER_APPROVED_COMPLETE** |
+| Stage 4 — Core content / value proposition | **FOUNDER_APPROVED_COMPLETE** |
+| Stage 5 — Transactional email content | **FOUNDER_APPROVED_COMPLETE** |
+| Stage 6 — Terminology / UX / brand polish | **FOUNDER_APPROVED_COMPLETE** — [Stage 6 report](./LAUNCH_STAGE6_COMPLETION_REPORT.md) |
+
+### 14.2 Pre-Launch Operational Readiness — open requirements
+
+These remain **open** until explicitly verified or implemented in the Pre-Launch programme. **None are marked resolved by Stage 6.**
+
+| # | Requirement | Status |
+|---|-------------|--------|
+| 1 | Professional legal review and publication approval | **OPEN** — policies **DRAFT_FOR_LEGAL_REVIEW** |
+| 2 | **FD-004** — invitation email address/subject legal review | **OPEN** — **PENDING_LEGAL_REVIEW** |
+| 3 | **privacy@** mailbox operational verification | **OPEN** |
+| 4 | Provider / DPA verification | **OPEN** |
+| 5 | Production environment / secrets review | **OPEN** |
+| 6 | **`NEXT_PUBLIC_APP_URL`** Production verification (§13.1) | **OPEN** |
+| 7 | **Resend** Production configuration (§13.2) | **OPEN** |
+| 8 | **Supabase Auth** Production email templates (§13.3) | **OPEN** |
+| 9 | EA branch user access revocation | **IMPLEMENTATION_COMPLETE_AWAITING_DEVELOPMENT_MIGRATION** — [Workstream 1 audit](./PRELAUNCH_EA_ACCESS_AND_BRANCH_MEMBERSHIP_AUDIT.md) · [implementation report](./PRELAUNCH_EA_ACCESS_IMPLEMENTATION_REPORT.md) |
+| 10 | EA owner transfer / continuity | **IMPLEMENTATION_COMPLETE_AWAITING_DEVELOPMENT_MIGRATION** — `transfer_ea_branch_ownership` RPC + one-Owner invariant |
+| 11 | Production observability and incident alerting | **OPEN** |
+| 12 | Product / business operational metrics | **OPEN** |
+| 13 | Privacy-conscious website analytics decision | **OPEN** |
+| 14 | Run-cost monitoring and cost governance | **OPEN** |
+| 15 | **Stripe / billing architecture** (FD-036) | **OPEN** — separate gated workstream |
+| 16 | Refund / cancellation / dispute procedures | **OPEN** |
+| 17 | Final security review | **OPEN** |
+| 18 | Final Production launch checklist (§11 gates + Production Supabase pre-flight) | **OPEN** |
+| 19 | Unwired email templates (Welcome · Property connected) | **OPEN** — documented inactive; wire or remove before describing as live |
+
+### 14.3 Stage 6 technical baseline (locked at sign-off)
+
+| Check | Result |
+|-------|--------|
+| `npm run build` | **PASS** |
+| `npx tsc --noEmit` | **PASS** |
+| `npm run lint` | **55 total / 22 errors / 33 warnings** — matches pre-Stage-6 baseline |
+| Stage 3 legal/content verification | **PASS** |
+| Stage 3.5 refinement verification | **PASS** |
+| Stage 3.5 critical scenarios | **PASS** |
+| Command Centre presentation verification | **PASS** |
+| Stage 5 transactional email verification | **PASS** |
+| Stage 6 terminology verification | **PASS** (20/20) |
 
 ---
 

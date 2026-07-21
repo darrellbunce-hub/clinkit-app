@@ -45,7 +45,7 @@ const outcomes = [
   {
     icon: Users,
     title: "Collaboration from either side",
-    text: "A homeowner may start their move and invite your branch — or your team may start and invite them. However the journey begins, everyone ends on the same platform.",
+    text: "A homeowner may start their move and invite your branch — or your team may start and invite them. However the journey begins, connected participants share one chain view on Keynetic.",
   },
   {
     icon: Clock3,
@@ -86,7 +86,7 @@ const solutions = [
   "Collaboration can begin from the homeowner or the estate agent",
   "Homeowners can use Keynetic independently and invite your branch when ready",
   "Your branch can create properties and invite clients — or join moves they started",
-  "Everyone ends on the same shared operational workspace, alongside your CRM",
+  "Connected participants share the same shared operational workspace, alongside your CRM",
   "Useful visibility begins with connected parts of the chain — and improves as more connects",
 ];
 
@@ -103,8 +103,8 @@ const entryPaths = [
   },
   {
     number: "→",
-    title: "Shared operational workspace",
-    text: "Whoever starts the move, everyone finishes on the same platform — with shared visibility, clear communication, and a full audit trail.",
+    title: "Shared chain view",
+    text: "Whether a homeowner or your branch joins first, connected participants work from the same shared chain view — with clear communication and a full audit trail.",
   },
 ];
 
@@ -292,17 +292,17 @@ export default function EaLandingPage() {
               </div>
 
               <h1 className="mt-8 text-4xl md:text-5xl lg:text-6xl font-bold text-white leading-tight tracking-tight">
-                Whoever starts the move,
+                One shared chain view —
                 <span className="block text-brand-accent">
-                  everyone finishes on the same platform.
+                  whether a homeowner or your branch joins first.
                 </span>
               </h1>
 
               <p className="mt-8 text-lg md:text-xl text-slate-300 leading-relaxed max-w-xl">
                 Keynetic is a collaborative platform — not estate agency
                 software. Whether your client starts their move or your
-                branch does, everyone ends up working from the same shared
-                operational view.
+                branch introduces a property, connected participants work
+                from the same shared chain model — without replacing your CRM.
               </p>
 
               <div className="mt-10 flex flex-col sm:flex-row gap-4">
@@ -365,7 +365,7 @@ export default function EaLandingPage() {
           <SectionIntro
             eyebrow="Why Keynetic is different"
             title="Traditional tools wait for the agency. Keynetic meets everyone where the move starts."
-            description="Most estate agency software assumes your branch must adopt first before homeowners benefit. Keynetic is a collaborative platform — homeowners and estate agents can each begin the journey, and everyone converges on the same shared operational workspace."
+            description="Most estate agency software assumes your branch must adopt first before homeowners benefit. Keynetic is a collaborative platform — homeowners and estate agents can each begin the journey, and connected participants converge on the same shared operational workspace."
             align="center"
           />
 
@@ -423,7 +423,7 @@ export default function EaLandingPage() {
           <SectionIntro
             eyebrow="How it works"
             title="Collaboration starts wherever the move starts"
-            description="Whether your client starts with Keynetic or your branch does, everyone ends up working from the same shared operational view — without replacing your CRM."
+            description="Whether your client starts with Keynetic or your branch does, connected participants work from the same shared operational view — without replacing your CRM."
           />
 
           <div className="mt-16 grid gap-8 md:grid-cols-3">
@@ -655,8 +655,8 @@ export default function EaLandingPage() {
 
           <p className="mt-8 text-xl text-slate-600 leading-relaxed max-w-3xl mx-auto">
             Join Keynetic as a founding branch and be prepared whether your
-            team starts the move or a client invites you in. Whoever starts
-            the move, everyone finishes on the same platform.
+            team introduces a property or a client invites you in. Connected
+            participants share one chain view on Keynetic.
           </p>
 
           <div className="mt-12 flex flex-col sm:flex-row justify-center gap-4">
@@ -687,11 +687,11 @@ export default function EaLandingPage() {
         <div className="max-w-6xl mx-auto px-6 py-12">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-8">
             <div>
-              <Logo variant="dark" />
+              <Logo variant="dark" showTagline />
 
               <p className="mt-3 text-slate-400 max-w-md">
                 A collaborative platform for property transactions.
-                Whoever starts the move, everyone finishes together.
+                One shared chain view as participants connect.
               </p>
             </div>
 

@@ -19,11 +19,6 @@ function assert(condition: boolean, message: string) {
 
 function testRoleMapping() {
   assert(
-    mapInviteRoleOptionToDbRole("owner") ===
-      "branch_admin",
-    "owner maps to branch_admin"
-  );
-  assert(
     mapInviteRoleOptionToDbRole("staff") === "agent",
     "staff maps to agent"
   );
@@ -83,6 +78,13 @@ function testErrorSurfacing() {
       "branch membership"
     ),
     "friendly message for not_branch_member"
+  );
+
+  assert(
+    formatEaBranchInvitationError(
+      "owner_invitation_not_allowed"
+    ).includes("Staff"),
+    "owner invitation blocked message"
   );
 }
 

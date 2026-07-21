@@ -1,8 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import InviteTeamMemberDialog from "@/components/account/InviteTeamMemberDialog";
+import TeamActionConfirmDialog from "@/components/account/TeamActionConfirmDialog";
+import TransferOwnershipDialog from "@/components/account/TransferOwnershipDialog";
 import {
   accountAlertErrorClassName,
   accountSectionClassName,
@@ -19,6 +21,7 @@ import {
   removeEaBranchMember,
   revokeEaBranchInvitation,
   type EaBranchTeamDirectory,
+  type EaBranchTeamMemberRow,
 } from "@/lib/estateAgent/branchTeam";
 import { loadAgentHomeContext } from "@/lib/estateAgent/loadAgentHomeContext";
 import { BTN_PRIMARY_SM_CLASS, BTN_SECONDARY_OUTLINE_SM_CLASS } from "@/lib/theme/themeTokens";
@@ -27,6 +30,18 @@ import { supabase } from "@/lib/supabase";
 type TeamMembersSectionProps = {
   userId: string;
 };
+
+type PendingConfirmAction =
+  | {
+      type: "remove_member";
+      member: EaBranchTeamMemberRow;
+    }
+  | {
+      type: "revoke_invitation";
+      invitationId: string;
+      inviteName: string;
+      inviteEmail: string;
+    };
 
 export default function TeamMembersSection({
   userId,
@@ -43,8 +58,12 @@ export default function TeamMembersSection({
   const [errorMessage, setErrorMessage] = useState("");
   const [isInviteOpen, setIsInviteOpen] =
     useState(false);
+  const [isTransferOpen, setIsTransferOpen] =
+    useState(false);
   const [pendingActionId, setPendingActionId] =
     useState<string | null>(null);
+  const [confirmAction, setConfirmAction] =
+    useState<PendingConfirmAction | null>(null);
 
   const reloadDirectory = useCallback(async () => {
     setErrorMessage("");
@@ -97,44 +116,78 @@ export default function TeamMembersSection({
     void reloadDirectory();
   }, [reloadDirectory]);
 
-  async function handleRevokeInvitation(
-    invitationId: string
-  ) {
-    setPendingActionId(invitationId);
+  const staffMembers = useMemo(
+    () =>
+      directory?.members.filter(
+        (member) => member.role === "agent"
+      ) ?? [],
+    [directory]
+  );
+
+  const confirmCopy = useMemo(() => {
+    if (!confirmAction) {
+      return null;
+    }
+
+    if (confirmAction.type === "remove_member") {
+      return {
+        title: `Remove access for ${confirmAction.member.contact_name}?`,
+        description:
+          "This person will no longer be able to access this branch or its properties in Keynetic. Their previous activity may remain in branch history.",
+        confirmLabel: "Remove access",
+      };
+    }
+
+    return {
+      title: `Cancel invitation for ${confirmAction.inviteName}?`,
+      description: `${confirmAction.inviteEmail} will not be able to join using the current invitation link.`,
+      confirmLabel: "Cancel invitation",
+    };
+  }, [confirmAction]);
+
+  async function handleConfirmAction() {
+    if (!confirmAction) {
+      return;
+    }
+
+    if (confirmAction.type === "remove_member") {
+      setPendingActionId(confirmAction.member.member_id);
+
+      const result = await removeEaBranchMember(
+        supabase,
+        confirmAction.member.member_id
+      );
+
+      setPendingActionId(null);
+      setConfirmAction(null);
+
+      if (!result.ok) {
+        setErrorMessage(
+          formatEaBranchInvitationError(
+            result.error ?? "remove_failed"
+          )
+        );
+        return;
+      }
+
+      await reloadDirectory();
+      return;
+    }
+
+    setPendingActionId(confirmAction.invitationId);
 
     const result = await revokeEaBranchInvitation(
       supabase,
-      invitationId
+      confirmAction.invitationId
     );
 
     setPendingActionId(null);
+    setConfirmAction(null);
 
     if (!result.ok) {
       setErrorMessage(
         formatEaBranchInvitationError(
           result.error ?? "revoke_failed"
-        )
-      );
-      return;
-    }
-
-    await reloadDirectory();
-  }
-
-  async function handleRemoveMember(memberId: string) {
-    setPendingActionId(memberId);
-
-    const result = await removeEaBranchMember(
-      supabase,
-      memberId
-    );
-
-    setPendingActionId(null);
-
-    if (!result.ok) {
-      setErrorMessage(
-        formatEaBranchInvitationError(
-          result.error ?? "remove_failed"
         )
       );
       return;
@@ -156,19 +209,31 @@ export default function TeamMembersSection({
 
           <p className="mt-2 text-sm text-slate-600">
             {companyName
-              ? `Everyone at ${companyName} shares the same operational dashboard.`
+              ? `Manage who can access ${companyName}'s branch workspace.`
               : "Manage who can access your branch workspace."}
           </p>
         </div>
 
         {directory?.canManageTeam ? (
-          <button
-            type="button"
-            onClick={() => setIsInviteOpen(true)}
-            className={`inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold ${BTN_PRIMARY_SM_CLASS}`}
-          >
-            Invite Team Member
-          </button>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            {directory.canTransferOwnership ? (
+              <button
+                type="button"
+                onClick={() => setIsTransferOpen(true)}
+                className={`inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold ${BTN_SECONDARY_OUTLINE_SM_CLASS}`}
+              >
+                Transfer Ownership
+              </button>
+            ) : null}
+
+            <button
+              type="button"
+              onClick={() => setIsInviteOpen(true)}
+              className={`inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold ${BTN_PRIMARY_SM_CLASS}`}
+            >
+              Invite Team Member
+            </button>
+          </div>
         ) : null}
       </div>
 
@@ -204,16 +269,17 @@ export default function TeamMembersSection({
                       member.member_id
                     }
                     onClick={() =>
-                      void handleRemoveMember(
-                        member.member_id
-                      )
+                      setConfirmAction({
+                        type: "remove_member",
+                        member,
+                      })
                     }
                     className={`rounded-lg px-3 py-1.5 text-xs font-medium ${BTN_SECONDARY_OUTLINE_SM_CLASS}`}
                   >
                     {pendingActionId ===
                     member.member_id
                       ? "Removing..."
-                      : "Remove"}
+                      : "Remove access"}
                   </button>
                 ) : null,
             })),
@@ -236,16 +302,22 @@ export default function TeamMembersSection({
                         invitation.invitation_id
                       }
                       onClick={() =>
-                        void handleRevokeInvitation(
-                          invitation.invitation_id
-                        )
+                        setConfirmAction({
+                          type: "revoke_invitation",
+                          invitationId:
+                            invitation.invitation_id,
+                          inviteName:
+                            invitation.invite_name,
+                          inviteEmail:
+                            invitation.invite_email,
+                        })
                       }
                       className={`rounded-lg px-3 py-1.5 text-xs font-medium ${BTN_SECONDARY_OUTLINE_SM_CLASS}`}
                     >
                       {pendingActionId ===
                       invitation.invitation_id
                         ? "Revoking..."
-                        : "Revoke"}
+                        : "Cancel invitation"}
                     </button>
                   ) : null,
               })
@@ -286,11 +358,33 @@ export default function TeamMembersSection({
       ) : null}
 
       {branchId ? (
-        <InviteTeamMemberDialog
-          branchId={branchId}
-          isOpen={isInviteOpen}
-          onClose={() => setIsInviteOpen(false)}
-          onInvited={reloadDirectory}
+        <>
+          <InviteTeamMemberDialog
+            branchId={branchId}
+            isOpen={isInviteOpen}
+            onClose={() => setIsInviteOpen(false)}
+            onInvited={reloadDirectory}
+          />
+
+          <TransferOwnershipDialog
+            branchId={branchId}
+            staffMembers={staffMembers}
+            isOpen={isTransferOpen}
+            onClose={() => setIsTransferOpen(false)}
+            onTransferred={reloadDirectory}
+          />
+        </>
+      ) : null}
+
+      {confirmCopy ? (
+        <TeamActionConfirmDialog
+          isOpen={confirmAction !== null}
+          title={confirmCopy.title}
+          description={confirmCopy.description}
+          confirmLabel={confirmCopy.confirmLabel}
+          isPending={pendingActionId !== null}
+          onCancel={() => setConfirmAction(null)}
+          onConfirm={handleConfirmAction}
         />
       ) : null}
     </section>

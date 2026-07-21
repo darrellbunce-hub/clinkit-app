@@ -36,10 +36,16 @@ Registered in `lib/communications/templateRegistry.ts`. Live templates:
 | `estate-agent-invitation` | Branch team invitation |
 | `password-reset` | Account password reset |
 | `welcome` | New account welcome |
-| `property-claimed` | Successful property claim |
+| `property-claimed` | Successful property connection confirmation (template ready; send not wired) |
 | `lifecycle-dormancy-warning` | Connected transaction dormancy warning |
 
-Preview/sample rendering: `renderEmailTemplateById()` and `lib/communications/sampleData.ts`.
+Preview/sample rendering: `renderEmailTemplateById()` · `/dev/emails` · `GET /api/dev/emails/render?template=…`
+
+Stage 5 content verification:
+
+```bash
+npx tsx scripts/verify-transactional-email-content.ts
+```
 
 ## Lifecycle dormancy warning email
 

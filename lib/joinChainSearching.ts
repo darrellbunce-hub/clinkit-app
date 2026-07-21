@@ -247,13 +247,17 @@ export async function resolveSearchingFromJoinIntent(
   };
 }
 
+/** Customer-safe message when join-chain searching setup conflicts with an existing downstream link. */
 export function formatTopologyConflictMessage(
   existingLinkedPropertyId: number
 ): string {
+  if (existingLinkedPropertyId < 0) {
+    return "";
+  }
+
   return (
-    "This property already has a downstream link in the chain " +
-    `(property #${existingLinkedPropertyId}). ` +
-    "Join completed, but the Searching placeholder could not be attached " +
-    "without replacing existing topology. Please review the chain or contact support."
+    "This property already has a downstream link in the chain. " +
+    "Join completed, but we could not set up your next-home search step " +
+    "without replacing an existing link. Please review the chain or contact support."
   );
 }

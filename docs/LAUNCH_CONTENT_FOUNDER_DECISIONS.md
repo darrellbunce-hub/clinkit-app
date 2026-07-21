@@ -77,14 +77,14 @@ Decisions below supersede conflicting recommendations in the original audit and 
 
 | Field | Detail |
 |-------|--------|
-| **Status** | **APPROVED** (product) · **PENDING_LEGAL_REVIEW** (legal sign-off) |
+| **Status** | **APPROVED** (product) · **PENDING_LEGAL_REVIEW** (legal sign-off — **not resolved**) |
+| **Stage 5 founder confirmation (21 Jul 2026)** | Full property address **retained in invitation email body**. Full property address **retained in invitation subject for now** (`Connect {address} on Keynetic`). |
 | **Stage 2 validated** | Address shown is **invitee's own property** — not another participant's |
-| **Product preference** | **Retain full property address in email body for now** |
-| **Rationale** | Recognition · wrong-property avoidance · invitation legitimacy · trust vs generic phishing |
-| **Subject line** | **Separately review** whether full address must appear in subject (lock screen / notification exposure) — potential future: reduced subject + full body |
-| **Do not** | Remove full address · expand disclosure · change template until legal review complete |
-| **Affected** | `HomeownerInvitation.tsx`, `PropertyClaimed.tsx` (when wired) |
-| **Legal review** | **Yes** — including subject-line minimisation options |
+| **Product preference** | **Retain full property address in email body** |
+| **Subject line** | **PENDING_LEGAL_REVIEW** — subject-line exposure (lock screen / notification) requires explicit legal/privacy review **before Production launch** |
+| **Do not** | Remove or reduce body address · change subject or body **automatically** without outcome of FD-004 legal review · expand disclosure beyond approved product direction |
+| **Affected** | `HomeownerInvitation.tsx` · `PropertyClaimed.tsx` (when wired) |
+| **Legal review** | **Yes — required before Production launch** for subject-line decision |
 
 ---
 
@@ -315,7 +315,7 @@ Decisions below supersede conflicting recommendations in the original audit and 
 
 | Field | Detail |
 |-------|--------|
-| **Status** | **APPROVED_IN_PRINCIPLE** |
+| **Status** | **FOUNDER_APPROVED** (Stage 5 transactional copy) |
 | **Journey** | INVITE → CONNECT |
 | **Invitation** | Communication sent |
 | **Connect** | Desired customer action/outcome |
@@ -470,7 +470,7 @@ Decisions below supersede conflicting recommendations in the original audit and 
 | **`delayed`** | **Delay reported** |
 | **`healthy` (topology)** | **Connected** — **not** "On track" · **not** customer-facing "Healthy" (conflicts with Chain Confidence band) |
 | **Chain Confidence bands** | **FOUNDER_APPROVED** — Strong · Good · Keep an eye on / Monitor · Needs attention (Stage 3.5) |
-| **Operational status** (chain page) | **FOUNDER_APPROVED** — see **FD-038**; distinct from Chain Confidence |
+| **Chain status** (homeowner chain page) | **FD-041** — supersedes FD-038 Operational status for homeowners; distinct from Chain Confidence |
 
 ---
 
@@ -502,14 +502,73 @@ Decisions below supersede conflicting recommendations in the original audit and 
 
 | Field | Detail |
 |-------|--------|
-| **Status** | **FOUNDER_APPROVED** |
-| **Customer-facing label** | **Operational status** |
-| **Replaces** | "Chain status" on chain page |
+| **Status** | **FOUNDER_APPROVED** — **superseded for homeowner-facing presentation** by **FD-041** (Stage 6) |
+| **Customer-facing label (Stage 4)** | **Operational status** |
+| **EA / internal** | Operational terminology remains valid in estate-agent surfaces and internal architecture |
 | **Purpose** | Highlights operational conditions — stale updates, reported delays, broken connections — separate from Chain Progress, Chain Confidence, and Estimated completion window |
 | **Status values (unchanged)** | Stable · Active · At Risk · Replacement Buyer Required |
 | **Implementation** | Customer-facing label and explainer only — `computeChainHealth()` behaviour unchanged |
 | **Affected** | `app/chain/[chainId]/page.tsx` |
 | **Legal review** | No |
+
+---
+
+## FD-041 — Homeowner chain status label (Stage 6 — supersedes FD-038 homeowner presentation)
+
+| Field | Detail |
+|-------|--------|
+| **Status** | **FOUNDER_APPROVED** (21 Jul 2026) |
+| **Customer-facing label (homeowner chain page)** | **Chain status** |
+| **Supersedes** | FD-038 **Operational status** on homeowner-facing surfaces only |
+| **Does not change** | `computeChainHealth()` · status values · internal operational architecture/code identifiers |
+| **EA / internal** | Estate-agent professional use of **operational** remains permitted where appropriate (Command Centre, EA landing, internal modules) |
+| **Explainer** | Plain English — stale updates, reported delays, connection issues; distinct from Chain Progress and Chain Confidence |
+| **Legal review** | No |
+
+---
+
+## FD-039 — “Moving Made Clear” tagline (Stage 6)
+
+| Field | Detail |
+|-------|--------|
+| **Status** | **FOUNDER_APPROVED** (21 Jul 2026) |
+| **Tagline** | **Moving Made Clear** — official Keynetic brand tagline |
+| **Canonical constant** | `KEYNETIC_TAGLINE` in `lib/theme/logoAssets.ts` (re-exported from `lib/customerFacingLabels.ts`) |
+| **Public marketing homepage header** | Navbar on `/` — logo + tagline beneath wordmark. **Route context only** — tagline remains visible for authenticated visitors on the public homepage; auth affects nav actions only, not brand presentation. |
+| **Public EA marketing header** | `EaMarketingShell` / `LightShellHeader` — same brand treatment (`showBrandTagline`). Route/layout context; not conditional on auth. |
+| **Authenticated application navigation** | `Navbar` on app routes (not `/`) · `AgentShell` · dashboard/chain/property chrome — **logo/wordmark only** (no tagline) |
+| **Rule** | **Public marketing context determines tagline visibility; authentication state does not.** |
+| **Supporting brand contexts** | Homepage footer · Estate-agent landing footer · Transactional email footer |
+| **Visual hierarchy** | Keynetic wordmark primary; **Moving Made Clear** secondary beneath wordmark — does not compete with navigation |
+| **Mobile** | Responsive tagline sizing (`text-[11px] sm:text-xs`); truncate on narrow viewports where needed |
+| **Compact rule** | Tagline does **not** need to appear beneath every logo instance |
+| **Do not** | Modify logo artwork · generate new logo assets · duplicate hardcoded tagline strings in UI |
+| **Legal review** | No |
+
+---
+
+## Stage 6 founder sign-off — additional locked decisions (21 Jul 2026)
+
+| Item | Decision |
+|------|----------|
+| **EA hero headline** | **Approved:** *“One shared chain view — whether a homeowner or your branch joins first.”* |
+| **Partial-chain positioning** | **Preserved:** do not imply every real-world chain participant uses Keynetic; visibility improves as more connect; homeowners and estate agents contribute to the **same shared chain model** (not separate versions) |
+| **Invite → Connect** | **Preserved** for customer-facing terminology; internal `property_claim` / claim architecture unchanged |
+| **“Keynetic meets everyone where the move starts”** (EA landing section title) | **Not a launch blocker.** May be revisited during final visual/marketing review if founder decides it is unclear. **Not changed** at Stage 6 sign-off. |
+
+---
+
+## FD-040 — Pre-Launch transactional email environment (Production readiness)
+
+| Field | Detail |
+|-------|--------|
+| **Status** | **PRE_LAUNCH_REQUIREMENT** — verify before Production launch |
+| **Scope** | Recorded at Stage 5 founder sign-off; detailed checklist in [Production Readiness Checklist §13](./PRODUCTION_READINESS_CHECKLIST.md) |
+| **`NEXT_PUBLIC_APP_URL`** | Must be set to approved Production Keynetic origin. Verify all transactional email links in Production resolve correctly. localhost / Development / Preview URLs must **not** appear in Production emails. |
+| **`RESEND_API_KEY` + sender/domain** | Verify approved Resend configuration in Production. **Do not** expose or document secret values in repo docs. |
+| **Supabase Auth templates** | Manually verify Production Dashboard content for **`reset-password`** and **`confirm-signup`** before launch (`docs/AUTH_ARCHITECTURE.md`). |
+| **Unwired templates** | **Welcome** and **Property connected** must remain documented as **inactive** until send paths implemented and verified |
+| **Implementation** | Configuration verification only — **no** email architecture / Auth behaviour changes without separate approval |
 
 ---
 
@@ -562,9 +621,12 @@ Decisions below supersede conflicting recommendations in the original audit and 
 | Category | Items |
 |----------|-------|
 | **APPROVED (ready for Stage 3+)** | FD-001–003, FD-005–010, FD-015–025, FD-030–034, FD-033 Connected, FD-024 disconnect, FD-007/031 commercial model |
-| **FOUNDER_APPROVED (Stage 4 complete)** | FD-002 live terminology · FD-006 partial-chain · FD-017 shared platform · FD-038 Operational status · Stage 4 homepage/EA/journey content · Estimated Completion presentation · benefit strip |
-| **APPROVED_IN_PRINCIPLE / ACCEPTED_IN_PRINCIPLE** | FD-004 body address · FD-012 · FD-014 launch cookie approach · FD-021 · Stage 2 recommendations not overridden |
-| **PENDING_LEGAL_REVIEW** | FD-004 (incl. subject line) · FD-011–013 · all policy drafts · Cookie Policy |
+| **FOUNDER_APPROVED (Stage 4 complete)** | FD-002 live terminology · FD-006 partial-chain · FD-017 shared platform · FD-038 Operational status (EA/internal; homeowner superseded by FD-041) · Stage 4 homepage/EA/journey content · Estimated Completion presentation · benefit strip |
+| **FOUNDER_APPROVED (Stage 5 complete)** | Transactional email content · FD-021 invite→connect · transactional footer · active vs unwired template documentation |
+| **FOUNDER_APPROVED (Stage 6 complete)** | FD-041 **Chain status** · FD-039 **Moving Made Clear** · homeowner no-operational rule · EA shared-chain hero · invite→connect UI polish · [Stage 6 report](./LAUNCH_STAGE6_COMPLETION_REPORT.md) |
+| **APPROVED_IN_PRINCIPLE / ACCEPTED_IN_PRINCIPLE** | FD-012 · FD-014 launch cookie approach · Stage 2 recommendations not overridden |
+| **PENDING_LEGAL_REVIEW** | **FD-004 (subject line — not resolved)** · FD-011–013 · all policy drafts · Cookie Policy · **professional legal review and publication approval** |
+| **PRE_LAUNCH_REQUIREMENT** | **Pre-Launch Operational Readiness programme** — see [Production Readiness Checklist §14](./PRODUCTION_READINESS_CHECKLIST.md) · **FD-040** · privacy@ verification · provider/DPA · Production env/secrets · Resend · Supabase Auth templates · EA access revocation · EA owner transfer · observability · metrics · analytics decision · run-cost governance · refund/cancellation/disputes · final security review · final Production launch checklist |
 | **STRIPE_IMPLEMENTATION_READINESS_PENDING** | FD-036 billing architecture · FD-007 final pricing copy when checkout live |
 | **PRODUCT_ROADMAP** | FD-037 future EA tiers |
 
@@ -577,13 +639,22 @@ Decisions below supersede conflicting recommendations in the original audit and 
 | **2** | Technical / content validation | **Complete** — see [Stage 2 report](./LAUNCH_STAGE2_TECHNICAL_VALIDATION.md) | — |
 | **3** | P0 legal / privacy / content structure | privacy@ · legal page structure · remove legal Coming soon · erasure entry · de-link vs erasure · collection notices · FAQ corrections · internal ID cleanup · pricing anchor fix · **DRAFT_FOR_LEGAL_REVIEW** policies only | Chain Confidence algorithm |
 | **3.5** | Chain Intelligence redesign | **FOUNDER_APPROVED_COMPLETE** — [Stage 3.5 report](./LAUNCH_STAGE3_5_COMPLETION_REPORT.md) |
-| **4** | Core content / value proposition | **FOUNDER_APPROVED_COMPLETE** — [Stage 4 report](./LAUNCH_STAGE4_COMPLETION_REPORT.md) · homepage · partial-chain · homeowner/EA journeys · live terminology · Operational status label · ETA presentation · benefit strip |
-| **5** | Email content | **Next planned** — after FD-004 legal review · invite→connect terminology | Template changes before legal |
-| **6** | Terminology / UX polish | Status labels (Connected) · Disconnect from chain · mobile · a11y | — |
+| **4** | Core content / value proposition | **FOUNDER_APPROVED_COMPLETE** — [Stage 4 report](./LAUNCH_STAGE4_COMPLETION_REPORT.md) |
+| **5** | Transactional email content | **FOUNDER_APPROVED_COMPLETE** — [Stage 5 report](./LAUNCH_STAGE5_COMPLETION_REPORT.md) · invite→connect · FD-004 body + subject retained pending legal · unwired templates documented · [Pre-Launch email checks §13](./PRODUCTION_READINESS_CHECKLIST.md) |
+| **6** | Terminology / UX polish | **FOUNDER_APPROVED_COMPLETE** — [Stage 6 report](./LAUNCH_STAGE6_COMPLETION_REPORT.md) · FD-041 · FD-039 · homeowner no-operational rule | Pre-Launch implementation |
+| **Next** | **Pre-Launch Operational Readiness** | **Not started** — see [Production Readiness Checklist §14](./PRODUCTION_READINESS_CHECKLIST.md) | Launch content Stages 3–6 |
 | **Billing/Stripe** | Separate gated workstream | FD-036 architecture · Stripe integration · founding branch counter | Not in Stage 3–6 content |
 
-**Awaiting explicit founder approval:** Billing/Stripe (FD-036) · Stage 5 (after FD-004 legal review)
+**Launch Content programme (Stages 3–6):** **FOUNDER_APPROVED_COMPLETE** (21 Jul 2026).
+
+**Next programme:** **Pre-Launch Operational Readiness** — implementation **not started**.
+
+**Awaiting explicit founder approval:** Billing/Stripe (FD-036)
+
+**Pre-Launch requirements (unchanged — not resolved by Stage 6):** FD-004 subject legal review · FD-040 transactional email environment · Supabase Auth template verification · full §14 checklist
+
+**Preserved at Stage 6 sign-off:** Invite → Connect customer terminology · partial-chain honesty · shared chain model positioning · unwired Welcome / Property connected templates documented inactive · EA hero approved wording · “everyone where the move starts” not a launch blocker
 
 ---
 
-*Stage 4 founder-approved complete. Do not begin Stage 5 without explicit authorisation.*
+*Launch Content programme complete (Stages 3–6 founder-approved). Pre-Launch Operational Readiness not started. No application behaviour changed in this sign-off documentation update.*

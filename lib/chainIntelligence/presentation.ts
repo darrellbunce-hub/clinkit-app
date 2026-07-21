@@ -155,7 +155,7 @@ export function confidencePresentation(params: {
 }
 
 export const CHAIN_CONFIDENCE_TOOLTIP =
-  "Keynetic calculates Chain Confidence using the timing and operational information available for your property chain. It reflects whether visible steps are progressing within expected timescales — not how far through the chain you are. It is a system-generated indication and is not independently verified or a guarantee that your move will complete.";
+  "Keynetic calculates Chain Confidence using the timing and chain information available for your property chain. It reflects whether visible steps are progressing within expected timescales — not how far through the chain you are. It is a system-generated indication and is not independently verified or a guarantee that your move will complete.";
 
 export const CHAIN_CONFIDENCE_UNAVAILABLE_MESSAGE =
   "We don't yet have enough timing information to calculate Chain Confidence for this chain.";

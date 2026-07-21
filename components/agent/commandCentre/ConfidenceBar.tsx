@@ -17,7 +17,7 @@ export default function ConfidenceBar({
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-3 text-sm">
         <span className="text-text-muted">
-          Operational confidence
+          Chain confidence
         </span>
 
         <span className="font-semibold tabular-nums text-text-charcoal">
@@ -31,7 +31,7 @@ export default function ConfidenceBar({
         aria-valuenow={clamped}
         aria-valuemin={0}
         aria-valuemax={100}
-        aria-label={`Operational confidence ${clamped} percent`}
+        aria-label={`Chain confidence ${clamped} percent`}
       >
         <div
           className={`h-full rounded-full transition-all ${getConfidenceBarFillClass(clamped)}`}

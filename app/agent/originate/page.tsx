@@ -306,7 +306,7 @@ export default function AgentOriginatePage() {
               <p className="mt-3 text-slate-600">
                 Create a property and begin managing the
                 transaction immediately. If the homeowner
-                later joins Keynetic, they can claim the
+                later joins Keynetic, they can connect their
                 property without affecting the chain.
               </p>
 
@@ -320,13 +320,13 @@ export default function AgentOriginatePage() {
 
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-slate-800">
-                    Homeowner claiming
+                    Homeowner connection
                   </p>
 
                   <p className="mt-1 text-xs leading-relaxed text-slate-600">
                     You can manage this property immediately.
                     If the homeowner later joins Keynetic they
-                    can claim the property without affecting
+                    can connect their property without affecting
                     the existing chain or transaction.
                   </p>
                 </div>
@@ -383,7 +383,7 @@ export default function AgentOriginatePage() {
                 value={inviteEmail}
                 onChange={setInviteEmail}
                 type="email"
-                hint="Used only to send a future claim invitation if the homeowner chooses to join Keynetic."
+                hint="Used only to send a future invitation if the homeowner chooses to join Keynetic."
               />
 
               <label className="flex items-start gap-3 rounded-2xl border border-slate-200 px-4 py-4">
@@ -407,7 +407,7 @@ export default function AgentOriginatePage() {
                     Enabled by default so your branch can
                     manage this transaction immediately.
                     Uncheck only if you want view-only
-                    access until the homeowner claims.
+                    access until the homeowner connects.
                   </span>
                 </span>
               </label>

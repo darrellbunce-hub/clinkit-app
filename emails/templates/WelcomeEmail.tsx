@@ -9,8 +9,8 @@ import EmailLayout from "@/emails/layout/EmailLayout";
 
 export default function WelcomeEmail(props: WelcomeEmailParams) {
   return (
-    <EmailLayout preview="Welcome to Keynetic">
-      <ContentContainer>
+    <EmailLayout preview="Your Keynetic account is ready">
+      <ContentContainer footerReason="You received this email because a Keynetic account was created for you.">
         <EmailSection style={{ paddingTop: 32, paddingBottom: 8 }}>
           <Heading
             as="h1"
@@ -44,8 +44,22 @@ export default function WelcomeEmail(props: WelcomeEmailParams) {
               lineHeight: "26px",
             }}
           >
-            Your Keynetic account is ready. You can now follow your property move,
-            stay aligned with your estate agent, and see what needs attention next.
+            Your Keynetic account is ready. Keynetic gives connected participants
+            a shared view of progress on property moves — with live updates as
+            information is shared.
+          </Text>
+
+          <Text
+            style={{
+              margin: 0,
+              color: EMAIL_BRAND.charcoal,
+              fontSize: 16,
+              lineHeight: "26px",
+            }}
+          >
+            Start your move, join an existing chain, or open your dashboard to
+            see connected parts of your property chain. Homeowners use Keynetic
+            for free.
           </Text>
         </EmailSection>
 

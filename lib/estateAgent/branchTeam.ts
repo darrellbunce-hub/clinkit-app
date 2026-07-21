@@ -34,6 +34,7 @@ export type EaBranchTeamDirectory = {
   members: EaBranchTeamMemberRow[];
   pendingInvitations: EaBranchTeamPendingInvitationRow[];
   canManageTeam: boolean;
+  canTransferOwnership: boolean;
 };
 
 export type EaBranchInvitationPreview = {
@@ -46,7 +47,8 @@ export type EaBranchInvitationPreview = {
   expiresAt: string;
 };
 
-export type EaBranchInviteRoleOption = "owner" | "staff";
+/** Invitations always create Staff (`agent`) access. Owner is assigned only via transfer. */
+export type EaBranchInviteRoleOption = "staff";
 
 type RpcResult = {
   ok?: boolean;
@@ -73,12 +75,18 @@ type TeamDirectoryRpc = RpcResult & {
   members?: EaBranchTeamMemberRow[];
   pending_invitations?: EaBranchTeamPendingInvitationRow[];
   can_manage_team?: boolean;
+  can_transfer_ownership?: boolean;
 };
 
+export type EaBranchOwnershipOutgoingAction =
+  | "remain_staff"
+  | "leave_branch";
+
 export function mapInviteRoleOptionToDbRole(
-  role: EaBranchInviteRoleOption
+  role: EaBranchInviteRoleOption = "staff"
 ): EaBranchMemberRole {
-  return role === "owner" ? "branch_admin" : "agent";
+  void role;
+  return "agent";
 }
 
 export function buildEaBranchInvitationUrl(
@@ -152,7 +160,6 @@ export async function createEaBranchInvitation(
     branchId: string;
     inviteEmail: string;
     inviteName: string;
-    role: EaBranchInviteRoleOption;
   }
 ): Promise<
   | {
@@ -169,9 +176,7 @@ export async function createEaBranchInvitation(
       p_branch_id: input.branchId,
       p_invite_email: input.inviteEmail.trim(),
       p_invite_name: input.inviteName.trim(),
-      p_invite_role: mapInviteRoleOptionToDbRole(
-        input.role
-      ),
+      p_invite_role: "agent",
     }
   );
 
@@ -312,6 +317,60 @@ export async function removeEaBranchMember(
   };
 }
 
+export async function transferEaBranchOwnership(
+  supabase: SupabaseClient,
+  input: {
+    branchId: string;
+    newOwnerMemberId: string;
+    outgoingAction: EaBranchOwnershipOutgoingAction;
+  }
+): Promise<
+  | {
+      ok: true;
+      newOwnerUserId: string;
+      outgoingAction: EaBranchOwnershipOutgoingAction;
+    }
+  | { ok: false; error: string }
+> {
+  const { data, error } = await supabase.rpc(
+    "transfer_ea_branch_ownership",
+    {
+      p_branch_id: input.branchId,
+      p_new_owner_member_id: input.newOwnerMemberId,
+      p_outgoing_action: input.outgoingAction,
+    }
+  );
+
+  if (error) {
+    return {
+      ok: false,
+      error: error.message,
+    };
+  }
+
+  const result = data as RpcResult & {
+    new_owner_user_id?: string;
+    outgoing_action?: EaBranchOwnershipOutgoingAction;
+  } | null;
+
+  if (
+    !result?.ok ||
+    !result.new_owner_user_id ||
+    !result.outgoing_action
+  ) {
+    return {
+      ok: false,
+      error: result?.error ?? "transfer_failed",
+    };
+  }
+
+  return {
+    ok: true,
+    newOwnerUserId: result.new_owner_user_id,
+    outgoingAction: result.outgoing_action,
+  };
+}
+
 export async function loadEaBranchTeamDirectory(
   supabase: SupabaseClient,
   branchId: string
@@ -352,6 +411,8 @@ export async function loadEaBranchTeamDirectory(
       pendingInvitations:
         result.pending_invitations ?? [],
       canManageTeam: result.can_manage_team === true,
+      canTransferOwnership:
+        result.can_transfer_ownership === true,
     },
   };
 }
@@ -400,6 +461,20 @@ export function formatEaBranchInvitationError(
         return "You cannot remove yourself from the branch.";
       case "cannot_remove_owner":
         return "Branch owners cannot be removed.";
+      case "owner_invitation_not_allowed":
+        return "New team invitations can only add Staff. Transfer ownership to assign a new Owner.";
+      case "target_must_be_staff":
+        return "Ownership can only be transferred to an active Staff member.";
+      case "target_not_found":
+        return "The selected team member could not be found.";
+      case "cannot_transfer_to_self":
+        return "You cannot transfer ownership to yourself.";
+      case "owner_invariant_violation":
+        return "This branch does not have a valid Owner record. Contact support.";
+      case "invalid_outgoing_action":
+        return "Choose what should happen to your branch access after transfer.";
+      case "transfer_failed":
+        return "Ownership could not be transferred. Try again.";
       default:
         return null;
     }

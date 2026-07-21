@@ -227,7 +227,7 @@ function JoinChainContent() {
           );
         } else {
           alert(
-            "Join completed, but the Searching placeholder could not be created. Please try again from the chain page or contact support."
+            "Join completed, but we could not set up your next-home search step. Please try again from the chain page or contact support."
           );
           console.error(
             "[join-chain] searching intent failed:",
@@ -266,7 +266,7 @@ function JoinChainContent() {
 
       if (!joinCompleted) {
         alert(
-          "An error occurred while finishing the join. Your membership may have been created, but onward Searching setup did not complete."
+          "An error occurred while finishing the join. Your membership may have been created, but setting up your next-home search step did not complete."
         );
       }
     }

@@ -41,6 +41,13 @@ import {
   resolveSubjectOperationalPosition,
 } from "@/lib/operationalSubject";
 import { getEstateAgentManagementModeForOperationalAssignment } from "@/lib/estateAgent/managementModePresentation";
+import {
+  getActionAlertBadgeLabel,
+  getActivityHistoryEmptyState,
+  getActivityHistoryIntro,
+  getNextMilestoneHint,
+  getShareUpdatesIntro,
+} from "@/lib/customerFacingLabels";
 import { ROUTES } from "@/lib/auth/routes";
 import { isEstateAgent } from "@/lib/accountType";
 import {
@@ -696,12 +703,15 @@ export default function BuyerReadyPage() {
                 access.viewerRole === "estate_agent"
               }
               managementMode={managementMode}
+              viewerRole={access.viewerRole}
             />
           )}
         </div>
 
         {showOperationalManager && (
-          <OperationalManagerBanner />
+          <OperationalManagerBanner
+            viewerRole={access.viewerRole}
+          />
         )}
 
         {access.canView &&
@@ -721,7 +731,7 @@ export default function BuyerReadyPage() {
                 <div
                   className={`${actionPanel.colour} px-5 py-3 rounded-2xl text-sm font-semibold whitespace-nowrap`}
                 >
-                  Operational Alert
+                  {getActionAlertBadgeLabel(access.viewerRole)}
                 </div>
               }
             >
@@ -832,8 +842,7 @@ export default function BuyerReadyPage() {
                   </p>
 
                   <p className="mt-3 text-slate-600">
-                    This is typically the next operational
-                    milestone in the property transaction.
+                    {getNextMilestoneHint(access.viewerRole)}
                   </p>
                 </div>
 
@@ -918,7 +927,7 @@ export default function BuyerReadyPage() {
               </h2>
 
               <p className="text-slate-500 mt-2">
-                Share operational updates with the chain.
+                {getShareUpdatesIntro(access.viewerRole)}
               </p>
 
               <select
@@ -981,15 +990,13 @@ export default function BuyerReadyPage() {
           </h2>
 
           <p className="text-slate-500 mt-2">
-            Structured updates and operational events recorded
-            for this workflow.
+            {getActivityHistoryIntro(access.viewerRole)}
           </p>
 
           <div className="mt-6">
             {timelineActivities.length === 0 && (
               <div className="bg-surface-inset rounded-2xl px-5 py-5 text-slate-500">
-                Operational updates will appear here as this
-                workflow progresses.
+                {getActivityHistoryEmptyState(access.viewerRole)}
               </div>
             )}
 

@@ -91,7 +91,7 @@ export async function renderClaimSuccessful(
 ): Promise<RenderedEmail> {
   return renderEmailTemplate(
     PropertyClaimedEmail(props),
-    getClaimSuccessfulSubject(props)
+    getClaimSuccessfulSubject()
   );
 }
 

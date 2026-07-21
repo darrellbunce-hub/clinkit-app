@@ -31,9 +31,11 @@ export default function HomeownerInvitationEmail(
 
   return (
     <EmailLayout
-      preview={`${props.companyName} invited you to connect ${props.propertyAddress} on Keynetic`}
+      preview={`${props.branchName} invited you to connect your property on Keynetic`}
     >
-      <ContentContainer>
+      <ContentContainer
+        footerReason={`You received this invitation because ${props.branchName} at ${props.companyName} asked you to connect your property on Keynetic.`}
+      >
         <EmailSection style={{ paddingTop: 32, paddingBottom: 8 }}>
           <Heading
             as="h1"
@@ -45,7 +47,7 @@ export default function HomeownerInvitationEmail(
               fontWeight: 700,
             }}
           >
-            You&apos;re invited to connect your property
+            You&apos;ve been invited to connect your property
           </Heading>
 
           <Text
@@ -68,14 +70,40 @@ export default function HomeownerInvitationEmail(
             }}
           >
             {props.branchName} at {props.companyName} has invited you to connect{" "}
-            <strong>{props.propertyAddress}</strong> on Keynetic so you can follow
-            progress on your move with clear, shared visibility.
+            <strong>{props.propertyAddress}</strong> on Keynetic.
+          </Text>
+
+          <Text
+            style={{
+              margin: "0 0 16px",
+              color: EMAIL_BRAND.charcoal,
+              fontSize: 16,
+              lineHeight: "26px",
+            }}
+          >
+            Keynetic is a shared property chain coordination platform. It gives
+            connected participants one shared view of progress on your move — with
+            live updates as information is shared. Homeowners use Keynetic for
+            free.
+          </Text>
+
+          <Text
+            style={{
+              margin: 0,
+              color: EMAIL_BRAND.charcoal,
+              fontSize: 16,
+              lineHeight: "26px",
+            }}
+          >
+            When you connect, you&apos;ll see progress across connected parts of
+            your chain. Visibility improves as more participants connect. Keynetic
+            does not independently verify information shared by participants.
           </Text>
         </EmailSection>
 
         <EmailSection style={{ paddingTop: 8, paddingBottom: 24 }}>
           <PrimaryButton href={props.invitationLink}>
-            Accept invitation
+            Connect your property
           </PrimaryButton>
         </EmailSection>
 
@@ -126,7 +154,8 @@ export default function HomeownerInvitationEmail(
             }}
           >
             If you were not expecting this invitation, you can safely ignore this
-            email.
+            email. No account changes will be made unless you follow the link
+            above.
           </Text>
         </EmailSection>
       </ContentContainer>

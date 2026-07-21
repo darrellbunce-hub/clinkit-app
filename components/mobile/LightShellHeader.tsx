@@ -24,6 +24,7 @@ type LightShellHeaderProps = {
   links: LightShellNavLink[];
   trailing?: ReactNode;
   onLogout?: () => void | Promise<void>;
+  showBrandTagline?: boolean;
 };
 
 /**
@@ -35,6 +36,7 @@ export default function LightShellHeader({
   links,
   trailing,
   onLogout,
+  showBrandTagline = false,
 }: LightShellHeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] =
     useState(false);
@@ -45,8 +47,13 @@ export default function LightShellHeader({
 
   return (
     <header className="border-b border-slate-200 bg-white sticky top-0 z-50">
-      <div className="max-w-6xl mx-auto px-6 py-4 sm:py-5 flex items-center justify-between gap-4">
-        <Logo href={logoHref} variant="light" priority />
+      <div className="max-w-6xl mx-auto px-6 py-4 sm:py-5 flex items-center justify-between gap-3 sm:gap-4">
+        <Logo
+          href={logoHref}
+          variant="light"
+          priority
+          showTagline={showBrandTagline}
+        />
 
         <nav className="hidden md:flex items-center gap-1 sm:gap-3 text-sm font-semibold">
           {links.map((link) => (

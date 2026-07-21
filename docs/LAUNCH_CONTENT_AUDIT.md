@@ -1,8 +1,10 @@
 # Keynetic Launch Content Audit
 
-**Phase:** Audit complete · Founder review complete · Stage 2 complete · Stage 3 complete · Stage 3.5 complete · **Stage 4 founder-approved complete**  
-**Date:** Original audit 19 July 2026 · Consolidation 19 July 2026  
+**Phase:** Audit complete · Founder review complete · Stage 2 complete · Stage 3 complete · Stage 3.5 complete · Stage 4 founder-approved complete · Stage 5 founder-approved complete · **Stage 6 founder-approved complete**  
+**Date:** Original audit 19 July 2026 · Consolidation 19 July 2026 · Stage 6 sign-off 21 July 2026  
 **Authority:** [Founder Decisions](./LAUNCH_CONTENT_FOUNDER_DECISIONS.md) · [Stage 2 Validation](./LAUNCH_STAGE2_TECHNICAL_VALIDATION.md)
+
+**Launch Content programme:** Stages **3–6** are **FOUNDER_APPROVED_COMPLETE**. **Next programme:** Pre-Launch Operational Readiness (implementation not started).
 
 ---
 
@@ -10,9 +12,13 @@
 
 This audit inventories user-facing copy across the public website, homeowner and estate-agent product surfaces, transactional emails, and Privacy Admin operator wording. It compares messaging against implemented product behaviour and GDPR engineering (Phases 2–4, Privacy Admin + MFA).
 
-**Founder review status:** FD-001–FD-038 in [LAUNCH_CONTENT_FOUNDER_DECISIONS.md](./LAUNCH_CONTENT_FOUNDER_DECISIONS.md). Stage 2 complete — [LAUNCH_STAGE2_TECHNICAL_VALIDATION.md](./LAUNCH_STAGE2_TECHNICAL_VALIDATION.md). **Stage 4 complete** — [LAUNCH_STAGE4_COMPLETION_REPORT.md](./LAUNCH_STAGE4_COMPLETION_REPORT.md).
+**Founder review status:** FD-001–FD-041 in [LAUNCH_CONTENT_FOUNDER_DECISIONS.md](./LAUNCH_CONTENT_FOUNDER_DECISIONS.md). Stage 2 complete — [LAUNCH_STAGE2_TECHNICAL_VALIDATION.md](./LAUNCH_STAGE2_TECHNICAL_VALIDATION.md). **Stage 4 complete** — [LAUNCH_STAGE4_COMPLETION_REPORT.md](./LAUNCH_STAGE4_COMPLETION_REPORT.md). **Stage 5 complete** — [LAUNCH_STAGE5_COMPLETION_REPORT.md](./LAUNCH_STAGE5_COMPLETION_REPORT.md). **Stage 6 complete** — [LAUNCH_STAGE6_COMPLETION_REPORT.md](./LAUNCH_STAGE6_COMPLETION_REPORT.md).
 
 **Chain Intelligence:** Stage 3.5 timing_v1 model **founder-approved** — customer-facing terminology incorporated in Stage 4. See [Stage 3.5 report](./LAUNCH_STAGE3_5_COMPLETION_REPORT.md).
+
+**Transactional email (Stage 5):** Active sends — homeowner invitation · EA invitation · dormancy warning. **Unwired (inactive):** Welcome · Property connected. **FD-004** subject-line exposure **PENDING_LEGAL_REVIEW** before Production. Pre-Launch email environment checks — [Production Readiness Checklist §13](./PRODUCTION_READINESS_CHECKLIST.md).
+
+**Stage 6 (terminology / brand):** FD-041 **Chain status** · FD-039 **Moving Made Clear** · homeowner no-operational rule · EA shared-chain hero approved. See [Stage 6 report](./LAUNCH_STAGE6_COMPLETION_REPORT.md). Pre-Launch programme — [§14](./PRODUCTION_READINESS_CHECKLIST.md).
 
 **Key launch risks (content):** Legal placeholders; no published policies; footer lacks privacy@; marketing real-time/chain-wide claims; current confidence tooltips misstate algorithm.
 
@@ -589,17 +595,20 @@ Link to Privacy Policy. Do not conflate with blanket GDPR consent. Treat Terms a
 
 ## Part 22 — Implementation roadmap (post–Stage 2)
 
-| Stage | Name | Scope |
-|-------|------|-------|
-| **2** | Technical / content validation | **Complete** |
-| **3** | P0 legal / privacy / content structure | privacy@ · legal routes · remove Coming soon · erasure entry · de-link cross-link · collection notices · FAQ · IDs · **DRAFT_FOR_LEGAL_REVIEW** only · **no Chain Confidence code** |
-| **3.5** | Chain Intelligence redesign | **DESIGN_REFINED_AWAITING_FOUNDER_APPROVAL** (FD-035) — [proposal](./CHAIN_INTELLIGENCE_REDESIGN_PROPOSAL.md) · confidence + ETA consolidation · **no implementation yet** |
-| **4** | Core content / value proposition | After 3.5 for confidence copy |
-| **5** | Email content | After FD-004 legal review |
-| **6** | Terminology / UX polish | Connected · Disconnect from chain · mobile · a11y |
-| **Billing/Stripe** | Separate gated workstream | FD-036 branch-level architecture before Stripe |
+| Stage | Name | Status |
+|-------|------|--------|
+| **2** | Technical / content validation | **FOUNDER_APPROVED_COMPLETE** |
+| **3** | P0 legal / privacy / content structure | **FOUNDER_APPROVED_COMPLETE** — policies remain **DRAFT_FOR_LEGAL_REVIEW** |
+| **3.5** | Chain Intelligence redesign | **FOUNDER_APPROVED_COMPLETE** — [Stage 3.5 report](./LAUNCH_STAGE3_5_COMPLETION_REPORT.md) |
+| **4** | Core content / value proposition | **FOUNDER_APPROVED_COMPLETE** — [Stage 4 report](./LAUNCH_STAGE4_COMPLETION_REPORT.md) |
+| **5** | Transactional email content | **FOUNDER_APPROVED_COMPLETE** — [Stage 5 report](./LAUNCH_STAGE5_COMPLETION_REPORT.md) |
+| **6** | Terminology / UX / brand polish | **FOUNDER_APPROVED_COMPLETE** — [Stage 6 report](./LAUNCH_STAGE6_COMPLETION_REPORT.md) · FD-041 · FD-039 |
+| **Next** | **Pre-Launch Operational Readiness** | **Not started** — [Production Readiness Checklist §14](./PRODUCTION_READINESS_CHECKLIST.md) |
+| **Billing/Stripe** | Separate gated workstream | FD-036 — awaiting explicit founder approval |
 
-**Awaiting explicit founder approval:** Stage 3 · Stage 3.5 · Billing/Stripe
+**Launch Content programme (Stages 3–6): complete.**
+
+**Awaiting explicit founder approval:** Billing/Stripe (FD-036)
 
 ---
 
@@ -657,4 +666,4 @@ User-facing claims to reconcile with formal governance pack:
 
 ---
 
-*Post–Stage 2 consolidation complete. Do not begin Stage 3 or Stage 3.5 without founder approval.*
+*Launch Content programme complete (Stages 3–6 founder-approved, 21 Jul 2026). Next programme: Pre-Launch Operational Readiness — not started.*

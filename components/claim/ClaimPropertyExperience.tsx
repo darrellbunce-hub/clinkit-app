@@ -139,15 +139,15 @@ export default function ClaimPropertyExperience({
         <h2 className="text-xl font-bold text-slate-900">
           {declinedInvitation
             ? "Invitation declined"
-            : "No properties to claim"}
+            : "No properties to connect"}
         </h2>
 
         <p className="mt-3 text-slate-600">
           {declinedInvitation
             ? "Your estate agent has been informed. You can accept a new invitation later if needed."
             : highlightPropertyId != null
-              ? "This claim link is no longer valid or the property has already been claimed."
-              : "There are no managed properties waiting for your claim right now."}
+              ? "This invitation link is no longer valid or the property has already been connected."
+              : "There are no managed properties waiting for your connection right now."}
         </p>
       </div>
     );
@@ -157,13 +157,13 @@ export default function ClaimPropertyExperience({
     <div className="space-y-8">
       <div>
         <h1 className={PAGE_TITLE_CLASS}>
-          Claim Your Property
+          Connect Your Property
         </h1>
 
         <p className="mt-3 text-lg text-slate-600">
           An estate agent has set up a property using
-          your email. Review the details below and claim
-          operational ownership when you are ready.
+          your email. Review the details below and connect
+          your property when you are ready.
         </p>
       </div>
 
@@ -209,17 +209,17 @@ export default function ClaimPropertyExperience({
 function mapClaimError(error: string): string {
   switch (error) {
     case "not_claimable":
-      return "This property is no longer available to claim.";
+      return "This property is no longer available to connect.";
     case "already_member":
       return "You are already linked to this property.";
     case "homeowner_only":
-      return "Only homeowner accounts can claim managed properties.";
+      return "Only homeowner accounts can connect managed properties.";
     case "email_required":
-      return "Your account must have a verified email address to claim a property.";
+      return "Your account must have a verified email address to connect a property.";
     case "invitation_declined":
       return "This invitation has already been declined.";
     default:
-      return "Could not claim this property. Please try again.";
+      return "Could not connect this property. Please try again.";
   }
 }
 
@@ -230,7 +230,7 @@ function mapRejectError(error: string): string {
     case "already_used":
       return "This invitation has already been used.";
     case "already_claimed":
-      return "This property has already been claimed.";
+      return "This property has already been connected.";
     case "email_mismatch":
       return "Sign in with the email address your estate agent used for this invitation.";
     case "invitation_declined":

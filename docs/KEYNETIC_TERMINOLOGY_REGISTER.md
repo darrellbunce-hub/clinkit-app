@@ -1,10 +1,10 @@
 # Keynetic Terminology Register
 
-**Version:** Post–Stage 2 consolidation — authoritative for implementation  
+**Version:** Post–Stage 6 founder sign-off — authoritative for implementation  
 **Purpose:** Customer-facing language standards for Stages 3–6 and Stage 3.5  
-**Related:** [Founder Decisions](./LAUNCH_CONTENT_FOUNDER_DECISIONS.md) · [Stage 2 Validation](./LAUNCH_STAGE2_TECHNICAL_VALIDATION.md)
+**Related:** [Founder Decisions](./LAUNCH_CONTENT_FOUNDER_DECISIONS.md) · [Stage 6 Report](./LAUNCH_STAGE6_COMPLETION_REPORT.md) · [Stage 2 Validation](./LAUNCH_STAGE2_TECHNICAL_VALIDATION.md)
 
-Founder decisions (FD-001–FD-037) supersede conflicting entries from the original audit and Stage 2 report.  
+Founder decisions (FD-001–FD-041) supersede conflicting entries from the original audit and Stage 2 report.  
 Do **not** rename code identifiers in planning or content-only phases.
 
 ---
@@ -24,13 +24,14 @@ Do **not** rename code identifiers in planning or content-only phases.
 
 | Concept | Customer-facing (approved) | Internal / technical | Founder decision | Notes |
 |---------|---------------------------|----------------------|------------------|-------|
-| Platform category (public/homeowner) | **Property chain tracking and coordination platform** | — | FD-015 | Not a CRM |
+| Platform category (public/homeowner) | **Property chain tracking and coordination platform** | — | FD-015 | Not a CRM; **do not** describe homeowners' experience as an "operational platform" (Stage 6 / FD-041) |
 | Platform category (estate agent) | **Shared operational platform for property chains** | — | FD-015 | Audience-specific wording OK |
 | CRM relationship | **Works alongside your CRM** | — | FD-015, FD-031 | Never CRM replacement |
 | Property chain | **Your property chain** / **Property chain** | `chains`, `chain_id` | FD-016 | Glossary on first use for non-industry users |
 | Move / transaction | **Your move** (homeowner/public) · **Transaction** (EA/formal) · **Property transaction** (legal) | `property`, operational workflow | FD-016 | Contextual variation permitted |
 | Shared truth | **One shared view of the chain** (variations allowed) | Single operational chain model | FD-017 | Do not imply all participants must connect first |
-| Operational owner | **You manage this property** (or equivalent plain language) | `operational_owner`, `canEditProperty()` | FD-018 | **Never** expose "operational owner" to customers |
+| Brand tagline | **Moving Made Clear** | — | FD-039 | Public marketing headers (homepage `/` + EA landing) · footers · email footer; auth does not hide homepage tagline; app routes logo-only |
+| Operational owner | **You manage this property** / **Managed by** (homeowner) · **Operational owner** (EA workspace only) | `operational_owner`, `canEditProperty()` | FD-018, FD-041 | **Never** expose "operational owner" to **homeowner** customers |
 
 ---
 
@@ -77,6 +78,7 @@ Do **not** rename code identifiers in planning or content-only phases.
 | Concept | Customer-facing | Internal | Founder decision | Notes |
 |---------|-----------------|----------|------------------|-------|
 | Chain progress | **Chain progress** | milestone/status progression | FD-027 | Distinct from confidence |
+| Chain status (homeowner chain page) | **Chain status** | `computeChainHealth()` / operational conditions | FD-041 | Supersedes FD-038 **Operational status** on homeowner chain page only; values unchanged |
 | Chain confidence | **Chain confidence** (system-generated indicator) | confidence algorithm | FD-027–029, FD-035 | **Target:** expected timeframes + buffer — **current code not approved** |
 | Estimated completion | **Estimated completion window** | ETA logic | FD-029, FD-035 | Consolidate single source; no "Forecast Engine" |
 | User sentiment | **Happy / Unsure / Concerned** (if shown) | user-provided signal | FD-027 | **Third distinct concept** — never conflate with confidence |
@@ -159,7 +161,9 @@ Do **not** rename code identifiers in planning or content-only phases.
 | Anonymised benchmarks | Operational insights / Coming soon | Not verified at launch | FD-003, FD-030 |
 | Real-time (absolute) | Live updates / live shared updates | Unless verified | FD-002, FD-030 |
 | CRM replacement | Works alongside your CRM | Positioning | FD-015 |
-| Operational owner | You manage this property | Ownership ambiguity | FD-018 |
+| Operational owner | You manage this property / Managed by | Ownership ambiguity | FD-018, FD-041 |
+| Operational status (homeowner) | Chain status | Internal operational conditions | FD-041 |
+| Operational (homeowner surfaces) | Plain English — progress, updates, attention needed | Stage 6 homeowner rule | FD-041 |
 | Searching placeholder | Searching for your next home | Internal term | FD-023 |
 | Break the chain | Disconnect from chain | Implies real-world collapse | FD-024 |
 | Forecast Engine | Estimated completion window | Overstates capability | FD-029 |

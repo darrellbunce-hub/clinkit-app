@@ -73,8 +73,8 @@ export default function ClaimablePropertyCard({
             className={`w-full rounded-xl px-5 py-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60 ${BTN_PRIMARY_SM_CLASS}`}
           >
             {isClaiming
-              ? "Claiming..."
-              : "Claim this property"}
+              ? "Connecting..."
+              : "Connect this property"}
           </button>
 
           <button

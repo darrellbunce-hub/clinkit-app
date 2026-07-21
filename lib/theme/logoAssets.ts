@@ -51,3 +51,18 @@ export const LOGO_WORDMARK_CLASS =
 /** Icon + wordmark lockup — vertically centred, 10–12px gap */
 export const LOGO_LOCKUP_CLASS =
   "inline-flex min-w-0 shrink-0 items-center gap-[10px] sm:gap-3";
+
+/** Brand tagline — FD-039; canonical customer-facing string */
+export const KEYNETIC_TAGLINE = "Moving Made Clear";
+
+const LOGO_TAGLINE_BASE_CLASS =
+  "block font-normal tracking-wide leading-tight";
+
+/** Tagline beneath wordmark — dark backgrounds (navbar, dark footer) */
+export const LOGO_TAGLINE_DARK_CLASS = `${LOGO_TAGLINE_BASE_CLASS} mt-0.5 text-[11px] sm:text-xs text-slate-400`;
+
+/** Tagline beneath wordmark — light backgrounds (EA marketing header) */
+export const LOGO_TAGLINE_LIGHT_CLASS = `${LOGO_TAGLINE_BASE_CLASS} mt-0.5 text-[11px] sm:text-xs text-slate-500`;
+
+/** @deprecated alias — use LOGO_TAGLINE_DARK_CLASS */
+export const LOGO_TAGLINE_CLASS = LOGO_TAGLINE_DARK_CLASS;

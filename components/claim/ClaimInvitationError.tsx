@@ -48,15 +48,15 @@ function getMessage(error: string): string {
     case "already_used":
       return "This invitation has already been used.";
     case "already_claimed":
-      return "This property has already been claimed.";
+      return "This property has already been connected.";
     case "email_mismatch":
       return "Sign in with the email address your estate agent used for this invitation.";
     case "not_authenticated":
-      return "Sign in to continue with your property claim.";
+      return "Sign in to continue connecting your property.";
     case "homeowner_only":
-      return "Only homeowner accounts can claim managed properties.";
+      return "Only homeowner accounts can connect managed properties.";
     case "email_required":
-      return "Your account must have an email address to claim this property.";
+      return "Your account must have an email address to connect this property.";
     default:
       return "This invitation link is not valid.";
   }

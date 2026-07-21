@@ -1,12 +1,18 @@
 import EstateAgentManagementModeBadge from "@/components/estate-agents/EstateAgentManagementModeBadge";
 import type { OperationalWorkspaceLabels } from "@/hooks/useOperationalWorkspaceLabels";
 import type { EstateAgentManagementModePresentation } from "@/lib/estateAgent/managementModePresentation";
+import {
+  getOperationalContextManagerLabel,
+  getOperationalContextOwnerLabel,
+} from "@/lib/customerFacingLabels";
+import type { WorkflowViewerRole } from "@/lib/workflowPermissions";
 
 type OperationalContextStripProps = {
   labels: OperationalWorkspaceLabels;
   editingMode: "Owner" | "Delegated" | "View only";
   showManager: boolean;
   managementMode?: EstateAgentManagementModePresentation | null;
+  viewerRole: WorkflowViewerRole;
 };
 
 function ContextItem({
@@ -34,6 +40,7 @@ export default function OperationalContextStrip({
   editingMode,
   showManager,
   managementMode = null,
+  viewerRole,
 }: OperationalContextStripProps) {
   const columnCount =
     2 +
@@ -51,7 +58,7 @@ export default function OperationalContextStrip({
       }`}
     >
       <ContextItem
-        label="Operational owner"
+        label={getOperationalContextOwnerLabel(viewerRole)}
         value={
           labels.isLoading
             ? "Loading…"
@@ -61,7 +68,7 @@ export default function OperationalContextStrip({
 
       {showManager && labels.operationalManager ? (
         <ContextItem
-          label="Operational manager"
+          label={getOperationalContextManagerLabel(viewerRole)}
           value={
             labels.isLoading
               ? "Loading…"

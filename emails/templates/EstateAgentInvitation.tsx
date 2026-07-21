@@ -12,9 +12,11 @@ export default function EstateAgentInvitationEmail(
 ) {
   return (
     <EmailLayout
-      preview={`Join ${props.companyName} on Keynetic`}
+      preview={`Join ${props.branchName} on Keynetic`}
     >
-      <ContentContainer>
+      <ContentContainer
+        footerReason={`You received this invitation to join ${props.branchName} at ${props.companyName} on Keynetic.`}
+      >
         <EmailSection style={{ paddingTop: 32, paddingBottom: 8 }}>
           <Heading
             as="h1"
@@ -26,7 +28,7 @@ export default function EstateAgentInvitationEmail(
               fontWeight: 700,
             }}
           >
-            Join your team on Keynetic
+            You&apos;ve been invited to join your branch on Keynetic
           </Heading>
 
           <Text
@@ -48,9 +50,23 @@ export default function EstateAgentInvitationEmail(
               lineHeight: "26px",
             }}
           >
-            You&apos;ve been invited to join {props.companyName} on Keynetic.
-            You&apos;ll work from the shared {props.branchName} operational
-            dashboard.
+            You&apos;ve been invited to join {props.companyName} on Keynetic —
+            a shared property chain coordination platform for the{" "}
+            {props.branchName} operational workspace.
+          </Text>
+
+          <Text
+            style={{
+              margin: 0,
+              color: EMAIL_BRAND.charcoal,
+              fontSize: 16,
+              lineHeight: "26px",
+            }}
+          >
+            Keynetic works alongside your CRM, giving your branch shared
+            operational visibility across connected chains. Accepting this
+            invitation lets you collaborate on property moves with homeowners
+            from the same workspace.
           </Text>
         </EmailSection>
 

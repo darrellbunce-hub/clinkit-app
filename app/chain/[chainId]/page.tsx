@@ -26,6 +26,10 @@ import {
   CHAIN_CONFIDENCE_TOOLTIP,
   CHAIN_PROGRESS_TOOLTIP,
 } from "@/lib/chainIntelligence/presentation";
+import {
+  CHAIN_STATUS_EXPLAINER,
+  CHAIN_STATUS_LABEL,
+} from "@/lib/customerFacingLabels";
 import { EstimatedCompletionWindowPanel } from "@/components/chainIntelligence/EstimatedCompletionWindowPanel";
 import { resolveBuyerReadyStageLabel } from "@/lib/chainIntelligence/buyerReadyLabels";
 import {
@@ -695,7 +699,7 @@ export default function ChainPage() {
           <div className={`mt-8 ${CARD_CLASS_NO_PADDING} ${CARD_PADDING_CLASS}`}>
 
 <p className="text-sm font-medium text-slate-500">
-  Operational status
+  {CHAIN_STATUS_LABEL}
 </p>
 
 <div className="mt-3 flex items-center gap-4">
@@ -723,10 +727,7 @@ export default function ChainPage() {
 </div>
 
 <p className="mt-3 text-xs text-slate-500 max-w-2xl leading-relaxed">
-  Highlights operational conditions such as stale updates, reported delays,
-  or broken connections that may require attention. Separate from Chain
-  Confidence, which reflects timing health for steps where reliable timing
-  data is available.
+  {CHAIN_STATUS_EXPLAINER}
 </p>
 
 <p className="mt-4 text-slate-600">
@@ -1522,8 +1523,8 @@ export default function ChainPage() {
                 </h2>
 
                 <p className="text-slate-500 mt-2">
-                  Assign an estate agent from your operational
-                  sale property page when you have an editable
+                  Assign an estate agent from your sale
+                  property page when you have an editable
                   sale position in this chain.
                 </p>
               </div>

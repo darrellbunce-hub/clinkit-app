@@ -41,6 +41,11 @@ import {
   resolveOperationalSubject,
   resolveSubjectOperationalPosition,
 } from "@/lib/operationalSubject";
+import {
+  getActionAlertBadgeLabel,
+  getNextMilestoneHint,
+  getShareUpdatesIntro,
+} from "@/lib/customerFacingLabels";
 import { getEstateAgentManagementModeForOperationalAssignment } from "@/lib/estateAgent/managementModePresentation";
 import { computeScopeEstimatedCompletionWindow } from "@/lib/chainIntelligence/scopeEstimate";
 import { resolvePropertyStageClock } from "@/lib/chainIntelligence/stageClock";
@@ -732,13 +737,16 @@ if (
       access.viewerRole === "estate_agent"
     }
     managementMode={managementMode}
+    viewerRole={access.viewerRole}
   />
 )}
 
 </div>
 
         {showOperationalManager && (
-          <OperationalManagerBanner />
+          <OperationalManagerBanner
+            viewerRole={access.viewerRole}
+          />
         )}
 
         {access.canView &&
@@ -765,7 +773,7 @@ if (
                 <div
                   className={`${actionColour} px-5 py-3 rounded-2xl text-sm font-semibold whitespace-nowrap`}
                 >
-                  Operational Alert
+                  {getActionAlertBadgeLabel(access.viewerRole)}
                 </div>
               }
             >
@@ -906,7 +914,7 @@ if (
     </p>
 
     <p className="mt-3 text-slate-600">
-      This is typically the next operational milestone in the property transaction.
+      {getNextMilestoneHint(access.viewerRole)}
     </p>
 
   </div>
@@ -1013,8 +1021,7 @@ if (
           </h2>
 
           <p className="text-slate-500 mt-2">
-            Share operational updates with
-            the chain.
+            {getShareUpdatesIntro(access.viewerRole)}
           </p>
 
           <select

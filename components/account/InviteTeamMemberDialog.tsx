@@ -16,7 +16,6 @@ import {
 import {
   createEaBranchInvitation,
   formatEaBranchInvitationError,
-  type EaBranchInviteRoleOption,
 } from "@/lib/estateAgent/branchTeam";
 import { BTN_SECONDARY_OUTLINE_SM_CLASS } from "@/lib/theme/themeTokens";
 
@@ -35,8 +34,6 @@ export default function InviteTeamMemberDialog({
 }: InviteTeamMemberDialogProps) {
   const [inviteName, setInviteName] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] =
-    useState<EaBranchInviteRoleOption>("staff");
   const [errorMessage, setErrorMessage] =
     useState("");
   const [successMessage, setSuccessMessage] =
@@ -48,7 +45,6 @@ export default function InviteTeamMemberDialog({
     if (!isOpen) {
       setInviteName("");
       setInviteEmail("");
-      setInviteRole("staff");
       setErrorMessage("");
       setSuccessMessage("");
       setIsSubmitting(false);
@@ -74,7 +70,6 @@ export default function InviteTeamMemberDialog({
           branchId,
           inviteEmail,
           inviteName,
-          role: inviteRole,
         });
 
       if (!invitationResult.ok) {
@@ -111,8 +106,8 @@ export default function InviteTeamMemberDialog({
 
       setSuccessMessage(
         emailResult.sent
-          ? `Invitation sent to ${inviteEmail.trim().toLowerCase()}.`
-          : "Invitation created. Email sending is disabled in this environment."
+          ? `Invitation sent to ${inviteEmail.trim().toLowerCase()}. They will join as Staff.`
+          : "Invitation created as Staff. Email sending is disabled in this environment."
       );
 
       await onInvited();
@@ -143,8 +138,9 @@ export default function InviteTeamMemberDialog({
             </h3>
 
             <p className="mt-2 text-sm text-slate-600">
-              They will join your branch and share the same
-              operational dashboard.
+              They will join your branch as Staff and share the
+              operational dashboard. To assign a new Owner, use
+              Transfer Ownership instead.
             </p>
           </div>
 
@@ -205,31 +201,6 @@ export default function InviteTeamMemberDialog({
               disabled={isSubmitting}
               className={accountInputClassName}
             />
-          </div>
-
-          <div>
-            <label
-              htmlFor="invite-role"
-              className="block text-sm font-medium text-slate-700"
-            >
-              Role
-            </label>
-
-            <select
-              id="invite-role"
-              name="inviteRole"
-              value={inviteRole}
-              onChange={(event) =>
-                setInviteRole(
-                  event.target.value as EaBranchInviteRoleOption
-                )
-              }
-              disabled={isSubmitting}
-              className={accountInputClassName}
-            >
-              <option value="staff">Staff</option>
-              <option value="owner">Owner</option>
-            </select>
           </div>
 
           {errorMessage ? (

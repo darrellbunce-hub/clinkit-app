@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import Logo from "@/components/Logo";
@@ -40,6 +41,10 @@ export default function Navbar() {
   const showAuthenticatedNav =
     !authLoading && isAuthenticated;
 
+  const pathname = usePathname();
+  // FD-039: public homepage marketing brand — route context only, not auth state.
+  const showMarketingBrandTagline = pathname === "/";
+
   return (
 
     <header className={NAV_HEADER_DARK_CLASS}>
@@ -49,13 +54,19 @@ export default function Navbar() {
           max-w-6xl
           mx-auto
           px-6
-          py-5
+          py-4
+          sm:py-5
           flex
           items-center
           justify-between
+          gap-4
         "
       >
-<Logo variant="dark" priority />
+<Logo
+  variant="dark"
+  priority
+  showTagline={showMarketingBrandTagline}
+/>
         
         {/* Desktop Nav */}
 <nav className="hidden md:flex items-center gap-3">

@@ -7,10 +7,12 @@ import Header from "@/emails/components/Header";
 
 type ContentContainerProps = {
   children: ReactNode;
+  footerReason?: string;
 };
 
 export default function ContentContainer({
   children,
+  footerReason,
 }: ContentContainerProps) {
   return (
     <Container
@@ -39,7 +41,7 @@ export default function ContentContainer({
             <td>
               <Header />
               {children}
-              <Footer />
+              <Footer receivedReason={footerReason} />
             </td>
           </tr>
         </tbody>

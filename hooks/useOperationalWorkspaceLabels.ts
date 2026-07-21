@@ -7,8 +7,8 @@ import { loadAssignmentWithBranchDirectory } from "@/lib/estateAgent/assignments
 import {
   formatOperationalManagerLabel,
   OPERATIONAL_MANAGER_FALLBACK_LABEL,
-  OPERATIONAL_OWNER_FALLBACK_LABEL,
 } from "@/lib/operationalPresentation";
+import { getOperationalOwnerDisplayFallback } from "@/lib/customerFacingLabels";
 import { supabase } from "@/lib/supabase";
 import { fetchProfileAccountFields } from "@/lib/currentUserContext";
 
@@ -37,7 +37,11 @@ export function useOperationalWorkspaceLabels(
 
   const [labels, setLabels] =
     useState<OperationalWorkspaceLabels>({
-      operationalOwner: OPERATIONAL_OWNER_FALLBACK_LABEL,
+      operationalOwner: getOperationalOwnerDisplayFallback(
+        accountType === "estate_agent"
+          ? "estate_agent"
+          : "owner"
+      ),
       operationalManager: null,
       isLoading: false,
     });
@@ -58,8 +62,9 @@ export function useOperationalWorkspaceLabels(
       const isEstateAgentViewer =
         accountType === "estate_agent";
 
-      let operationalOwner =
-        OPERATIONAL_OWNER_FALLBACK_LABEL;
+      let operationalOwner = getOperationalOwnerDisplayFallback(
+        isEstateAgentViewer ? "estate_agent" : "owner"
+      );
       let operationalManager: string | null =
         null;
 
@@ -102,7 +107,7 @@ export function useOperationalWorkspaceLabels(
 
         operationalOwner =
           viewerProfile?.contact_name?.trim() ||
-          OPERATIONAL_OWNER_FALLBACK_LABEL;
+          getOperationalOwnerDisplayFallback("owner");
       }
 
       if (!cancelled) {

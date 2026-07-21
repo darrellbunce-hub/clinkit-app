@@ -12,7 +12,7 @@ export default function PasswordResetEmail(
 ) {
   return (
     <EmailLayout preview="Reset your Keynetic password">
-      <ContentContainer>
+      <ContentContainer footerReason="You received this email because a password reset was requested for your Keynetic account.">
         <EmailSection style={{ paddingTop: 32, paddingBottom: 8 }}>
           <Heading
             as="h1"
@@ -66,7 +66,7 @@ export default function PasswordResetEmail(
               lineHeight: "22px",
             }}
           >
-            This link will expire shortly for security. If the button does not work,
+            This link expires shortly for security. If the button does not work,
             copy and paste this link into your browser:
           </Text>
 
@@ -99,7 +99,8 @@ export default function PasswordResetEmail(
               lineHeight: "20px",
             }}
           >
-            If you did not request a password reset, you can safely ignore this email.
+            If you did not request a password reset, you can safely ignore this
+            email. Your password will not change unless you use the link above.
           </Text>
         </EmailSection>
       </ContentContainer>

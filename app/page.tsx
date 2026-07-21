@@ -258,7 +258,7 @@ export default function HomePage() {
             </h2>
 
             <p className="mt-6 text-xl text-slate-600 max-w-3xl mx-auto">
-              A shared operational platform for property chains — giving connected
+              A shared platform for property chains — giving connected
               participants an up-to-date picture of progress as updates are shared.
             </p>
           </div>
@@ -420,7 +420,7 @@ export default function HomePage() {
             </h2>
 
             <p className="mt-6 text-xl text-slate-600 max-w-3xl mx-auto">
-              Operational visibility and structured updates for everyone involved in
+              Clear visibility and structured updates for connected participants in
               the move — based on information shared on the platform.
             </p>
           </div>
@@ -472,7 +472,7 @@ export default function HomePage() {
               </h3>
 
               <p className="mt-4 text-slate-600 leading-relaxed">
-                Buyers and sellers see a shared operational view of connected parts of
+                Buyers and sellers see a shared view of connected parts of
                 the move.
               </p>
             </div>
@@ -574,10 +574,10 @@ export default function HomePage() {
         <div className="max-w-6xl mx-auto px-6 py-12">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-8">
             <div>
-              <Logo variant="dark" />
+              <Logo variant="dark" showTagline />
 
               <p className="mt-3 text-slate-400 max-w-md">
-                Shared operational visibility for modern residential property chains.
+                Property chain coordination for modern residential moves.
               </p>
             </div>
 

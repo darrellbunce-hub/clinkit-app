@@ -37,6 +37,7 @@ export default function EaMarketingShell({
       <LightShellHeader
         logoHref={ROUTES.home}
         links={[...marketingNavLinks]}
+        showBrandTagline
       />
 
       <PageHeaderBand />

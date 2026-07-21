@@ -12,9 +12,9 @@ export default function PropertyClaimedEmail(
 ) {
   return (
     <EmailLayout
-      preview={`${props.propertyAddress} is now connected on Keynetic`}
+      preview={`Your property is now connected on Keynetic`}
     >
-      <ContentContainer>
+      <ContentContainer footerReason="You received this email because you successfully connected your property on Keynetic.">
         <EmailSection style={{ paddingTop: 32, paddingBottom: 8 }}>
           <Heading
             as="h1"
@@ -55,14 +55,15 @@ export default function PropertyClaimedEmail(
 
           <Text
             style={{
-              margin: "0 0 16px",
+              margin: 0,
               color: EMAIL_BRAND.charcoal,
               fontSize: 16,
               lineHeight: "26px",
             }}
           >
-            You can now follow progress, view updates, and stay aligned as your move
-            continues.
+            You can now follow live shared updates and see progress across
+            connected parts of your chain. Visibility improves as more
+            participants connect.
           </Text>
         </EmailSection>
 
@@ -76,8 +77,6 @@ export default function PropertyClaimedEmail(
   );
 }
 
-export function getClaimSuccessfulSubject(
-  props: Pick<ClaimSuccessfulEmailParams, "propertyAddress">
-): string {
-  return `${props.propertyAddress} is now connected on Keynetic`;
+export function getClaimSuccessfulSubject(): string {
+  return `Your property is connected on Keynetic`;
 }

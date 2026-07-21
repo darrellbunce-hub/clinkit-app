@@ -177,6 +177,28 @@ Recommended: **900 seconds (15 minutes)** for production (`docs/ACCOUNT_SECURITY
 
 ---
 
+## Estate agent branch authorisation (Pre-Launch Workstream 1)
+
+EA **authentication** (Supabase session, `profiles.account_type = 'estate_agent'`) is separate from EA **branch authorisation** (`ea_branch_members`).
+
+- Branch membership and roles (`branch_admin` / `agent`) are the authoritative access-control mechanism for branch and assigned property data.
+- RLS helpers (`is_ea_branch_member`, `is_ea_assigned_to_property`, summary views) enforce access server-side; UI hiding is not sufficient.
+- Removing a user from a branch does **not** delete their Supabase Auth account or sign them out globally; it removes branch authorisation on live checks.
+
+**Audit and design (21 Jul 2026):** [Pre-Launch EA Access & Branch Membership Audit](./PRELAUNCH_EA_ACCESS_AND_BRANCH_MEMBERSHIP_AUDIT.md)
+
+**Implementation (21 Jul 2026):** [Implementation report](./PRELAUNCH_EA_ACCESS_IMPLEMENTATION_REPORT.md) — status `IMPLEMENTATION_COMPLETE_AWAITING_DEVELOPMENT_MIGRATION`. Key controls:
+
+- Exactly one Owner (`branch_admin`) per branch — deferred DB invariant trigger
+- Direct authenticated `UPDATE` on `ea_branch_members` revoked (OC-01)
+- `transfer_ea_branch_ownership` RPC — atomic; promote successor before outgoing Owner loses status
+- Staff-only invitations; founder team-management bypass retired
+- Append-only `ea_branch_membership_events` audit trail
+
+**Support (exception path):** [Inaccessible sole Owner runbook](./EA_BRANCH_OWNER_SUPPORT_RUNBOOK.md)
+
+---
+
 ## Related documentation
 
 - `docs/ACCOUNT_SECURITY.md` — account settings, security review, testing checklist

@@ -24,7 +24,7 @@ export const EMAIL_TEMPLATE_REGISTRY: EmailTemplateDefinition[] = [
     id: "password-reset",
     title: "Password Reset",
     description:
-      "Sent when a user requests to reset their Keynetic account password.",
+      "Reference template — production password reset is sent by Supabase Auth (see docs/AUTH_ARCHITECTURE.md).",
     category: "transactional",
     available: true,
   },
@@ -32,15 +32,15 @@ export const EMAIL_TEMPLATE_REGISTRY: EmailTemplateDefinition[] = [
     id: "welcome",
     title: "Welcome Email",
     description:
-      "Sent when a new Keynetic account is ready to use.",
+      "Sent when a new Keynetic account is ready to use (send path not yet wired in production).",
     category: "transactional",
     available: true,
   },
   {
     id: "property-claimed",
-    title: "Property Claimed",
+    title: "Property connected",
     description:
-      "Sent when a homeowner successfully connects their property on Keynetic.",
+      "Sent when a homeowner successfully connects their property on Keynetic (send path not yet wired in production).",
     category: "transactional",
     available: true,
   },
