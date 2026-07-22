@@ -1,7 +1,19 @@
 # Pre-Launch Workstream 2 — Staging Sentry Verification
 
-**Status:** Verification surface implemented — awaiting founder Sentry event confirmation  
+**Status:** Server flush fix applied — awaiting founder re-verification on Preview  
 **Scope:** Preview/Staging only · **not** Production · **not** Phase 2
+
+---
+
+## Server verification failure (fixed)
+
+**Symptom:** Client verification reached Sentry (`KEYNETIC_SENTRY_CLIENT_VERIFICATION`) but server verification (`KEYNETIC_SENTRY_SERVER_VERIFICATION`) did not.
+
+**Root cause:** The verification route called `captureObservabilityException()` (sync queue only) then threw. On Vercel **Node.js** serverless (`runtime = "nodejs"`), Sentry's `onRequestError` flush path uses `vercelWaitUntil`, which **only runs on Edge** — it is a no-op on Node. The lambda finished before the queued event was transmitted.
+
+**Fix:** `captureObservabilityException()` now `await flushIfServerless({ timeout: 2000 })` on the server before the handler returns. The verification route awaits capture before throwing so the tagged event is flushed while the invocation is still alive.
+
+**Note:** `onRequestError` (`Sentry.captureRequestError`) still runs on throw but its Edge-only `waitUntil` flush does not help Node routes. The manual capture + serverless flush is the reliable path for this verification.
 
 ---
 
@@ -138,4 +150,14 @@ Do **not** remove the verification surface yet. After both events pass privacy r
 
 ## Staging redeploy
 
-**Yes** — required after this commit and after adding `NEXT_PUBLIC_SENTRY_ENABLED=true` (and optionally `NEXT_PUBLIC_VERCEL_ENV=preview`).
+**Yes** — required after this server flush fix. Redeploy Preview, then re-run both verification buttons.
+
+### Founder retest (after redeploy)
+
+1. Open `https://<preview-url>/dev/sentry-verification`
+2. Click **Trigger server verification** (client already passed — optional to re-check)
+3. Expect on-page success message and HTTP 500 from the API (correct)
+4. In Sentry Issues, filter `environment:preview`, search `KEYNETIC_SENTRY_SERVER_VERIFICATION`
+5. Confirm tags: `runtime:server`, `error_code:sentry_verification_server`, `operation:sentry_verification_server`
+
+---

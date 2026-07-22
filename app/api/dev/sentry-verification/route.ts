@@ -20,7 +20,7 @@ export async function GET() {
 
   const error = new Error(SENTRY_SERVER_VERIFICATION_MESSAGE);
 
-  captureObservabilityException(error, {
+  await captureObservabilityException(error, {
     operation: "sentry_verification_server",
     route: "/api/dev/sentry-verification",
     errorCode: "sentry_verification_server",

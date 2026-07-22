@@ -23,7 +23,7 @@ export default function SentryVerificationPanel() {
     try {
       throw new Error(SENTRY_CLIENT_VERIFICATION_MESSAGE);
     } catch (error) {
-      captureObservabilityException(error, {
+      void captureObservabilityException(error, {
         operation: "sentry_verification_client",
         route: "/dev/sentry-verification",
         errorCode: "sentry_verification_client",

@@ -1,3 +1,4 @@
+import { flushIfServerless } from "@sentry/core";
 import * as Sentry from "@sentry/nextjs";
 
 import {
@@ -51,14 +52,14 @@ export function initializeSentry(
   Sentry.init(options);
 }
 
-export function captureObservabilityException(
+export async function captureObservabilityException(
   error: unknown,
   context?: {
     operation?: string;
     route?: string;
     errorCode?: string;
   }
-): void {
+): Promise<void> {
   if (!isSentryEnabled()) {
     return;
   }
@@ -78,4 +79,10 @@ export function captureObservabilityException(
 
     Sentry.captureException(error);
   });
+
+  // Node.js route handlers on Vercel do not flush via onRequestError's
+  // vercelWaitUntil (Edge-only). Await serverless flush before returning.
+  if (typeof window === "undefined") {
+    await flushIfServerless({ timeout: 2000 });
+  }
 }

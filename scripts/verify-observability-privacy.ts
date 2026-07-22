@@ -292,6 +292,15 @@ function main() {
     verificationApi.includes("captureObservabilityException")
   );
   record(
+    "Server observability capture flushes before serverless exit",
+    sharedSource.includes("flushIfServerless") &&
+      sharedSource.includes('typeof window === "undefined"')
+  );
+  record(
+    "Verification server route awaits capture before throwing",
+    verificationApi.includes("await captureObservabilityException")
+  );
+  record(
     "Verification client panel uses observability capture helper",
     verificationPanel.includes("captureObservabilityException")
   );
