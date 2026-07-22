@@ -79,6 +79,14 @@ function main() {
     environmentSource.includes('resolveKeyneticEnvironment() === "production"')
   );
   record(
+    "Client enablement reads NEXT_PUBLIC_SENTRY_ENABLED",
+    environmentSource.includes("NEXT_PUBLIC_SENTRY_ENABLED")
+  );
+  record(
+    "Environment resolution reads NEXT_PUBLIC_VERCEL_ENV for client bundles",
+    environmentSource.includes("NEXT_PUBLIC_VERCEL_ENV")
+  );
+  record(
     "No hardcoded Sentry DSN in repository",
     ![
       clientConfig,
@@ -177,21 +185,31 @@ function main() {
   delete process.env.SENTRY_DSN;
   process.env.VERCEL_ENV = "preview";
   delete process.env.SENTRY_ENABLED;
+  delete process.env.NEXT_PUBLIC_SENTRY_ENABLED;
 
   record(
-    "Preview remains disabled unless SENTRY_ENABLED=true",
+    "Preview remains disabled unless SENTRY_ENABLED or NEXT_PUBLIC_SENTRY_ENABLED",
     !isSentryEnabled()
   );
 
   process.env.SENTRY_ENABLED = "true";
 
   record(
-    "Explicit SENTRY_ENABLED=true allows non-production capture",
+    "Explicit SENTRY_ENABLED=true allows non-production server capture",
+    isSentryEnabled()
+  );
+
+  delete process.env.SENTRY_ENABLED;
+  process.env.NEXT_PUBLIC_SENTRY_ENABLED = "true";
+
+  record(
+    "Explicit NEXT_PUBLIC_SENTRY_ENABLED=true allows non-production client capture",
     isSentryEnabled()
   );
 
   process.env.VERCEL_ENV = "production";
   delete process.env.SENTRY_ENABLED;
+  delete process.env.NEXT_PUBLIC_SENTRY_ENABLED;
 
   record(
     "Production enables Sentry when DSN present",
@@ -210,6 +228,8 @@ function main() {
     delete process.env.SENTRY_ENABLED;
   }
 
+  delete process.env.NEXT_PUBLIC_SENTRY_ENABLED;
+
   if (previousVercelEnv) {
     process.env.VERCEL_ENV = previousVercelEnv;
   } else {
@@ -219,6 +239,61 @@ function main() {
   record(
     "Environment resolver distinguishes preview",
     resolveKeyneticEnvironment.name.length > 0
+  );
+
+  const verificationSource = read("lib/observability/sentryVerification.ts");
+  const verificationPage = read("app/dev/sentry-verification/page.tsx");
+  const verificationApi = read("app/api/dev/sentry-verification/route.ts");
+  const verificationPanel = read("components/dev/SentryVerificationPanel.tsx");
+
+  record(
+    "Verification gate blocks Production VERCEL_ENV",
+    verificationSource.includes('VERCEL_ENV?.trim() === "production"')
+  );
+  record(
+    "Verification gate requires Sentry enabled",
+    verificationSource.includes("isSentryEnabled()")
+  );
+  record(
+    "Verification uses fixed client identifier only",
+    verificationSource.includes("KEYNETIC_SENTRY_CLIENT_VERIFICATION")
+  );
+  record(
+    "Verification uses fixed server identifier only",
+    verificationSource.includes("KEYNETIC_SENTRY_SERVER_VERIFICATION")
+  );
+  record(
+    "Verification page returns notFound when blocked",
+    verificationPage.includes("notFound()")
+  );
+  record(
+    "Verification API returns 404 when blocked",
+    verificationApi.includes('status: 404')
+  );
+  record(
+    "Verification surface does not expose environment variables",
+    !verificationPanel.includes("process.env") &&
+      !verificationApi.match(/NextResponse\.json\([\s\S]*process\.env/)
+  );
+  record(
+    "Verification surface does not use Supabase",
+    !verificationSource.includes("supabase") &&
+      !verificationPage.includes("supabase") &&
+      !verificationApi.includes("supabase") &&
+      !verificationPanel.includes("supabase")
+  );
+  record(
+    "Verification panel does not expose stack traces",
+    !verificationPanel.includes("error.stack") &&
+      !verificationPanel.includes("error.message")
+  );
+  record(
+    "Verification server route uses observability capture helper",
+    verificationApi.includes("captureObservabilityException")
+  );
+  record(
+    "Verification client panel uses observability capture helper",
+    verificationPanel.includes("captureObservabilityException")
   );
 
   const failed = results.filter((entry) => !entry.pass);

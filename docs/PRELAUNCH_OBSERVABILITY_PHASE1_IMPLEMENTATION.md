@@ -4,7 +4,8 @@
 **Phase:** 1 — Minimum Viable Production Observability  
 **Status:** **`IMPLEMENTATION_COMPLETE_AWAITING_FOUNDER_CONFIGURATION_AND_STAGING_VERIFICATION`**  
 **Implementation date:** 22 July 2026  
-**Health endpoint correction:** 22 July 2026 — `?probe=app` now returns `database:"skipped"` (see §2–3)
+**Health endpoint correction:** 22 July 2026 — `?probe=app` now returns `database:"skipped"` (see §2–3)  
+**Staging Sentry verification:** [PRELAUNCH_OBSERVABILITY_SENTRY_VERIFICATION.md](./PRELAUNCH_OBSERVABILITY_SENTRY_VERIFICATION.md)
 
 **Audit basis:** [PRELAUNCH_OBSERVABILITY_AUDIT_AND_ARCHITECTURE.md](./PRELAUNCH_OBSERVABILITY_AUDIT_AND_ARCHITECTURE.md) — **`AUDIT_FOUNDER_APPROVED`**
 

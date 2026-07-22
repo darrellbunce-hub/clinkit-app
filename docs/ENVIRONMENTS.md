@@ -28,6 +28,8 @@ If either is missing, `/api/health` returns `"status":"degraded"` with `"databas
 | `NEXT_PUBLIC_SENTRY_DSN` | Client + server | Enables Sentry when combined with enablement rules |
 | `SENTRY_DSN` | Server | Alternative server-only DSN |
 | `SENTRY_ENABLED` | All | `true` forces enable on Preview/dev; `false` disables even on Production |
+| `NEXT_PUBLIC_SENTRY_ENABLED` | Client + server | Required for **browser** capture on Preview — mirrors `SENTRY_ENABLED` |
+| `NEXT_PUBLIC_VERCEL_ENV` | Client + server | Set to `preview` on Preview so client Sentry events tag correctly |
 | `SENTRY_TRACES_SAMPLE_RATE` | All | `0`–`1`; default **0** (error-only) |
 | `SENTRY_ORG` | Build | Source map upload organisation slug |
 | `SENTRY_PROJECT` | Build | Source map upload project slug |
@@ -38,9 +40,11 @@ If either is missing, `/api/health` returns `"status":"degraded"` with `"databas
 
 - No DSN → Sentry fully disabled; app behaves normally
 - DSN + Production (`VERCEL_ENV=production`) → enabled by default
-- DSN + Preview/development → disabled unless `SENTRY_ENABLED=true`
+- DSN + Preview/development → disabled unless `SENTRY_ENABLED=true` **and/or** `NEXT_PUBLIC_SENTRY_ENABLED=true`
 
 Full setup instructions: [PRELAUNCH_OBSERVABILITY_PHASE1_IMPLEMENTATION.md](./PRELAUNCH_OBSERVABILITY_PHASE1_IMPLEMENTATION.md)
+
+Staging Sentry verification (Preview only): [PRELAUNCH_OBSERVABILITY_SENTRY_VERIFICATION.md](./PRELAUNCH_OBSERVABILITY_SENTRY_VERIFICATION.md)
 
 ---
 
