@@ -19,6 +19,8 @@ Uses existing public Supabase variables:
 
 If either is missing, `/api/health` returns `"status":"degraded"` with `"database":"failed"`.
 
+`GET /api/health?probe=app` returns `"database":"skipped"` and does not contact Supabase.
+
 ### Sentry (optional)
 
 | Variable | Scope | Purpose |

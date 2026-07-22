@@ -9,6 +9,7 @@ import { join } from "path";
 
 import {
   evaluateHealthStatus,
+  getDatabaseProbeNetworkCallCountForTests,
   probeDatabaseReachability,
   resetDatabaseProbeCacheForTests,
   resolveHealthHttpStatus,
@@ -65,8 +66,9 @@ async function main() {
       healthLibSource.includes('count: "exact"')
   );
   record(
-    "Database probe caches results",
-    healthLibSource.includes("DATABASE_PROBE_TTL_MS")
+    "Database probe caches probe results separately from app-only responses",
+    healthLibSource.includes("DATABASE_PROBE_TTL_MS") &&
+      healthLibSource.includes('"skipped"')
   );
   record(
     "Database probe does not use service-role key",
@@ -92,10 +94,14 @@ async function main() {
   });
 
   record(
-    "Missing Supabase config returns degraded (database failed)",
+    "Full probe with missing Supabase config returns degraded (database failed)",
     missingConfig.status === "degraded" &&
       missingConfig.checks.app === "ok" &&
       missingConfig.checks.database === "failed"
+  );
+  record(
+    "Full probe without Supabase config avoids network call",
+    getDatabaseProbeNetworkCallCountForTests() === 0
   );
   record(
     "Missing Supabase config keeps HTTP 200 degraded semantics",
@@ -106,6 +112,31 @@ async function main() {
     !JSON.stringify(missingConfig).match(/supabase|service.?role|apikey/i)
   );
 
+  resetDatabaseProbeCacheForTests();
+
+  const appOnlyMissingConfig = await evaluateHealthStatus({
+    includeDatabaseProbe: false,
+    now: () => new Date("2026-07-22T12:00:00.000Z"),
+  });
+
+  record(
+    "App-only probe returns database skipped",
+    appOnlyMissingConfig.checks.database === "skipped"
+  );
+  record(
+    "App-only probe does not claim database ok",
+    appOnlyMissingConfig.checks.database !== "ok"
+  );
+  record(
+    "App-only probe remains healthy when database is not checked",
+    appOnlyMissingConfig.status === "healthy" &&
+      appOnlyMissingConfig.checks.app === "ok"
+  );
+  record(
+    "App-only probe does not execute database health logic",
+    getDatabaseProbeNetworkCallCountForTests() === 0
+  );
+
   if (previousUrl) {
     process.env.NEXT_PUBLIC_SUPABASE_URL = previousUrl;
   }
@@ -114,38 +145,74 @@ async function main() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = previousAnon;
   }
 
-  const appOnly = await evaluateHealthStatus({
-    includeDatabaseProbe: false,
-    now: () => new Date("2026-07-22T12:00:00.000Z"),
-  });
-
-  record(
-    "App-only evaluation returns healthy without database probe",
-    appOnly.status === "healthy" && appOnly.checks.database === "ok"
-  );
-
   resetDatabaseProbeCacheForTests();
 
   if (
     process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() &&
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim()
   ) {
-    const first = await probeDatabaseReachability();
-    const second = await probeDatabaseReachability();
+    const fullProbe = await evaluateHealthStatus({
+      includeDatabaseProbe: true,
+      now: () => new Date("2026-07-22T12:00:00.000Z"),
+    });
+    const fullProbeCalls = getDatabaseProbeNetworkCallCountForTests();
 
     record(
-      "Repeated database probes use cache within TTL",
-      first === second
+      "Full probe executes database health logic",
+      fullProbeCalls === 1 &&
+        (fullProbe.checks.database === "ok" ||
+          fullProbe.checks.database === "failed")
     );
 
+    const cachedFullProbe = await evaluateHealthStatus({
+      includeDatabaseProbe: true,
+      now: () => new Date("2026-07-22T12:00:01.000Z"),
+    });
+
     record(
-      "Live database probe returns ok or failed without throwing",
-      first === "ok" || first === "failed"
+      "Repeated full probes reuse database probe cache within TTL",
+      getDatabaseProbeNetworkCallCountForTests() === fullProbeCalls &&
+        cachedFullProbe.checks.database === fullProbe.checks.database
+    );
+
+    const appOnlyAfterFull = await evaluateHealthStatus({
+      includeDatabaseProbe: false,
+      now: () => new Date("2026-07-22T12:00:02.000Z"),
+    });
+
+    record(
+      "App-only probe after full probe does not claim database ok",
+      appOnlyAfterFull.checks.database === "skipped"
+    );
+    record(
+      "App-only probe after full probe does not add database network calls",
+      getDatabaseProbeNetworkCallCountForTests() === fullProbeCalls
+    );
+    record(
+      "App-only response cannot reuse cached full-health database ok semantics",
+      appOnlyAfterFull.checks.database !== fullProbe.checks.database ||
+        fullProbe.checks.database === "skipped"
     );
   } else {
     record(
-      "Live database probe skipped — Supabase env not configured locally",
+      "Live database probe checks skipped — Supabase env not configured locally",
       true
+    );
+  }
+
+  resetDatabaseProbeCacheForTests();
+
+  const first = await probeDatabaseReachability();
+  const second = await probeDatabaseReachability();
+
+  if (
+    process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() &&
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim()
+  ) {
+    record(
+      "Database probe cache reduces repeated network calls within TTL",
+      getDatabaseProbeNetworkCallCountForTests() === 1 &&
+        first === second
     );
   }
 

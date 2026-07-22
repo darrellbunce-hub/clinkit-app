@@ -4,9 +4,16 @@ export type HealthStatus = "healthy" | "degraded" | "unhealthy";
 
 export type HealthCheck = "app" | "database";
 
+export type AppCheckResult = "ok" | "failed";
+
+export type DatabaseCheckResult = "ok" | "failed" | "skipped";
+
 export type HealthCheckResult = {
   status: HealthStatus;
-  checks: Record<HealthCheck, "ok" | "failed">;
+  checks: {
+    app: AppCheckResult;
+    database: DatabaseCheckResult;
+  };
   timestamp: string;
 };
 
@@ -23,6 +30,7 @@ type CachedDatabaseProbe = {
 const DATABASE_PROBE_TTL_MS = 45_000;
 
 let cachedDatabaseProbe: CachedDatabaseProbe | null = null;
+let databaseProbeNetworkCallCount = 0;
 
 function resolveTimestamp(now?: () => Date): string {
   return (now ?? (() => new Date()))().toISOString();
@@ -66,6 +74,8 @@ export async function probeDatabaseReachability(): Promise<"ok" | "failed"> {
     return "failed";
   }
 
+  databaseProbeNetworkCallCount += 1;
+
   const supabase = createClient(url, anonKey, {
     auth: {
       persistSession: false,
@@ -108,15 +118,21 @@ export async function probeDatabaseReachability(): Promise<"ok" | "failed"> {
 
 export function resetDatabaseProbeCacheForTests(): void {
   cachedDatabaseProbe = null;
+  databaseProbeNetworkCallCount = 0;
+}
+
+/** Test-only metric: counts actual Supabase network probes (not cache hits). */
+export function getDatabaseProbeNetworkCallCountForTests(): number {
+  return databaseProbeNetworkCallCount;
 }
 
 export async function evaluateHealthStatus(
   options: HealthCheckOptions = {}
 ): Promise<HealthCheckResult> {
   const includeDatabaseProbe = options.includeDatabaseProbe ?? true;
-  const checks: Record<HealthCheck, "ok" | "failed"> = {
+  const checks: HealthCheckResult["checks"] = {
     app: "ok",
-    database: "ok",
+    database: "skipped",
   };
 
   if (includeDatabaseProbe) {

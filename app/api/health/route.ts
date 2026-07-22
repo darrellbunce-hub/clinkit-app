@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
  * - Does not mutate data, expose secrets, or return internal error details.
  *
  * Optional query:
- *   ?probe=app — skip the database probe (application-only check).
+ *   ?probe=app — skip the database probe; returns database:"skipped".
  */
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);

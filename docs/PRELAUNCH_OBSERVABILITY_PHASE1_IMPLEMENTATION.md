@@ -3,7 +3,8 @@
 **Workstream:** Production Observability & Incident Alerting  
 **Phase:** 1 — Minimum Viable Production Observability  
 **Status:** **`IMPLEMENTATION_COMPLETE_AWAITING_FOUNDER_CONFIGURATION_AND_STAGING_VERIFICATION`**  
-**Implementation date:** 22 July 2026
+**Implementation date:** 22 July 2026  
+**Health endpoint correction:** 22 July 2026 — `?probe=app` now returns `database:"skipped"` (see §2–3)
 
 **Audit basis:** [PRELAUNCH_OBSERVABILITY_AUDIT_AND_ARCHITECTURE.md](./PRELAUNCH_OBSERVABILITY_AUDIT_AND_ARCHITECTURE.md) — **`AUDIT_FOUNDER_APPROVED`**
 
@@ -43,6 +44,8 @@ Repository-side foundations are in place for proactive Production failure detect
 
 ### Response shape
 
+**Full probe** (`GET /api/health`):
+
 ```json
 {
   "status": "healthy" | "degraded" | "unhealthy",
@@ -50,6 +53,18 @@ Repository-side foundations are in place for proactive Production failure detect
   "timestamp": "ISO-8601"
 }
 ```
+
+**App-only probe** (`GET /api/health?probe=app`):
+
+```json
+{
+  "status": "healthy",
+  "checks": { "app": "ok", "database": "skipped" },
+  "timestamp": "ISO-8601"
+}
+```
+
+`database:"skipped"` explicitly means **no Supabase/database request was made** on that request.
 
 ### HTTP status codes
 
@@ -63,7 +78,7 @@ Repository-side foundations are in place for proactive Production failure detect
 
 | Parameter | Effect |
 |-----------|--------|
-| `?probe=app` | Skips database probe — use for monitors that should not hit Supabase |
+| `?probe=app` | Skips database probe — **no Supabase request** — returns `database:"skipped"` |
 
 ### Security properties
 
@@ -80,10 +95,24 @@ Repository-side foundations are in place for proactive Production failure detect
 | Factor | Detail |
 |--------|--------|
 | Probe type | HEAD/count request — minimal payload |
-| Cache TTL | **45 seconds** per warm serverless instance (`DATABASE_PROBE_TTL_MS`) |
-| Uptime at 5 min interval | ~12 probes/hour/instance; with cache ≈ **≤80 DB API calls/hour/instance** |
-| Recommended monitor interval | **5 minutes** on `/api/health`; use `?probe=app` on homepage/login monitors |
-| Cost risk | Low at launch scale; avoid sub-minute polling on full health endpoint |
+| Full probe cost | **1 Supabase REST API call per request** (when cache miss) |
+| App-only probe cost | **0 Supabase requests** |
+| Cache TTL | **45 seconds** per warm serverless instance — caches **database probe result only**, not full HTTP responses |
+| **Correct estimate: one monitor on `/api/health` every 5 minutes** | **12 checks/hour → ~12 Supabase API calls/hour** (interval 300s ≫ cache TTL 45s, so cache rarely helps at this interval) |
+| Homepage/login monitors using `?probe=app` | **0 Supabase calls** from those monitors |
+| Cost risk | Negligible at launch scale; avoid sub-minute polling on full `/api/health` |
+
+### Serverless cache limitations
+
+The 45-second cache is **in-process and instance-local only**:
+
+- Each warm Vercel serverless instance maintains its own cache
+- Cold starts reset the cache
+- Concurrent instances do not share cache state
+- It is **not** a globally reliable request-reduction mechanism
+- It only reduces burst traffic to Supabase when the **same instance** receives multiple full probes within 45 seconds (e.g. manual retests, overlapping monitors)
+
+**Do not rely on this cache for cost control at 5-minute monitoring intervals.** At that interval, assume **one DB call per full health check**.
 
 ---
 
@@ -442,7 +471,7 @@ No unrelated ESLint cleanup performed.
 1. **Review** this implementation report and Phase 1 code on `staging-test` branch  
 2. **Deploy to Staging** Preview and verify:
    - `GET /api/health` returns JSON with expected shape
-   - `GET /api/health?probe=app` skips DB check
+   - `GET /api/health?probe=app` returns `"database":"skipped"` and makes **no** Supabase request
    - Deliberate error boundary (optional test route) shows branded UI  
 3. **Create Sentry project** (EU region recommended) — do not share auth token in chat  
 4. **Set Vercel Production environment variables** (DSN, optional org/project/auth token)  
