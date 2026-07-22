@@ -1,9 +1,7 @@
 # Production Readiness Checklist
 
-**Audit date:** 2026-06-06  
-**Audit type:** Read-only — no changes made  
-**Development Supabase:** `bbbsxzxcjkmpqsfvmhbo` (confirmed via `.env.local`)  
-**Production Supabase:** Separate branch/project per `docs/KEYNETIC_ARCHITECTURE.md` — **not probeable from this workspace** (no Production credentials in repo)
+**Audit date (§14 refresh):** 2026-07-22  
+**Audit type (§14 refresh):** Staging smoke-test audit, EA navigation audit, EA access verification, **Workstream 2 observability audit** — no Production changes
 
 ---
 
@@ -510,11 +508,26 @@ Keynetic `emails/templates/PasswordReset.tsx` is a **reference template only**; 
 
 ## 14. Pre-Launch Operational Readiness programme
 
-**Recorded at Stage 6 founder sign-off (21 Jul 2026).**
+**Recorded at Stage 6 founder sign-off (21 Jul 2026).**  
+**Updated:** 22 Jul 2026 — **Workstream 1 EA Access `FOUNDER_APPROVED_COMPLETE`** · **Workstream 2 Phase 1 `IMPLEMENTATION_COMPLETE_AWAITING_FOUNDER_CONFIGURATION_AND_STAGING_VERIFICATION`** · follow-ups FD-042–FD-045 recorded
 
-The **Launch Content programme** (Stages 3–6) is **FOUNDER_APPROVED_COMPLETE**. The **next programme** is **Pre-Launch Operational Readiness**.
+The **Launch Content programme** (Stages 3–6) is **FOUNDER_APPROVED_COMPLETE**. The **Pre-Launch Operational Readiness** programme is **in progress** — Workstream 1 complete; Workstream 2 Phase 1 repository implementation complete; **external observability configuration not performed**.
 
-**Implementation status:** Workstream 1 (EA branch access) — **implementation complete, awaiting Development migration and founder sign-off**; other Pre-Launch items remain open.
+**Implementation status (22 Jul 2026):**
+
+| Workstream | Status |
+|------------|--------|
+| **Workstream 1 — EA branch access & ownership continuity** | **`FOUNDER_APPROVED_COMPLETE`** — [sign-off record](./PRELAUNCH_EA_ACCESS_FOUNDER_SIGNOFF.md) · Dev **29/29** · Staging manual **PASS** |
+| **Workstream 2 — Production observability & incident alerting** | **Phase 1 repo complete** — [audit](./PRELAUNCH_OBSERVABILITY_AUDIT_AND_ARCHITECTURE.md) **`AUDIT_FOUNDER_APPROVED`** · [Phase 1 report](./PRELAUNCH_OBSERVABILITY_PHASE1_IMPLEMENTATION.md) · **awaiting founder Staging verification + external config** |
+| Monitoring / observability | **IN PROGRESS** — Phase 1 foundations in repo; Sentry/uptime/Vercel/Supabase alerts **not configured** (§14.3 A · §14.7) |
+| Cost / unit economics | **OPEN** — not started (§14.3 B) |
+| Performance / concurrency | **OPEN** — not started (§14.3 C) |
+| Security architecture review | **OPEN** — not started (§14.3 D–F) |
+| Google OAuth assessment | **OPEN** — not implemented (§14.3 G) |
+| Address lookup assessment | **OPEN** — not implemented (§14.3 H) |
+| Browser / brand assets | **OPEN** (§14.3 I) |
+| Stripe / commercial readiness | **OPEN** — not started (§14.3 J) |
+| Serverless vs containers review | **Future evidence-based review** (§14.3 K) |
 
 ### 14.1 Launch Content programme — complete
 
@@ -526,9 +539,7 @@ The **Launch Content programme** (Stages 3–6) is **FOUNDER_APPROVED_COMPLETE**
 | Stage 5 — Transactional email content | **FOUNDER_APPROVED_COMPLETE** |
 | Stage 6 — Terminology / UX / brand polish | **FOUNDER_APPROVED_COMPLETE** — [Stage 6 report](./LAUNCH_STAGE6_COMPLETION_REPORT.md) |
 
-### 14.2 Pre-Launch Operational Readiness — open requirements
-
-These remain **open** until explicitly verified or implemented in the Pre-Launch programme. **None are marked resolved by Stage 6.**
+### 14.2 Pre-Launch Operational Readiness — requirement register
 
 | # | Requirement | Status |
 |---|-------------|--------|
@@ -540,31 +551,188 @@ These remain **open** until explicitly verified or implemented in the Pre-Launch
 | 6 | **`NEXT_PUBLIC_APP_URL`** Production verification (§13.1) | **OPEN** |
 | 7 | **Resend** Production configuration (§13.2) | **OPEN** |
 | 8 | **Supabase Auth** Production email templates (§13.3) | **OPEN** |
-| 9 | EA branch user access revocation | **IMPLEMENTATION_COMPLETE_AWAITING_DEVELOPMENT_MIGRATION** — [Workstream 1 audit](./PRELAUNCH_EA_ACCESS_AND_BRANCH_MEMBERSHIP_AUDIT.md) · [implementation report](./PRELAUNCH_EA_ACCESS_IMPLEMENTATION_REPORT.md) |
-| 10 | EA owner transfer / continuity | **IMPLEMENTATION_COMPLETE_AWAITING_DEVELOPMENT_MIGRATION** — `transfer_ea_branch_ownership` RPC + one-Owner invariant |
-| 11 | Production observability and incident alerting | **OPEN** |
-| 12 | Product / business operational metrics | **OPEN** |
-| 13 | Privacy-conscious website analytics decision | **OPEN** |
-| 14 | Run-cost monitoring and cost governance | **OPEN** |
-| 15 | **Stripe / billing architecture** (FD-036) | **OPEN** — separate gated workstream |
-| 16 | Refund / cancellation / dispute procedures | **OPEN** |
-| 17 | Final security review | **OPEN** |
+| 9 | EA branch user access revocation | **`FOUNDER_APPROVED_COMPLETE`** — [sign-off](./PRELAUNCH_EA_ACCESS_FOUNDER_SIGNOFF.md) · Dev **29/29** · Staging manual **PASS** |
+| 10 | EA owner transfer / continuity | **`FOUNDER_APPROVED_COMPLETE`** — remain Staff + leave branch verified (Dev + Staging) |
+| 11 | Production observability and incident alerting | **IN PROGRESS** — Phase 1 repo complete ([report](./PRELAUNCH_OBSERVABILITY_PHASE1_IMPLEMENTATION.md)); `/api/health`, error boundaries, optional Sentry wired; **awaiting founder external config** |
+| 12 | Product / business operational metrics | **OPEN** — §14.3 A · design in Workstream 2 Part 7 (precomputed `platform_operational_metrics`) |
+| 13 | Privacy-conscious website analytics decision | **OPEN** — §14.3 A · design in Workstream 2 Part 9 (defer invasive tracking; legal review for marketing analytics) |
+| 14 | Run-cost monitoring and cost governance | **OPEN** — §14.3 B |
+| 15 | **Stripe / billing architecture** (FD-036) | **OPEN** — §14.3 J |
+| 16 | Refund / cancellation / dispute procedures | **OPEN** — §14.3 J |
+| 17 | Final security review | **OPEN** — §14.3 D–F |
 | 18 | Final Production launch checklist (§11 gates + Production Supabase pre-flight) | **OPEN** |
-| 19 | Unwired email templates (Welcome · Property connected) | **OPEN** — documented inactive; wire or remove before describing as live |
+| 19 | Unwired email templates (Welcome · Property connected) | **OPEN** — documented inactive |
+| 20 | Concurrent-user / performance validation | **OPEN** — §14.3 C |
+| 21 | Google OAuth via Supabase Auth | **OPEN** — §14.3 G |
+| 22 | UK address lookup provider | **OPEN** — §14.3 H |
+| 23 | Favicon / browser & social brand assets | **OPEN** — §14.3 I |
+| 24 | Serverless vs containers architecture review (evidence-based) | **OPEN** — §14.3 K |
+| 25 | **FD-042** — Existing-account invitation UX | **OPEN** — not an EA Access security blocker |
+| 26 | **FD-043** — Wrong-email invitation UX (plain-English / switch account) | **OPEN** — security correct; UX follow-up |
+| 27 | **FD-044** — Invitation timestamp / BST-GMT investigation | **OPEN** |
+| 28 | **FD-045** — EA mobile/visual UX checks | **OPEN** — UX only; not access-control blockers |
+| 29 | EA access Production migration & parity | **OPEN** — Development/Staging only; Production **not deployed** |
 
-### 14.3 Stage 6 technical baseline (locked at sign-off)
+### 14.3 Expanded Pre-Launch scope (founder requirements — preserved)
+
+#### A. Monitoring / observability
+
+- Production application error tracking · proactive error alerts · failed API / database request monitoring
+- Supabase usage visibility · Vercel function/runtime monitoring · transactional email delivery/failure monitoring
+- Website traffic analytics (privacy decision required) · active homeowner / EA metrics · chain counts (live, fully vs partially connected)
+- Operational dashboards · founder alerts before users report problems
+
+**Status:** **IN PROGRESS** — Phase 1 repository implementation complete; external configuration pending
+
+**Phase 1 delivered in repo (22 Jul 2026):**
+
+| Item | Status |
+|------|--------|
+| `GET /api/health` with cached DB probe | **Implemented** |
+| `app/error.tsx` + `app/global-error.tsx` | **Implemented** |
+| `@sentry/nextjs@10.67.0` (optional when DSN absent) | **Implemented** |
+| PII scrubbing / no Session Replay | **Implemented** |
+| Static verifiers | **Added** |
+| External uptime monitor | **Not configured** — founder action |
+| Sentry DSN / auth token in Vercel | **Not configured** — founder action |
+| Vercel/Supabase billing alerts | **Not configured** — founder action |
+
+**Remaining P0 until external config:**
+
+| Finding | Severity |
+|---------|----------|
+| No automated uptime monitor configured | **P0** |
+| No Sentry DSN in Production | **P0** |
+| No founder alert destinations configured | **P0** |
+
+**Key audit findings still open at provider level:**
+
+| Finding | Severity |
+|---------|----------|
+| No automated downtime/uptime monitoring | **P0** |
+| No application error monitoring (Sentry or equivalent) | **P0** |
+| No founder operational alerting configured | **P0** |
+| Resend delivery/bounce webhooks not implemented | **P1** |
+| Chain intelligence cron route exists but **not scheduled** in `vercel.json` | **P1** |
+| No `/api/health` endpoint | ~~**P1**~~ **Resolved in repo** |
+| Unstructured `console.error` only (~149 calls); no correlation IDs | **P2** |
+| No React error boundaries (`error.tsx`) | ~~**P1**~~ **Resolved in repo** |
+| `email_events` captures send attempts only; `provider_events` unused | **P1** |
+
+**Recommended launch stack:** external uptime monitor + `/api/health` + Sentry (Production only) + Vercel/Supabase native dashboards + Phase 3 Resend webhooks. Expected cost **£0–35/month** at low traffic.
+
+#### B. Cost / unit economics
+
+Track/model: fixed + variable infrastructure cost · anonymous visitor cost · cost per active homeowner / chain / paying EA branch · attributable free-user activity · revenue per paying branch · infrastructure gross margin · break-even branch count · Vercel · Supabase · Resend · observability · address lookup · Stripe · bandwidth/egress.
+
+**Pricing scenarios (do not change live pricing without founder approval):** £79/£99 and £99/£129 founder/standard tiers. **£129/month ≈ £4.30/day** — positioning note only. Pricing must consider product value, not cost alone.
+
+**Status:** **OPEN**
+
+#### C. Performance / scalability
+
+Concurrent-user load testing · latency/error rate under load · DB/Supabase/Vercel behaviour · memory/CPU · event-loop blocking · sync/blocking handlers · long-running APIs · unresolved promises · unbounded concurrency · leaks · React/Realtime cleanup · N+1 · polling · idle compute · cron efficiency · repeated DB reads · cache effectiveness · single-endpoint degradation risk. **Do not over-architect for huge scale.**
+
+**Status:** **OPEN**
+
+#### D. Security architecture review
+
+IDOR/BOLA · property/chain/branch ID manipulation · invitation/token manipulation · RPC auth · RLS coverage · anon/authenticated DB exposure · browser Supabase client inventory · server vs client DB requests · service-role usage/exposure · `NEXT_PUBLIC_*` audit · secrets in logs/source · rotation · Stripe/Resend/cron/address API key security.
+
+**Status:** **OPEN**
+
+#### E. Authentication architecture
+
+Supabase Auth-only confirmation · custom JWT usage · JWT claim trust · live DB membership re-check · session lifecycle · removed-user sessions · OAuth linking risks.
+
+**Status:** **OPEN** (partial EA evidence)
+
+#### F. URL / server trust boundaries
+
+Server-generated URLs · `NEXT_PUBLIC_APP_URL` · Host/forwarded headers · redirects · callbacks · invitation/password-reset/OAuth URLs · user-controlled header trust.
+
+**Status:** **OPEN**
+
+#### G. Google authentication (assessment only)
+
+Google OAuth via Supabase · retain email/password · linking · duplicate prevention · existing users · redirect security · callback config. **Do not implement yet.**
+
+**Status:** **OPEN**
+
+#### H. Address lookup (assessment only)
+
+UK provider · pricing/limits/quality · GDPR · API key security · client vs server · fallback · standardisation · property data impact. **Do not implement yet.**
+
+**Status:** **OPEN**
+
+#### I. Browser / brand assets
+
+Favicon · tab icon · remove Vercel default · app/bookmark/iOS icons · metadata · Open Graph.
+
+**Status:** **OPEN**
+
+#### J. Stripe / commercial readiness
+
+Secret/webhook handling · signature verification · idempotency · subscription lifecycle · cancellation · failed payments · refunds · disputes · policies/procedures · access after non-payment. **Do not implement yet.**
+
+**Status:** **OPEN**
+
+#### K. Serverless vs containers (future)
+
+Retain Vercel + Supabase for launch · measure post-launch · compare when sustained · move heavy workloads independently · measurable review thresholds. **Not a current migration.**
+
+**Status:** **OPEN**
+
+### 14.4 Staging deployment smoke test (22 Jul 2026)
+
+**Repository:** `staging-test` @ `ca86ab2` — migrations `20260721100000` + `20260721110000` **git-tracked**.
+
+**Architecture:** Staging Preview → Development Supabase (`bbbsxzxcjkmpqsfvmhbo`) per [KEYNETIC_ARCHITECTURE.md](./KEYNETIC_ARCHITECTURE.md).
+
+| Surface | Evidence | Staging |
+|---------|----------|---------|
+| EA login / Command Centre / Team / Invite / Remove / Transfer UI | App routes + components | Founder manual (partial done) |
+| Property access revocation | Layout gates + EA assignment RPCs | **Founder confirmed** |
+| Chain / homepage / marketing / nav | Routes + shells | Founder manual |
+
+**Nav fixes in repo (pending Staging redeploy):** EA marketing same-page anchors; AgentShell Account Settings on `/account`.
+
+### 14.5 Prioritised Pre-Launch roadmap
+
+| Priority | Items |
+|----------|-------|
+| **P0** | Production Supabase/RLS parity · Production email/app URL config · Security IDOR/BOLA/RLS review · Legal/FD-004/privacy@ · EA access **Production migration** |
+| **P1** | Observability · Stripe/billing · Cost model · Performance baseline · Favicon/brand assets |
+| **P2** | Google OAuth assessment · Address lookup assessment · Analytics decision · Unwired email template decision |
+| **P3** | Serverless vs containers review · DPA completion (if parallel) |
+
+**Recommended next step:** Deploy Phase 1 to **Staging Preview** → founder verifies `/api/health` → configure Sentry + uptime monitor on Production → begin **Phase 2** alerting after Staging sign-off.
+
+### 14.6 Technical baseline (22 Jul 2026)
 
 | Check | Result |
 |-------|--------|
-| `npm run build` | **PASS** |
+| `npm run build` | **PASS** (Phase 1 — includes `/api/health`) |
 | `npx tsc --noEmit` | **PASS** |
-| `npm run lint` | **55 total / 22 errors / 33 warnings** — matches pre-Stage-6 baseline |
-| Stage 3 legal/content verification | **PASS** |
-| Stage 3.5 refinement verification | **PASS** |
-| Stage 3.5 critical scenarios | **PASS** |
-| Command Centre presentation verification | **PASS** |
-| Stage 5 transactional email verification | **PASS** |
-| Stage 6 terminology verification | **PASS** (20/20) |
+| `npm run lint` | **55 / 22 / 33** — baseline preserved |
+| `verify-health-endpoint.ts` | **PASS** |
+| `verify-observability-privacy.ts` | **PASS** |
+| `verify-ea-branch-access-revocation.ts` | **5/5 PASS** (prior baseline) |
+| Development EA integration suite | **29/29 PASS** · **`FOUNDER_APPROVED_COMPLETE`** |
+
+### 14.7 Workstream 2 — Observability implementation phases (design only)
+
+| Phase | Scope | DB migration? | Est. cost |
+|-------|-------|---------------|-----------|
+| **1 — MVP observability** | `/api/health`, error boundaries, optional Sentry | **Repo complete** — awaiting external config | No | £0–35/mo when configured |
+| **2 — Incident alerting** | P0/P1 rules (Sentry + uptime + provider billing alerts) | No | £0 |
+| **3 — Email delivery monitoring** | Resend webhooks → `email_events.provider_events` | Possibly | £0 |
+| **4 — Business metrics** | Precomputed `platform_operational_metrics` + founder admin view | **Yes** | £0 |
+| **5 — Privacy analytics** | Legal review; optional Vercel Web Analytics on public pages | No | £0–9/mo |
+| **6 — Cost telemetry** | Usage snapshots + internal counters | Optional | £0 |
+| **7 — Runbooks & verification** | Incident runbooks, chain-intelligence cron schedule, fire drill | No | £0 |
+
+Full detail: [PRELAUNCH_OBSERVABILITY_AUDIT_AND_ARCHITECTURE.md](./PRELAUNCH_OBSERVABILITY_AUDIT_AND_ARCHITECTURE.md).
 
 ---
 

@@ -1,18 +1,18 @@
 # Pre-Launch Workstream 1 — Implementation Completion Report
 
 **Workstream:** EA Branch User Access, Revocation & Ownership Continuity  
-**Status:** `IMPLEMENTATION_COMPLETE_AWAITING_DEVELOPMENT_MIGRATION`  
-**Date:** 21 July 2026  
-**Founder approval to implement:** 21 July 2026  
-**Founder sign-off on implementation:** **Pending**
+**Status:** **`FOUNDER_APPROVED_COMPLETE`**  
+**Implementation complete:** 21 July 2026  
+**Development verification:** 22 July 2026 (29/29 integration PASS)  
+**Founder sign-off:** 22 July 2026 — [Founder sign-off record](./PRELAUNCH_EA_ACCESS_FOUNDER_SIGNOFF.md)
 
 ---
 
 ## Summary
 
-Implemented founder-approved MVP controls for branch team administration:
+Implemented and founder-approved MVP controls for branch team administration:
 
-- **Exactly one Owner** (`branch_admin`) per branch — deferred DB invariant
+- **Exactly one Owner** (`branch_admin`) per branch — deferred DB invariant + lifecycle teardown guard
 - **OC-01 closed** — revoked authenticated `UPDATE` on `ea_branch_members`
 - **Atomic ownership transfer** — `transfer_ea_branch_ownership` with remain-as-Staff or leave-branch
 - **Staff-only invitations** — Owner invite path blocked in RPC and UI
@@ -21,15 +21,16 @@ Implemented founder-approved MVP controls for branch team administration:
 - **Confirmation UX** — remove access, cancel invitation, transfer ownership
 
 **Production:** Not modified.  
-**Development migration:** Required — not applied in this session.
+**Development / Staging:** Migrations applied; automated + manual verification complete.
 
 ---
 
-## Migration
+## Migrations
 
-| File | Purpose |
-|------|---------|
-| `supabase/migrations/20260721100000_ea_branch_access_ownership_continuity.sql` | Audit table, invariant trigger, RPC hardening, transfer RPC, OC-01 |
+| File | Purpose | Development | Production |
+|------|---------|-------------|------------|
+| `supabase/migrations/20260721100000_ea_branch_access_ownership_continuity.sql` | Audit table, invariant trigger, RPC hardening, transfer RPC, OC-01 | **Applied** | **Not applied** |
+| `supabase/migrations/20260721110000_ea_branch_owner_invariant_lifecycle_fix.sql` | Leave-branch ordering fix; invariant skip on branch teardown | **Applied** · Git-tracked | **Not applied** |
 
 ---
 
@@ -39,69 +40,36 @@ Implemented founder-approved MVP controls for branch team administration:
 |------|-------|
 | Team lib | `lib/estateAgent/branchTeam.ts` |
 | Team UI | `components/account/TeamMembersSection.tsx`, `InviteTeamMemberDialog.tsx`, `TransferOwnershipDialog.tsx`, `TeamActionConfirmDialog.tsx` |
-| Verification | `scripts/verify-ea-branch-access-revocation.ts`, `scripts/verify-ea-branch-team.ts` |
+| Verification | `scripts/verify-ea-branch-access-*.ts`, `scripts/verify-ea-branch-owner-invariant-lifecycle-*.sql` |
 
 ---
 
-## One-Owner invariant enforcement
+## Verification summary
 
-1. **Data repair** on migration — demote duplicate Owners; promote earliest member if none
-2. **Deferred constraint trigger** `ea_branch_owner_invariant_trigger` — `count(branch_admin) = 1` at transaction commit
-3. **Revoked authenticated UPDATE** on `ea_branch_members` + dropped `ea_branch_members_update_admins` policy
-4. **All role changes** via security-definer RPCs only (`transfer_ea_branch_ownership`, founding insert policy unchanged)
-5. **Advisory lock** on branch during ownership transfer
-
----
-
-## Verification (local — no Development DB migration applied)
-
-| Check | Result |
+| Layer | Result |
 |-------|--------|
-| `npx tsx scripts/verify-ea-branch-team.ts` | **PASS** (4/4) |
-| `npx tsx scripts/verify-ea-branch-access-revocation.ts` | **PASS** (4/4) |
-| `npm run build` | **PASS** |
-| `npx tsc --noEmit` | **PASS** |
-| `npm run lint` | **55 total / 22 errors / 33 warnings** — matches Stage 6 baseline |
-
-Direct RLS/RPC integration tests requiring Development Supabase — **pending migration apply**.
+| Development integration (`--execute`) | **29/29 PASS** |
+| Development lifecycle post-migration SQL | **PASS** |
+| Static revocation suite | **5/5 PASS** |
+| Founder manual Staging verification | **PASS** — see [sign-off record](./PRELAUNCH_EA_ACCESS_FOUNDER_SIGNOFF.md) |
+| Production parity | **OPEN** |
 
 ---
 
-## Development migration steps
+## Open follow-ups (not blockers)
 
-See **[Development Verification Guide](./PRELAUNCH_EA_ACCESS_DEVELOPMENT_VERIFICATION.md)** for:
-
-1. Preflight SQL (`scripts/verify-ea-branch-access-migration-preflight.sql`)
-2. Exact SQL Editor migration instructions
-3. Post-migration SQL (`scripts/verify-ea-branch-access-post-migration.sql`)
-4. Integration script (`npx tsx scripts/verify-ea-branch-access-dev-integration.ts --execute`)
-5. Founder manual UI test sequence
-6. Post-verification report template
-
-Summary:
-
-1. Review migration SQL in repo.
-2. Run preflight SQL on Development (`bbbsxzxcjkmpqsfvmhbo`).
-3. Apply **entire** `20260721100000_ea_branch_access_ownership_continuity.sql` in one SQL Editor execution.
-4. Run post-migration SQL + integration script with `--execute`.
-5. Complete manual browser tests and verification report.
-
----
-
-## Remaining risks / legal review
-
-- Audit event retention period
-- Support runbook for inaccessible sole Owner ([EA_BRANCH_OWNER_SUPPORT_RUNBOOK.md](./EA_BRANCH_OWNER_SUPPORT_RUNBOOK.md))
-- No removal notification email (deferred by founder)
+Documented in sign-off record as **FD-042** (existing-account invitation UX), **FD-043** (wrong-email UX), **FD-044** (timestamp/timezone), **FD-045** (mobile/visual UX).
 
 ---
 
 ## Related documentation
 
+- [Founder sign-off](./PRELAUNCH_EA_ACCESS_FOUNDER_SIGNOFF.md)
+- [Development verification guide](./PRELAUNCH_EA_ACCESS_DEVELOPMENT_VERIFICATION.md)
 - [Audit & design](./PRELAUNCH_EA_ACCESS_AND_BRANCH_MEMBERSHIP_AUDIT.md)
 - [Auth Architecture](./AUTH_ARCHITECTURE.md)
 - [Production Readiness Checklist §14](./PRODUCTION_READINESS_CHECKLIST.md)
 
 ---
 
-*Awaiting founder review after Development migration and testing.*
+*Workstream 1 — **FOUNDER_APPROVED_COMPLETE** (22 July 2026).*

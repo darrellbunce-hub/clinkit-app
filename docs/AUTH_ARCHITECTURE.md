@@ -187,7 +187,7 @@ EA **authentication** (Supabase session, `profiles.account_type = 'estate_agent'
 
 **Audit and design (21 Jul 2026):** [Pre-Launch EA Access & Branch Membership Audit](./PRELAUNCH_EA_ACCESS_AND_BRANCH_MEMBERSHIP_AUDIT.md)
 
-**Implementation (21 Jul 2026):** [Implementation report](./PRELAUNCH_EA_ACCESS_IMPLEMENTATION_REPORT.md) — status `IMPLEMENTATION_COMPLETE_AWAITING_DEVELOPMENT_MIGRATION`. Key controls:
+**Implementation (21–22 Jul 2026):** [Implementation report](./PRELAUNCH_EA_ACCESS_IMPLEMENTATION_REPORT.md) · **`FOUNDER_APPROVED_COMPLETE`** — [sign-off record](./PRELAUNCH_EA_ACCESS_FOUNDER_SIGNOFF.md). Key controls:
 
 - Exactly one Owner (`branch_admin`) per branch — deferred DB invariant trigger
 - Direct authenticated `UPDATE` on `ea_branch_members` revoked (OC-01)

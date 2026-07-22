@@ -642,19 +642,63 @@ Decisions below supersede conflicting recommendations in the original audit and 
 | **4** | Core content / value proposition | **FOUNDER_APPROVED_COMPLETE** — [Stage 4 report](./LAUNCH_STAGE4_COMPLETION_REPORT.md) |
 | **5** | Transactional email content | **FOUNDER_APPROVED_COMPLETE** — [Stage 5 report](./LAUNCH_STAGE5_COMPLETION_REPORT.md) · invite→connect · FD-004 body + subject retained pending legal · unwired templates documented · [Pre-Launch email checks §13](./PRODUCTION_READINESS_CHECKLIST.md) |
 | **6** | Terminology / UX polish | **FOUNDER_APPROVED_COMPLETE** — [Stage 6 report](./LAUNCH_STAGE6_COMPLETION_REPORT.md) · FD-041 · FD-039 · homeowner no-operational rule | Pre-Launch implementation |
-| **Next** | **Pre-Launch Operational Readiness** | **Not started** — see [Production Readiness Checklist §14](./PRODUCTION_READINESS_CHECKLIST.md) | Launch content Stages 3–6 |
+| **Next** | **Pre-Launch Operational Readiness** | **In progress** — Workstream 1 EA Access **`FOUNDER_APPROVED_COMPLETE`** · Observability **not started** — see [Checklist §14](./PRODUCTION_READINESS_CHECKLIST.md) | Launch content Stages 3–6 |
 | **Billing/Stripe** | Separate gated workstream | FD-036 architecture · Stripe integration · founding branch counter | Not in Stage 3–6 content |
 
 **Launch Content programme (Stages 3–6):** **FOUNDER_APPROVED_COMPLETE** (21 Jul 2026).
 
-**Next programme:** **Pre-Launch Operational Readiness** — implementation **not started**.
+**Next programme:** **Pre-Launch Operational Readiness** — Workstream 1 (EA Access) **`FOUNDER_APPROVED_COMPLETE`**; Observability **not started**.
 
-**Awaiting explicit founder approval:** Billing/Stripe (FD-036)
+**Awaiting explicit founder approval:** Billing/Stripe (FD-036) · Observability implementation (§14.3 A)
 
-**Pre-Launch requirements (unchanged — not resolved by Stage 6):** FD-004 subject legal review · FD-040 transactional email environment · Supabase Auth template verification · full §14 checklist
+**Pre-Launch requirements (unchanged — not resolved by Stage 6 or EA Access sign-off):** FD-004 subject legal review · FD-040 transactional email environment · Supabase Auth template verification · Production security parity · full §14 checklist · **FD-042–FD-045** EA invitation/UX follow-ups
+
+---
+
+## Pre-Launch Workstream 1 — EA Access & Branch Membership
+
+**Status:** **`FOUNDER_APPROVED_COMPLETE`** (22 Jul 2026)  
+**Record:** [PRELAUNCH_EA_ACCESS_FOUNDER_SIGNOFF.md](./PRELAUNCH_EA_ACCESS_FOUNDER_SIGNOFF.md)
+
+Founder-approved based on Development **29/29** integration tests plus manual Staging verification (Staff removal, property access revocation, re-invitation, `email_mismatch`, ownership transfer remain + leave).
+
+**Production:** Not deployed. **Observability:** Not started.
+
+### FD-042 — Existing-account invitation UX
+
+| Field | Decision |
+|-------|----------|
+| **Issue** | Removed Staff retain Auth accounts; unauthenticated invite open can show account creation for existing users |
+| **Workaround verified** | Sign in → reopen invitation link → accept |
+| **Follow-up** | “Already have a Keynetic account? Sign in to accept” path; preserve invite context through auth |
+| **Constraints** | No Auth deletion on branch removal · no enumeration · no weakening one-company-per-domain |
+| **Status** | **OPEN** — not an EA Access security blocker |
+
+### FD-043 — Wrong-email invitation UX
+
+| Field | Decision |
+|-------|----------|
+| **Security** | `email_mismatch` blocking is **correct** |
+| **Follow-up** | Plain-English customer message; safe sign-out/switch-account; preserve invitation context |
+| **Status** | **OPEN** |
+
+### FD-044 — Invitation timestamp / timezone
+
+| Field | Decision |
+|-------|----------|
+| **Observation** | ~1 hour discrepancy in July (displayed ~7:49pm vs UK ~8:49pm) |
+| **Follow-up** | UTC vs `Europe/London`; BST/GMT-aware display; expiry presentation; EA + homeowner invites; DB stays UTC; no hardcoded +1 offset |
+| **Status** | **OPEN** |
+
+### FD-045 — EA mobile/visual UX (non-blockers)
+
+| Field | Decision |
+|-------|----------|
+| **Scope** | Mobile Team layout · mobile remove/transfer dialogs · EA marketing nav anchors · revoked invitation visible state |
+| **Status** | **OPEN** — UX checks only; not access-control blockers |
 
 **Preserved at Stage 6 sign-off:** Invite → Connect customer terminology · partial-chain honesty · shared chain model positioning · unwired Welcome / Property connected templates documented inactive · EA hero approved wording · “everyone where the move starts” not a launch blocker
 
 ---
 
-*Launch Content programme complete (Stages 3–6 founder-approved). Pre-Launch Operational Readiness not started. No application behaviour changed in this sign-off documentation update.*
+*Launch Content programme complete (Stages 3–6 founder-approved). Pre-Launch Workstream 1 (EA Access) **FOUNDER_APPROVED_COMPLETE** (22 Jul 2026). Observability not started. No application behaviour changed in this sign-off documentation update.*

@@ -1,9 +1,10 @@
 # EA Branch Access — Development Verification Guide
 
 **Workstream:** Pre-Launch Operational Readiness — Workstream 1  
-**Status:** Ready for Development migration and testing (not founder-approved complete)  
+**Status:** **`FOUNDER_APPROVED_COMPLETE`** (22 Jul 2026) — [Founder sign-off record](./PRELAUNCH_EA_ACCESS_FOUNDER_SIGNOFF.md)  
+**Development integration:** **29/29 PASS** · **Staging manual verification:** **PASS**  
 **Development Supabase:** `bbbsxzxcjkmpqsfvmhbo` only  
-**Production:** Do not modify
+**Production:** Not modified · Production parity **OPEN**
 
 ---
 
@@ -241,34 +242,43 @@ Use two browsers (or normal + incognito). App: local dev server against Developm
 
 ---
 
-## Step 5 — Post-migration verification report template
+## Step 5 — Verification report (completed)
 
-Complete after migration + tests. Save as `docs/PRELAUNCH_EA_ACCESS_DEVELOPMENT_VERIFICATION_REPORT.md`.
+**Sign-off date:** 22 July 2026  
+**Full record:** [PRELAUNCH_EA_ACCESS_FOUNDER_SIGNOFF.md](./PRELAUNCH_EA_ACCESS_FOUNDER_SIGNOFF.md)
 
-| # | Item | Result (fill in) |
-|---|------|----------------|
-| 1 | Migration result | |
-| 2 | Data repair (branches checked / duplicate Owners / missing Owners / zero-member) | |
-| 3 | One-Owner invariant verification | |
-| 4 | Direct UPDATE denial | |
-| 5 | Staff privilege-escalation tests | |
-| 6 | Staff removal | |
-| 7 | Removed-user active session | |
-| 8 | Known URL/data access after removal | |
-| 9 | Transfer — remain Staff | |
-| 10 | Transfer — leave branch | |
-| 11 | Failed-transfer atomicity | |
-| 12 | Invitation security | |
-| 13 | Audit events | |
-| 14 | Cross-branch isolation | |
-| 15 | Automated integration (`--execute`) | |
-| 16 | Manual browser tests still required | |
-| 17 | `npm run build` | |
-| 18 | `npx tsc --noEmit` | |
-| 19 | `npm run lint` vs 55/22/33 | |
-| 20 | Defects discovered | |
-| 21 | Another Development migration needed? | |
-| 22 | Ready for founder sign-off? | |
+| # | Item | Result |
+|---|------|--------|
+| 1 | Migration `20260721100000` | **Applied** — Development |
+| 2 | Migration `20260721110000` (lifecycle fix) | **Applied** · post-migration **PASS** · Git-tracked |
+| 3 | One-Owner invariant | **PASS** — automated + manual |
+| 4 | Direct UPDATE denial | **PASS** — integration |
+| 5 | Staff privilege-escalation blocked | **PASS** — integration |
+| 6 | Staff removal | **PASS** — integration + Staging manual |
+| 7 | Removed-user active session | **PASS** — Staging manual |
+| 8 | Property URL access after removal | **PASS** — Staging manual |
+| 9 | Transfer — remain Staff | **PASS** — integration + Staging manual |
+| 10 | Transfer — leave branch | **PASS** — integration + Staging manual |
+| 11 | Failed-transfer atomicity | **PASS** — integration |
+| 12 | Invitation security (`email_mismatch`) | **PASS** — integration + Staging manual |
+| 13 | Audit events | **PASS** — integration |
+| 14 | Cross-branch isolation | **PASS** — integration |
+| 15 | Automated integration (`--execute`) | **29/29 PASS** |
+| 16 | Re-invitation after removal | **PASS** — Staging manual |
+| 17 | Production deployment | **NOT performed** |
+| 18 | Production security parity | **OPEN** |
+| 19 | Ready for founder sign-off | **YES** — **`FOUNDER_APPROVED_COMPLETE`** |
+
+---
+
+## Open Pre-Launch follow-ups (not EA Access blockers)
+
+See [Founder sign-off §5](./PRELAUNCH_EA_ACCESS_FOUNDER_SIGNOFF.md) and [Production Readiness Checklist §14.2](./PRODUCTION_READINESS_CHECKLIST.md) items 25–28:
+
+- **FD-042** — Existing-account invitation UX
+- **FD-043** — Wrong-email invitation UX (plain-English; sign-out/switch journey)
+- **FD-044** — Invitation timestamp / BST-GMT investigation
+- **FD-045** — Mobile/visual UX checks (Team layout, dialogs, marketing anchors, revoked invite visible state)
 
 ---
 
@@ -283,4 +293,4 @@ Complete after migration + tests. Save as `docs/PRELAUNCH_EA_ACCESS_DEVELOPMENT_
 
 ---
 
-*Do not mark FOUNDER_APPROVED_COMPLETE until this verification report is reviewed.*
+*Workstream 1 — **FOUNDER_APPROVED_COMPLETE** (22 July 2026).*

@@ -1,8 +1,8 @@
 # EA Branch Access — Inaccessible Sole Owner (Support Runbook)
 
-**Status:** Draft operational procedure — requires security/legal review before Production use  
-**Workstream:** Pre-Launch Operational Readiness — Workstream 1  
-**Related:** [Pre-Launch EA Access Audit](./PRELAUNCH_EA_ACCESS_AND_BRANCH_MEMBERSHIP_AUDIT.md)
+**Workstream status:** **`FOUNDER_APPROVED_COMPLETE`** (22 Jul 2026)  
+**Runbook status:** Draft operational procedure — requires security/legal review before Production use  
+**Related:** [Pre-Launch EA Access Audit](./PRELAUNCH_EA_ACCESS_AND_BRANCH_MEMBERSHIP_AUDIT.md) · [Founder sign-off](./PRELAUNCH_EA_ACCESS_FOUNDER_SIGNOFF.md)
 
 ---
 

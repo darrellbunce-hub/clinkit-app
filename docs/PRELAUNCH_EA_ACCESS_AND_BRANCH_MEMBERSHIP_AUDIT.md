@@ -1,6 +1,7 @@
 # Pre-Launch EA Branch User Access, Revocation & Ownership Continuity
 
 **Programme:** Pre-Launch Operational Readiness — Workstream 1  
+**Status:** **`FOUNDER_APPROVED_COMPLETE`** (22 Jul 2026)  
 **Phase:** Audit, design, and implementation (Development migration pending)  
 **Status:** `IMPLEMENTATION_COMPLETE_AWAITING_DEVELOPMENT_MIGRATION` — see [implementation report](./PRELAUNCH_EA_ACCESS_IMPLEMENTATION_REPORT.md)  
 **Audit date:** 21 July 2026  
@@ -624,4 +625,4 @@ Add **`scripts/verify-ea-branch-access-revocation.ts`** for automated RLS/RPC ch
 
 ---
 
-*End of audit — Workstream 1 implementation not started.*
+*End of audit — Workstream 1 **`FOUNDER_APPROVED_COMPLETE`** (22 Jul 2026) — [sign-off record](./PRELAUNCH_EA_ACCESS_FOUNDER_SIGNOFF.md).*
