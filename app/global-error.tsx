@@ -15,7 +15,7 @@ export default function GlobalErrorPage({
   reset,
 }: GlobalErrorPageProps) {
   useEffect(() => {
-    void captureObservabilityException(error, {
+    captureObservabilityException(error, {
       route: "app/global-error",
       operation: "global_error_boundary",
       errorCode: error.digest ? "global_error_digest" : "global_error",

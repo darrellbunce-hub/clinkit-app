@@ -16,7 +16,7 @@ export default function ErrorPage({
   reset,
 }: ErrorPageProps) {
   useEffect(() => {
-    void captureObservabilityException(error, {
+    captureObservabilityException(error, {
       route: "app/error",
       operation: "render_error_boundary",
       errorCode: error.digest ? "render_error_digest" : "render_error",

@@ -4,7 +4,7 @@
  * Usage:
  *   npx tsx scripts/verify-observability-privacy.ts
  */
-import { readFileSync } from "fs";
+import { existsSync, readFileSync } from "fs";
 import { join } from "path";
 
 import {
@@ -24,6 +24,10 @@ function record(name: string, pass: boolean, detail?: string) {
 
 function read(relativePath: string): string {
   return readFileSync(join(process.cwd(), relativePath), "utf8");
+}
+
+function fileExists(relativePath: string): boolean {
+  return existsSync(join(process.cwd(), relativePath));
 }
 
 function main() {
@@ -110,6 +114,25 @@ function main() {
     "instrumentation.ts registers server and edge configs",
     instrumentation.includes("sentry.server.config") &&
       instrumentation.includes("sentry.edge.config")
+  );
+  record(
+    "onRequestError flushes serverless events on Node route failures",
+    instrumentation.includes("captureRequestError") &&
+      instrumentation.includes("flushIfServerless")
+  );
+  const captureHelperSource =
+    sharedSource.match(
+      /export function captureObservabilityException[\s\S]*?\n}/
+    )?.[0] ?? "";
+
+  record(
+    "captureObservabilityException does not globally block on server flush",
+    !captureHelperSource.includes("flushIfServerless")
+  );
+  record(
+    "Explicit serverless flush helper exported for background boundaries",
+    sharedSource.includes("flushObservabilityEvents") &&
+      sharedSource.includes("flushIfServerless")
   );
   record(
     "instrumentation-client.ts present for browser runtime",
@@ -241,68 +264,36 @@ function main() {
     resolveKeyneticEnvironment.name.length > 0
   );
 
-  const verificationSource = read("lib/observability/sentryVerification.ts");
-  const verificationPage = read("app/dev/sentry-verification/page.tsx");
-  const verificationApi = read("app/api/dev/sentry-verification/route.ts");
-  const verificationPanel = read("components/dev/SentryVerificationPanel.tsx");
+  const verificationRecord = read(
+    "docs/PRELAUNCH_OBSERVABILITY_SENTRY_VERIFICATION.md"
+  );
 
   record(
-    "Verification gate blocks Production VERCEL_ENV",
-    verificationSource.includes('VERCEL_ENV?.trim() === "production"')
+    "Temporary Sentry verification page removed",
+    !fileExists("app/dev/sentry-verification/page.tsx")
   );
   record(
-    "Verification gate requires Sentry enabled",
-    verificationSource.includes("isSentryEnabled()")
+    "Temporary Sentry verification API removed",
+    !fileExists("app/api/dev/sentry-verification/route.ts")
   );
   record(
-    "Verification uses fixed client identifier only",
-    verificationSource.includes("KEYNETIC_SENTRY_CLIENT_VERIFICATION")
+    "Temporary Sentry verification module removed",
+    !fileExists("lib/observability/sentryVerification.ts")
   );
   record(
-    "Verification uses fixed server identifier only",
-    verificationSource.includes("KEYNETIC_SENTRY_SERVER_VERIFICATION")
+    "Founder client Sentry verification PASS recorded",
+    verificationRecord.includes("KEYNETIC_SENTRY_CLIENT_VERIFICATION") &&
+      verificationRecord.includes("**PASS**")
   );
   record(
-    "Verification page returns notFound when blocked",
-    verificationPage.includes("notFound()")
+    "Founder server Sentry verification PASS recorded",
+    verificationRecord.includes("KEYNETIC_SENTRY_SERVER_VERIFICATION") &&
+      verificationRecord.includes("**PASS**")
   );
   record(
-    "Verification API returns 404 when blocked",
-    verificationApi.includes('status: 404')
-  );
-  record(
-    "Verification surface does not expose environment variables",
-    !verificationPanel.includes("process.env") &&
-      !verificationApi.match(/NextResponse\.json\([\s\S]*process\.env/)
-  );
-  record(
-    "Verification surface does not use Supabase",
-    !verificationSource.includes("supabase") &&
-      !verificationPage.includes("supabase") &&
-      !verificationApi.includes("supabase") &&
-      !verificationPanel.includes("supabase")
-  );
-  record(
-    "Verification panel does not expose stack traces",
-    !verificationPanel.includes("error.stack") &&
-      !verificationPanel.includes("error.message")
-  );
-  record(
-    "Verification server route uses observability capture helper",
-    verificationApi.includes("captureObservabilityException")
-  );
-  record(
-    "Server observability capture flushes before serverless exit",
-    sharedSource.includes("flushIfServerless") &&
-      sharedSource.includes('typeof window === "undefined"')
-  );
-  record(
-    "Verification server route awaits capture before throwing",
-    verificationApi.includes("await captureObservabilityException")
-  );
-  record(
-    "Verification client panel uses observability capture helper",
-    verificationPanel.includes("captureObservabilityException")
+    "Verification record marks temporary routes removed",
+    verificationRecord.includes("**removed**") ||
+      verificationRecord.includes("removed")
   );
 
   const failed = results.filter((entry) => !entry.pass);

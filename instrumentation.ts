@@ -1,3 +1,4 @@
+import { flushIfServerless } from "@sentry/core";
 import * as Sentry from "@sentry/nextjs";
 
 export async function register() {
@@ -10,4 +11,12 @@ export async function register() {
   }
 }
 
-export const onRequestError = Sentry.captureRequestError;
+export async function onRequestError(
+  ...args: Parameters<typeof Sentry.captureRequestError>
+): Promise<void> {
+  Sentry.captureRequestError(...args);
+
+  // Sentry's captureRequestError schedules flush via vercelWaitUntil, which
+  // only runs on Edge. Await serverless flush on Node route failures.
+  await flushIfServerless({ timeout: 2000 });
+}

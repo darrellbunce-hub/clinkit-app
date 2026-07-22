@@ -44,7 +44,23 @@ If either is missing, `/api/health` returns `"status":"degraded"` with `"databas
 
 Full setup instructions: [PRELAUNCH_OBSERVABILITY_PHASE1_IMPLEMENTATION.md](./PRELAUNCH_OBSERVABILITY_PHASE1_IMPLEMENTATION.md)
 
-Staging Sentry verification (Preview only): [PRELAUNCH_OBSERVABILITY_SENTRY_VERIFICATION.md](./PRELAUNCH_OBSERVABILITY_SENTRY_VERIFICATION.md)
+Founder Staging verification record (routes removed): [PRELAUNCH_OBSERVABILITY_SENTRY_VERIFICATION.md](./PRELAUNCH_OBSERVABILITY_SENTRY_VERIFICATION.md)
+
+### Recommended variable sets
+
+| Variable | Production | Preview | Client-visible? |
+|----------|------------|---------|-----------------|
+| `NEXT_PUBLIC_SENTRY_DSN` | **Required** | Required for Sentry tests | Yes (DSN is public by design) |
+| `SENTRY_ENABLED` | Optional (`false` to disable) | `true` to opt in | **No** — server-only |
+| `NEXT_PUBLIC_SENTRY_ENABLED` | Omit (Production auto-enables with DSN) | `true` for browser capture | Yes |
+| `NEXT_PUBLIC_VERCEL_ENV` | Omit — `VERCEL_ENV=production` is automatic | `preview` recommended for client bundle tagging | Yes |
+| `SENTRY_TRACES_SAMPLE_RATE` | Omit (defaults to 0) | Omit | N/A |
+| `SENTRY_AUTH_TOKEN` | Build secret when source maps desired | **Avoid on Preview** (volume/cost) | **Never** |
+| `SENTRY_ORG` / `SENTRY_PROJECT` | Build-time when uploading maps | Avoid on Preview | **Never** |
+
+**Minimise duplication:** Production needs only `NEXT_PUBLIC_SENTRY_DSN` (Sentry auto-enables). Preview needs explicit enable flags because non-Production defaults to disabled. Do **not** set `SENTRY_ENABLED=true` on Production unless you need an override.
+
+**`NEXT_PUBLIC_VERCEL_ENV`:** Required only because client bundles cannot read server-only `VERCEL_ENV`. On Preview, set to `preview` so browser events tag correctly. On Production, omit it — server runtime reads `VERCEL_ENV` automatically; client Production builds infer production from `NODE_ENV`.
 
 ---
 

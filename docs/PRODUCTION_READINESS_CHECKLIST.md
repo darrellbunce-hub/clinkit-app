@@ -509,16 +509,16 @@ Keynetic `emails/templates/PasswordReset.tsx` is a **reference template only**; 
 ## 14. Pre-Launch Operational Readiness programme
 
 **Recorded at Stage 6 founder sign-off (21 Jul 2026).**  
-**Updated:** 22 Jul 2026 — **Workstream 1 EA Access `FOUNDER_APPROVED_COMPLETE`** · **Workstream 2 Phase 1 `IMPLEMENTATION_COMPLETE_AWAITING_FOUNDER_CONFIGURATION_AND_STAGING_VERIFICATION`** · follow-ups FD-042–FD-045 recorded
+**Updated:** 22 Jul 2026 — **Workstream 1 EA Access `FOUNDER_APPROVED_COMPLETE`** · **Workstream 2 Phase 1 application-side `FOUNDER_VERIFIED_COMPLETE`** · follow-ups FD-042–FD-045 recorded
 
-The **Launch Content programme** (Stages 3–6) is **FOUNDER_APPROVED_COMPLETE**. The **Pre-Launch Operational Readiness** programme is **in progress** — Workstream 1 complete; Workstream 2 Phase 1 repository implementation complete; **external observability configuration not performed**.
+The **Launch Content programme** (Stages 3–6) is **FOUNDER_APPROVED_COMPLETE**. The **Pre-Launch Operational Readiness** programme is **in progress** — Workstream 1 complete; Workstream 2 Phase 1 **application-side founder verified**; **external Production observability configuration not performed**.
 
 **Implementation status (22 Jul 2026):**
 
 | Workstream | Status |
 |------------|--------|
 | **Workstream 1 — EA branch access & ownership continuity** | **`FOUNDER_APPROVED_COMPLETE`** — [sign-off record](./PRELAUNCH_EA_ACCESS_FOUNDER_SIGNOFF.md) · Dev **29/29** · Staging manual **PASS** |
-| **Workstream 2 — Production observability & incident alerting** | **Phase 1 repo complete** — [audit](./PRELAUNCH_OBSERVABILITY_AUDIT_AND_ARCHITECTURE.md) **`AUDIT_FOUNDER_APPROVED`** · [Phase 1 report](./PRELAUNCH_OBSERVABILITY_PHASE1_IMPLEMENTATION.md) · **awaiting founder Staging verification + external config** |
+| **Workstream 2 — Production observability & incident alerting** | **Phase 1 application-side `FOUNDER_VERIFIED_COMPLETE`** — [audit](./PRELAUNCH_OBSERVABILITY_AUDIT_AND_ARCHITECTURE.md) **`AUDIT_FOUNDER_APPROVED`** · [Phase 1 report](./PRELAUNCH_OBSERVABILITY_PHASE1_IMPLEMENTATION.md) · [Sentry verification record](./PRELAUNCH_OBSERVABILITY_SENTRY_VERIFICATION.md) · **external Production config open** |
 | Monitoring / observability | **IN PROGRESS** — Phase 1 foundations in repo; Sentry/uptime/Vercel/Supabase alerts **not configured** (§14.3 A · §14.7) |
 | Cost / unit economics | **OPEN** — not started (§14.3 B) |
 | Performance / concurrency | **OPEN** — not started (§14.3 C) |
@@ -553,7 +553,7 @@ The **Launch Content programme** (Stages 3–6) is **FOUNDER_APPROVED_COMPLETE**
 | 8 | **Supabase Auth** Production email templates (§13.3) | **OPEN** |
 | 9 | EA branch user access revocation | **`FOUNDER_APPROVED_COMPLETE`** — [sign-off](./PRELAUNCH_EA_ACCESS_FOUNDER_SIGNOFF.md) · Dev **29/29** · Staging manual **PASS** |
 | 10 | EA owner transfer / continuity | **`FOUNDER_APPROVED_COMPLETE`** — remain Staff + leave branch verified (Dev + Staging) |
-| 11 | Production observability and incident alerting | **IN PROGRESS** — Phase 1 repo complete ([report](./PRELAUNCH_OBSERVABILITY_PHASE1_IMPLEMENTATION.md)); `/api/health`, error boundaries, optional Sentry wired; **awaiting founder external config** |
+| 11 | Production observability and incident alerting | **IN PROGRESS** — Phase 1 app-side **founder verified** on Preview ([record](./PRELAUNCH_OBSERVABILITY_SENTRY_VERIFICATION.md)); `/api/health`, error boundaries, optional Sentry wired; **Production external config open** |
 | 12 | Product / business operational metrics | **OPEN** — §14.3 A · design in Workstream 2 Part 7 (precomputed `platform_operational_metrics`) |
 | 13 | Privacy-conscious website analytics decision | **OPEN** — §14.3 A · design in Workstream 2 Part 9 (defer invasive tracking; legal review for marketing analytics) |
 | 14 | Run-cost monitoring and cost governance | **OPEN** — §14.3 B |
@@ -706,7 +706,7 @@ Retain Vercel + Supabase for launch · measure post-launch · compare when susta
 | **P2** | Google OAuth assessment · Address lookup assessment · Analytics decision · Unwired email template decision |
 | **P3** | Serverless vs containers review · DPA completion (if parallel) |
 
-**Recommended next step:** Deploy Phase 1 to **Staging Preview** → founder verifies `/api/health` → configure Sentry + uptime monitor on Production → begin **Phase 2** alerting after Staging sign-off.
+**Recommended next step:** Configure Production Sentry DSN + external uptime monitor → complete Vercel/Supabase checklists → begin **Phase 2** alerting after Production external config.
 
 ### 14.6 Technical baseline (22 Jul 2026)
 

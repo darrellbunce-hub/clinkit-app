@@ -2,10 +2,10 @@
 
 **Workstream:** Production Observability & Incident Alerting  
 **Phase:** 1 — Minimum Viable Production Observability  
-**Status:** **`IMPLEMENTATION_COMPLETE_AWAITING_FOUNDER_CONFIGURATION_AND_STAGING_VERIFICATION`**  
+**Status:** **`APPLICATION_SIDE_FOUNDER_VERIFIED`** — awaiting external Production configuration only  
 **Implementation date:** 22 July 2026  
 **Health endpoint correction:** 22 July 2026 — `?probe=app` now returns `database:"skipped"` (see §2–3)  
-**Staging Sentry verification:** [PRELAUNCH_OBSERVABILITY_SENTRY_VERIFICATION.md](./PRELAUNCH_OBSERVABILITY_SENTRY_VERIFICATION.md)
+**Staging verification:** **`FOUNDER_VERIFIED_COMPLETE`** — [record](./PRELAUNCH_OBSERVABILITY_SENTRY_VERIFICATION.md) (temporary routes removed)
 
 **Audit basis:** [PRELAUNCH_OBSERVABILITY_AUDIT_AND_ARCHITECTURE.md](./PRELAUNCH_OBSERVABILITY_AUDIT_AND_ARCHITECTURE.md) — **`AUDIT_FOUNDER_APPROVED`**
 
@@ -124,7 +124,9 @@ The 45-second cache is **in-process and instance-local only**:
 | `app/error.tsx` | Segment-level render errors — branded message, Try again + Back to dashboard |
 | `app/global-error.tsx` | Root layout failures — includes `<html>`/`<body>`, Try again |
 
-Both capture to Sentry via `captureObservabilityException` when Sentry is enabled. No stack traces or technical messages shown to users.
+Both capture to Sentry via `captureObservabilityException` when Sentry is enabled (client-side only — no blocking server flush). No stack traces or technical messages shown to users.
+
+**Server-side thrown errors** are captured via Next.js `onRequestError` in `instrumentation.ts`, which awaits `flushIfServerless()` on Node serverless invocations. **Cron/background handlers** that capture without throwing should call `flushObservabilityEvents()` at invocation end.
 
 ---
 
@@ -150,12 +152,12 @@ Both capture to Sentry via `captureObservabilityException` when Sentry is enable
 | File | Purpose |
 |------|---------|
 | `instrumentation-client.ts` | Browser init + router transitions |
-| `instrumentation.ts` | Server/edge registration + `onRequestError` |
+| `instrumentation.ts` | Server/edge registration + `onRequestError` with serverless flush |
 | `sentry.server.config.ts` | Node.js runtime |
 | `sentry.edge.config.ts` | Edge runtime (middleware) |
 | `lib/observability/environment.ts` | Environment + enablement logic |
 | `lib/observability/sentryPrivacy.ts` | `beforeSend` scrubbing |
-| `lib/observability/sentryShared.ts` | Shared init + safe capture helper |
+| `lib/observability/sentryShared.ts` | Shared init + safe capture helper + `flushObservabilityEvents()` |
 | `next.config.ts` | Wrapped with `withSentryConfig` |
 
 ---
@@ -469,16 +471,15 @@ No unrelated ESLint cleanup performed.
 
 ## 31. Exact founder actions required next
 
-1. **Review** this implementation report and Phase 1 code on `staging-test` branch  
-2. **Deploy to Staging** Preview and verify:
-   - `GET /api/health` returns JSON with expected shape
-   - `GET /api/health?probe=app` returns `"database":"skipped"` and makes **no** Supabase request
-   - Deliberate error boundary (optional test route) shows branded UI  
-3. **Create Sentry project** (EU region recommended) — do not share auth token in chat  
-4. **Set Vercel Production environment variables** (DSN, optional org/project/auth token)  
-5. **Configure external uptime monitor** (§14) after Production URL confirmed  
-6. **Complete Vercel + Supabase checklists** (§17–18)  
-7. **Approve Phase 2** (alert rules) after Staging verification passes  
+**Application-side Phase 1:** **`FOUNDER_VERIFIED_COMPLETE`** on Preview (health + Sentry client/server). Temporary verification routes removed.
+
+**Still open (external configuration — not repo work):**
+
+1. **Set Vercel Production environment variables** (DSN; see [ENVIRONMENTS.md](./ENVIRONMENTS.md))  
+2. **Configure external uptime monitor** (§14) after Production URL confirmed  
+3. **Optional:** `SENTRY_AUTH_TOKEN` + org/project for readable Production stack traces (§11)  
+4. **Complete Vercel + Supabase checklists** (§17–18)  
+5. **Approve Phase 2** (alert rules) after Production external config is in place  
 
 ---
 
@@ -487,12 +488,13 @@ No unrelated ESLint cleanup performed.
 | Gate | Ready? |
 |------|--------|
 | Repository implementation | **Yes** |
-| Staging deploy + manual health check | **Founder action** |
-| Sentry DSN in Staging (`SENTRY_ENABLED=true` optional) | **Founder action** |
-| Production observability live | **No** — awaiting founder configuration |
+| Staging deploy + health check | **Founder verified** |
+| Staging Sentry client + server capture | **Founder verified** |
+| Temporary verification surface | **Removed** |
+| Sentry DSN in Production | **Founder action** |
+| External uptime monitor | **Founder action** |
+| Production observability live | **No** — awaiting founder external configuration |
 | Phase 2 alerting | **Not started** |
-
-**Recommendation:** Deploy to Staging Preview, run health verifiers against Staging URL, optionally enable Sentry on Preview with `SENTRY_ENABLED=true`, then configure Production external services after sign-off.
 
 ---
 
