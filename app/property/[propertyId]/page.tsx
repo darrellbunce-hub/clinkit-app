@@ -34,6 +34,8 @@ import {
   getOperationalUpdateSuccessMessage,
   getOperationalWorkspaceSubtitle,
   getOperationalWorkspaceTitle,
+  formatAlreadyRecordedStatusMessage,
+  formatAlreadyRecordedUpdateMessage,
 } from "@/lib/operationalPresentation";
 import {
   applyOperationalSubjectLens,
@@ -58,6 +60,7 @@ import {
   mapToOperationalProperties,
 } from "@/lib/operationalPosition";
 import PageHeaderBand from "@/components/theme/PageHeaderBand";
+import ParticipantDataLoadingState from "@/components/loading/ParticipantDataLoadingState";
 import {
   BTN_PRIMARY_CLASS,
   CARD_CLASS_NO_PADDING,
@@ -86,6 +89,12 @@ import {
 } from "@/lib/activityIntelligence";
 export default function PropertyPage() {
 
+  type SectionFeedback = {
+    section: "status" | "update" | "lifecycle";
+    variant: "success" | "warning";
+    message: string;
+  };
+
   const [updateType, setUpdateType] =
     useState("");
 
@@ -93,12 +102,20 @@ export default function PropertyPage() {
     useState("");
     const [draftStage, setDraftStage] =
   useState("");
-  const [successMessage, setSuccessMessage] =
-  useState("");
+  const [sectionFeedback, setSectionFeedback] =
+  useState<SectionFeedback | null>(null);
 
-const [warningMessage, setWarningMessage] =
-  useState("");
-    const [breakReason, setBreakReason] =
+  function showSectionFeedback(
+    feedback: SectionFeedback
+  ) {
+    setSectionFeedback(feedback);
+
+    setTimeout(() => {
+      setSectionFeedback(null);
+    }, 4000);
+  }
+
+const [breakReason, setBreakReason] =
     useState("");
   const params = useParams();
   const propertyId = Number(
@@ -117,6 +134,8 @@ const [warningMessage, setWarningMessage] =
     breakChainConnection,
     currentUserId,
     accountType,
+    authLoading,
+    participantDataReady,
     refreshParticipantData,
     estateAgentOperationalAssignments,
     recordChainCompletionDate,
@@ -209,11 +228,34 @@ const [warningMessage, setWarningMessage] =
     return `${days} days ago`;
   }
 
+  if (authLoading || !participantDataReady) {
+    return (
+      <ParticipantDataLoadingState message="Loading property…" />
+    );
+  }
+
   if (!currentProperty) {
     return (
-      <div className="p-10 text-2xl">
-        Property not found
-      </div>
+      <main className={PAGE_BG_CLASS}>
+        <Navbar />
+        <PageHeaderBand />
+
+        <div className="max-w-4xl mx-auto px-6 py-12">
+          <div
+            className={`bg-surface-card rounded-3xl shadow-sm border border-surface-card-border ${CARD_PADDING_CLASS}`}
+            role="status"
+          >
+            <h1 className={PAGE_TITLE_CLASS}>
+              Property not found
+            </h1>
+
+            <p className="mt-3 text-slate-600">
+              We could not find this property in your account. It may have
+              been removed or you may not have access.
+            </p>
+          </div>
+        </div>
+      </main>
     );
   }
 
@@ -546,15 +588,11 @@ if (
   updateMessage
 ) {
 
-  setWarningMessage(
-    "This update has already been recorded."
-  );
-
-  setTimeout(() => {
-
-    setWarningMessage("");
-
-  }, 4000);
+  showSectionFeedback({
+    section: "update",
+    variant: "warning",
+    message: formatAlreadyRecordedUpdateMessage(),
+  });
 
   return;
 
@@ -563,18 +601,14 @@ if (
         currentProperty.id,
         updateMessage
       );
-      setSuccessMessage(
-        getOperationalUpdateSuccessMessage(
+      showSectionFeedback({
+        section: "update",
+        variant: "success",
+        message: getOperationalUpdateSuccessMessage(
           accountType,
           "structured_update"
-        )
-      );
-      
-      setTimeout(() => {
-      
-        setSuccessMessage("");
-      
-      }, 4000);
+        ),
+      });
       setUpdateType("");
       setDelayReason("");
     }
@@ -587,19 +621,22 @@ if (
       if (
         currentProperty.stage === draftStage
       ) {
-    
-        setWarningMessage(
-          "This status has already been recorded."
-        );
-    
-        setTimeout(() => {
-    
-          setWarningMessage("");
-    
-        }, 4000);
-    
+        const stageLabel =
+          STAGES.find(
+            (stage) => stage.value === draftStage
+          )?.label ?? "recorded";
+
+        showSectionFeedback({
+          section: "status",
+          variant: "warning",
+          message:
+            formatAlreadyRecordedStatusMessage(
+              stageLabel
+            ),
+        });
+
         return;
-    
+
       }
 
       if (
@@ -607,13 +644,12 @@ if (
         (currentProperty.address ||
           currentProperty.postcode)
       ) {
-        setWarningMessage(
-          "An agreed purchase cannot be changed back to searching."
-        );
-
-        setTimeout(() => {
-          setWarningMessage("");
-        }, 4000);
+        showSectionFeedback({
+          section: "status",
+          variant: "warning",
+          message:
+            "An agreed purchase cannot be changed back to searching.",
+        });
 
         return;
       }
@@ -623,18 +659,14 @@ if (
         draftStage
       );
     
-      setSuccessMessage(
-        getOperationalUpdateSuccessMessage(
+      showSectionFeedback({
+        section: "status",
+        variant: "success",
+        message: getOperationalUpdateSuccessMessage(
           accountType,
           "property_stage"
-        )
-      );
-    
-      setTimeout(() => {
-    
-        setSuccessMessage("");
-    
-      }, 4000);
+        ),
+      });
     
     }
   const workspaceTitle = getOperationalWorkspaceTitle({
@@ -677,6 +709,36 @@ if (
     isOperationalDisplay ||
     access.viewerRole === "estate_agent";
 
+  function renderSectionAlert(
+    section: SectionFeedback["section"]
+  ) {
+    if (
+      !sectionFeedback ||
+      sectionFeedback.section !== section
+    ) {
+      return null;
+    }
+
+    return (
+      <div className="mb-4">
+        <MobileAlertStack>
+          <MobileAlert
+            variant={
+              sectionFeedback.variant === "success"
+                ? "success"
+                : "warning"
+            }
+          >
+            {sectionFeedback.variant === "success"
+              ? "✓ "
+              : "⚠ "}
+            {sectionFeedback.message}
+          </MobileAlert>
+        </MobileAlertStack>
+      </div>
+    );
+  }
+
   return (
     <main className={PAGE_BG_CLASS}>
 
@@ -684,22 +746,6 @@ if (
       <PageHeaderBand />
 
       <div className="max-w-4xl mx-auto px-6 py-12">
-        {(successMessage || warningMessage) && (
-          <MobileAlertStack>
-            {successMessage ? (
-              <MobileAlert variant="success">
-                ✓ {successMessage}
-              </MobileAlert>
-            ) : null}
-
-            {warningMessage ? (
-              <MobileAlert variant="warning">
-                ⚠ {warningMessage}
-              </MobileAlert>
-            ) : null}
-          </MobileAlertStack>
-        )}
-
         <MobilePageNavRow
           links={[
             {
@@ -757,11 +803,19 @@ if (
           />
         )}
 
+        {renderSectionAlert("lifecycle")}
+
         <PropertyLifecycleDormancySection
           propertyId={propertyId}
           currentUserId={currentUserId}
           onConfirmed={refreshParticipantData}
-          onSuccessMessage={setSuccessMessage}
+          onSuccessMessage={(message) =>
+            showSectionFeedback({
+              section: "lifecycle",
+              variant: "success",
+              message,
+            })
+          }
         />
 
         {!isCompletedCompletionMode && (
@@ -1005,6 +1059,7 @@ if (
             ))}
 
           </select>
+          {renderSectionAlert("status")}
           <button
   onClick={handlePropertyStageUpdate}
   className={`mt-4 ${BTN_PRIMARY_CLASS} rounded-xl px-6 py-3`}
@@ -1097,6 +1152,8 @@ if (
             </select>
 
           )}
+
+          {renderSectionAlert("update")}
 
 <button
   onClick={handleStructuredUpdate}

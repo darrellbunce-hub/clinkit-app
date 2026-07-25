@@ -123,22 +123,21 @@ User-confirmed applied: `20260610215000`, `20260610220000`.
 | `ensure_property_membership` idempotent | OK |
 | Dashboard loads chains | OK (user confirmed) |
 
-#### RLS — **Mixed / gap identified**
+#### RLS — **Live verified 25 Jul 2026 (supersedes June probe)**
 
-| Table | Expected (post-10220000) | Development probe |
-|-------|--------------------------|-------------------|
-| `properties` anon | Blocked | **OK** — permission denied |
-| `properties` authenticated non-participant | 0 rows / blocked | **FAIL** — stranger sees ~164 rows |
-| `properties` peer read by participant | Blocked | **FAIL** — participant reads peer address via base table |
-| `property_members` stranger | Own rows only | **FAIL** — stranger sees ~215 rows |
-| `activities` stranger | Participant chains only | **FAIL** — stranger sees ~133 rows |
-| `chains` stranger by ID | 0 rows | **FAIL** — stranger sees chain + access code |
-| `chain_nodes` stranger | 0 rows | **OK** — count 0 |
-| `chain_properties_participant` privacy | Peer address null | **OK** |
+| Table | Expected (post-10220000) | Development live probe (`verify-platform-security-development.ts --execute`) |
+|-------|--------------------------|-------------------------------------------------------------------------------|
+| `properties` anon | Blocked | **OK** — empty/denied |
+| `properties` authenticated stranger | 0 rows / blocked | **OK** — unrelated fixture property not readable |
+| `properties` participant own row | Allowed | **OK** |
+| `property_members` stranger | Blocked / scoped | **OK** — empty on unrelated fixture |
+| `activities` stranger | Blocked / scoped | **OK** |
+| `chains` stranger by ID | 0 rows | **OK** |
+| `chain_properties_participant` privacy | Peer address null | **OK** (prior script) |
 
-**Automated script:** `node scripts/verify-participant-privacy-rls.mjs` → **10/11 pass** (fails: peer base-table read).
+**Historical note:** June 2026 checklist probe and `verify-participant-privacy-rls.mjs` **10/11** reflected a **stale Development state**. Live verification **25 Jul 2026** shows base-table RLS **enforced** for stranger reads. Re-run privacy script optional; platform verifier is canonical for SEC-003.
 
-**Implication:** UI privacy paths are safe via the participant **view**, but **base-table RLS may not be fully enforced** on Development despite migration apply claim. **Resolve before Production** via SQL Editor catalog check (`relrowsecurity`, `pg_policies`).
+**Catalog SQL:** `scripts/verify-platform-security-catalog.sql` — run in SQL Editor for grant/policy inventory snapshot.
 
 ---
 
@@ -418,8 +417,8 @@ alter table public.activities disable row level security;
 | Route authorization committed | Uncommitted | **No** | **Yes** |
 | `10215000` applied | Yes | Unknown | **Yes** if duplicates |
 | `10220000` applied | Yes (user confirmed) | Unknown | **Yes** |
-| Base-table RLS enforced | **Probe fail** | Unknown | **Yes** — fix Dev first |
-| Privacy script 11/11 | **10/11** | Not run | **Yes** |
+| Base-table RLS enforced | **Live PASS** (25 Jul 2026) | Unknown | **Yes** — Production pre-flight still required |
+| Privacy / platform security verifier | **`verify-platform-security-development.ts --execute`** | Not run | **Yes** — RPC P0s remain |
 | EA flows tested | OK (user) | Unknown | Verify post-deploy |
 | Production Supabase probed | N/A | **Not done** | **Yes** — Phase A required |
 | Transactional email environment (§13) | Not verified | **Not done** | **Yes** — before Production launch |
@@ -428,8 +427,8 @@ alter table public.activities disable row level security;
 
 **Not ready for Production deployment** until:
 
-1. Development base-table RLS verified/fixed and privacy script passes 11/11.
-2. Production Supabase pre-flight + migrations applied (`10215000` → `10220000` minimum).
+1. Ungated RPC remediation (SEC-001, 002, 004, 101) applied on Development and verified.
+2. Production Supabase pre-flight + migrations applied (`10215000` → `10220000` minimum) with live catalog verification.
 3. `staging-test` (including route authorization) merged to `main` and deployed.
 4. Production verification script + manual privacy test complete.
 5. **Transactional email Pre-Launch checks complete (§13)** — including `NEXT_PUBLIC_APP_URL`, Resend configuration, Supabase Auth templates, and FD-004 legal review outcome.
@@ -509,20 +508,21 @@ Keynetic `emails/templates/PasswordReset.tsx` is a **reference template only**; 
 ## 14. Pre-Launch Operational Readiness programme
 
 **Recorded at Stage 6 founder sign-off (21 Jul 2026).**  
-**Updated:** 22 Jul 2026 — **Workstream 1 EA Access `FOUNDER_APPROVED_COMPLETE`** · **Workstream 2 Phase 1 application-side `FOUNDER_VERIFIED_COMPLETE`** · follow-ups FD-042–FD-045 recorded
+**Updated:** 25 Jul 2026 — **Platform Security Phase 1 `SECURITY_PHASE1_REMEDIATED_AND_VERIFIED_ON_DEVELOPMENT`** · **Supabase/Vercel provider review `FOUNDER_VERIFIED`** · Workstream 2 Phase 1 application-side **`FOUNDER_VERIFIED_COMPLETE`**
 
-The **Launch Content programme** (Stages 3–6) is **FOUNDER_APPROVED_COMPLETE**. The **Pre-Launch Operational Readiness** programme is **in progress** — Workstream 1 complete; Workstream 2 Phase 1 **application-side founder verified**; **external Production observability configuration not performed**.
+The **Launch Content programme** (Stages 3–6) is **FOUNDER_APPROVED_COMPLETE**. The **Pre-Launch Operational Readiness** programme is **in progress** — Workstream 1 complete; Workstream 2 Phase 1 **application-side founder verified**; **Supabase/Vercel provider review documented**; **external Production observability configuration not performed**.
 
 **Implementation status (22 Jul 2026):**
 
 | Workstream | Status |
 |------------|--------|
 | **Workstream 1 — EA branch access & ownership continuity** | **`FOUNDER_APPROVED_COMPLETE`** — [sign-off record](./PRELAUNCH_EA_ACCESS_FOUNDER_SIGNOFF.md) · Dev **29/29** · Staging manual **PASS** |
-| **Workstream 2 — Production observability & incident alerting** | **Phase 1 application-side `FOUNDER_VERIFIED_COMPLETE`** — [audit](./PRELAUNCH_OBSERVABILITY_AUDIT_AND_ARCHITECTURE.md) **`AUDIT_FOUNDER_APPROVED`** · [Phase 1 report](./PRELAUNCH_OBSERVABILITY_PHASE1_IMPLEMENTATION.md) · [Sentry verification record](./PRELAUNCH_OBSERVABILITY_SENTRY_VERIFICATION.md) · **external Production config open** |
-| Monitoring / observability | **IN PROGRESS** — Phase 1 foundations in repo; Sentry/uptime/Vercel/Supabase alerts **not configured** (§14.3 A · §14.7) |
-| Cost / unit economics | **OPEN** — not started (§14.3 B) |
+| **Workstream 2 — Production observability & incident alerting** | **Phase 1 application-side `FOUNDER_VERIFIED_COMPLETE`** — [audit](./PRELAUNCH_OBSERVABILITY_AUDIT_AND_ARCHITECTURE.md) **`AUDIT_FOUNDER_APPROVED`** · [Phase 1 report](./PRELAUNCH_OBSERVABILITY_PHASE1_IMPLEMENTATION.md) · [Sentry record](./PRELAUNCH_OBSERVABILITY_SENTRY_VERIFICATION.md) · **Production Sentry + uptime config open** |
+| **Provider review — Supabase & Vercel** | **`FOUNDER_VERIFIED`** (22 Jul 2026) — [record](./PRELAUNCH_PROVIDER_REVIEW_SUPABASE_VERCEL_22JUL2026.md) · Pro + spend cap + backups verified · Hobby confirmed · alerts/uptime/Production plan decisions **open** |
+| Monitoring / observability | **IN PROGRESS** — Phase 1 app-side complete; external uptime + Production Sentry **not configured**; Supabase usage alerts **not identified** (§14.8) |
+| Cost / unit economics | **PARTIAL EVIDENCE** — Supabase usage/cost reviewed; full unit-economics model **not complete** (§14.3 B · §14.8) |
 | Performance / concurrency | **OPEN** — not started (§14.3 C) |
-| Security architecture review | **OPEN** — not started (§14.3 D–F) |
+| **Platform security architecture review** | **`SECURITY_PHASE1_REMEDIATED_AND_VERIFIED_ON_DEVELOPMENT`** — [Phase 1 remediation](./PRELAUNCH_PLATFORM_SECURITY_REMEDIATION_PHASE1.md) · Dev **13/13 + 36/36 PASS** · Production parity **OPEN** |
 | Google OAuth assessment | **OPEN** — not implemented (§14.3 G) |
 | Address lookup assessment | **OPEN** — not implemented (§14.3 H) |
 | Browser / brand assets | **OPEN** (§14.3 I) |
@@ -556,10 +556,10 @@ The **Launch Content programme** (Stages 3–6) is **FOUNDER_APPROVED_COMPLETE**
 | 11 | Production observability and incident alerting | **IN PROGRESS** — Phase 1 app-side **founder verified** on Preview ([record](./PRELAUNCH_OBSERVABILITY_SENTRY_VERIFICATION.md)); `/api/health`, error boundaries, optional Sentry wired; **Production external config open** |
 | 12 | Product / business operational metrics | **OPEN** — §14.3 A · design in Workstream 2 Part 7 (precomputed `platform_operational_metrics`) |
 | 13 | Privacy-conscious website analytics decision | **OPEN** — §14.3 A · design in Workstream 2 Part 9 (defer invasive tracking; legal review for marketing analytics) |
-| 14 | Run-cost monitoring and cost governance | **OPEN** — §14.3 B |
+| 14 | Run-cost monitoring and cost governance | **PARTIAL** — Supabase Pro usage/cost reviewed 22 Jul 2026; spend cap enabled; full unit-economics model **open** (§14.3 B · §14.8) |
 | 15 | **Stripe / billing architecture** (FD-036) | **OPEN** — §14.3 J |
 | 16 | Refund / cancellation / dispute procedures | **OPEN** — §14.3 J |
-| 17 | Final security review | **OPEN** — §14.3 D–F |
+| 17 | Final security review | **Phase 1 RPC remediation COMPLETE ON DEVELOPMENT** — [audit §25](./PRELAUNCH_PLATFORM_SECURITY_ARCHITECTURE_AUDIT.md) · **Production parity OPEN** (SEC-102, SEC-103) · app hardening OPEN (SEC-104, SEC-201+) |
 | 18 | Final Production launch checklist (§11 gates + Production Supabase pre-flight) | **OPEN** |
 | 19 | Unwired email templates (Welcome · Property connected) | **OPEN** — documented inactive |
 | 20 | Concurrent-user / performance validation | **OPEN** — §14.3 C |
@@ -593,9 +593,10 @@ The **Launch Content programme** (Stages 3–6) is **FOUNDER_APPROVED_COMPLETE**
 | `@sentry/nextjs@10.67.0` (optional when DSN absent) | **Implemented** |
 | PII scrubbing / no Session Replay | **Implemented** |
 | Static verifiers | **Added** |
-| External uptime monitor | **Not configured** — founder action |
-| Sentry DSN / auth token in Vercel | **Not configured** — founder action |
-| Vercel/Supabase billing alerts | **Not configured** — founder action |
+| External uptime monitor | **Not configured** — deferred until Production URL ready (§14.8) |
+| Sentry DSN in Production Vercel | **Not configured** — founder action |
+| Supabase usage/billing alerts | **Not identified** in dashboard — spend cap enabled; manual review required |
+| Vercel spend/budget alerts | **N/A on Hobby** — Production plan review open |
 
 **Remaining P0 until external config:**
 
@@ -627,7 +628,7 @@ Track/model: fixed + variable infrastructure cost · anonymous visitor cost · c
 
 **Pricing scenarios (do not change live pricing without founder approval):** £79/£99 and £99/£129 founder/standard tiers. **£129/month ≈ £4.30/day** — positioning note only. Pricing must consider product value, not cost alone.
 
-**Status:** **OPEN**
+**Status:** **PARTIAL EVIDENCE** — Supabase Pro usage and July 2026 billing reviewed ([provider record](./PRELAUNCH_PROVIDER_REVIEW_SUPABASE_VERCEL_22JUL2026.md)). Current usage is within Pro quotas; incremental cost is primarily Development branching compute. **Full unit-economics model remains open** — Vercel load, query patterns, concurrency, email/Stripe/address lookup costs and paying-EA ratios not yet assessed. **Do not infer scale readiness from current Supabase usage alone.**
 
 #### C. Performance / scalability
 
@@ -639,7 +640,18 @@ Concurrent-user load testing · latency/error rate under load · DB/Supabase/Ver
 
 IDOR/BOLA · property/chain/branch ID manipulation · invitation/token manipulation · RPC auth · RLS coverage · anon/authenticated DB exposure · browser Supabase client inventory · server vs client DB requests · service-role usage/exposure · `NEXT_PUBLIC_*` audit · secrets in logs/source · rotation · Stripe/Resend/cron/address API key security.
 
-**Status:** **OPEN**
+**Status:** **`SECURITY_PHASE1_REMEDIATED_AND_VERIFIED_ON_DEVELOPMENT`** — [Phase 1 record](./PRELAUNCH_PLATFORM_SECURITY_REMEDIATION_PHASE1.md)
+
+**Summary (25 Jul 2026 — Phase 1 applied and verified on Development):**
+
+| Area | Verdict |
+|------|---------|
+| Ungated lifecycle/invitation RPCs (SEC-001, 002, 004, 101) | **REMEDIATED AND VERIFIED ON DEVELOPMENT** — 13/13 + 36/36 PASS |
+| Operational summary refresh (view column drift) | **Migration ready** — `20260725140000` pending Development apply · [Phase 1 §10](./PRELAUNCH_PLATFORM_SECURITY_REMEDIATION_PHASE1.md) |
+| Base-table RLS on Development (SEC-003) | **PROTECTED** — unchanged this phase |
+| `email_events` on Development (SEC-105) | **PROTECTED** — unchanged this phase |
+| Production DB parity (SEC-102) | **NOT PROVEN** — migration not applied on Production |
+| Application merge (SEC-103) | **OPEN** — `main` lacks staging security code |
 
 #### E. Authentication architecture
 
@@ -701,12 +713,14 @@ Retain Vercel + Supabase for launch · measure post-launch · compare when susta
 
 | Priority | Items |
 |----------|-------|
-| **P0** | Production Supabase/RLS parity · Production email/app URL config · Security IDOR/BOLA/RLS review · Legal/FD-004/privacy@ · EA access **Production migration** |
-| **P1** | Observability · Stripe/billing · Cost model · Performance baseline · Favicon/brand assets |
+| **P0** | **Production Supabase/RLS parity** (SEC-102) · **Production Phase 1 migration apply** · Production email/app URL config · Legal/FD-004/privacy@ · EA access **Production migration** |
+| **P1** | Production external observability config (Sentry + uptime) · Stripe/billing · Performance baseline · Favicon/brand assets · Full cost/unit-economics model |
 | **P2** | Google OAuth assessment · Address lookup assessment · Analytics decision · Unwired email template decision |
 | **P3** | Serverless vs containers review · DPA completion (if parallel) |
 
-**Recommended next step:** Configure Production Sentry DSN + external uptime monitor → complete Vercel/Supabase checklists → begin **Phase 2** alerting after Production external config.
+**Recommended next workstream (25 Jul 2026):** **Production security parity** — founder-approved Production catalog pre-flight (SEC-102, SEC-105) + apply `20260725120000_platform_security_rpc_authorisation_hardening.sql` on Production + live verifier re-run — **after** SEC-103 merge path agreed. See [audit §25.6](./PRELAUNCH_PLATFORM_SECURITY_ARCHITECTURE_AUDIT.md). **Do not start without founder approval.**
+
+External observability Production config and uptime monitoring remain **open** until Production URL is ready.
 
 ### 14.6 Technical baseline (22 Jul 2026)
 
@@ -724,7 +738,7 @@ Retain Vercel + Supabase for launch · measure post-launch · compare when susta
 
 | Phase | Scope | DB migration? | Est. cost |
 |-------|-------|---------------|-----------|
-| **1 — MVP observability** | `/api/health`, error boundaries, optional Sentry | **Repo complete** — awaiting external config | No | £0–35/mo when configured |
+| **1 — MVP observability** | `/api/health`, error boundaries, optional Sentry | **Application-side founder verified** — Production external config open | No | £0–35/mo when configured |
 | **2 — Incident alerting** | P0/P1 rules (Sentry + uptime + provider billing alerts) | No | £0 |
 | **3 — Email delivery monitoring** | Resend webhooks → `email_events.provider_events` | Possibly | £0 |
 | **4 — Business metrics** | Precomputed `platform_operational_metrics` + founder admin view | **Yes** | £0 |
@@ -733,6 +747,51 @@ Retain Vercel + Supabase for launch · measure post-launch · compare when susta
 | **7 — Runbooks & verification** | Incident runbooks, chain-intelligence cron schedule, fire drill | No | £0 |
 
 Full detail: [PRELAUNCH_OBSERVABILITY_AUDIT_AND_ARCHITECTURE.md](./PRELAUNCH_OBSERVABILITY_AUDIT_AND_ARCHITECTURE.md).
+
+### 14.8 Founder provider review — Supabase & Vercel (22 Jul 2026)
+
+**Status:** **`FOUNDER_VERIFIED`** — [full record](./PRELAUNCH_PROVIDER_REVIEW_SUPABASE_VERCEL_22JUL2026.md)
+
+#### Supabase provider review
+
+| Item | Status |
+|------|--------|
+| Pro plan confirmed | **VERIFIED** |
+| Usage reviewed (22 Jul 2026) | **VERIFIED** — comfortably within Pro quotas |
+| Current cost reviewed | **VERIFIED** — $27.22 current / $34.98 projected; branching compute is main incremental cost |
+| Spend cap | **ENABLED** — keep during pre-launch; **Production go-live decision open** |
+| Daily DB backups | **VERIFIED** |
+| Restore availability | **VERIFIED** — restore points 15–22 Jul 2026 |
+| Restore drill | **NOT PERFORMED** |
+| Storage backup limitation | **DOCUMENTED** — Storage objects not in DB backups; Storage Size currently 0 GB |
+| Organisation Audit Logs | **Unavailable on Pro** — accepted; do not upgrade solely for this |
+| Connection/disconnection logging | **Intentionally OFF** |
+| Configurable usage alerts | **Not identified** in dashboard — manual review + spend cap; reassess before Production |
+| Development branching | **Retained** — isolation valuable; do not remove for small cost saving |
+
+#### Vercel provider review
+
+| Item | Status |
+|------|--------|
+| Current plan | **Hobby — VERIFIED** |
+| Spend controls | **Not required at pre-launch stage** |
+| Production plan decision | **OPEN** — review limits, log retention, spend controls before go-live; **Hobby not approved as final Production plan** |
+
+#### External uptime monitoring
+
+| Item | Status |
+|------|--------|
+| Configuration | **OPEN** — deferred until Production URL ready |
+| Mandatory at Production launch | `/` · `/login` · `/api/health` (full probe: `status: healthy`, `database: ok`) |
+
+#### Sentry / Phase 1 application-side
+
+| Item | Status |
+|------|--------|
+| Preview health + Sentry client/server | **`FOUNDER_VERIFIED_COMPLETE`** |
+| Temporary verification routes | **Removed** — redeployed Preview returns 404 |
+| Production Sentry configuration | **OPEN** |
+| Phase 2 | **Not started** |
 
 ---
 

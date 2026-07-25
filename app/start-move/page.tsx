@@ -14,6 +14,11 @@ import {
 } from "@/lib/ownership/grants";
 import { attachSearchingPlaceholderToSale } from "@/lib/searchingPlaceholder";
 import CollectionPointNotice from "@/components/legal/CollectionPointNotice";
+import DuplicatePropertyDialog from "@/components/onboarding/DuplicatePropertyDialog";
+
+type PendingDuplicateJoin = {
+  chainId: number;
+};
 
 export default function StartMovePage() {
  
@@ -26,6 +31,10 @@ export default function StartMovePage() {
       searchingForProperty,
       setSearchingForProperty,
     ] = useState(false);
+  const [duplicateDialogOpen, setDuplicateDialogOpen] =
+    useState(false);
+  const [pendingDuplicateJoin, setPendingDuplicateJoin] =
+    useState<PendingDuplicateJoin | null>(null);
   const [sellingAddress, setSellingAddress] =
     useState("");
 
@@ -60,6 +69,27 @@ export default function StartMovePage() {
     
       return result;
     }
+
+    function redirectToJoinExistingChain(
+      chainId: number
+    ) {
+      const joinParams = new URLSearchParams({
+        sourceChain: String(chainId),
+      });
+
+      if (searchingForProperty) {
+        joinParams.set("searching", "1");
+      }
+
+      window.location.href =
+        `/join-chain?${joinParams.toString()}`;
+    }
+
+    function promptJoinExistingChain(chainId: number) {
+      setPendingDuplicateJoin({ chainId });
+      setDuplicateDialogOpen(true);
+    }
+
     async function handleStartMove() {
 
       try {
@@ -141,37 +171,8 @@ export default function StartMovePage() {
           );
     
           if (sellingExists) {
-    
-            const shouldJoinExisting =
-              window.confirm(
-                "This property already exists within an active chain.\n\nWould you like to connect to the existing transaction?"
-              );
-    
-            if (shouldJoinExisting) {
-
-              const joinParams =
-                new URLSearchParams({
-                  sourceChain: String(
-                    chainId
-                  ),
-                });
-
-              if (searchingForProperty) {
-                joinParams.set(
-                  "searching",
-                  "1"
-                );
-              }
-
-              window.location.href =
-                `/join-chain?${joinParams.toString()}`;
-
-              return;
-    
-            }
-    
+            promptJoinExistingChain(chainId);
             return;
-    
           }
     
           const {
@@ -259,37 +260,8 @@ export default function StartMovePage() {
           );
     
           if (buyingExists) {
-    
-            const shouldJoinExisting =
-              window.confirm(
-                "This property already exists within an active chain.\n\nWould you like to connect to the existing transaction?"
-              );
-    
-            if (shouldJoinExisting) {
-
-              const joinParams =
-                new URLSearchParams({
-                  sourceChain: String(
-                    chainId
-                  ),
-                });
-
-              if (searchingForProperty) {
-                joinParams.set(
-                  "searching",
-                  "1"
-                );
-              }
-
-              window.location.href =
-                `/join-chain?${joinParams.toString()}`;
-
-              return;
-    
-            }
-    
+            promptJoinExistingChain(chainId);
             return;
-    
           }
     
           const {
@@ -648,6 +620,21 @@ export default function StartMovePage() {
 </div>
 
 </form>
+
+      <DuplicatePropertyDialog
+        isOpen={duplicateDialogOpen}
+        onJoinExisting={() => {
+          if (pendingDuplicateJoin) {
+            redirectToJoinExistingChain(
+              pendingDuplicateJoin.chainId
+            );
+          }
+        }}
+        onCancel={() => {
+          setDuplicateDialogOpen(false);
+          setPendingDuplicateJoin(null);
+        }}
+      />
 
     </main>
   );

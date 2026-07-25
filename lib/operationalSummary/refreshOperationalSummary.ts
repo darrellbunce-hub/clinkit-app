@@ -9,6 +9,9 @@ import {
 } from "@/lib/operationalSummary/loadOperationalRefreshDataset";
 import { persistOperationalSummaries } from "@/lib/operationalSummary/persistOperationalSummaries";
 import type { OperationalRefreshDataset } from "@/lib/operationalSummary/types";
+import type { RefreshOperationalSummaryResult } from "@/lib/operationalSummary/refreshOperationalSummaryResult";
+
+export type { RefreshOperationalSummaryResult } from "@/lib/operationalSummary/refreshOperationalSummaryResult";
 
 export type RefreshOperationalSummaryParams = {
   chainId: number;
@@ -25,7 +28,7 @@ async function persistSummaries(
     >;
     useServiceRolePersist?: boolean;
   }
-) {
+): Promise<RefreshOperationalSummaryResult> {
   if (params.useServiceRolePersist) {
     const { error } = await supabase.rpc(
       "upsert_operational_summaries_service",
@@ -39,40 +42,54 @@ async function persistSummaries(
       return {
         ok: false,
         error: error.message,
+        errorCode: error.code ?? null,
+        step: "persist",
       };
     }
 
     return { ok: true, error: null };
   }
 
-  return persistOperationalSummaries(supabase, {
+  const persistResult = await persistOperationalSummaries(supabase, {
     chainSummary: params.chainSummary,
     propertySummaries: params.propertySummaries,
   });
+
+  if (!persistResult.ok) {
+    return {
+      ok: false,
+      error: persistResult.error,
+      step: "persist",
+    };
+  }
+
+  return { ok: true, error: null };
 }
 
 export async function refreshOperationalSummary(
   supabase: Parameters<typeof persistOperationalSummaries>[0],
   params: RefreshOperationalSummaryParams
-): Promise<{ ok: boolean; error: string | null }> {
-  const dataset =
-    params.dataset ??
-    (await loadOperationalRefreshDataset(
-      supabase,
-      params.chainId
-    ));
+): Promise<RefreshOperationalSummaryResult> {
+  const loadResult = params.dataset
+    ? { ok: true as const, dataset: params.dataset }
+    : await loadOperationalRefreshDataset(
+        supabase,
+        params.chainId
+      );
 
-  if (!dataset) {
+  if (!loadResult.ok) {
     return {
       ok: false,
-      error: "Could not load operational refresh dataset.",
+      error: loadResult.message,
+      errorCode: loadResult.code,
+      step: loadResult.step,
     };
   }
 
   const normalizedDataset = buildOperationalRefreshDataset({
-    chain: dataset.chain,
-    properties: dataset.properties,
-    chainNodes: dataset.chainNodes,
+    chain: loadResult.dataset.chain,
+    properties: loadResult.dataset.properties,
+    chainNodes: loadResult.dataset.chainNodes,
   });
 
   const chainSummary = deriveChainSummary(normalizedDataset);
@@ -93,7 +110,7 @@ export async function refreshOperationalSummaryForProperty(
   supabase: Parameters<typeof persistOperationalSummaries>[0],
   propertyId: number,
   chainId: number
-): Promise<{ ok: boolean; error: string | null }> {
+): Promise<RefreshOperationalSummaryResult> {
   return refreshOperationalSummary(supabase, {
     chainId,
   });
@@ -102,7 +119,7 @@ export async function refreshOperationalSummaryForProperty(
 export async function refreshOperationalSummaryForWorker(
   supabase: Parameters<typeof persistOperationalSummaries>[0],
   chainId: number
-): Promise<{ ok: boolean; error: string | null }> {
+): Promise<RefreshOperationalSummaryResult> {
   const dataset = await loadOperationalRefreshDatasetForWorker(
     supabase,
     chainId
@@ -112,6 +129,7 @@ export async function refreshOperationalSummaryForWorker(
     return {
       ok: false,
       error: "Could not load worker refresh dataset.",
+      step: "chains",
     };
   }
 

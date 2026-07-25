@@ -1,6 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { sortActivitiesNewestFirst } from "@/lib/activityIntelligence";
+import {
+  operationalRefreshDatasetLoadFailure,
+  type OperationalRefreshDatasetLoadResult,
+} from "@/lib/operationalSummary/loadOperationalRefreshDatasetResult";
 import type {
   OperationalRefreshChain,
   OperationalRefreshChainNode,
@@ -23,7 +27,7 @@ export function buildOperationalRefreshDataset(params: {
 export async function loadOperationalRefreshDataset(
   supabase: SupabaseClient,
   chainId: number
-): Promise<OperationalRefreshDataset | null> {
+): Promise<OperationalRefreshDatasetLoadResult> {
   const { data: chainRow, error: chainError } =
     await supabase
       .from("chains")
@@ -33,9 +37,20 @@ export async function loadOperationalRefreshDataset(
       .eq("id", chainId)
       .maybeSingle();
 
-  if (chainError || !chainRow) {
-    console.error(chainError);
-    return null;
+  if (chainError) {
+    return operationalRefreshDatasetLoadFailure(
+      "chains",
+      chainError,
+      "Failed to load chain row."
+    );
+  }
+
+  if (!chainRow) {
+    return operationalRefreshDatasetLoadFailure(
+      "chains",
+      null,
+      "Chain not found or not visible."
+    );
   }
 
   const {
@@ -49,9 +64,20 @@ export async function loadOperationalRefreshDataset(
     .eq("chain_id", chainId)
     .order("chain_position");
 
-  if (propertiesError || !participantProperties) {
-    console.error(propertiesError);
-    return null;
+  if (propertiesError) {
+    return operationalRefreshDatasetLoadFailure(
+      "participant_properties",
+      propertiesError,
+      "Failed to load participant properties."
+    );
+  }
+
+  if (!participantProperties) {
+    return operationalRefreshDatasetLoadFailure(
+      "participant_properties",
+      null,
+      "Participant properties unavailable."
+    );
   }
 
   const propertyIds = participantProperties.map(
@@ -74,9 +100,7 @@ export async function loadOperationalRefreshDataset(
       )
       .in("property_id", propertyIds);
 
-    if (propertyActivitiesError) {
-      console.error(propertyActivitiesError);
-    } else {
+    if (!propertyActivitiesError) {
       for (const activity of propertyActivities || []) {
         if (!activity.property_id) {
           continue;
@@ -112,9 +136,20 @@ export async function loadOperationalRefreshDataset(
     )
     .eq("chain_id", chainId);
 
-  if (chainNodesError || !chainNodesData) {
-    console.error(chainNodesError);
-    return null;
+  if (chainNodesError) {
+    return operationalRefreshDatasetLoadFailure(
+      "chain_nodes",
+      chainNodesError,
+      "Failed to load chain nodes."
+    );
+  }
+
+  if (!chainNodesData) {
+    return operationalRefreshDatasetLoadFailure(
+      "chain_nodes",
+      null,
+      "Chain nodes unavailable."
+    );
   }
 
   const chainNodeIds = chainNodesData.map(
@@ -137,9 +172,7 @@ export async function loadOperationalRefreshDataset(
       )
       .in("chain_node_id", chainNodeIds);
 
-    if (nodeActivitiesError) {
-      console.error(nodeActivitiesError);
-    } else {
+    if (!nodeActivitiesError) {
       for (const activity of nodeActivities || []) {
         if (!activity.chain_node_id) {
           continue;
@@ -208,9 +241,12 @@ export async function loadOperationalRefreshDataset(
   };
 
   return {
-    chain,
-    properties,
-    chainNodes,
+    ok: true,
+    dataset: {
+      chain,
+      properties,
+      chainNodes,
+    },
   };
 }
 
@@ -384,3 +420,8 @@ export async function loadOperationalRefreshDatasetForWorker(
     chainNodes,
   };
 }
+
+export type {
+  OperationalRefreshDatasetLoadFailure,
+  OperationalRefreshDatasetLoadResult,
+} from "@/lib/operationalSummary/loadOperationalRefreshDatasetResult";

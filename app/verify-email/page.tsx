@@ -15,6 +15,7 @@ import {
   EMAIL_VERIFICATION_TRANSACTION_MESSAGE,
 } from "@/lib/auth/emailVerificationGate";
 import { ROUTES } from "@/lib/auth/routes";
+import { flushPendingSignupLegalAcceptance } from "@/lib/legal/recordSignupLegalAcceptance";
 import {
   BTN_ACCENT_CLASS,
   HERO_GLOW_PRIMARY_CLASS,
@@ -51,6 +52,14 @@ function VerifyEmailContent() {
     }
 
     void loadPendingEmail();
+  }, []);
+
+  useEffect(() => {
+    async function flushPendingAcceptance() {
+      await flushPendingSignupLegalAcceptance(supabase);
+    }
+
+    void flushPendingAcceptance();
   }, []);
 
   async function handleResend(

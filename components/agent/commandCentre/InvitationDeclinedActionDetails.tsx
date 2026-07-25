@@ -14,7 +14,7 @@ export default function InvitationDeclinedActionDetails({
   const details = getInvitationDeclinedActionDetails(summary);
 
   return (
-    <dl className="grid gap-3 rounded-xl border border-surface-card-border bg-surface-mist px-4 py-3 text-sm sm:grid-cols-2">
+    <dl className="grid gap-3 rounded-xl border border-surface-card-border bg-surface-card px-4 py-3 text-sm sm:grid-cols-2">
       <div>
         <dt className="text-xs font-medium text-text-muted">
           Homeowner email

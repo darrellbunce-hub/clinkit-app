@@ -62,10 +62,24 @@ Also add staging/dev URLs as needed.
 
 | Setting | Location | Current state | Recommended | Required before launch |
 |---|---|---|---|---|
-| Auth rate limits (sign-in, sign-up, OTP) | Authentication → Rate Limits (or project settings) | **Manual verification** | Platform defaults; tighten if abuse seen | Verify defaults |
-| CAPTCHA (Turnstile / hCaptcha) | Authentication → Bot and Abuse Protection | **Manual verification** | **Disabled at launch** unless pen-test requires | No (defer) |
+| Auth rate limits (OTP, verify, token, email) | **Authentication → Rate Limits** | **Manual verification** | Record all values; see [Supabase rate limits docs](https://supabase.com/docs/guides/auth/rate-limits) | **Yes** |
+| IP address forwarding (`Sb-Forwarded-For`) | Same section | **Manual verification** | Evaluate before high `/auth/confirm` volume | Verify |
+| CAPTCHA (Turnstile / hCaptcha) | **Authentication → Bot and Abuse Protection** | **Manual verification** | **Disabled at launch** unless pen-test requires | No (defer) |
 
-Keynetic does **not** duplicate Supabase auth rate limits in Redis for launch.
+### Documented Supabase defaults (verify on live project — do not assume)
+
+| Operation | Documented limit | Customizable? |
+|-----------|------------------|---------------|
+| Email sends (built-in SMTP) | 2/hour project-wide | Custom SMTP only |
+| Password reset / signup resend per user | 60 seconds between requests | Yes |
+| OTP sends | 30/hour project-wide | Yes |
+| Token endpoint (password login + refresh) | 1800/hour per IP, burst 30 | No |
+| Verify endpoint (OTP exchange) | 360/hour per IP, burst 30 | No |
+| MFA challenge/verify | 15/hour per IP | No |
+
+**Dashboard labelling caveat:** The slider labelled “Rate limit for sign-ups and sign-ins” may map to OTP limits, not password login. Password login uses the **Token** endpoint IP bucket. Record actual Dashboard field names during verification.
+
+Keynetic does **not** duplicate Supabase auth rate limits in Redis for launch. See **`docs/SEC-104_AUTHENTICATION_ABUSE_RATE_LIMITING_AUDIT.md`** for full SEC-104 audit (2026-07-25).
 
 ---
 

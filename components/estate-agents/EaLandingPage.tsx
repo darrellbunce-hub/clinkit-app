@@ -671,7 +671,7 @@ export default function EaLandingPage() {
               href={ROUTES.estateAgentLogin}
               className={`${BTN_SECONDARY_OUTLINE_CLASS} px-8 py-5 text-lg`}
             >
-              Login to your agency
+              Log in to your agency
             </Link>
           </div>
 
@@ -721,7 +721,7 @@ export default function EaLandingPage() {
                 href={ROUTES.estateAgentLogin}
                 className="hover:text-white transition"
               >
-                Login
+                Log in
               </Link>
 
               <Link

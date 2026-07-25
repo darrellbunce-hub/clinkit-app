@@ -55,7 +55,21 @@ function mainLocalChecks() {
 }
 
 async function mainRemoteAudit() {
-  const supabase = createClient(url, anonKey);
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+  if (
+    !serviceRoleKey ||
+    serviceRoleKey === "your-service-role-key" ||
+    serviceRoleKey === "your_service_role_key"
+  ) {
+    console.log(
+      "Remote audit skipped: SUPABASE_SERVICE_ROLE_KEY required for report_multiple_operational_homeowners."
+    );
+    return;
+  }
+
+  const supabase = createClient(url, serviceRoleKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
 
   const { data, error } = await supabase.rpc(
     "report_multiple_operational_homeowners"

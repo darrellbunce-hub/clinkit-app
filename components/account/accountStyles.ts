@@ -1,18 +1,22 @@
 import { CARD_PADDING_CLASS } from "@/components/mobileStandards";
-import { BTN_PRIMARY_CLASS, BTN_SECONDARY_OUTLINE_CLASS } from "@/lib/theme/themeTokens";
+import {
+  AUTH_ERROR_CLASS,
+  AUTH_INPUT_CLASS,
+  AUTH_PRIMARY_BUTTON_CLASS,
+  AUTH_SECONDARY_BUTTON_CLASS,
+  AUTH_SUCCESS_CLASS,
+} from "@/components/auth/authStyles";
+import { BTN_SECONDARY_OUTLINE_CLASS } from "@/lib/theme/themeTokens";
 
-export const accountInputClassName =
-  "mt-2 w-full border border-slate-300 text-base text-slate-900 rounded-2xl px-4 py-3 disabled:bg-slate-100";
+export const accountInputClassName = AUTH_INPUT_CLASS;
 
-export const accountButtonPrimaryClassName = `w-full ${BTN_PRIMARY_CLASS} py-4`;
+export const accountButtonPrimaryClassName =
+  AUTH_PRIMARY_BUTTON_CLASS;
 
 export const accountButtonSecondaryClassName = `w-full ${BTN_SECONDARY_OUTLINE_CLASS} py-4 disabled:bg-slate-100 disabled:text-slate-400`;
 
-export const accountAlertErrorClassName =
-  "rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800";
+export const accountAlertErrorClassName = AUTH_ERROR_CLASS;
 
-export const accountAlertSuccessClassName =
-  "rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-medium text-green-800";
+export const accountAlertSuccessClassName = AUTH_SUCCESS_CLASS;
 
-export const accountSectionClassName =
-  `bg-surface-card rounded-3xl shadow-sm border border-surface-card-border ${CARD_PADDING_CLASS}`;
+export const accountSectionClassName = `bg-surface-card rounded-3xl shadow-sm border border-surface-card-border ${CARD_PADDING_CLASS}`;

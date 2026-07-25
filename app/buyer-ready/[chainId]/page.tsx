@@ -34,6 +34,8 @@ import {
   getOperationalUpdateSuccessMessage,
   getOperationalWorkspaceSubtitle,
   getOperationalWorkspaceTitle,
+  formatAlreadyRecordedStatusMessage,
+  formatAlreadyRecordedUpdateMessage,
 } from "@/lib/operationalPresentation";
 import {
   resolveOperationalSubject,
@@ -61,6 +63,7 @@ import { resolveBuyerReadyStageClock } from "@/lib/chainIntelligence/stageClock"
 import { EstimatedCompletionWindowPanel } from "@/components/chainIntelligence/EstimatedCompletionWindowPanel";
 import OperationalCompletionDatePanel from "@/components/OperationalCompletionDatePanel";
 import PageHeaderBand from "@/components/theme/PageHeaderBand";
+import ParticipantDataLoadingState from "@/components/loading/ParticipantDataLoadingState";
 import {
   BTN_PRIMARY_CLASS,
   PAGE_BG_CLASS,
@@ -133,12 +136,27 @@ function activityUpdaterBadgeClass(
 }
 
 export default function BuyerReadyPage() {
+  type SectionFeedback = {
+    section: "status" | "update";
+    variant: "success" | "warning";
+    message: string;
+  };
+
   const [updateType, setUpdateType] = useState("");
   const [delayReason, setDelayReason] = useState("");
   const [draftStage, setDraftStage] = useState("");
-  const [successMessage, setSuccessMessage] = useState("");
-  const [warningMessage, setWarningMessage] = useState("");
+  const [sectionFeedback, setSectionFeedback] =
+    useState<SectionFeedback | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  function showSectionFeedback(feedback: SectionFeedback) {
+    setSectionFeedback(feedback);
+
+    setTimeout(() => {
+      setSectionFeedback(null);
+    }, 4000);
+  }
+
   const params = useParams();
   const chainId = Number(params.chainId);
 
@@ -151,6 +169,7 @@ export default function BuyerReadyPage() {
     accountType,
     estateAgentOperationalAssignments,
     authLoading,
+    participantDataReady,
     refreshParticipantData,
     recordChainCompletionDate,
     amendChainCompletionDate,
@@ -221,19 +240,33 @@ export default function BuyerReadyPage() {
         bannerMessage: null,
       };
 
-  if (authLoading) {
+  if (authLoading || !participantDataReady) {
     return (
-      <div className="p-10 text-2xl">
-        Loading workflow…
-      </div>
+      <ParticipantDataLoadingState message="Loading Buyer Ready…" />
     );
   }
 
   if (!buyerNode || !access.canView) {
     return (
-      <div className="p-10 text-2xl">
-        Buyer Ready workflow not found
-      </div>
+      <main className={PAGE_BG_CLASS}>
+        <Navbar />
+        <PageHeaderBand />
+
+        <div className="max-w-4xl mx-auto px-6 py-12">
+          <div
+            className={`bg-surface-card rounded-3xl shadow-sm border border-surface-card-border ${CARD_PADDING_CLASS}`}
+            role="status"
+          >
+            <h1 className={PAGE_TITLE_CLASS}>
+              Buyer Ready workflow not found
+            </h1>
+
+            <p className="mt-3 text-slate-600">
+              We could not find a Buyer Ready workflow for this chain.
+            </p>
+          </div>
+        </div>
+      </main>
     );
   }
 
@@ -446,13 +479,13 @@ export default function BuyerReadyPage() {
     }
 
     if (workflowNode.stage === selectedStage.value) {
-      setWarningMessage(
-        "This status has already been recorded."
-      );
-
-      setTimeout(() => {
-        setWarningMessage("");
-      }, 4000);
+      showSectionFeedback({
+        section: "status",
+        variant: "warning",
+        message: formatAlreadyRecordedStatusMessage(
+          selectedStage.label
+        ),
+      });
 
       setIsSaving(false);
       return;
@@ -465,11 +498,11 @@ export default function BuyerReadyPage() {
       );
 
     if (!stageGateResult.ok) {
-      setWarningMessage(stageGateResult.message);
-
-      setTimeout(() => {
-        setWarningMessage("");
-      }, 4000);
+      showSectionFeedback({
+        section: "status",
+        variant: "warning",
+        message: stageGateResult.message,
+      });
 
       setIsSaving(false);
       return;
@@ -503,16 +536,14 @@ export default function BuyerReadyPage() {
       await refreshParticipantData();
 
       setDraftStage("");
-      setSuccessMessage(
-        getOperationalUpdateSuccessMessage(
+      showSectionFeedback({
+        section: "status",
+        variant: "success",
+        message: getOperationalUpdateSuccessMessage(
           accountType,
           "buyer_ready_stage"
-        )
-      );
-
-      setTimeout(() => {
-        setSuccessMessage("");
-      }, 4000);
+        ),
+      });
     } else {
       console.error(error);
 
@@ -522,18 +553,19 @@ export default function BuyerReadyPage() {
           "completion_date_agreed_requires_contracts_exchanged"
         )
       ) {
-        setWarningMessage(
-          COMPLETION_DATE_AGREED_REQUIRES_CONTRACTS_EXCHANGED_MESSAGE
-        );
+        showSectionFeedback({
+          section: "status",
+          variant: "warning",
+          message:
+            COMPLETION_DATE_AGREED_REQUIRES_CONTRACTS_EXCHANGED_MESSAGE,
+        });
       } else {
-        setWarningMessage(
-          "Could not update Buyer Ready status."
-        );
+        showSectionFeedback({
+          section: "status",
+          variant: "warning",
+          message: "Could not update Buyer Ready status.",
+        });
       }
-
-      setTimeout(() => {
-        setWarningMessage("");
-      }, 4000);
     }
 
     setIsSaving(false);
@@ -618,13 +650,11 @@ export default function BuyerReadyPage() {
     const latestActivity = workflowNode.activities?.[0];
 
     if (latestActivity?.update === updateMessage) {
-      setWarningMessage(
-        "This update has already been recorded."
-      );
-
-      setTimeout(() => {
-        setWarningMessage("");
-      }, 4000);
+      showSectionFeedback({
+        section: "update",
+        variant: "warning",
+        message: formatAlreadyRecordedUpdateMessage(),
+      });
 
       return;
     }
@@ -637,16 +667,44 @@ export default function BuyerReadyPage() {
 
     setUpdateType("");
     setDelayReason("");
-    setSuccessMessage(
-      getOperationalUpdateSuccessMessage(
+    showSectionFeedback({
+      section: "update",
+      variant: "success",
+      message: getOperationalUpdateSuccessMessage(
         accountType,
         "structured_update"
-      )
-    );
+      ),
+    });
+  }
 
-    setTimeout(() => {
-      setSuccessMessage("");
-    }, 4000);
+  function renderSectionAlert(
+    section: SectionFeedback["section"]
+  ) {
+    if (
+      !sectionFeedback ||
+      sectionFeedback.section !== section
+    ) {
+      return null;
+    }
+
+    return (
+      <div className="mb-4">
+        <MobileAlertStack>
+          <MobileAlert
+            variant={
+              sectionFeedback.variant === "success"
+                ? "success"
+                : "warning"
+            }
+          >
+            {sectionFeedback.variant === "success"
+              ? "✓ "
+              : "⚠ "}
+            {sectionFeedback.message}
+          </MobileAlert>
+        </MobileAlertStack>
+      </div>
+    );
   }
 
   return (
@@ -655,22 +713,6 @@ export default function BuyerReadyPage() {
       <PageHeaderBand />
 
       <div className="max-w-4xl mx-auto px-6 py-12">
-        {(successMessage || warningMessage) && (
-          <MobileAlertStack>
-            {successMessage ? (
-              <MobileAlert variant="success">
-                ✓ {successMessage}
-              </MobileAlert>
-            ) : null}
-
-            {warningMessage ? (
-              <MobileAlert variant="warning">
-                ⚠ {warningMessage}
-              </MobileAlert>
-            ) : null}
-          </MobileAlertStack>
-        )}
-
         <MobilePageNavRow
           links={[
             {
@@ -910,6 +952,8 @@ export default function BuyerReadyPage() {
                 ))}
               </select>
 
+              {renderSectionAlert("status")}
+
               <button
                 onClick={updateBuyerStage}
                 disabled={isSaving}
@@ -971,6 +1015,8 @@ export default function BuyerReadyPage() {
                   </option>
                 </select>
               )}
+
+              {renderSectionAlert("update")}
 
               <button
                 onClick={handleStructuredUpdate}

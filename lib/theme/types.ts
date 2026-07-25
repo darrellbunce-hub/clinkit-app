@@ -1,9 +1,4 @@
-export type BrandThemeId = "keynetic" | "teal-mimosa" | "butter-green";
+/** Production Keynetic brand theme identifier (fixed — no runtime switching). */
+export type BrandThemeId = "keynetic";
 
-export type BrandThemeDefinition = {
-  id: BrandThemeId;
-  label: string;
-  description: string;
-  primary: string;
-  secondary: string;
-};
+export const DEFAULT_BRAND_THEME_ID: BrandThemeId = "keynetic";

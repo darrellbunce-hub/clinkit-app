@@ -14,7 +14,7 @@ export default function CommandCentreSectionHeader({
   return (
     <div className="flex items-start gap-3">
       {icon ? (
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-mist text-brand-primary">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-surface-card-border bg-surface-card text-brand-primary">
           <WorkspaceIcon
             name={icon}
             className="h-5 w-5"

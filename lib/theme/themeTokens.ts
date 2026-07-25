@@ -9,7 +9,7 @@ export const PAGE_BG_CLASS = "min-h-screen bg-surface-page";
 
 /** Thin identity strip — visible immediately below nav on product pages */
 export const PAGE_HEADER_BAND_CLASS =
-  "h-1.5 w-full bg-gradient-to-r from-brand-primary via-brand-secondary to-brand-primary shrink-0";
+  "h-1.5 w-full bg-gradient-to-r from-brand-hero-from via-brand-primary to-brand-hero-to shrink-0";
 
 export const SECTION_BG_CLASS =
   "relative overflow-hidden bg-surface-section border-y border-surface-section-border";
@@ -33,7 +33,8 @@ export const CARD_CLASS_NO_PADDING =
 export const DASHBOARD_LIST_CLASS =
   "divide-y divide-surface-divider border border-surface-divider rounded-2xl overflow-hidden";
 
-export const DASHBOARD_LIST_ROW_CLASS = `px-4 py-3 ${SURFACE_PANEL_CLASS}`;
+export const DASHBOARD_LIST_ROW_CLASS =
+  "px-4 py-3 bg-surface-card";
 
 export const CHAIN_VIZ_CANVAS_CLASS =
   "rounded-2xl bg-chain-viz-canvas p-4 md:p-6";
@@ -72,11 +73,12 @@ export const MARKETING_METRIC_CARD_CLASS =
 
 export const FOOTER_BG_CLASS = "bg-footer-bg border-t border-footer-border";
 
+/** Primary CTA — Mimosa fill (brand accent). Teal is reserved for links, nav, and outlines. */
 export const BTN_PRIMARY_CLASS =
-  "bg-brand-primary text-brand-on-primary rounded-2xl font-semibold hover:bg-brand-primary-hover transition disabled:bg-slate-400 disabled:cursor-not-allowed";
+  "bg-brand-accent text-brand-on-accent rounded-2xl font-semibold hover:bg-brand-accent-hover transition shadow-lg shadow-brand-accent/30 disabled:bg-slate-400 disabled:cursor-not-allowed disabled:shadow-none";
 
 export const BTN_PRIMARY_SM_CLASS =
-  "bg-brand-primary text-brand-on-primary rounded-xl font-semibold hover:bg-brand-primary-hover transition disabled:bg-slate-400";
+  "bg-brand-accent text-brand-on-accent rounded-xl font-semibold hover:bg-brand-accent-hover transition shadow-lg shadow-brand-accent/20 disabled:bg-slate-400 disabled:shadow-none";
 
 export const BTN_ACCENT_CLASS =
   "bg-brand-accent text-brand-on-accent rounded-2xl font-semibold hover:bg-brand-accent-hover transition shadow-lg shadow-brand-accent/30";
@@ -117,10 +119,10 @@ export const LINK_MUTED_CLASS =
   "text-slate-600 hover:text-brand-primary transition";
 
 export const NAV_HEADER_DARK_CLASS =
-  "sticky top-0 z-50 backdrop-blur-xl bg-brand-header border-b border-brand-header-border";
+  "sticky top-0 z-50 bg-brand-header-solid border-b border-brand-header-border";
 
 export const NAV_HEADER_MOBILE_DRAWER_CLASS =
-  "md:hidden border-t border-brand-header-border bg-brand-header-solid backdrop-blur-xl";
+  "md:hidden border-t border-brand-header-border bg-brand-header-solid";
 
 export const NAV_LINK_DARK_CLASS =
   "text-brand-header-link hover:text-brand-header-link-hover transition";
@@ -135,7 +137,7 @@ export const HERO_GLOW_SECONDARY_CLASS =
   "absolute bottom-[-200px] left-[-100px] w-[400px] h-[400px] bg-brand-glow-secondary rounded-full blur-3xl";
 
 export const HERO_BADGE_CLASS =
-  "inline-flex items-center bg-brand-badge-bg text-brand-badge-text border border-brand-badge-border px-4 py-2 rounded-full text-sm font-semibold";
+  "inline-flex items-center bg-brand-accent text-text-charcoal px-4 py-2 rounded-full text-sm font-semibold shadow-lg shadow-brand-accent/30";
 
 export const GLASS_CARD_CLASS =
   "bg-white/10 backdrop-blur-xl rounded-3xl border border-white/10";

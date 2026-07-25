@@ -46,6 +46,8 @@ Full setup instructions: [PRELAUNCH_OBSERVABILITY_PHASE1_IMPLEMENTATION.md](./PR
 
 Founder Staging verification record (routes removed): [PRELAUNCH_OBSERVABILITY_SENTRY_VERIFICATION.md](./PRELAUNCH_OBSERVABILITY_SENTRY_VERIFICATION.md)
 
+Supabase & Vercel provider review (22 Jul 2026): [PRELAUNCH_PROVIDER_REVIEW_SUPABASE_VERCEL_22JUL2026.md](./PRELAUNCH_PROVIDER_REVIEW_SUPABASE_VERCEL_22JUL2026.md)
+
 ### Recommended variable sets
 
 | Variable | Production | Preview | Client-visible? |

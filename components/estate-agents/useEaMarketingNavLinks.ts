@@ -29,7 +29,7 @@ export function useEaMarketingNavLinks(): LightShellNavLink[] {
     },
     {
       href: ROUTES.estateAgentLogin,
-      label: "Login",
+      label: "Log in",
     },
     {
       href: ROUTES.estateAgentSignup,

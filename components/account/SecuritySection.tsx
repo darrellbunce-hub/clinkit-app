@@ -1,18 +1,16 @@
 "use client";
 
-import {
-  useState,
-  type FormEvent,
-} from "react";
+import { useState, type FormEvent } from "react";
 
-import PasswordRequirementsChecklist from "@/components/auth/PasswordRequirementsChecklist";
+import AuthErrorAlert from "@/components/auth/AuthErrorAlert";
+import AuthPasswordFieldWithRequirements from "@/components/auth/AuthPasswordFieldWithRequirements";
+import AuthSuccessAlert from "@/components/auth/AuthSuccessAlert";
+import AuthTextField from "@/components/auth/AuthTextField";
 import {
-  accountAlertErrorClassName,
-  accountAlertSuccessClassName,
-  accountButtonPrimaryClassName,
-  accountInputClassName,
-  accountSectionClassName,
-} from "@/components/account/accountStyles";
+  AUTH_FORM_CLASS,
+  AUTH_PRIMARY_BUTTON_CLASS,
+} from "@/components/auth/authStyles";
+import { accountSectionClassName } from "@/components/account/accountStyles";
 import {
   mapPasswordUpdateError,
   validateNewPassword,
@@ -26,22 +24,14 @@ type SecuritySectionProps = {
 export default function SecuritySection({
   email,
 }: SecuritySectionProps) {
-  const [currentPassword, setCurrentPassword] =
-    useState("");
-  const [newPassword, setNewPassword] =
-    useState("");
-  const [confirmPassword, setConfirmPassword] =
-    useState("");
-  const [errorMessage, setErrorMessage] =
-    useState("");
-  const [successMessage, setSuccessMessage] =
-    useState("");
-  const [isSubmitting, setIsSubmitting] =
-    useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  async function handleSubmit(
-    event: FormEvent<HTMLFormElement>
-  ) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setErrorMessage("");
     setSuccessMessage("");
@@ -69,32 +59,26 @@ export default function SecuritySection({
     setIsSubmitting(true);
 
     try {
-      const verifyResult =
-        await supabase.auth.signInWithPassword(
-          {
-            email,
-            password: currentPassword,
-          }
-        );
+      const verifyResult = await supabase.auth.signInWithPassword(
+        {
+          email,
+          password: currentPassword,
+        }
+      );
 
       if (verifyResult.error) {
-        setErrorMessage(
-          "Current password is incorrect."
-        );
+        setErrorMessage("Current password is incorrect.");
 
         return;
       }
 
-      const updateResult =
-        await supabase.auth.updateUser({
-          password: newPassword,
-        });
+      const updateResult = await supabase.auth.updateUser({
+        password: newPassword,
+      });
 
       if (updateResult.error) {
         setErrorMessage(
-          mapPasswordUpdateError(
-            updateResult.error.message
-          )
+          mapPasswordUpdateError(updateResult.error.message)
         );
 
         return;
@@ -118,122 +102,66 @@ export default function SecuritySection({
   }
 
   return (
-    <section
-      id="security"
-      className={accountSectionClassName}
-    >
+    <section id="security" className={accountSectionClassName}>
       <div className="max-w-xl">
-        <h2 className="text-xl font-bold text-slate-900">
+        <h2 className="text-xl font-bold text-text-charcoal">
           Security
         </h2>
 
         <p className="mt-2 text-sm text-slate-600">
-          Change your password while signed in. You will
-          need your current password to confirm the change.
+          Change your password while signed in. You will need your
+          current password to confirm the change.
         </p>
 
         <form
           onSubmit={handleSubmit}
-          className="mt-6 space-y-5"
+          className={`${AUTH_FORM_CLASS} mt-6`}
           noValidate
         >
-          <div>
-            <label
-              htmlFor="current-password"
-              className="block text-sm font-medium text-slate-700"
-            >
-              Current password
-            </label>
+          <AuthTextField
+            id="current-password"
+            name="currentPassword"
+            label="Current password"
+            type="password"
+            value={currentPassword}
+            onChange={setCurrentPassword}
+            autoComplete="current-password"
+            disabled={isSubmitting}
+          />
 
-            <input
-              id="current-password"
-              name="currentPassword"
-              type="password"
-              autoComplete="current-password"
-              value={currentPassword}
-              onChange={(event) =>
-                setCurrentPassword(
-                  event.target.value
-                )
-              }
-              disabled={isSubmitting}
-              className={accountInputClassName}
-            />
-          </div>
+          <AuthPasswordFieldWithRequirements
+            id="new-password"
+            name="newPassword"
+            label="New password"
+            password={newPassword}
+            onPasswordChange={setNewPassword}
+            autoComplete="new-password"
+            disabled={isSubmitting}
+          />
 
-          <div>
-            <label
-              htmlFor="new-password"
-              className="block text-sm font-medium text-slate-700"
-            >
-              New password
-            </label>
+          <AuthTextField
+            id="confirm-password"
+            name="confirmPassword"
+            label="Confirm new password"
+            type="password"
+            value={confirmPassword}
+            onChange={setConfirmPassword}
+            autoComplete="new-password"
+            disabled={isSubmitting}
+          />
 
-            <input
-              id="new-password"
-              name="newPassword"
-              type="password"
-              autoComplete="new-password"
-              value={newPassword}
-              onChange={(event) =>
-                setNewPassword(event.target.value)
-              }
-              disabled={isSubmitting}
-              className={accountInputClassName}
-            />
+          {errorMessage ? (
+            <AuthErrorAlert message={errorMessage} />
+          ) : null}
 
-            <PasswordRequirementsChecklist
-              password={newPassword}
-              className="mt-3"
-            />
-          </div>
-
-          <div>
-            <label
-              htmlFor="confirm-password"
-              className="block text-sm font-medium text-slate-700"
-            >
-              Confirm new password
-            </label>
-
-            <input
-              id="confirm-password"
-              name="confirmPassword"
-              type="password"
-              autoComplete="new-password"
-              value={confirmPassword}
-              onChange={(event) =>
-                setConfirmPassword(
-                  event.target.value
-                )
-              }
-              disabled={isSubmitting}
-              className={accountInputClassName}
-            />
-          </div>
-
-          {errorMessage && (
-            <p
-              role="alert"
-              className={accountAlertErrorClassName}
-            >
-              {errorMessage}
-            </p>
-          )}
-
-          {successMessage && (
-            <p
-              role="status"
-              className={accountAlertSuccessClassName}
-            >
-              {successMessage}
-            </p>
-          )}
+          {successMessage ? (
+            <AuthSuccessAlert message={successMessage} />
+          ) : null}
 
           <button
             type="submit"
             disabled={isSubmitting}
-            className={accountButtonPrimaryClassName}
+            className={AUTH_PRIMARY_BUTTON_CLASS}
           >
             {isSubmitting
               ? "Updating password..."

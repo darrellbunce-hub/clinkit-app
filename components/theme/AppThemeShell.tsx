@@ -1,18 +1,10 @@
-"use client";
-
-import { DevThemeSwitcher } from "@/components/theme/DevThemeSwitcher";
-import { BrandThemeProvider } from "@/context/BrandThemeContext";
 import type { ReactNode } from "react";
 
+/** Pass-through shell — production Keynetic branding is fixed in globals.css. */
 export function AppThemeShell({
   children,
 }: {
   children: ReactNode;
 }) {
-  return (
-    <BrandThemeProvider>
-      {children}
-      <DevThemeSwitcher />
-    </BrandThemeProvider>
-  );
+  return children;
 }

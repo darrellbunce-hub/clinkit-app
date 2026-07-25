@@ -6,24 +6,46 @@ import {
   type FormEvent,
 } from "react";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
-import { AUTH_TITLE_CLASS } from "@/components/mobileStandards";
-import { resolveLoginNextDestination } from "@/lib/auth/redirects";
-import { ROUTES } from "@/lib/auth/routes";
-import { getAccountType } from "@/lib/accountType";
-import { fetchAuthenticatedProfileAccountFields } from "@/lib/currentUserContext";
-import { ensureUserProfile } from "@/lib/profile/ensureUserProfile";
-import PasswordRequirementsChecklist from "@/components/auth/PasswordRequirementsChecklist";
+import { useRouter } from "next/navigation";
+
+import AuthEmailField from "@/components/auth/AuthEmailField";
+import AuthErrorAlert from "@/components/auth/AuthErrorAlert";
+import AuthPageShell from "@/components/auth/AuthPageShell";
+import AuthPasswordFieldWithRequirements from "@/components/auth/AuthPasswordFieldWithRequirements";
+import {
+  AUTH_BUTTON_STACK_CLASS,
+  AUTH_FORM_CLASS,
+  AUTH_FOOTER_LINK_CLASS,
+  AUTH_INLINE_LINK_CLASS,
+  AUTH_PRIMARY_BUTTON_CLASS,
+  AUTH_SECONDARY_BUTTON_CLASS,
+  AUTH_SUBTITLE_CLASS,
+  AUTH_TITLE_CLASS,
+} from "@/components/auth/authStyles";
 import CollectionPointNotice from "@/components/legal/CollectionPointNotice";
+import LegalAcceptanceFields from "@/components/legal/LegalAcceptanceFields";
+import { getAccountType } from "@/lib/accountType";
 import {
   mapAuthSignInError,
   mapAuthSignUpError,
 } from "@/lib/auth/authErrors";
+import { validatePasswordForSignUp } from "@/lib/auth/passwordPolicy";
+import { resolveLoginNextDestination } from "@/lib/auth/redirects";
+import { ROUTES } from "@/lib/auth/routes";
+import { fetchAuthenticatedProfileAccountFields } from "@/lib/currentUserContext";
 import {
-  validatePasswordForSignUp,
-} from "@/lib/auth/passwordPolicy";
+  LEGAL_DOCUMENT_VERSIONS,
+  SIGNUP_LEGAL_ACCEPTANCE_ERROR,
+} from "@/lib/legal/constants";
+import {
+  buildHomeownerSignupLegalAcceptance,
+  flushPendingSignupLegalAcceptance,
+  isSignupLegalAcceptanceComplete,
+  persistSignupLegalAcceptanceAfterAuth,
+} from "@/lib/legal/recordSignupLegalAcceptance";
+import { ensureUserProfile } from "@/lib/profile/ensureUserProfile";
 import { resolveHomeownerPostAuthDestination } from "@/lib/propertyClaim/resolveHomeownerPostAuthDestination";
-import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase";
 
 function readCredentials(form: HTMLFormElement) {
   const formData = new FormData(form);
@@ -35,27 +57,26 @@ function readCredentials(form: HTMLFormElement) {
 }
 
 export default function LoginPage() {
-  const formRef =
-    useRef<HTMLFormElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
   const router = useRouter();
 
-  const [errorMessage, setErrorMessage] =
-    useState("");
-  const [isLoggingIn, setIsLoggingIn] =
+  const [errorMessage, setErrorMessage] = useState("");
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [isSigningUp, setIsSigningUp] = useState(false);
+  const [passwordValue, setPasswordValue] = useState("");
+  const [isCreateAccountMode, setIsCreateAccountMode] =
     useState(false);
-  const [isSigningUp, setIsSigningUp] =
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [privacyAccepted, setPrivacyAccepted] =
     useState(false);
-  const [passwordValue, setPasswordValue] =
-    useState("");
 
-  async function handleLogin(
-    event: FormEvent<HTMLFormElement>
-  ) {
+  async function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setErrorMessage("");
 
-    const { email, password } =
-      readCredentials(event.currentTarget);
+    const { email, password } = readCredentials(
+      event.currentTarget
+    );
 
     if (!email || !password) {
       setErrorMessage(
@@ -68,11 +89,10 @@ export default function LoginPage() {
     setIsLoggingIn(true);
 
     try {
-      const result =
-        await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
+      const result = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
       if (result.error) {
         setErrorMessage(
@@ -90,8 +110,7 @@ export default function LoginPage() {
         return;
       }
 
-      const profileEnsure =
-        await ensureUserProfile(supabase);
+      const profileEnsure = await ensureUserProfile(supabase);
 
       if (!profileEnsure.ok) {
         setErrorMessage(
@@ -100,6 +119,8 @@ export default function LoginPage() {
 
         return;
       }
+
+      await flushPendingSignupLegalAcceptance(supabase);
 
       const nextParam = new URLSearchParams(
         window.location.search
@@ -149,10 +170,10 @@ export default function LoginPage() {
       return;
     }
 
+    setIsCreateAccountMode(true);
     setErrorMessage("");
 
-    const { email, password } =
-      readCredentials(formRef.current);
+    const { email, password } = readCredentials(formRef.current);
 
     if (!email || !password) {
       setErrorMessage(
@@ -171,34 +192,60 @@ export default function LoginPage() {
       return;
     }
 
+    if (
+      !isSignupLegalAcceptanceComplete(
+        termsAccepted,
+        privacyAccepted
+      )
+    ) {
+      setErrorMessage(SIGNUP_LEGAL_ACCEPTANCE_ERROR);
+
+      return;
+    }
+
     setIsSigningUp(true);
 
+    const acceptedAt = new Date().toISOString();
+    const legalAcceptance = buildHomeownerSignupLegalAcceptance(
+      LEGAL_DOCUMENT_VERSIONS.termsOfUse,
+      LEGAL_DOCUMENT_VERSIONS.privacyPolicy,
+      acceptedAt
+    );
+
     try {
-      const {
-        data,
-        error,
-      } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
       });
 
       if (error) {
-        setErrorMessage(
-          mapAuthSignUpError(error.message)
-        );
+        setErrorMessage(mapAuthSignUpError(error.message));
 
         return;
       }
 
       if (data.user) {
+        const legalRecord =
+          await persistSignupLegalAcceptanceAfterAuth(
+            supabase,
+            legalAcceptance
+          );
+
+        if (!legalRecord.ok) {
+          setErrorMessage(
+            "Your account was created but we could not record legal acceptance. Try signing in again."
+          );
+
+          return;
+        }
+
         if (!data.session) {
           router.push("/verify-email");
 
           return;
         }
 
-        const profileEnsure =
-          await ensureUserProfile(supabase);
+        const profileEnsure = await ensureUserProfile(supabase);
 
         if (!profileEnsure.ok) {
           setErrorMessage(
@@ -230,124 +277,84 @@ export default function LoginPage() {
     }
   }
 
-  const isBusy =
-    isLoggingIn || isSigningUp;
+  const isBusy = isLoggingIn || isSigningUp;
 
   return (
-    <main className="min-h-screen bg-slate-100 flex items-center justify-center px-6">
+    <AuthPageShell>
+      <h1 className={AUTH_TITLE_CLASS}>Log in</h1>
 
-      <div className="w-full max-w-md bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
+      <p className={AUTH_SUBTITLE_CLASS}>
+        Access your property chain
+      </p>
 
-        <h1 className={AUTH_TITLE_CLASS}>
-          Login
-        </h1>
+      <form
+        ref={formRef}
+        onSubmit={handleLogin}
+        className={AUTH_FORM_CLASS}
+        noValidate
+      >
+        <AuthEmailField
+          id="login-email"
+          label="Email"
+          disabled={isBusy}
+        />
 
-        <p className="mt-2 text-slate-600">
-          Access your property chain
-        </p>
-
-        <form
-          ref={formRef}
-          onSubmit={handleLogin}
-          className="mt-8"
-          noValidate
-        >
-          <div>
-
-            <label
-              htmlFor="login-email"
-              className="block text-sm font-medium text-slate-700"
+        <AuthPasswordFieldWithRequirements
+          id="login-password"
+          name="password"
+          label="Password"
+          password={passwordValue}
+          onPasswordChange={setPasswordValue}
+          autoComplete="current-password"
+          disabled={isBusy}
+          labelAccessory={
+            <Link
+              href={ROUTES.forgotPassword}
+              className={AUTH_INLINE_LINK_CLASS}
             >
-              Email
-            </label>
+              Forgot password?
+            </Link>
+          }
+        />
 
-            <input
-              id="login-email"
-              name="email"
-              type="email"
-              autoComplete="email"
-              inputMode="email"
-              enterKeyHint="next"
-              disabled={isBusy}
-              className="mt-2 w-full border border-slate-300 text-base text-slate-900 rounded-2xl px-4 py-3 disabled:bg-slate-100"
-            />
+        {errorMessage ? (
+          <AuthErrorAlert message={errorMessage} />
+        ) : null}
 
-          </div>
+        {isCreateAccountMode ? (
+          <LegalAcceptanceFields
+            variant="homeowner"
+            termsAccepted={termsAccepted}
+            privacyAccepted={privacyAccepted}
+            onTermsAcceptedChange={setTermsAccepted}
+            onPrivacyAcceptedChange={setPrivacyAccepted}
+            disabled={isBusy}
+          />
+        ) : null}
 
-          <div className="mt-6">
-
-            <div className="flex items-center justify-between gap-4">
-              <label
-                htmlFor="login-password"
-                className="block text-sm font-medium text-slate-700"
-              >
-                Password
-              </label>
-
-              <Link
-                href={ROUTES.forgotPassword}
-                className="text-sm font-medium text-slate-600 hover:text-slate-900 underline underline-offset-2"
-              >
-                Forgot password?
-              </Link>
-            </div>
-
-            <input
-              id="login-password"
-              name="password"
-              type="password"
-              autoComplete="current-password"
-              enterKeyHint="go"
-              disabled={isBusy}
-              value={passwordValue}
-              onChange={(event) =>
-                setPasswordValue(event.target.value)
-              }
-              className="mt-2 w-full border border-slate-300 text-base text-slate-900 rounded-2xl px-4 py-3 disabled:bg-slate-100"
-            />
-
-            <PasswordRequirementsChecklist
-              password={passwordValue}
-              className="mt-3"
-            />
-
-          </div>
-
-          {errorMessage && (
-            <p
-              role="alert"
-              className="mt-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800"
-            >
-              {errorMessage}
-            </p>
-          )}
-
+        <div className={AUTH_BUTTON_STACK_CLASS}>
           <button
             type="submit"
             disabled={isBusy}
-            className="mt-8 w-full bg-slate-900 text-white rounded-2xl py-4 font-semibold disabled:bg-slate-400"
+            className={AUTH_PRIMARY_BUTTON_CLASS}
           >
-            {isLoggingIn
-              ? "Signing in..."
-              : "Login"}
+            {isLoggingIn ? "Signing in..." : "Log in"}
           </button>
 
           <button
             type="button"
             disabled={isBusy}
             onClick={handleSignup}
-            className="mt-4 w-full border border-slate-300 text-slate-900 rounded-2xl py-4 font-semibold disabled:bg-slate-100 disabled:text-slate-400"
+            className={AUTH_SECONDARY_BUTTON_CLASS}
           >
             {isSigningUp
               ? "Creating account..."
-              : "Create Account"}
+              : "Create account"}
           </button>
-        </form>
+        </div>
+      </form>
 
-        <CollectionPointNotice className="mt-6" context="homeowner" />
-
-      </div>
-
-    </main>
+      <CollectionPointNotice className="mt-6" context="homeowner" />
+    </AuthPageShell>
   );
 }

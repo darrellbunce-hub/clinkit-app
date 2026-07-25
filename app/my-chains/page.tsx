@@ -10,11 +10,20 @@ import {
 } from "@/components/mobileStandards";
 import { MobileActionHeader } from "@/components/mobile/MobileLayout";
 import Navbar from "@/components/Navbar";
+import ParticipantDataLoadingState from "@/components/loading/ParticipantDataLoadingState";
 import { useChain } from "@/context/ChainContext";
 import { getDashboardChainTitle } from "@/lib/operationalPosition";
+import { PAGE_BG_CLASS } from "@/lib/theme/themeTokens";
 
 export default function MyChainsPage() {
-  const { properties, chains } = useChain();
+  const { properties, chains, authLoading, participantDataReady } =
+    useChain();
+
+  if (authLoading || !participantDataReady) {
+    return (
+      <ParticipantDataLoadingState message="Loading your chains…" />
+    );
+  }
 
   const uniqueChainIds = [
     ...new Set(
@@ -27,7 +36,7 @@ export default function MyChainsPage() {
   );
 
   return (
-    <main className="min-h-screen bg-slate-100">
+    <main className={PAGE_BG_CLASS}>
       <Navbar />
 
       <div className="max-w-5xl mx-auto px-6 py-12">

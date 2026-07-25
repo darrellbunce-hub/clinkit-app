@@ -79,6 +79,8 @@ The following were removed after founder sign-off:
 
 No debug/test Sentry endpoint remains reachable in Preview or Production.
 
+**Post-cleanup redeploy:** Founder confirmed redeployed Preview returns **Page Not Found** for the removed verification route (expected).
+
 ---
 
 *Historical record only — do not reintroduce verification routes without a new approved task.*

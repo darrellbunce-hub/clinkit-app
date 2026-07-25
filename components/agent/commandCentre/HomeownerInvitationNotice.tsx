@@ -12,7 +12,7 @@ const NOTICE_CLASSES: Record<
   warning:
     "bg-status-warning-soft text-status-warning-text ring-1 ring-status-warning/20",
   neutral:
-    "bg-surface-mist text-text-charcoal ring-1 ring-surface-card-border",
+    "bg-surface-card text-text-charcoal ring-1 ring-surface-card-border",
 };
 
 export default function HomeownerInvitationNotice({

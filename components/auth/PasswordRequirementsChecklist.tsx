@@ -54,7 +54,7 @@ export default function PasswordRequirementsChecklist({
 
       <p className="sr-only">
         Minimum length {PASSWORD_POLICY.minLength} characters with uppercase,
-        lowercase, number, and special character required.
+        lowercase, number, and symbol required.
       </p>
     </div>
   );

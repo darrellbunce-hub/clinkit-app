@@ -9,31 +9,53 @@ import {
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
+import AuthEmailField from "@/components/auth/AuthEmailField";
+import AuthErrorAlert from "@/components/auth/AuthErrorAlert";
+import AuthPasswordFieldWithRequirements from "@/components/auth/AuthPasswordFieldWithRequirements";
+import {
+  AUTH_CARD_CLASS,
+  AUTH_EA_SECTION_CLASS,
+  AUTH_FORM_CLASS,
+  AUTH_FOOTER_LINK_CLASS,
+  AUTH_FOOTER_TEXT_CLASS,
+  AUTH_INLINE_LINK_CLASS,
+  AUTH_PRIMARY_BUTTON_CLASS,
+  AUTH_SUBTITLE_CLASS,
+  AUTH_TITLE_CLASS,
+} from "@/components/auth/authStyles";
 import EaMarketingShell from "@/components/estate-agents/EaMarketingShell";
-import { AUTH_TITLE_CLASS } from "@/components/mobileStandards";
 import { mapAuthSignInError } from "@/lib/auth/authErrors";
-import { resolveLoginNextDestination, resolvePostLoginRedirect } from "@/lib/auth/redirects";
+import {
+  resolveLoginNextDestination,
+  resolvePostLoginRedirect,
+} from "@/lib/auth/redirects";
 import { ROUTES } from "@/lib/auth/routes";
 import { fetchAuthenticatedProfileAccountFields } from "@/lib/currentUserContext";
 import { ensureUserProfile } from "@/lib/profile/ensureUserProfile";
+import { flushPendingSignupLegalAcceptance } from "@/lib/legal/recordSignupLegalAcceptance";
 import { supabase } from "@/lib/supabase";
 
-const inputClassName =
-  "mt-2 w-full border border-slate-300 text-base text-slate-900 rounded-2xl px-4 py-3 disabled:bg-slate-100";
+function AuthLoadingCard({
+  message,
+}: {
+  message: string;
+}) {
+  return (
+    <EaMarketingShell>
+      <section className={AUTH_EA_SECTION_CLASS}>
+        <div
+          className={`${AUTH_CARD_CLASS} text-center text-slate-600`}
+        >
+          {message}
+        </div>
+      </section>
+    </EaMarketingShell>
+  );
+}
 
 export default function EstateAgentLoginPage() {
   return (
-    <Suspense
-      fallback={
-        <EaMarketingShell>
-          <section className="max-w-xl mx-auto px-6 py-16">
-            <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-8 text-center text-slate-600">
-              Loading login...
-            </div>
-          </section>
-        </EaMarketingShell>
-      }
-    >
+    <Suspense fallback={<AuthLoadingCard message="Loading…" />}>
       <EstateAgentLoginContent />
     </Suspense>
   );
@@ -43,12 +65,11 @@ function EstateAgentLoginContent() {
   const searchParams = useSearchParams();
   const nextDestination = searchParams.get("next");
 
-  const [errorMessage, setErrorMessage] =
-    useState("");
-  const [isLoggingIn, setIsLoggingIn] =
-    useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [isCheckingSession, setIsCheckingSession] =
     useState(true);
+  const [passwordValue, setPasswordValue] = useState("");
 
   useEffect(() => {
     async function redirectIfAuthenticated() {
@@ -62,8 +83,7 @@ function EstateAgentLoginContent() {
         return;
       }
 
-      const profileEnsure =
-        await ensureUserProfile(supabase);
+      const profileEnsure = await ensureUserProfile(supabase);
 
       if (!profileEnsure.ok) {
         setIsCheckingSession(false);
@@ -89,32 +109,23 @@ function EstateAgentLoginContent() {
         return;
       }
 
-      window.location.href =
-        resolveLoginNextDestination(
-          nextDestination,
-          resolvePostLoginRedirect(profile)
-        );
+      window.location.href = resolveLoginNextDestination(
+        nextDestination,
+        resolvePostLoginRedirect(profile)
+      );
     }
 
     redirectIfAuthenticated();
   }, [nextDestination]);
 
-  async function handleSubmit(
-    event: FormEvent<HTMLFormElement>
-  ) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setErrorMessage("");
 
-    const formData = new FormData(
-      event.currentTarget
-    );
+    const formData = new FormData(event.currentTarget);
 
-    const email = String(
-      formData.get("email") ?? ""
-    ).trim();
-    const password = String(
-      formData.get("password") ?? ""
-    );
+    const email = String(formData.get("email") ?? "").trim();
+    const password = String(formData.get("password") ?? "");
 
     if (!email || !password) {
       setErrorMessage(
@@ -127,11 +138,10 @@ function EstateAgentLoginContent() {
     setIsLoggingIn(true);
 
     try {
-      const result =
-        await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
+      const result = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
       if (result.error) {
         setErrorMessage(
@@ -149,8 +159,7 @@ function EstateAgentLoginContent() {
         return;
       }
 
-      const profileEnsure =
-        await ensureUserProfile(supabase);
+      const profileEnsure = await ensureUserProfile(supabase);
 
       if (!profileEnsure.ok) {
         setErrorMessage(
@@ -159,6 +168,8 @@ function EstateAgentLoginContent() {
 
         return;
       }
+
+      await flushPendingSignupLegalAcceptance(supabase);
 
       const profile =
         await fetchAuthenticatedProfileAccountFields(
@@ -174,11 +185,10 @@ function EstateAgentLoginContent() {
         return;
       }
 
-      window.location.href =
-        resolveLoginNextDestination(
-          nextDestination,
-          resolvePostLoginRedirect(profile)
-        );
+      window.location.href = resolveLoginNextDestination(
+        nextDestination,
+        resolvePostLoginRedirect(profile)
+      );
     } catch (error) {
       setErrorMessage(
         error instanceof Error
@@ -191,107 +201,68 @@ function EstateAgentLoginContent() {
   }
 
   if (isCheckingSession) {
-    return (
-      <EaMarketingShell>
-        <section className="max-w-xl mx-auto px-6 py-16">
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-8 text-center text-slate-600">
-            Checking session...
-          </div>
-        </section>
-      </EaMarketingShell>
-    );
+    return <AuthLoadingCard message="Checking session…" />;
   }
 
   return (
     <EaMarketingShell>
-      <section className="max-w-xl mx-auto px-6 py-16">
-        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-8">
-          <h1 className={AUTH_TITLE_CLASS}>
-            Estate Agent Login
-          </h1>
+      <section className={AUTH_EA_SECTION_CLASS}>
+        <div className={AUTH_CARD_CLASS}>
+          <h1 className={AUTH_TITLE_CLASS}>Log in</h1>
 
-          <p className="mt-2 text-slate-600">
+          <p className={AUTH_SUBTITLE_CLASS}>
             Access your agency account
           </p>
 
           <form
             onSubmit={handleSubmit}
-            className="mt-8 space-y-6"
+            className={AUTH_FORM_CLASS}
             noValidate
           >
-            <div>
-              <label
-                htmlFor="ea-login-email"
-                className="block text-sm font-medium text-slate-700"
-              >
-                Business email
-              </label>
+            <AuthEmailField
+              id="ea-login-email"
+              label="Work email"
+              disabled={isLoggingIn}
+            />
 
-              <input
-                id="ea-login-email"
-                name="email"
-                type="email"
-                autoComplete="email"
-                inputMode="email"
-                disabled={isLoggingIn}
-                className={inputClassName}
-              />
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between gap-4">
-                <label
-                  htmlFor="ea-login-password"
-                  className="block text-sm font-medium text-slate-700"
-                >
-                  Password
-                </label>
-
+            <AuthPasswordFieldWithRequirements
+              id="ea-login-password"
+              name="password"
+              label="Password"
+              password={passwordValue}
+              onPasswordChange={setPasswordValue}
+              autoComplete="current-password"
+              disabled={isLoggingIn}
+              labelAccessory={
                 <Link
                   href={ROUTES.forgotPassword}
-                  className="text-sm font-medium text-slate-600 hover:text-slate-900 underline underline-offset-2"
+                  className={AUTH_INLINE_LINK_CLASS}
                 >
                   Forgot password?
                 </Link>
-              </div>
+              }
+            />
 
-              <input
-                id="ea-login-password"
-                name="password"
-                type="password"
-                autoComplete="current-password"
-                disabled={isLoggingIn}
-                className={inputClassName}
-              />
-            </div>
-
-            {errorMessage && (
-              <p
-                role="alert"
-                className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800"
-              >
-                {errorMessage}
-              </p>
-            )}
+            {errorMessage ? (
+              <AuthErrorAlert message={errorMessage} />
+            ) : null}
 
             <button
               type="submit"
               disabled={isLoggingIn}
-              className="w-full bg-slate-900 text-white rounded-2xl py-4 font-semibold disabled:bg-slate-400"
+              className={AUTH_PRIMARY_BUTTON_CLASS}
             >
-              {isLoggingIn
-                ? "Signing in..."
-                : "Login"}
+              {isLoggingIn ? "Signing in..." : "Log in"}
             </button>
           </form>
 
-          <p className="mt-6 text-sm text-slate-600">
+          <p className={AUTH_FOOTER_TEXT_CLASS}>
             Need an account?{" "}
             <Link
               href={ROUTES.estateAgentSignup}
-              className="font-semibold text-slate-900 underline"
+              className={AUTH_FOOTER_LINK_CLASS}
             >
-              Sign up
+              Create account
             </Link>
           </p>
 
@@ -299,9 +270,9 @@ function EstateAgentLoginContent() {
             Homeowner?{" "}
             <Link
               href={ROUTES.homeownerLogin}
-              className="font-semibold text-slate-900 underline"
+              className={AUTH_FOOTER_LINK_CLASS}
             >
-              Sign in here
+              Log in here
             </Link>
           </p>
         </div>

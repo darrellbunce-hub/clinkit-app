@@ -142,3 +142,19 @@ export const OPERATIONAL_OWNER_FALLBACK_LABEL =
 
 export const OPERATIONAL_MANAGER_FALLBACK_LABEL =
   "Operational manager";
+
+export function formatAlreadyRecordedStatusMessage(
+  statusLabel: string
+): string {
+  const trimmed = statusLabel.trim();
+
+  if (!trimmed) {
+    return "No changes made — your current status is already recorded.";
+  }
+
+  return `No changes made — your current status is already ${trimmed}.`;
+}
+
+export function formatAlreadyRecordedUpdateMessage(): string {
+  return "No changes made — this update is already recorded.";
+}

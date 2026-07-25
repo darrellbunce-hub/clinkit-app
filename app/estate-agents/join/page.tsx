@@ -283,7 +283,7 @@ function JoinBranchContent() {
                 href={loginHref}
                 className="block w-full rounded-2xl border border-slate-300 py-4 text-center font-semibold text-slate-900"
               >
-                Sign in
+                Log in
               </Link>
             </div>
           )}

@@ -50,7 +50,7 @@ function JoinChainContent() {
     } = await supabase.auth.getUser();
 
     if (!user) {
-      alert("Please login first");
+      alert("Please log in first");
       return;
     }
 

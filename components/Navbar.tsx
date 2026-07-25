@@ -119,14 +119,14 @@ export default function Navbar() {
       href="/login"
       className={`${NAV_LINK_DARK_CLASS} px-4 py-2`}
     >
-      Login
+      Log in
     </Link>
 
     <Link
       href="/login"
       className={`${BTN_ACCENT_SM_CLASS} px-5 py-3`}
     >
-      Create Account
+      Create account
     </Link>
 
   </>
@@ -225,7 +225,7 @@ window.location.href = "/";
         setMobileMenuOpen(false)
       }
     >
-      Login
+      Log in
     </Link>
 
     <Link
@@ -235,7 +235,7 @@ window.location.href = "/";
         setMobileMenuOpen(false)
       }
     >
-      Create Account
+      Create account
     </Link>
 
   </>

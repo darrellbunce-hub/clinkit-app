@@ -1,6 +1,6 @@
 # Pre-Launch Workstream 2 — Production Observability, Incident Alerting & Operational Monitoring
 
-**Status:** **`AUDIT_FOUNDER_APPROVED`** · Phase 1 **`IMPLEMENTATION_COMPLETE_AWAITING_FOUNDER_CONFIGURATION_AND_STAGING_VERIFICATION`** — see [Phase 1 report](./PRELAUNCH_OBSERVABILITY_PHASE1_IMPLEMENTATION.md)  
+**Status:** **`AUDIT_FOUNDER_APPROVED`** · Phase 1 application-side **`FOUNDER_VERIFIED_COMPLETE`** · Supabase/Vercel provider review **`FOUNDER_VERIFIED`** (22 Jul 2026) — see [Phase 1 report](./PRELAUNCH_OBSERVABILITY_PHASE1_IMPLEMENTATION.md) · [Sentry record](./PRELAUNCH_OBSERVABILITY_SENTRY_VERIFICATION.md) · [Provider review](./PRELAUNCH_PROVIDER_REVIEW_SUPABASE_VERCEL_22JUL2026.md)  
 **Audit date:** 22 July 2026  
 **Audit type:** Repository audit and architecture design only — **no Production changes**, **no implementation**, **no third-party product installation**
 
@@ -10,9 +10,9 @@
 
 ## Executive summary
 
-Keynetic currently has **partial operational visibility** through Vercel function logs, Supabase provider dashboards, unstructured `console.error` calls, and several **application-owned audit tables** (`email_events`, `property_lifecycle_events`, operational summaries). There is **no automated founder alerting**, **no health/uptime monitoring**, **no application error monitoring SDK**, **no structured logging**, **no React error boundaries**, and **no Resend delivery webhook integration**.
+Keynetic has **Phase 1 application-side observability implemented and founder-verified on Preview** (`/api/health`, error boundaries, optional Sentry). **External Production configuration** (Sentry DSN, uptime monitor, Production plan decisions) remains open. **Supabase Pro** usage/cost/spend cap/backups and **Vercel Hobby** plan were founder-verified 22 Jul 2026 ([provider record](./PRELAUNCH_PROVIDER_REVIEW_SUPABASE_VERCEL_22JUL2026.md)).
 
-The founder would **not reliably know** about Production outages, error spikes, cron worker failures, email delivery problems, or authentication degradation **before a customer reports it**. Manual inspection of Vercel and Supabase dashboards is required for most failure modes.
+Remaining gaps: **no automated founder alerting** on Production, **no external uptime monitor configured** (deferred until Production URL ready), **no configurable Supabase usage alerts identified**, unstructured `console.error` (~149 calls), **no Resend delivery webhook integration**. Manual Usage dashboard review and spend cap remain primary Supabase cost controls during pre-launch.
 
 **Recommended launch stack (simplest cost-effective architecture):**
 
@@ -28,7 +28,7 @@ The founder would **not reliably know** about Production outages, error spikes, 
 
 **Expected early-stage recurring observability cost:** **£0–£35/month** at low traffic (free uptime monitor + Sentry Developer tier + native provider dashboards). Scale risk is **log/telemetry volume**, not base subscription price — safeguards required.
 
-**Launch blockers from observability alone:** **P0** — no automated downtime detection; **P1** — no proactive application error alerting; **P1** — chain intelligence cron not scheduled in `vercel.json`.
+**Launch blockers from observability alone (updated 22 Jul 2026):** Application-side Phase 1 **complete**. **P0 external:** no Production uptime monitor configured (deferred until Production URL); no Production Sentry DSN. **P1:** chain intelligence cron not scheduled in `vercel.json`; Resend webhooks not implemented.
 
 ---
 
@@ -203,11 +203,14 @@ Classification: **GOOD** = founder can discover proactively · **PARTIAL** = log
 
 ### Vercel
 
+**Founder verified (22 Jul 2026):** **Hobby** plan. No spend-management configuration required at pre-launch stage. Production plan/spend controls remain an **open go-live decision** — Hobby is **not** approved as the final Production plan. Detail: [provider record](./PRELAUNCH_PROVIDER_REVIEW_SUPABASE_VERCEL_22JUL2026.md).
+
 | Capability | Repo evidence | Assessment |
 |------------|---------------|------------|
+| Current plan | Founder dashboard | **Hobby — verified 22 Jul 2026** |
 | Deployment failures | Vercel Git integration | Visible in Vercel dashboard; email notifications **REQUIRES PLAN CONFIRMATION** |
 | Function logs | All server code uses stdout/stderr | Available in Vercel log viewer; retention **REQUIRES PLAN CONFIRMATION** |
-| Runtime errors | No SDK aggregation | Must search logs manually |
+| Runtime errors | Sentry SDK (Phase 1) when DSN configured | Preview verified; Production DSN **not configured** |
 | Request logs | Platform default | Status codes visible; retention **REQUIRES PLAN CONFIRMATION** |
 | Latency / duration | Platform metrics | Dashboard per route; alerting **REQUIRES PLAN CONFIRMATION** |
 | CPU/memory | Limited serverless visibility | High-level only; not app-instrumented |
@@ -215,21 +218,28 @@ Classification: **GOOD** = founder can discover proactively · **PARTIAL** = log
 | Bandwidth | Platform | Dashboard + billing |
 | Web Analytics | **Not configured** | Not in `package.json` or layout |
 | Speed Insights | **Not configured** | Not installed |
-| Alerts | **None configured in repo** | **REQUIRES PLAN CONFIRMATION** |
+| Alerts | **None configured in repo** | **REQUIRES PLAN CONFIRMATION** — spend alerts N/A on Hobby |
 | Log drains | **None configured** | Optional export to external SIEM |
-| Spend alerts | Account billing settings | **REQUIRES PLAN CONFIRMATION** |
+| Spend alerts | Account billing settings | **N/A on Hobby at pre-launch** — Production plan review open |
 
 ### Supabase
 
+**Founder verified (22 Jul 2026):** **Pro** plan; usage within quotas; spend cap **enabled**; daily DB backups **verified**; restore points observed; Organisation Audit Logs **unavailable on Pro** (accepted); connection logging **intentionally OFF**; configurable usage alerts **not identified** in dashboard. Detail: [provider record](./PRELAUNCH_PROVIDER_REVIEW_SUPABASE_VERCEL_22JUL2026.md).
+
 | Capability | Assessment |
 |------------|------------|
+| Plan | **Pro — verified 22 Jul 2026** |
+| Usage vs quotas | **Within Pro included quotas** — not evidence of scale readiness |
+| Spend cap | **Enabled** — keep during pre-launch; Production go-live decision open |
 | Database / API / Auth logs | Available in Supabase dashboard; detail and retention **REQUIRES PLAN CONFIRMATION** |
-| Postgres logs / slow queries | Pro+ features vary; **REQUIRES PLAN CONFIRMATION** |
-| CPU / memory / connections / disk | Dashboard metrics; alerts **REQUIRES PLAN CONFIRMATION** |
+| Postgres logs / slow queries | Connection/disconnection logging **intentionally OFF** |
+| CPU / memory / connections / disk | Dashboard metrics; alerts **not identified** in dashboard |
 | RLS errors | Visible in logs when logging enabled |
 | Auth failures | Auth logs section |
-| Backups | Documented 7-day on Pro in GDPR docs; **REQUIRES PLAN CONFIRMATION for Production** |
-| Usage/spend controls | Dashboard + billing alerts **REQUIRES PLAN CONFIRMATION** |
+| Backups | **Daily backups verified** (22 Jul 2026); restore drill **not performed** |
+| Storage backups | **Not included in DB backups** — separate policy required before business-critical Storage use |
+| Organisation Audit Logs | **Team/Enterprise only** — accepted limitation at current stage |
+| Usage/spend alerts | **Not identified** in dashboard — manual review + spend cap; reassess before Production |
 
 ### Resend
 
@@ -787,14 +797,23 @@ Part 16 — Phases 1–7.
 
 ### 24. External founder configuration / actions required
 
-1. Approve this audit and Phase 1 implementation  
-2. Confirm Vercel plan (log retention, alerts)  
-3. Confirm Supabase Production plan (logs, backups, alerts)  
-4. Create Sentry organisation/project (EU region recommended)  
-5. Configure external uptime monitor with founder email/SMS  
-6. Configure Vercel/Supabase billing alerts  
-7. Legal review for marketing analytics (Phase 5)  
-8. Configure Resend webhooks (Phase 3)
+**Application-side Phase 1:** **`FOUNDER_VERIFIED_COMPLETE`**
+
+**Provider review (22 Jul 2026):** **`FOUNDER_VERIFIED`** — [record](./PRELAUNCH_PROVIDER_REVIEW_SUPABASE_VERCEL_22JUL2026.md)
+
+**Still open before Production go-live:**
+
+1. Production Vercel deployment + URL  
+2. Production Supabase branch parity (separate workstream)  
+3. Production `NEXT_PUBLIC_SENTRY_DSN` (+ optional source map vars)  
+4. External uptime monitor on `/`, `/login`, `/api/health` — **deferred until Production URL ready**  
+5. Production spend-cap decision (Supabase)  
+6. Vercel plan decision (Hobby vs Pro) — **Hobby not approved as final Production plan**  
+7. Reassess Supabase usage/billing alerting before go-live  
+8. Optional Supabase restore drill before Production cutover  
+9. Legal review for marketing analytics (Phase 5)  
+10. Configure Resend webhooks (Phase 3)  
+11. Phase 2 alerting — **not started**; separate approval
 
 ### 25. Database / schema changes eventually required
 
@@ -818,7 +837,7 @@ No migrations required for Phase 1.
 
 ### 27. Documentation status
 
-**`AUDIT_COMPLETE_AWAITING_FOUNDER_APPROVAL`** — implementation **not started**.
+**`AUDIT_FOUNDER_APPROVED`** · Phase 1 application-side **`FOUNDER_VERIFIED_COMPLETE`** · Supabase/Vercel provider review **`FOUNDER_VERIFIED`** (22 Jul 2026). External Production configuration and Phase 2 **not started**.
 
 ### 28. Exact recommendation for first implementation phase
 

@@ -541,7 +541,7 @@ export default function HomeownerInvitationPanel({
   if (isLoading) {
     return (
       <div
-        className="rounded-xl bg-surface-mist px-4 py-3 ring-1 ring-surface-card-border"
+        className="rounded-xl bg-surface-card px-4 py-3 ring-1 ring-surface-card-border"
         aria-busy="true"
         aria-label="Loading homeowner invitation"
       >
@@ -554,7 +554,7 @@ export default function HomeownerInvitationPanel({
 
   if (!status?.ok) {
     return (
-      <div className="rounded-xl bg-surface-mist px-4 py-3 ring-1 ring-surface-card-border">
+      <div className="rounded-xl bg-surface-card px-4 py-3 ring-1 ring-surface-card-border">
         <HomeownerInvitationNotice variant="warning">
           Could not load invitation status.
         </HomeownerInvitationNotice>
@@ -567,8 +567,8 @@ export default function HomeownerInvitationPanel({
   const hasInviteEmail = Boolean(inviteEmail);
   const isConnected = phase === "connected";
   const panelPadding = isConnected
-    ? "rounded-xl bg-surface-mist px-4 py-3 ring-1 ring-surface-card-border"
-    : "rounded-xl bg-surface-mist px-4 py-4 ring-1 ring-surface-card-border";
+    ? "rounded-xl bg-surface-card px-4 py-3 ring-1 ring-surface-card-border"
+    : "rounded-xl bg-surface-card px-4 py-4 ring-1 ring-surface-card-border";
 
   const joinedLabel =
     status.state === "claimed"

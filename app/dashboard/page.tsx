@@ -8,6 +8,7 @@ import {
 } from "@/components/mobileStandards";
 import EmailVerificationBanner from "@/components/auth/EmailVerificationBanner";
 import Navbar from "@/components/Navbar";
+import ParticipantDataLoadingState from "@/components/loading/ParticipantDataLoadingState";
 import PageHeaderBand from "@/components/theme/PageHeaderBand";
 import { STAGES } from "@/data/stages";
 import { useChain } from "@/context/ChainContext";
@@ -57,7 +58,14 @@ function getStageLabel(stage: string | null | undefined): string {
 }
 
 export default function DashboardPage() {
-  const { properties, chains } = useChain();
+  const { properties, chains, authLoading, participantDataReady } =
+    useChain();
+
+  if (authLoading || !participantDataReady) {
+    return (
+      <ParticipantDataLoadingState message="Loading your chains…" />
+    );
+  }
 
   return (
     <main className={PAGE_BG_CLASS}>

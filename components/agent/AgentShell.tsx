@@ -44,11 +44,7 @@ export default function AgentShell({
             >
               Account Settings
             </span>
-          ) : (
-            <span className="text-slate-500 hidden lg:inline px-2">
-              Keynetic Agent
-            </span>
-          )
+          ) : undefined
         }
         onLogout={handleLogout}
       />

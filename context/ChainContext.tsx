@@ -62,6 +62,8 @@ import {
   resolveMutationOperationalPosition,
 } from "@/lib/mutationPermission";
 import { refreshOperationalSummary } from "@/lib/operationalSummary/refreshOperationalSummary";
+import type { RefreshOperationalSummaryResult } from "@/lib/operationalSummary/refreshOperationalSummaryResult";
+import { captureObservabilityException } from "@/lib/observability/sentryShared";
 type Activity = OperationalActivity;
 
 type Property = {
@@ -114,6 +116,7 @@ type ChainContextType = {
   accountType: AccountType | null;
   estateAgentOperationalAssignments: EstateAgentOperationalAssignment[];
   authLoading: boolean;
+  participantDataReady: boolean;
   isAuthenticated: boolean;
   refreshParticipantData: () => Promise<void>;
 
@@ -446,6 +449,8 @@ const [chains, setChains] =
   ] = useState<EstateAgentOperationalAssignment[]>([]);
   const [authLoading, setAuthLoading] =
     useState(true);
+  const [participantDataReady, setParticipantDataReady] =
+    useState(false);
   const [isAuthenticated, setIsAuthenticated] =
     useState(false);
 
@@ -489,6 +494,8 @@ const [chains, setChains] =
 
   const runParticipantLoad =
     useCallback(async () => {
+      setParticipantDataReady(false);
+
       const requestId =
         ++participantRequestIdRef.current;
 
@@ -524,6 +531,7 @@ const [chains, setChains] =
       );
       participantLoadedUserIdRef.current =
         currentUserIdRef.current;
+      setParticipantDataReady(true);
     }, [applyParticipantDataset]);
 
   const refreshParticipantData =
@@ -542,6 +550,7 @@ const [chains, setChains] =
 
       participantLoadedUserIdRef.current = null;
       invalidateParticipantRequests();
+      setParticipantDataReady(false);
 
       await runParticipantLoad();
     }, [
@@ -557,6 +566,7 @@ const [chains, setChains] =
         authGenerationRef.current;
 
       setAuthLoading(true);
+      setParticipantDataReady(false);
 
       const {
         data: { user },
@@ -605,6 +615,7 @@ const [chains, setChains] =
           setChains,
           setEstateAgentOperationalAssignments
         );
+        setParticipantDataReady(true);
       }
     }
 
@@ -656,6 +667,7 @@ const [chains, setChains] =
               setChains,
               setEstateAgentOperationalAssignments
             );
+            setParticipantDataReady(true);
 
             return;
           }
@@ -701,6 +713,16 @@ const [chains, setChains] =
       return;
     }
 
+    if (!shouldLoadParticipantData) {
+      setParticipantDataReady(true);
+    }
+  }, [authLoading, shouldLoadParticipantData]);
+
+  useEffect(() => {
+    if (authLoading) {
+      return;
+    }
+
     const loadDecision =
       resolveParticipantLoadTransition({
         authLoading: false,
@@ -729,6 +751,7 @@ const [chains, setChains] =
         setChains,
         setEstateAgentOperationalAssignments
       );
+      setParticipantDataReady(true);
 
       return;
     }
@@ -753,21 +776,37 @@ const [chains, setChains] =
   const getActivityUpdaterRole = () =>
     resolveActivityUpdaterRole(accountType);
 
+  function reportOperationalSummaryRefreshFailure(
+    result: RefreshOperationalSummaryResult
+  ) {
+    if (result.ok) {
+      return;
+    }
+
+    captureObservabilityException(
+      new Error(
+        result.error ?? "operational_summary_refresh_failed"
+      ),
+      {
+        operation: "refresh_operational_summary",
+        errorCode: result.errorCode ?? undefined,
+      }
+    );
+  }
+
   async function refreshOperationalSummariesForChain(
     chainId: number
-  ) {
-    const result =
-      await refreshOperationalSummary(
-        supabase,
-        { chainId }
-      );
+  ): Promise<RefreshOperationalSummaryResult> {
+    const result = await refreshOperationalSummary(
+      supabase,
+      { chainId }
+    );
 
     if (!result.ok) {
-      console.error(
-        "Operational summary refresh failed:",
-        result.error
-      );
+      reportOperationalSummaryRefreshFailure(result);
     }
+
+    return result;
   }
 
 async function updatePropertyStage(
@@ -1468,6 +1507,7 @@ return (
         accountType,
         estateAgentOperationalAssignments,
         authLoading,
+        participantDataReady,
         isAuthenticated,
         refreshParticipantData,
         updatePropertyStage,

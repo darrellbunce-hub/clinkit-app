@@ -48,7 +48,7 @@ export const PASSWORD_REQUIREMENT_DEFINITIONS: ReadonlyArray<{
 }> = [
   {
     id: "min_length",
-    label: `At least ${PASSWORD_MIN_LENGTH} characters`,
+    label: `Minimum ${PASSWORD_MIN_LENGTH} characters`,
     test: (password) => password.length >= PASSWORD_MIN_LENGTH,
   },
   {
@@ -68,7 +68,7 @@ export const PASSWORD_REQUIREMENT_DEFINITIONS: ReadonlyArray<{
   },
   {
     id: "special",
-    label: "Special character",
+    label: "Symbol",
     test: (password) => SPECIAL_PATTERN.test(password),
   },
 ];

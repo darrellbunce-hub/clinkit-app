@@ -2,10 +2,11 @@
 
 **Workstream:** Production Observability & Incident Alerting  
 **Phase:** 1 — Minimum Viable Production Observability  
-**Status:** **`APPLICATION_SIDE_FOUNDER_VERIFIED`** — awaiting external Production configuration only  
+**Status:** **`APPLICATION_SIDE_FOUNDER_VERIFIED`** — Supabase/Vercel provider review documented 22 Jul 2026 — awaiting external Production configuration only  
 **Implementation date:** 22 July 2026  
 **Health endpoint correction:** 22 July 2026 — `?probe=app` now returns `database:"skipped"` (see §2–3)  
-**Staging verification:** **`FOUNDER_VERIFIED_COMPLETE`** — [record](./PRELAUNCH_OBSERVABILITY_SENTRY_VERIFICATION.md) (temporary routes removed)
+**Staging verification:** **`FOUNDER_VERIFIED_COMPLETE`** — [Sentry record](./PRELAUNCH_OBSERVABILITY_SENTRY_VERIFICATION.md) (temporary routes removed)  
+**Provider review:** **`FOUNDER_VERIFIED`** — [Supabase/Vercel record](./PRELAUNCH_PROVIDER_REVIEW_SUPABASE_VERCEL_22JUL2026.md)
 
 **Audit basis:** [PRELAUNCH_OBSERVABILITY_AUDIT_AND_ARCHITECTURE.md](./PRELAUNCH_OBSERVABILITY_AUDIT_AND_ARCHITECTURE.md) — **`AUDIT_FOUNDER_APPROVED`**
 
@@ -303,30 +304,36 @@ Configure P0 SMS via mobile carrier email gateway or Better Stack SMS add-on.
 
 ## 17. Vercel native monitoring checklist
 
-**REQUIRES FOUNDER/PROVIDER PLAN CONFIRMATION** for tier-specific features.
+**Founder review (22 Jul 2026):** [Provider record](./PRELAUNCH_PROVIDER_REVIEW_SUPABASE_VERCEL_22JUL2026.md)
 
-- [ ] Confirm current Vercel plan (Hobby / Pro / Enterprise)
-- [ ] Enable **spend/budget alerts** in Billing
+- [x] Confirm current Vercel plan — **Hobby verified**
+- [ ] Enable **spend/budget alerts** in Billing — **N/A on Hobby at pre-launch; Production plan review open**
 - [ ] Verify **deployment failure notifications** (email/Slack)
-- [ ] Review **function log retention** period for Production
+- [ ] Review **function log retention** period for Production — **requires Production plan decision**
 - [ ] Review **runtime logs** access for `/api/*` and cron routes
 - [ ] Check **observability / analytics** tab for error rates (plan-dependent)
 - [ ] Document Production project URL and team access
 - [ ] Optional later: log drain (Phase 2+)
 
+**Decision:** Do not upgrade to Vercel Pro solely for spend controls during pre-launch. Review plan requirements before Production go-live. **Hobby is not approved as the final Production plan.**
+
 ---
 
 ## 18. Supabase native monitoring checklist
 
-**REQUIRES FOUNDER/PROVIDER PLAN CONFIRMATION** for Production project.
+**Founder review (22 Jul 2026):** [Provider record](./PRELAUNCH_PROVIDER_REVIEW_SUPABASE_VERCEL_22JUL2026.md)
 
-- [ ] Confirm Production Supabase plan (Free / Pro)
-- [ ] Verify **daily backups** enabled (Pro — 7-day per GDPR docs)
-- [ ] Enable **spend/usage alerts** if available
+- [x] Confirm Supabase plan — **Pro verified**
+- [x] Verify **daily backups** enabled — **verified; restore points 15–22 Jul 2026**
+- [ ] Perform **restore drill** — **not yet performed**
+- [ ] Enable **spend/usage alerts** if available — **none identified in dashboard; spend cap enabled; manual review required**
+- [x] Review **Usage dashboard** — **verified 22 Jul 2026; within Pro quotas**
 - [ ] Review **Database → Reports** for CPU, memory, connections
 - [ ] Review **Auth logs** for login failure spikes
 - [ ] Review **API logs** for elevated 4xx/5xx
-- [ ] Confirm **Postgres logs** availability on plan
+- [x] Confirm **Postgres logs** availability — connection/disconnection logging **intentionally OFF**
+- [x] Confirm **spend cap** — **ENABLED** (keep during pre-launch; Production go-live decision open)
+- [ ] Document **Storage backup policy** before business-critical Storage use — **future requirement; Storage Size currently 0 GB**
 - [ ] Set calendar reminder for monthly usage review
 
 ---
@@ -491,8 +498,10 @@ No unrelated ESLint cleanup performed.
 | Staging deploy + health check | **Founder verified** |
 | Staging Sentry client + server capture | **Founder verified** |
 | Temporary verification surface | **Removed** |
+| Supabase Pro usage/cost/spend cap/backups | **Founder verified** — [provider record](./PRELAUNCH_PROVIDER_REVIEW_SUPABASE_VERCEL_22JUL2026.md) |
+| Vercel Hobby plan | **Founder verified** |
 | Sentry DSN in Production | **Founder action** |
-| External uptime monitor | **Founder action** |
+| External uptime monitor | **Founder action** — deferred until Production URL ready |
 | Production observability live | **No** — awaiting founder external configuration |
 | Phase 2 alerting | **Not started** |
 

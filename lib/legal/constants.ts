@@ -9,6 +9,20 @@ export const DATA_CONTROLLER_PLACEHOLDER =
 
 export const LEGAL_LAST_UPDATED = "June 2026";
 
+/** Stable version identifiers for acceptance audit records. */
+export const LEGAL_DOCUMENT_VERSIONS = {
+  privacyPolicy: "2026-06-v1",
+  termsOfUse: "2026-06-v1",
+  estateAgentTerms: "2026-06-v1",
+} as const;
+
+export type SignupTermsDocument =
+  | "terms_of_use"
+  | "estate_agent_terms";
+
+export const SIGNUP_LEGAL_ACCEPTANCE_ERROR =
+  "Accept the Terms and Privacy Policy to create your account.";
+
 export const LEGAL_ROUTES = {
   privacy: "/privacy",
   terms: "/terms",

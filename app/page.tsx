@@ -141,7 +141,7 @@ export default function HomePage() {
               transition={{ duration: 0.7 }}
             >
               <div className={HERO_BADGE_CLASS}>
-                Shared property chain coordination
+                One shared view for your property chain
               </div>
 
               <h1 className={`mt-8 ${PAGE_TITLE_INVERTED_CLASS} leading-tight`}>
@@ -195,33 +195,33 @@ export default function HomePage() {
                   </h2>
                 </div>
 
-                <div className="bg-green-100 text-green-700 px-4 py-2 rounded-full font-semibold">
+                <div className="bg-brand-badge-bg text-brand-badge-text border border-brand-badge-border px-4 py-2 rounded-full font-semibold">
                   95%
                 </div>
               </div>
 
               <div className="mt-10 space-y-6">
                 <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-2xl bg-green-100 border-2 border-green-500 flex items-center justify-center">
-                    <Home className="w-7 h-7 text-green-700" />
+                  <div className="w-14 h-14 rounded-2xl bg-brand-info-bg border-2 border-brand-primary flex items-center justify-center">
+                    <Home className="w-7 h-7 text-brand-primary" />
                   </div>
 
-                  <div className="flex-1 h-2 bg-green-400 rounded-full"></div>
+                  <div className="flex-1 h-2 bg-brand-primary rounded-full"></div>
 
-                  <div className="w-14 h-14 rounded-2xl bg-green-100 border-2 border-green-500 flex items-center justify-center">
-                    <Home className="w-7 h-7 text-green-700" />
+                  <div className="w-14 h-14 rounded-2xl bg-brand-info-bg border-2 border-brand-primary flex items-center justify-center">
+                    <Home className="w-7 h-7 text-brand-primary" />
                   </div>
                 </div>
 
                 <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-2xl bg-green-100 border-2 border-green-500 flex items-center justify-center">
-                    <Home className="w-7 h-7 text-green-700" />
+                  <div className="w-14 h-14 rounded-2xl bg-brand-info-bg border-2 border-brand-primary flex items-center justify-center">
+                    <Home className="w-7 h-7 text-brand-primary" />
                   </div>
 
-                  <div className="flex-1 h-2 bg-amber-400 rounded-full"></div>
+                  <div className="flex-1 h-2 bg-brand-accent rounded-full"></div>
 
-                  <div className="w-14 h-14 rounded-2xl bg-amber-100 border-2 border-amber-500 flex items-center justify-center">
-                    <Clock3 className="w-7 h-7 text-amber-700" />
+                  <div className="w-14 h-14 rounded-2xl bg-brand-badge-bg border-2 border-brand-accent flex items-center justify-center">
+                    <Clock3 className="w-7 h-7 text-brand-badge-text" />
                   </div>
                 </div>
 
@@ -453,7 +453,7 @@ export default function HomePage() {
             </div>
 
             <div className={MARKETING_FEATURE_CARD_CLASS}>
-              <ShieldCheck className="w-12 h-12 text-emerald-600" />
+              <ShieldCheck className={`${MARKETING_FEATURE_ICON_CLASS}`} />
 
               <h3 className="mt-6 text-2xl font-bold text-slate-900">
                 Permission Controlled
@@ -465,7 +465,7 @@ export default function HomePage() {
             </div>
 
             <div className={MARKETING_FEATURE_CARD_CLASS}>
-              <Home className="w-12 h-12 text-green-700" />
+              <Home className={MARKETING_FEATURE_ICON_CLASS} />
 
               <h3 className="mt-6 text-2xl font-bold text-slate-900">
                 Shared Visibility

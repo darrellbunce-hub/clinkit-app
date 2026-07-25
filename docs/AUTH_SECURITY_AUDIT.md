@@ -285,6 +285,25 @@ npm run build
 
 ---
 
+## Part 10 — SEC-104 audit (2026-07-25)
+
+**Status:** AUDIT COMPLETE — **SEC-104 OPEN** (not closed). No code changes in audit pass.
+
+Full report: **`docs/SEC-104_AUTHENTICATION_ABUSE_RATE_LIMITING_AUDIT.md`**
+
+| Topic | Conclusion |
+|-------|------------|
+| Trust boundary | Auth is browser → Supabase direct; Keynetic Upstash cannot authoritatively limit those calls |
+| Supabase limits | Email cooldowns, token/verify IP buckets — founder must verify Dashboard values |
+| App-layer limits | None on auth; invitation **send** limits are separate (3/15min) |
+| Brute force | Per-IP token bucket only; no per-account lockout without Auth Hook |
+| Enumeration | Login/forgot/reset largely generic; login “no session” message may hint unverified account |
+| CAPTCHA | Defer at launch |
+| Recommended option | **Minimum Launch** — Dashboard verification + monitoring |
+| Revised severity | SEC-104 **P2**; Production Dashboard verification **P1 gate** |
+
+---
+
 ## Implemented Code Changes (this pass)
 
 1. **`lib/auth/passwordPolicy.ts`** — 10-char policy with complexity, requirement states, error mappers
@@ -307,6 +326,7 @@ npm run build
 | **P0** | Verify redirect URLs include `/auth/confirm` in Supabase allow-list | Ops / manual |
 | ~~**P0**~~ | ~~Decide and implement email verification gating for operational actions~~ | **Done** — see Part 5 |
 | **P1** | Enable leaked password protection (if Pro+ plan) | Ops / manual |
+| **P1** | Complete Supabase Auth rate-limit + SMTP Dashboard verification on Production (SEC-104) | Ops / manual |
 | **P1** | Manual end-to-end auth regression on staging | QA |
 | **P2** | CAPTCHA (only if abuse observed or pen-test requires) | Ops |
 

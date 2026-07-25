@@ -395,7 +395,7 @@ export default function EstateAgentOnboardingPage() {
                       htmlFor="business-email"
                       className="block text-sm font-medium text-slate-700"
                     >
-                      Business email
+                      Work email
                     </label>
 
                     <input

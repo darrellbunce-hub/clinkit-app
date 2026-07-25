@@ -65,6 +65,7 @@ import {
 } from "@/lib/searchingPlaceholder";
 import CompletionScheduledBanner from "@/components/CompletionScheduledBanner";
 import ChainCompletedBanner from "@/components/ChainCompletedBanner";
+import ParticipantDataLoadingState from "@/components/loading/ParticipantDataLoadingState";
 import PropertyEstateAgentAssignment from "@/components/estate-agents/PropertyEstateAgentAssignment";
 import RecordCompletionDateForm from "@/components/RecordCompletionDateForm";
 import { canShowCompletionSchedulingForm } from "@/lib/recordChainCompletionDate";
@@ -134,6 +135,8 @@ export default function ChainPage() {
       chainNodes,
       currentUserId,
       accountType,
+      authLoading,
+      participantDataReady,
       estateAgentOperationalAssignments,
       recordChainCompletionDate,
       amendChainCompletionDate,
@@ -640,6 +643,12 @@ export default function ChainPage() {
     }
 
     window.location.reload();
+  }
+
+  if (authLoading || !participantDataReady) {
+    return (
+      <ParticipantDataLoadingState message="Loading chain…" />
+    );
   }
 
   return (
