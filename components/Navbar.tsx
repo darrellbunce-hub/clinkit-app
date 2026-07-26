@@ -47,7 +47,7 @@ export default function Navbar() {
 
   return (
 
-    <header className={NAV_HEADER_DARK_CLASS}>
+    <header className={`${NAV_HEADER_DARK_CLASS} w-full`}>
 
       <div
         className="
@@ -60,13 +60,16 @@ export default function Navbar() {
           items-center
           justify-between
           gap-4
+          min-w-0
         "
       >
-<Logo
-  variant="dark"
-  priority
-  showTagline={showMarketingBrandTagline}
-/>
+        <div className="min-w-0 flex-1">
+          <Logo
+            variant="dark"
+            priority
+            showTagline={showMarketingBrandTagline}
+          />
+        </div>
         
         {/* Desktop Nav */}
 <nav className="hidden md:flex items-center gap-3">
@@ -107,6 +110,13 @@ export default function Navbar() {
 ) : (
 
   <>
+
+    <Link
+      href={ROUTES.about}
+      className={`${NAV_LINK_DARK_CLASS} px-4 py-2`}
+    >
+      Why Keynetic?
+    </Link>
 
     <Link
       href={ROUTES.estateAgentMarketing}
@@ -207,6 +217,16 @@ window.location.href = "/";
 ) : (
 
   <>
+
+    <Link
+      href={ROUTES.about}
+      className={`${NAV_LINK_DARK_CLASS} py-3 min-h-11 inline-flex items-center`}
+      onClick={() =>
+        setMobileMenuOpen(false)
+      }
+    >
+      Why Keynetic?
+    </Link>
 
     <Link
       href={ROUTES.estateAgentMarketing}

@@ -36,17 +36,17 @@ export default function MyChainsPage() {
   );
 
   return (
-    <main className={PAGE_BG_CLASS}>
+    <main className={`${PAGE_BG_CLASS} overflow-x-clip`}>
       <Navbar />
 
-      <div className="max-w-5xl mx-auto px-6 py-12">
+      <div className="max-w-5xl mx-auto min-w-0 px-6 py-12">
         <h1 className={PAGE_TITLE_CLASS}>My Chains</h1>
 
         <p className="mt-3 text-lg text-slate-600">
           Your active property chains
         </p>
 
-        <div className="mt-10 grid gap-6">
+        <div className="mt-10 grid min-w-0 gap-6">
           {userChains.map((chain) => {
             const chainProperties = properties.filter(
               (property) =>
@@ -66,11 +66,11 @@ export default function MyChainsPage() {
             return (
               <div
                 key={chain.id}
-                className={`bg-white rounded-3xl border border-slate-200 ${CARD_PADDING_CLASS}`}
+                className={`min-w-0 bg-white rounded-3xl border border-slate-200 ${CARD_PADDING_CLASS}`}
               >
                 <MobileActionHeader
                   title={
-                    <h2 className={SECTION_TITLE_CLASS}>
+                    <h2 className={`${SECTION_TITLE_CLASS} break-words`}>
                       {getDashboardChainTitle(
                         chain.id,
                         chainProperties

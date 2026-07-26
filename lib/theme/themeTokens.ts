@@ -139,6 +139,14 @@ export const HERO_GLOW_SECONDARY_CLASS =
 export const HERO_BADGE_CLASS =
   "inline-flex items-center bg-brand-accent text-text-charcoal px-4 py-2 rounded-full text-sm font-semibold shadow-lg shadow-brand-accent/30";
 
+/** Marketing hero headline — tighter on very small screens */
+export const HERO_TITLE_CLASS =
+  "text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-white leading-tight";
+
+/** Hero illustration card — higher contrast on dark teal backgrounds */
+export const HERO_ILLUSTRATION_CARD_CLASS =
+  "rounded-3xl border border-white/20 bg-white/12 backdrop-blur-xl shadow-xl shadow-black/10";
+
 export const GLASS_CARD_CLASS =
   "bg-white/10 backdrop-blur-xl rounded-3xl border border-white/10";
 

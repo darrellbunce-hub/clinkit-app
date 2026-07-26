@@ -6,6 +6,7 @@ import {
   PAGE_TITLE_CLASS,
   SECTION_TITLE_CLASS,
 } from "@/components/mobileStandards";
+import { MobilePanelHeader } from "@/components/mobile/MobileLayout";
 import EmailVerificationBanner from "@/components/auth/EmailVerificationBanner";
 import Navbar from "@/components/Navbar";
 import ParticipantDataLoadingState from "@/components/loading/ParticipantDataLoadingState";
@@ -68,11 +69,11 @@ export default function DashboardPage() {
   }
 
   return (
-    <main className={PAGE_BG_CLASS}>
+    <main className={`${PAGE_BG_CLASS} overflow-x-clip`}>
       <Navbar />
       <PageHeaderBand />
 
-      <div className="max-w-6xl mx-auto px-6 py-12">
+      <div className="max-w-6xl mx-auto min-w-0 px-6 py-12">
         <EmailVerificationBanner className="mb-8" />
 
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
@@ -95,9 +96,9 @@ export default function DashboardPage() {
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 mt-12">
-          <div className="xl:col-span-2">
-            <div className="grid gap-6 md:grid-cols-2">
+        <div className="mt-12 grid min-w-0 grid-cols-1 xl:grid-cols-3 gap-8">
+          <div className="min-w-0 xl:col-span-2">
+            <div className="grid min-w-0 gap-6 md:grid-cols-2">
               {chains.map((chain) => {
                 const chainProperties = properties
                   .filter(
@@ -117,52 +118,52 @@ export default function DashboardPage() {
                 return (
                   <div
                     key={chain.id}
-                    className={`bg-surface-card rounded-3xl shadow-sm border border-surface-card-border ${CARD_PADDING_CLASS}`}
+                    className={`min-w-0 bg-surface-card rounded-3xl shadow-sm border border-surface-card-border ${CARD_PADDING_CLASS}`}
                   >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="min-w-0 flex-1">
-                        <h2 className="text-2xl font-bold text-slate-900 truncate">
-                          {getDashboardChainTitle(
-                            chain.id,
-                            properties,
-                            operationalPropertyId
-                          )}
-                        </h2>
-
-                        <p className="text-slate-500 mt-1 text-sm">
-                          Access Code: {chain.accessCode}
-                        </p>
-                      </div>
-
-                      <div
-                        className={`
-                          shrink-0 px-3 py-1.5 rounded-full text-xs font-medium
-                          ${statusBadgeClasses(
-                            chainProperties.some(
-                              (property) =>
-                                property.status ===
-                                "broken_connection"
-                            )
-                              ? "broken_connection"
-                              : chainProperties.some(
-                                    (property) =>
-                                      property.status ===
-                                      "pending_connection"
-                                  )
-                                ? "pending_connection"
+                    <MobilePanelHeader
+                      aside={
+                        <div
+                          className={`
+                            px-3 py-1.5 rounded-full text-xs font-medium
+                            ${statusBadgeClasses(
+                              chainProperties.some(
+                                (property) =>
+                                  property.status ===
+                                  "broken_connection"
+                              )
+                                ? "broken_connection"
                                 : chainProperties.some(
                                       (property) =>
                                         property.status ===
-                                        "delayed"
+                                        "pending_connection"
                                     )
-                                  ? "delayed"
-                                  : "healthy"
-                          )}
-                        `}
-                      >
-                        {formatChainState(chain.state)}
-                      </div>
-                    </div>
+                                  ? "pending_connection"
+                                  : chainProperties.some(
+                                        (property) =>
+                                          property.status ===
+                                          "delayed"
+                                      )
+                                    ? "delayed"
+                                    : "healthy"
+                            )}
+                          `}
+                        >
+                          {formatChainState(chain.state)}
+                        </div>
+                      }
+                    >
+                      <h2 className={`${SECTION_TITLE_CLASS} break-words`}>
+                        {getDashboardChainTitle(
+                          chain.id,
+                          properties,
+                          operationalPropertyId
+                        )}
+                      </h2>
+
+                      <p className="text-slate-500 mt-1 text-sm break-words">
+                        Access Code: {chain.accessCode}
+                      </p>
+                    </MobilePanelHeader>
 
                     <div className={`mt-4 ${DASHBOARD_LIST_CLASS}`}>
                       {chainProperties.map((property) => {
@@ -179,7 +180,7 @@ export default function DashboardPage() {
                             className={DASHBOARD_LIST_ROW_CLASS}
                           >
                             <div className="min-w-0">
-                              <h3 className="font-semibold text-slate-900 text-sm leading-snug">
+                              <h3 className="font-semibold text-slate-900 text-sm leading-snug break-words">
                                 {getParticipantPropertyLabel(
                                   {
                                     id: property.id,
@@ -196,7 +197,7 @@ export default function DashboardPage() {
                                 )}
                               </h3>
 
-                              <p className="text-xs text-slate-500 mt-1">
+                              <p className="text-xs text-slate-500 mt-1 break-words">
                                 Position #{property.chainPosition}
                                 {" · "}
                                 {stageLabel}
@@ -221,7 +222,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <div className="space-y-6">
+          <div className="min-w-0 space-y-6">
             <div className={`${CARD_CLASS_NO_PADDING} ${CARD_PADDING_CLASS}`}>
               <h2 className="text-xl font-bold text-slate-900">
                 Recommended Next Steps
