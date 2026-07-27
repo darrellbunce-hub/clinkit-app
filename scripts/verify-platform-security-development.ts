@@ -376,14 +376,15 @@ async function createFixture(admin: SupabaseClient, stamp: string): Promise<Fixt
   }
 
   const { error: memberError } = await participant.rpc(
-    "establish_operational_homeowner",
+    "establish_operational_homeowner_for_created_property",
     {
       p_property_id: property.id,
-      p_granted_via: "start_move",
     }
   );
   if (memberError) {
-    throw new Error(`establish_operational_homeowner failed: ${memberError.message}`);
+    throw new Error(
+      `establish_operational_homeowner_for_created_property failed: ${memberError.message}`
+    );
   }
 
   const syntheticToken = `sec-fixture-${stamp}`;

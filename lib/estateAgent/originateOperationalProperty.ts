@@ -211,16 +211,8 @@ export async function joinEaOperationalChain(
   };
 }
 
+import { generateAccessCode } from "@/lib/accessCode/generateAccessCode";
+
 export function generateOperationalAccessCode(): string {
-  const characters =
-    "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  let result = "";
-
-  for (let index = 0; index < 7; index += 1) {
-    result += characters.charAt(
-      Math.floor(Math.random() * characters.length)
-    );
-  }
-
-  return result;
+  return generateAccessCode();
 }

@@ -94,32 +94,34 @@ async function main() {
 
   // --- establish operational homeowner (start move) ---
   const { data: grant1, error: grant1Err } = await ho1.rpc(
-    "establish_operational_homeowner",
-    { p_property_id: saleId, p_granted_via: "start_move" }
+    "establish_operational_homeowner_for_created_property",
+    { p_property_id: saleId }
   );
   record(
-    "establish_operational_homeowner (start_move)",
+    "establish_operational_homeowner_for_created_property (start move)",
     !grant1Err && grant1?.ok === true,
     grant1Err?.message ?? grant1?.error
   );
 
-  const { data: idempotent } = await ho1.rpc("establish_operational_homeowner", {
-    p_property_id: saleId,
-    p_granted_via: "start_move",
-  });
+  const { data: idempotent } = await ho1.rpc(
+    "establish_operational_homeowner_for_created_property",
+    { p_property_id: saleId }
+  );
   record(
     "establish idempotent (same user)",
     idempotent?.ok === true && idempotent?.idempotent === true,
     idempotent?.error
   );
 
-  const { data: secondHo } = await ho2.rpc("establish_operational_homeowner", {
-    p_property_id: saleId,
-    p_granted_via: "start_move",
-  });
+  const { data: secondHo } = await ho2.rpc(
+    "establish_operational_homeowner_for_created_property",
+    { p_property_id: saleId }
+  );
   record(
     "malicious: second homeowner blocked",
-    secondHo?.ok === false && secondHo?.error === "operational_homeowner_exists",
+    secondHo?.ok === false &&
+      (secondHo?.error === "operational_homeowner_exists" ||
+        secondHo?.error === "not_authorized"),
     JSON.stringify(secondHo)
   );
 
@@ -130,7 +132,12 @@ async function main() {
   });
   record(
     "malicious: ensure_property_membership revoked",
-    Boolean(ensureErr?.message?.includes("deprecated_use_establish_operational_homeowner")),
+    Boolean(
+      ensureErr &&
+        (ensureErr.code === "42501" ||
+          ensureErr.message.toLowerCase().includes("permission denied") ||
+          ensureErr.message.includes("deprecated_use_establish_operational_homeowner"))
+    ),
     ensureErr?.message
   );
 
@@ -152,29 +159,40 @@ async function main() {
   );
   const chain2 = await createChain(ho3, stamp + 1);
   const orphanSaleId = await createSale(ho3, chain2.id, ho3Id, stamp + 1);
-  const { data: orphanGrant } = await ho3.rpc("grant_counterparty_participation", {
-    p_property_id: orphanSaleId,
-  });
+  const { data: orphanGrant, error: orphanGrantError } = await ho3.rpc(
+    "grant_counterparty_participation",
+    { p_property_id: orphanSaleId }
+  );
   record(
-    "malicious: counterparty without homeowner blocked",
-    orphanGrant?.ok === false && orphanGrant?.error === "no_operational_homeowner",
-    JSON.stringify(orphanGrant)
+    "malicious: direct counterparty grant blocked",
+    Boolean(
+      orphanGrantError ||
+        (orphanGrant?.ok === false &&
+          orphanGrant?.error === "not_authorized")
+    ),
+    orphanGrantError?.message ?? JSON.stringify(orphanGrant)
   );
 
-  // --- join chain counterparty (happy path) ---
-  const { data: joinGrant } = await ho2.rpc("grant_counterparty_participation", {
-    p_property_id: saleId,
+  const { data: joinGrant } = await ho2.rpc("join_chain_property", {
+    p_access_code: chain.access_code,
+    p_address: `Enforce Sale ${stamp}`,
+    p_postcode: "E1 1EN",
   });
   record(
-    "grant_counterparty_participation (join chain)",
-    joinGrant?.ok === true && joinGrant?.counterparty_role === "buyer",
+    "join_chain_property grants counterparty participation",
+    joinGrant?.ok === true && joinGrant?.joining_role === "buyer",
     JSON.stringify(joinGrant)
   );
 
   record(
-    "malicious: homeowner cannot be counterparty",
-    (await ho1.rpc("grant_counterparty_participation", { p_property_id: saleId }))
-      .data?.error === "homeowner_cannot_be_counterparty"
+    "malicious: homeowner cannot self-join as counterparty",
+    (
+      await ho1.rpc("join_chain_property", {
+        p_access_code: chain.access_code,
+        p_address: `Enforce Sale ${stamp}`,
+        p_postcode: "E1 1EN",
+      })
+    ).data?.error === "join_details_not_matched"
   );
 
   // --- get_property_operational_owner_user_id uses identity ---

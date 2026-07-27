@@ -35,10 +35,20 @@ export async function establishOperationalHomeowner(
     grantedVia: OperationalIdentityGrantVia;
   }
 ): Promise<{ data: EstablishOperationalHomeownerResult; error: PostgrestError | null }> {
-  const { data, error } = await supabase.rpc("establish_operational_homeowner", {
-    p_property_id: params.propertyId,
-    p_granted_via: params.grantedVia,
-  });
+  const rpcName =
+    params.grantedVia === OPERATIONAL_IDENTITY_GRANT_VIA.startMove
+      ? "establish_operational_homeowner_for_created_property"
+      : "establish_operational_homeowner";
+
+  const rpcArgs =
+    params.grantedVia === OPERATIONAL_IDENTITY_GRANT_VIA.startMove
+      ? { p_property_id: params.propertyId }
+      : {
+          p_property_id: params.propertyId,
+          p_granted_via: params.grantedVia,
+        };
+
+  const { data, error } = await supabase.rpc(rpcName, rpcArgs);
 
   if (error) {
     return { data: { ok: false, error: error.message }, error };
@@ -69,40 +79,17 @@ export async function establishOperationalHomeowner(
   };
 }
 
-/** Approved workflow: join-chain counterparty participation (not ownership). */
+/**
+ * @deprecated Join-chain counterparty participation must use join_chain_property.
+ */
 export async function grantCounterpartyParticipation(
   supabase: SupabaseClient,
   params: { propertyId: number }
 ): Promise<{ data: GrantCounterpartyParticipationResult; error: PostgrestError | null }> {
-  const { data, error } = await supabase.rpc("grant_counterparty_participation", {
-    p_property_id: params.propertyId,
-  });
-
-  if (error) {
-    return { data: { ok: false, error: error.message }, error };
-  }
-
-  const row = (data ?? {}) as GrantRpcRow;
-
-  if (!row.ok) {
-    return {
-      data: {
-        ok: false,
-        error:
-          mapTransactionParticipationError(row.error) ??
-          row.error ??
-          "grant_failed",
-      },
-      error: null,
-    };
-  }
-
+  void supabase;
+  void params;
   return {
-    data: {
-      ok: true,
-      propertyId: row.property_id ?? params.propertyId,
-      counterpartyRole: row.counterparty_role ?? "unknown",
-    },
+    data: { ok: false, error: "not_authorized" },
     error: null,
   };
 }

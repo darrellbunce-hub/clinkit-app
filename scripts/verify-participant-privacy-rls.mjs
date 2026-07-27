@@ -126,10 +126,9 @@ async function createSharedChain(clientA) {
   }
 
   const { error: memberAError } = await clientA.rpc(
-    "establish_operational_homeowner",
+    "establish_operational_homeowner_for_created_property",
     {
       p_property_id: propertyA.id,
-      p_granted_via: "start_move",
     }
   );
 
@@ -144,12 +143,12 @@ async function createSharedChain(clientA) {
       chain_position: 2,
       address: `7777 Pickle Close ${Date.now()}`,
       postcode: "ABCD",
-      stage: "offer_accepted",
+      stage: "property_listed",
       status: "pending_connection",
-      relationship_type: "purchase",
+      relationship_type: "sale",
       created_by_user_id: userA,
-      buyer_connected: true,
-      seller_connected: false,
+      buyer_connected: false,
+      seller_connected: true,
       is_searching: false,
     })
     .select("id, address")
@@ -157,6 +156,33 @@ async function createSharedChain(clientA) {
 
   if (propertyBError || !propertyB) {
     throw new Error(`Property B create failed: ${propertyBError?.message}`);
+  }
+
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+  if (!serviceRoleKey) {
+    throw new Error(
+      "SUPABASE_SERVICE_ROLE_KEY required to bootstrap operational identity for join fixture"
+    );
+  }
+
+  const adminClient = createClient(supabaseUrl, serviceRoleKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+
+  const { error: identityError } = await adminClient
+    .from("property_operational_identities")
+    .insert({
+      property_id: propertyB.id,
+      homeowner_user_id: userA,
+      operational_role: "seller",
+      granted_via: "backfill",
+      status: "active",
+    });
+
+  if (identityError) {
+    throw new Error(
+      `Property B operational identity bootstrap failed: ${identityError.message}`
+    );
   }
 
   return {
@@ -289,27 +315,31 @@ async function main() {
   );
 
   const { data: existsCheck } = await clientA.rpc(
-    "property_exists_for_onboarding",
+    "validate_onboarding_property_address",
     {
       p_address: setup.addressA,
       p_postcode: "ABCD",
+      p_chain_id: setup.chainId,
     }
   );
 
   record(
-    "property_exists_for_onboarding RPC works",
-    existsCheck === true,
-    String(existsCheck)
+    "validate_onboarding_property_address scoped duplicate check works",
+    existsCheck?.ok === false && existsCheck?.error === "address_unavailable",
+    JSON.stringify(existsCheck)
   );
 
-  const { data: resolveJoin } = await clientB.rpc("resolve_chain_for_join", {
-    p_access_code: setup.accessCode,
-  });
+  const { data: resolveJoin, error: resolveJoinError } = await clientB.rpc(
+    "resolve_chain_for_join",
+    {
+      p_access_code: setup.accessCode,
+    }
+  );
 
   record(
-    "resolve_chain_for_join RPC works",
-    resolveJoin?.ok === true,
-    JSON.stringify(resolveJoin)
+    "resolve_chain_for_join blocked for authenticated clients",
+    Boolean(resolveJoinError) || resolveJoin?.ok !== true,
+    resolveJoinError?.message || JSON.stringify(resolveJoin)
   );
 
   const { data: summaries, error: summariesError } = await clientA

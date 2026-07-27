@@ -73,13 +73,10 @@ function JoinChainContent() {
     }
 
     if (!joinResult?.ok) {
-      if (joinResult?.error === "invalid_access_code") {
-        alert("Invalid access code");
-        return;
-      }
-
-      if (joinResult?.error === "property_not_found") {
-        alert("Property not found in this chain");
+      if (joinResult?.error === "join_details_not_matched") {
+        alert(
+          "We could not match those details to a property. Check the access code, address, and postcode, then try again."
+        );
         return;
       }
 

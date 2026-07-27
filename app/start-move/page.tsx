@@ -12,6 +12,7 @@ import {
   establishOperationalHomeowner,
   OPERATIONAL_IDENTITY_GRANT_VIA,
 } from "@/lib/ownership/grants";
+import { generateAccessCode } from "@/lib/accessCode";
 import { attachSearchingPlaceholderToSale } from "@/lib/searchingPlaceholder";
 import CollectionPointNotice from "@/components/legal/CollectionPointNotice";
 import DuplicatePropertyDialog from "@/components/onboarding/DuplicatePropertyDialog";
@@ -46,29 +47,6 @@ export default function StartMovePage() {
 
   const [buyingPostcode, setBuyingPostcode] =
     useState("");
-    function generateAccessCode() {
-      
-      const characters =
-        "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-    
-      let result = "KN-";
-    
-      for (let i = 0; i < 7; i++) {
-    
-        if (i === 3) {
-          result += "-";
-        }
-    
-        result += characters.charAt(
-          Math.floor(
-            Math.random() *
-            characters.length
-          )
-        );
-      }
-    
-      return result;
-    }
 
     function redirectToJoinExistingChain(
       chainId: number
@@ -160,17 +138,19 @@ export default function StartMovePage() {
 
         // SELLING PROPERTY
         if (!notSelling && sellingAddress) {
-          const {
-            data: sellingExists,
-          } = await supabase.rpc(
-            "property_exists_for_onboarding",
+          const { data: sellingCheck } = await supabase.rpc(
+            "validate_onboarding_property_address",
             {
               p_address: sellingAddress,
               p_postcode: sellingPostcode,
+              p_chain_id: chainId,
             }
           );
-    
-          if (sellingExists) {
+
+          if (
+            sellingCheck?.ok === false &&
+            sellingCheck.error === "address_unavailable"
+          ) {
             promptJoinExistingChain(chainId);
             return;
           }
@@ -249,17 +229,19 @@ export default function StartMovePage() {
         let buyerReadyPropertyId = null;
         // BUYING PROPERTY
         if (!notBuying && buyingAddress) {
-          const {
-            data: buyingExists,
-          } = await supabase.rpc(
-            "property_exists_for_onboarding",
+          const { data: buyingCheck } = await supabase.rpc(
+            "validate_onboarding_property_address",
             {
               p_address: buyingAddress,
               p_postcode: buyingPostcode,
+              p_chain_id: chainId,
             }
           );
-    
-          if (buyingExists) {
+
+          if (
+            buyingCheck?.ok === false &&
+            buyingCheck.error === "address_unavailable"
+          ) {
             promptJoinExistingChain(chainId);
             return;
           }
