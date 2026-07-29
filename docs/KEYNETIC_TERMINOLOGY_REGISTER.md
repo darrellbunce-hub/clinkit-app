@@ -96,8 +96,8 @@ Do **not** rename code identifiers in planning or content-only phases.
 |---------|-----------------|----------|------------------|-------|
 | Command centre | **Operational Command Centre** | `/agent` | FD-031 | Approved |
 | Homeowner pricing | **Free for homeowners** | — | FD-031 | OK |
-| Founding offer | **Founding branch offer** (when billing live) | pricing config | FD-007, FD-031 | **£79/month per branch** (first 20 founding) · **£99/month per branch** standard |
-| Subscription unit | **Per estate agent branch** | `ea_branches` (target) | FD-031, FD-036 | Schema stub on company — architecture review before Stripe |
+| Founding offer | **Founding branch offer** (when billing live) | `lib/billing/eaBranchPricing.ts` | FD-007 (amended Stage 1) | **£99/month per branch** (first 20 founding) · **£129/month per branch** standard — historical FD-007 £79/£99 retained in decision record |
+| Subscription unit | **Per estate agent branch** | `ea_branches` + `ea_branch_subscriptions` | FD-031, FD-036, Billing Stage 1 | Schema foundation live; Stripe Checkout Stage 2 |
 | EA business terms | Separate from platform Terms | — | FD-011 | Commercial/legal document |
 
 ---

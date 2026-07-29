@@ -29,8 +29,8 @@ export const estateAgentTermsContent: LegalDocumentContent = {
       title: "Branch subscription model",
       paragraphs: [
         "The subscription unit is an individual estate agent branch.",
-        "Founding direction: £79 per month per branch for the first 20 founding branches, retaining £79/month while the subscription remains active.",
-        "Standard direction: £99 per month per branch thereafter.",
+        "Founding pricing: £99 per month per branch for the first 20 founding branches, retaining £99/month while the subscription remains active.",
+        "Standard pricing: £129 per month per branch thereafter.",
         "Automated billing and payment collection are not yet live. Registering a branch today does not charge a subscription fee. Commercial billing mechanics, including cancellation, refunds and invoicing, are subject to final implementation and will be confirmed before automated billing begins.",
       ],
     },

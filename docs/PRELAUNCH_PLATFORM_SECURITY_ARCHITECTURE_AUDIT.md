@@ -781,7 +781,7 @@ Key behavioural confirmations:
 
 | ID | Severity | Notes |
 |----|----------|-------|
-| SEC-104 | **P2** | Auth abuse — Supabase-authoritative; Dashboard verification P1 gate — see §26 |
+| SEC-104 | **P2** | Hybrid remediation in repo (Postgres RPC limits + verified Dev Auth limits); **CLOSED on Development after migration apply + verifier**; Production parity + Auth email/SMTP review remaining — see §26 |
 | SEC-201 | **P2** | Verify-email open redirect via unsanitized `next` |
 | SEC-202–207 | **P2** | Env bootstrap, dev APIs, client property updates, invitation oracles, Dashboard password policy, npm advisories |
 | SEC-301–304 | **P3** | Middleware refresh edge cases, log hygiene, cron scheduling, branch directory privacy |
@@ -811,27 +811,30 @@ Legal review, FD-004, privacy@ mailbox, Resend/Auth Production config, observabi
 
 ---
 
-## 26. SEC-104 authentication abuse audit (25 Jul 2026)
+## 26. SEC-104 authentication abuse audit (25 Jul 2026) + remediation (29 Jul 2026)
 
-**Status:** AUDIT COMPLETE — **SEC-104 remains OPEN** (not closed).
+**Status:** Remediation **implemented in repository** — mark **CLOSED ON DEVELOPMENT** only after applying `20260729120000_sec104_rpc_rate_limiting.sql` and passing `scripts/verify-sec104-rate-limiting-development.ts --execute`.
 
-Full report: **[SEC-104_AUTHENTICATION_ABUSE_RATE_LIMITING_AUDIT.md](./SEC-104_AUTHENTICATION_ABUSE_RATE_LIMITING_AUDIT.md)**
+Full report: **[SEC-104_APPLICATION_LAYER_RATE_LIMITING_ABUSE_PROTECTION_AUDIT.md](./SEC-104_APPLICATION_LAYER_RATE_LIMITING_ABUSE_PROTECTION_AUDIT.md)**
 
-### Summary
-
-| Topic | Finding |
+| Topic | Outcome |
 |-------|---------|
-| Auth architecture | ~95% browser → Supabase direct; only `/auth/confirm` (recovery OTP) and non-auth invitation APIs hit Keynetic server |
-| App-layer rate limits | **None** on login/signup/reset/resend; Upstash used only for privacy-admin subject lookup |
-| Supabase protection | Email cooldowns, project email caps, IP token buckets on `/token` and `/verify` — exact values **REQUIRES FOUNDER DASHBOARD VERIFICATION** |
-| Invitation send abuse | **Separate** — 3/15min via `email_events` (not SEC-104 reopen) |
-| Revised severity | SEC-104 **P1 → P2**; **P1 gate** = Production Supabase Auth Dashboard checklist |
-| Recommended launch option | **Minimum Launch** — verify Dashboard; defer auth proxy/CAPTCHA unless abuse observed |
-| Known enumeration gap | Login “no session” message hints unverified account — optional P2 fix |
+| Auth abuse | Supabase Auth remains authoritative; Dev Rate Limits founder-verified 2026-07-29 |
+| Invitation send abuse | **Unchanged** — 3/15min via `email_events` |
+| Join / claim / chain create / summary | Postgres `rpc_rate_limit_buckets` inside RPCs |
+| Auth 2 emails/hour | Launch-readiness note — custom SMTP review before Production |
+| Revised severity | SEC-104 **P2**; Production apply + SMTP = remaining gates |
 
-### Founder next action
+### Founder next action (Development)
 
-Complete `docs/SUPABASE_AUTH_DASHBOARD_CHECKLIST.md` on **Production** before launch. No application code or migrations required for Minimum Launch.
+```bash
+npx tsx scripts/apply-development-migration.ts supabase/migrations/20260729120000_sec104_rpc_rate_limiting.sql
+npx tsx scripts/verify-sec104-rate-limiting-development.ts --execute
+npx tsx scripts/verify-chain-join-security-development.ts --execute
+npx tsx scripts/verify-platform-security-development.ts --execute
+```
+
+Production Auth Dashboard checklist + custom SMTP remain pre-launch gates. Production migration apply is a separate approved task.
 
 ---
 

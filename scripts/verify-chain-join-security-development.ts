@@ -876,12 +876,41 @@ async function runExecuteProbes(fixture: FixtureContext): Promise<void> {
     JSON.stringify(legacyEaJoin.data)
   );
 
+  // Deterministic matrix — do not use UUID-derived fixture codes here.
+  // Fixture stamps are hex and can include 0/1, which the generator alphabet
+  // (and TS LOOKUP_CHARSET filter) exclude; that made this assertion flaky.
+  const normalisationMatrix: Array<{
+    input: string;
+    expectedCanonical: string;
+  }> = [
+    { input: "KN-ABC-DEFG", expectedCanonical: "KN-ABC-DEFG" },
+    { input: "kn-abc-defg", expectedCanonical: "KN-ABC-DEFG" },
+    { input: " KN-ABC-DEFG ", expectedCanonical: "KN-ABC-DEFG" },
+    { input: "KN ABC DEFG", expectedCanonical: "KN-ABC-DEFG" },
+    { input: "knabcdefg", expectedCanonical: "KN-ABC-DEFG" },
+    { input: "KN-ABC-DEF", expectedCanonical: "KN-ABC-DEF" },
+    { input: "kn-abc-def", expectedCanonical: "KN-ABC-DEF" },
+    { input: "KN ABC DEF", expectedCanonical: "KN-ABC-DEF" },
+    { input: "knabcdef", expectedCanonical: "KN-ABC-DEF" },
+    { input: "ABC2DEF", expectedCanonical: "ABC2DEF" },
+    { input: "abc2def", expectedCanonical: "ABC2DEF" },
+    { input: " ABC2DEF ", expectedCanonical: "ABC2DEF" },
+  ];
+  const normalisationFailures = normalisationMatrix
+    .map(({ input, expectedCanonical }) => {
+      const candidates = accessCodeLookupCandidates(input);
+      return candidates.includes(expectedCanonical)
+        ? null
+        : `${JSON.stringify(input)} => [${candidates.join(",")}] (expected ${expectedCanonical})`;
+    })
+    .filter((detail): detail is string => detail !== null);
+
   record(
     "TS normalisation helper includes canonical candidate",
-    accessCodeLookupCandidates(fixture.newFormatAccessCode.toLowerCase()).includes(
-      fixture.newFormatAccessCode
-    ),
-    accessCodeLookupCandidates(fixture.newFormatAccessCode.toLowerCase()).join(",")
+    normalisationFailures.length === 0,
+    normalisationFailures.length === 0
+      ? `${normalisationMatrix.length} fixed alphabet-valid inputs`
+      : normalisationFailures.join("; ")
   );
 
   const { data: directGrant, error: directGrantError } = await stranger.rpc(

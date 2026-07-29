@@ -22,6 +22,9 @@ export function isEmailVerificationRequiredError(
   );
 }
 
+export const TOO_MANY_ATTEMPTS_MESSAGE =
+  "Too many attempts. Please wait a few minutes and try again.";
+
 export function mapTransactionParticipationError(
   error: string | null | undefined
 ): string | null {
@@ -31,6 +34,14 @@ export function mapTransactionParticipationError(
 
   if (isEmailVerificationRequiredError(error)) {
     return EMAIL_VERIFICATION_TRANSACTION_MESSAGE;
+  }
+
+  if (
+    error === "too_many_attempts" ||
+    error.includes("too_many_attempts") ||
+    error.includes("rate_limited")
+  ) {
+    return TOO_MANY_ATTEMPTS_MESSAGE;
   }
 
   return null;

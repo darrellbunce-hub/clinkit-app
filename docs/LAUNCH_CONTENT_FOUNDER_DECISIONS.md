@@ -130,6 +130,7 @@ Decisions below supersede conflicting recommendations in the original audit and 
 | **Architecture note** | Current schema leans `ea_companies` for billing stub — **requires separate billing architecture design** before Stripe (FD-036) |
 | **Affected** | `EaLandingPage.tsx`, EA signup, future checkout, EA Business Terms |
 | **Legal review** | Yes (subscription/pricing claims when published) |
+| **SUPERSEDED PRICING (2026-07-29)** | Founder-approved Billing Stage 1: **£99 founding / £129 standard** per branch (first 20). Historical £79/£99 figures above retained for audit trail. See `docs/EA_BILLING_STAGE1_ARCHITECTURE.md`. |
 
 ---
 

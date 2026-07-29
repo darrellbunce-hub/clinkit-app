@@ -163,7 +163,7 @@ const faqs = [
   },
   {
     title: "What does the founding branch offer include?",
-    text: "The Professional founding offer is £79/month (normally £99/month), limited to the first 20 paying branches. Founding branches keep £79/month while their subscription remains active.",
+    text: "The Professional founding offer is £99/month (normally £129/month), limited to the first 20 paying branches. Founding branches keep £99/month while their subscription remains active.",
   },
   {
     title: "Do homeowners need to pay?",
@@ -523,7 +523,7 @@ export default function EaLandingPage() {
 
               <div className="mt-4 flex flex-wrap items-end gap-3">
                 <p className="text-5xl md:text-6xl font-bold text-slate-900">
-                  £79
+                  £99
                 </p>
                 <p className="pb-2 text-lg text-slate-500">
                   / month
@@ -531,13 +531,13 @@ export default function EaLandingPage() {
               </div>
 
               <p className="mt-2 text-slate-500">
-                <span className="line-through">£99/month</span>{" "}
+                <span className="line-through">£129/month</span>{" "}
                 founding branch rate
               </p>
 
               <p className="mt-6 text-slate-600 leading-relaxed">
                 Limited to the first 20 founding branches. Founding branches
-                retain £79/month while their subscription remains active.
+                retain £99/month while their subscription remains active.
                 Automated billing is not yet live — registration is free while
                 commercial payment is finalised.
               </p>
@@ -676,7 +676,7 @@ export default function EaLandingPage() {
           </div>
 
           <p className="mt-6 text-sm text-slate-500">
-            £79/month founding offer (billing not yet live) · Homeowners start
+            £99/month founding offer (billing not yet live) · Homeowners start
             free · Your CRM stays in place
           </p>
         </div>

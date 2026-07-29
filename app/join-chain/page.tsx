@@ -73,6 +73,7 @@ function JoinChainContent() {
     }
 
     if (!joinResult?.ok) {
+      // Rate-limited joins intentionally reuse join_details_not_matched (no oracle).
       if (joinResult?.error === "join_details_not_matched") {
         alert(
           "We could not match those details to a property. Check the access code, address, and postcode, then try again."

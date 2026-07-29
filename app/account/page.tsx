@@ -8,6 +8,7 @@ import { PAGE_BG_CLASS } from "@/lib/theme/themeTokens";
 import LegalPrivacySection from "@/components/account/LegalPrivacySection";
 import ProfileSection from "@/components/account/ProfileSection";
 import SecuritySection from "@/components/account/SecuritySection";
+import SubscriptionSection from "@/components/account/SubscriptionSection";
 import TeamMembersSection from "@/components/account/TeamMembersSection";
 import Navbar from "@/components/Navbar";
 import PageHeaderBand from "@/components/theme/PageHeaderBand";
@@ -20,6 +21,7 @@ import { supabase } from "@/lib/supabase";
 const SECTION_LINKS = [
   { href: "#profile", label: "Profile" },
   { href: "#security", label: "Security" },
+  { href: "#subscription", label: "Subscription" },
   { href: "#team", label: "Team Members" },
   { href: "#legal", label: "Legal & Privacy" },
 ] as const;
@@ -103,7 +105,9 @@ export default function AccountSettingsPage() {
           })
             ? SECTION_LINKS
             : SECTION_LINKS.filter(
-                (link) => link.href !== "#team"
+                (link) =>
+                  link.href !== "#team" &&
+                  link.href !== "#subscription"
               )
         ).map((link) => (
           <a
@@ -131,6 +135,13 @@ export default function AccountSettingsPage() {
           {email && (
             <SecuritySection email={email} />
           )}
+
+          {isEstateAgent({
+            account_type: accountType,
+          }) &&
+            userId && (
+              <SubscriptionSection userId={userId} />
+            )}
 
           {isEstateAgent({
             account_type: accountType,

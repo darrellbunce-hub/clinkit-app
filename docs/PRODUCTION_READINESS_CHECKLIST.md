@@ -526,7 +526,7 @@ The **Launch Content programme** (Stages 3–6) is **FOUNDER_APPROVED_COMPLETE**
 | Google OAuth assessment | **OPEN** — not implemented (§14.3 G) |
 | Address lookup assessment | **OPEN** — not implemented (§14.3 H) |
 | Browser / brand assets | **OPEN** (§14.3 I) |
-| Stripe / commercial readiness | **OPEN** — not started (§14.3 J) |
+| Stripe / commercial readiness | **PARTIAL** — Billing Stage 1 schema/domain foundation; Checkout Stage 2 OPEN (§14.3 J) |
 | Serverless vs containers review | **Future evidence-based review** (§14.3 K) |
 
 ### 14.1 Launch Content programme — complete
@@ -557,9 +557,9 @@ The **Launch Content programme** (Stages 3–6) is **FOUNDER_APPROVED_COMPLETE**
 | 12 | Product / business operational metrics | **OPEN** — §14.3 A · design in Workstream 2 Part 7 (precomputed `platform_operational_metrics`) |
 | 13 | Privacy-conscious website analytics decision | **OPEN** — §14.3 A · design in Workstream 2 Part 9 (defer invasive tracking; legal review for marketing analytics) |
 | 14 | Run-cost monitoring and cost governance | **PARTIAL** — Supabase Pro usage/cost reviewed 22 Jul 2026; spend cap enabled; full unit-economics model **open** (§14.3 B · §14.8) |
-| 15 | **Stripe / billing architecture** (FD-036) | **OPEN** — §14.3 J |
+| 15 | **Stripe / billing architecture** (FD-036) | **PARTIAL** — Stage 1 foundation (`EA_BILLING_STAGE1_ARCHITECTURE.md`); Stage 2 Checkout OPEN |
 | 16 | Refund / cancellation / dispute procedures | **OPEN** — §14.3 J |
-| 17 | Final security review | **Phase 1 RPC remediation COMPLETE ON DEVELOPMENT** — [audit §25](./PRELAUNCH_PLATFORM_SECURITY_ARCHITECTURE_AUDIT.md) · **Production parity OPEN** (SEC-102, SEC-103) · app hardening OPEN (SEC-104, SEC-201+) |
+| 17 | Final security review | **Phase 1 RPC remediation COMPLETE ON DEVELOPMENT** — [audit §25](./PRELAUNCH_PLATFORM_SECURITY_ARCHITECTURE_AUDIT.md) · **SEC-104 Postgres RPC rate limiting IN REPO** (apply `20260729120000_sec104_rpc_rate_limiting.sql` + verifier) · **Production parity OPEN** (SEC-102, SEC-103, SEC-104) · SEC-201+ OPEN |
 | 18 | Final Production launch checklist (§11 gates + Production Supabase pre-flight) | **OPEN** |
 | 19 | Unwired email templates (Welcome · Property connected) | **OPEN** — documented inactive |
 | 20 | Concurrent-user / performance validation | **OPEN** — §14.3 C |
@@ -626,7 +626,9 @@ The **Launch Content programme** (Stages 3–6) is **FOUNDER_APPROVED_COMPLETE**
 
 Track/model: fixed + variable infrastructure cost · anonymous visitor cost · cost per active homeowner / chain / paying EA branch · attributable free-user activity · revenue per paying branch · infrastructure gross margin · break-even branch count · Vercel · Supabase · Resend · observability · address lookup · Stripe · bandwidth/egress.
 
-**Pricing scenarios (do not change live pricing without founder approval):** £79/£99 and £99/£129 founder/standard tiers. **£129/month ≈ £4.30/day** — positioning note only. Pricing must consider product value, not cost alone.
+**Pricing (Billing Stage 1 — founder-approved):** **£99 founding / £129 standard** per estate agent branch; first **20** founding branches. Historical scenarios £79/£99 retained in FD-007 audit trail only. **£129/month ≈ £4.30/day** — positioning note only. See [EA_BILLING_STAGE1_ARCHITECTURE.md](./EA_BILLING_STAGE1_ARCHITECTURE.md).
+
+**Stripe / commercial readiness:** Stage 2 Checkout/Portal/webhook implemented for Sandbox; entitlement enforcement still OFF. See [EA_BILLING_STAGE2_ARCHITECTURE.md](./EA_BILLING_STAGE2_ARCHITECTURE.md).
 
 **Status:** **PARTIAL EVIDENCE** — Supabase Pro usage and July 2026 billing reviewed ([provider record](./PRELAUNCH_PROVIDER_REVIEW_SUPABASE_VERCEL_22JUL2026.md)). Current usage is within Pro quotas; incremental cost is primarily Development branching compute. **Full unit-economics model remains open** — Vercel load, query patterns, concurrency, email/Stripe/address lookup costs and paying-EA ratios not yet assessed. **Do not infer scale readiness from current Supabase usage alone.**
 
@@ -685,9 +687,15 @@ Favicon · tab icon · remove Vercel default · app/bookmark/iOS icons · metada
 
 #### J. Stripe / commercial readiness
 
-Secret/webhook handling · signature verification · idempotency · subscription lifecycle · cancellation · failed payments · refunds · disputes · policies/procedures · access after non-payment. **Do not implement yet.**
+Secret/webhook handling · signature verification · idempotency · subscription lifecycle · cancellation · failed payments · refunds · disputes · policies/procedures · access after non-payment.
 
-**Status:** **OPEN**
+**Stage 1 (done):** branch subscription schema, founding cohort ledger, webhook idempotency table, domain types, RLS — see [EA_BILLING_STAGE1_ARCHITECTURE.md](./EA_BILLING_STAGE1_ARCHITECTURE.md).
+
+**Stage 2 (Sandbox implemented in repo):** Checkout + Portal + webhook reconciliation — see [EA_BILLING_STAGE2_ARCHITECTURE.md](./EA_BILLING_STAGE2_ARCHITECTURE.md). Requires founder `STRIPE_WEBHOOK_SECRET` + Portal Dashboard settings for full E2E. **Entitlement enforcement remains OFF.**
+
+**Stage 3 (OPEN):** paid entitlement enforcement.
+
+**Status:** **PARTIAL** (Stage 2 Sandbox code) · Live Production billing **OPEN**
 
 #### K. Serverless vs containers (future)
 
