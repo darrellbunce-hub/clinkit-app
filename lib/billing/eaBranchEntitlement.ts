@@ -14,6 +14,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
   isCommerciallyEntitledStatus,
+  resolveEffectiveEntitlementStatus,
   type EaBranchSubscriptionSummary,
   type EaEntitlementStatus,
 } from "@/lib/billing/eaBranchSubscription";
@@ -73,11 +74,18 @@ export async function getEaBranchEntitlement(
     });
     summary = (data as EaBranchSubscriptionSummary | null) ?? null;
     if (summary?.ok && summary.entitlement_status) {
-      entitlementStatus = summary.entitlement_status;
+      entitlementStatus = resolveEffectiveEntitlementStatus({
+        entitlementStatus: summary.entitlement_status,
+        graceEndsAt: summary.grace_ends_at,
+      });
+      summary = { ...summary, entitlement_status: entitlementStatus };
     }
   }
 
-  const commerciallyEntitled = isCommerciallyEntitledStatus(entitlementStatus);
+  const commerciallyEntitled = isCommerciallyEntitledStatus(
+    entitlementStatus,
+    summary?.grace_ends_at
+  );
   const enforcementEnabled = EA_BILLING_ENTITLEMENT_ENFORCEMENT_ENABLED;
 
   return {

@@ -27,8 +27,8 @@ export type EaStripeSubscriptionStatus =
  * Keynetic commercial entitlement — intentionally separate from Stripe status.
  * - none: no open entitled subscription
  * - entitled: paid access allowed
- * - grace: payment recovery / past_due grace window
- * - ended: access revoked after period end / unrecovered failure
+ * - grace: payment recovery / past_due grace window (unexpired)
+ * - ended: access revoked after period end / unrecovered failure / expired grace
  */
 export const EA_ENTITLEMENT_STATUSES = [
   "none",
@@ -80,7 +80,10 @@ export type EaBranchSubscriptionSummary = {
   currency?: string;
   founding_slot_number?: number | null;
   stripe_status?: EaStripeSubscriptionStatus;
+  /** Effective entitlement (expired grace → ended). */
   entitlement_status?: EaEntitlementStatus;
+  /** Raw persisted column when summary RPC provides it. */
+  persisted_entitlement_status?: EaEntitlementStatus;
   current_period_start?: string | null;
   current_period_end?: string | null;
   cancel_at_period_end?: boolean;
@@ -91,8 +94,36 @@ export type EaBranchSubscriptionSummary = {
   enforcement_enabled?: boolean;
 };
 
+/**
+ * Authoritative read-time mapping.
+ * Expired grace is ended even if the persisted row still says grace.
+ */
+export function resolveEffectiveEntitlementStatus(input: {
+  entitlementStatus: EaEntitlementStatus | null | undefined;
+  graceEndsAt?: string | null;
+  now?: Date;
+}): EaEntitlementStatus {
+  const status = input.entitlementStatus ?? "none";
+  if (
+    status === "grace" &&
+    input.graceEndsAt &&
+    new Date(input.graceEndsAt).getTime() <=
+      (input.now ?? new Date()).getTime()
+  ) {
+    return "ended";
+  }
+  return status;
+}
+
 export function isCommerciallyEntitledStatus(
-  status: EaEntitlementStatus | null | undefined
+  status: EaEntitlementStatus | null | undefined,
+  graceEndsAt?: string | null,
+  now?: Date
 ): boolean {
-  return status === "entitled" || status === "grace";
+  const effective = resolveEffectiveEntitlementStatus({
+    entitlementStatus: status,
+    graceEndsAt,
+    now,
+  });
+  return effective === "entitled" || effective === "grace";
 }

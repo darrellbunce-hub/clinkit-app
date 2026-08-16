@@ -8,10 +8,14 @@ export type PortalCreateResult =
   | { ok: true; url: string }
   | { ok: false; error: string; status: number };
 
+/**
+ * Customer Portal for a single branch Stripe Customer.
+ * Day 1 isolation: one Customer per branch ⇒ Portal cannot list sibling branches.
+ */
 export async function createEaBillingPortalSession(
   context: AuthorisedBranchContext
 ): Promise<PortalCreateResult> {
-  if (!context.companyStripeCustomerId) {
+  if (!context.branchStripeCustomerId) {
     return { ok: false, error: "no_stripe_customer", status: 409 };
   }
 
@@ -20,7 +24,7 @@ export async function createEaBillingPortalSession(
 
   try {
     const session = await stripe.billingPortal.sessions.create({
-      customer: context.companyStripeCustomerId,
+      customer: context.branchStripeCustomerId,
       return_url: `${config.appUrl}/account#subscription`,
     });
 

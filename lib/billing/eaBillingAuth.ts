@@ -11,10 +11,63 @@ export type AuthorisedBranchContext = {
   branchId: string;
   companyId: string;
   companyName: string;
+  /**
+   * Day 1 authoritative Stripe Customer for this branch
+   * (`ea_branches.stripe_customer_id`).
+   */
+  branchStripeCustomerId: string | null;
+  /**
+   * Reserved for FUTURE organisation-level billing only.
+   * Not used by Day 1 Checkout/Portal.
+   */
   companyStripeCustomerId: string | null;
   memberRole: "branch_admin" | "agent";
   isOwner: boolean;
 };
+
+type BranchBillingRow = {
+  id: string;
+  company_id: string;
+  stripe_customer_id: string | null;
+};
+
+async function loadBranchForBilling(
+  supabase: SupabaseClient,
+  branchId: string
+): Promise<BranchBillingRow | null> {
+  const withCustomer = await supabase
+    .from("ea_branches")
+    .select("id, company_id, stripe_customer_id")
+    .eq("id", branchId)
+    .maybeSingle();
+
+  if (!withCustomer.error && withCustomer.data) {
+    return {
+      id: withCustomer.data.id as string,
+      company_id: withCustomer.data.company_id as string,
+      stripe_customer_id:
+        (withCustomer.data.stripe_customer_id as string | null) ?? null,
+    };
+  }
+
+  // Pre-migration resilience: column may not exist yet on Development.
+  const message = withCustomer.error?.message?.toLowerCase() ?? "";
+  if (message.includes("stripe_customer_id")) {
+    const basic = await supabase
+      .from("ea_branches")
+      .select("id, company_id")
+      .eq("id", branchId)
+      .maybeSingle();
+    if (!basic.data) return null;
+    return {
+      id: basic.data.id as string,
+      company_id: basic.data.company_id as string,
+      stripe_customer_id: null,
+    };
+  }
+
+  return null;
+}
 
 /**
  * Resolve branch ownership for billing mutations.
@@ -55,13 +108,8 @@ export async function requireEaBranchBillingOwner(
     return { ok: false, error: "not_branch_admin", status: 403 };
   }
 
-  const { data: branch, error: branchError } = await supabase
-    .from("ea_branches")
-    .select("id, company_id")
-    .eq("id", branchId)
-    .maybeSingle();
-
-  if (branchError || !branch) {
+  const branch = await loadBranchForBilling(supabase, branchId);
+  if (!branch) {
     return { ok: false, error: "branch_not_found", status: 404 };
   }
 
@@ -79,9 +127,10 @@ export async function requireEaBranchBillingOwner(
     ok: true,
     context: {
       user,
-      branchId: branch.id as string,
+      branchId: branch.id,
       companyId: company.id as string,
       companyName: company.name as string,
+      branchStripeCustomerId: branch.stripe_customer_id,
       companyStripeCustomerId:
         (company.stripe_customer_id as string | null) ?? null,
       memberRole: "branch_admin",
@@ -90,7 +139,7 @@ export async function requireEaBranchBillingOwner(
   };
 }
 
-/** Portal/read: any branch member may open portal for their company customer. */
+/** Portal/read: branch member context; Portal mutations still require Owner at route. */
 export async function requireEaBranchBillingMember(
   supabase: SupabaseClient,
   user: User,
@@ -122,12 +171,7 @@ export async function requireEaBranchBillingMember(
     return { ok: false, error: "not_branch_member", status: 403 };
   }
 
-  const { data: branch } = await supabase
-    .from("ea_branches")
-    .select("id, company_id")
-    .eq("id", branchId)
-    .maybeSingle();
-
+  const branch = await loadBranchForBilling(supabase, branchId);
   if (!branch) {
     return { ok: false, error: "branch_not_found", status: 404 };
   }
@@ -146,9 +190,10 @@ export async function requireEaBranchBillingMember(
     ok: true,
     context: {
       user,
-      branchId: branch.id as string,
+      branchId: branch.id,
       companyId: company.id as string,
       companyName: company.name as string,
+      branchStripeCustomerId: branch.stripe_customer_id,
       companyStripeCustomerId:
         (company.stripe_customer_id as string | null) ?? null,
       memberRole: membership.role as "branch_admin" | "agent",

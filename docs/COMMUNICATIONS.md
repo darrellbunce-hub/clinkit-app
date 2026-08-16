@@ -22,6 +22,7 @@ Audit records live in `email_events` (append-only provider lifecycle via `append
 | `RESEND_API_KEY` | Enables live provider sends |
 | `EMAIL_SENDING_ENABLED=false` | Disables provider sends (returns `email_sending_disabled`) |
 | `EMAIL_FROM` | From address (default `Keynetic <notifications@keynetic.co.uk>`) |
+| `BILLING_OPS_ALERT_EMAIL` | Day 1 Stripe billing ops alert recipient (e.g. `admin@keynetic.co.uk`). Unset = detect issues but skip email. |
 | `NEXT_PUBLIC_APP_URL` / `APP_URL` / `VERCEL_URL` | Base URL for in-app links |
 
 Application links must never hard-code localhost, staging, or production domains in code — use `getAppBaseUrl()`.

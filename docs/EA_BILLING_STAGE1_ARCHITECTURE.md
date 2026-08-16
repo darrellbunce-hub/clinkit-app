@@ -27,15 +27,18 @@ ea_companies (organisation; optional future Stripe Customer owner)
               └── ea_founding_slot_ledger (slots 1–20)
 ```
 
-## Stripe ownership recommendation (Stage 2)
+## Stripe ownership (Day 1 — branch Customer isolation)
 
 | Object | Owner |
 |---|---|
-| Stripe Customer | **`ea_companies`** (one customer; multiple branch subscriptions) |
-| Stripe Subscription | **`ea_branch_subscriptions`** (one open subscription per branch) |
+| Stripe Customer (Day 1) | **`ea_branches.stripe_customer_id`** — one Customer per branch |
+| Stripe Subscription | **`ea_branch_subscriptions`** — one open subscription per branch |
+| Stripe Customer (future org) | **`ea_companies.stripe_customer_id`** — reserved; not used by Day 1 Checkout/Portal |
 | Price selection | Server-only constants → Stripe Price IDs (not client-supplied) |
 
-`ea_companies.stripe_customer_id` is **deprecated as authoritative** but kept for Stage 2 reuse / dual-write.
+Portal isolation: Branch A Portal uses Customer A only, so sibling Branch B subscriptions are not visible.
+
+See Stage 2 doc for Portal/Checkout/webhook details.
 
 ## Entitlement model
 

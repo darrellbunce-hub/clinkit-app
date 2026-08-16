@@ -40,6 +40,12 @@ import {
   SECTION_BG_CLASS,
   SECTION_CONTENT_CLASS,
 } from "@/lib/theme/themeTokens";
+import type { EaFoundingPublicDisplay } from "@/lib/billing/eaFoundingAvailabilityShared";
+import { EA_STANDARD_MONTHLY_LABEL } from "@/lib/billing/eaBranchPricing";
+
+export type EaLandingPageProps = {
+  foundingDisplay?: EaFoundingPublicDisplay | null;
+};
 
 const outcomes = [
   {
@@ -214,7 +220,22 @@ function SectionIntro({
   );
 }
 
-export default function EaLandingPage() {
+export default function EaLandingPage({
+  foundingDisplay = null,
+}: EaLandingPageProps) {
+  const display =
+    foundingDisplay ??
+    ({
+      mode: "founding_available",
+      priceLabel: "founding",
+      placesRemaining: 20,
+      headline: "£99/month — Founding Member Price",
+      detail:
+        "Founding places are limited to the first 20 branches. Your place is secured when you start Checkout — not by viewing this page.",
+    } satisfies EaFoundingPublicDisplay);
+
+  const isSecured = display.mode === "founding_secured";
+  const showFoundingPrice = display.priceLabel === "founding";
   return (
     <>
       {/* Hero */}
@@ -507,14 +528,26 @@ export default function EaLandingPage() {
         <div className={SECTION_CONTENT_CLASS}>
           <SectionIntro
             eyebrow="Pricing"
-            title="Professional — Founding Branch Offer"
-            description="Register your branch to collaborate on moves you start or moves your clients invite you to — with founding pricing locked while your subscription stays active."
+            title={
+              isSecured
+                ? "Professional — Branch Subscription"
+                : "Professional — Founding Branch Offer"
+            }
+            description={
+              isSecured
+                ? "Collaborate on moves you start or moves your clients invite you to — with clear per-branch pricing."
+                : "Register your branch to collaborate on moves you start or moves your clients invite you to — with founding pricing locked while your subscription stays active."
+            }
           />
 
           <div className="mt-16 max-w-3xl mx-auto">
             <div className="relative overflow-hidden rounded-3xl border-2 border-brand-primary bg-surface-card p-8 md:p-10 shadow-xl shadow-brand-primary/10">
               <div className="absolute top-0 right-0 rounded-bl-2xl bg-brand-primary px-4 py-2 text-sm font-semibold text-brand-on-primary">
-                First 20 branches
+                {isSecured
+                  ? "Founding places secured"
+                  : display.mode === "founding_securing"
+                    ? "Being secured"
+                    : "First 20 branches"}
               </div>
 
               <p className="text-sm font-semibold uppercase tracking-wide text-brand-primary">
@@ -523,24 +556,37 @@ export default function EaLandingPage() {
 
               <div className="mt-4 flex flex-wrap items-end gap-3">
                 <p className="text-5xl md:text-6xl font-bold text-slate-900">
-                  £99
+                  {showFoundingPrice ? "£99" : "£129"}
                 </p>
-                <p className="pb-2 text-lg text-slate-500">
-                  / month
-                </p>
+                <p className="pb-2 text-lg text-slate-500">/ month</p>
               </div>
 
-              <p className="mt-2 text-slate-500">
-                <span className="line-through">£129/month</span>{" "}
-                founding branch rate
+              {showFoundingPrice ? (
+                <p className="mt-2 text-slate-500">
+                  <span className="line-through">{EA_STANDARD_MONTHLY_LABEL}</span>{" "}
+                  founding branch rate
+                </p>
+              ) : (
+                <p className="mt-2 text-slate-500">
+                  Per branch · billed monthly
+                </p>
+              )}
+
+              <p className="mt-4 text-base font-semibold text-slate-900">
+                {display.headline}
               </p>
 
-              <p className="mt-6 text-slate-600 leading-relaxed">
-                Limited to the first 20 founding branches. Founding branches
-                retain £99/month while their subscription remains active.
-                Automated billing is not yet live — registration is free while
-                commercial payment is finalised.
+              <p className="mt-3 text-slate-600 leading-relaxed">
+                {display.detail}
               </p>
+
+              {display.mode === "founding_available" ? (
+                <p className="mt-4 text-sm font-medium text-brand-primary">
+                  {display.placesRemaining === 1
+                    ? "1 founding place remaining"
+                    : `${display.placesRemaining} founding places remaining`}
+                </p>
+              ) : null}
 
               <ul className="mt-8 grid gap-3 sm:grid-cols-2">
                 {pricingFeatures.map((feature) => (
@@ -559,7 +605,7 @@ export default function EaLandingPage() {
                   href={ROUTES.estateAgentSignup}
                   className={`${BTN_PRIMARY_CLASS} px-8 py-4 text-center text-lg`}
                 >
-                  Register your branch — free signup
+                  Register your branch
                 </Link>
 
                 <Link

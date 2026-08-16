@@ -199,7 +199,7 @@ export default function SubscriptionSection({
     }
   }, [reload]);
 
-  async function startCheckout() {
+  async function startCheckout(acceptStandardPricing = false) {
     if (!branchId || !isOwner) return;
     setIsActing(true);
     setErrorMessage("");
@@ -207,13 +207,39 @@ export default function SubscriptionSection({
       const response = await fetch("/api/billing/ea/checkout-session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ branchId }),
+        body: JSON.stringify({
+          branchId,
+          ...(acceptStandardPricing ? { acceptStandardPricing: true } : {}),
+        }),
       });
       const payload = (await response.json()) as {
         ok?: boolean;
         url?: string;
         error?: string;
+        message?: string;
+        pricingTier?: string;
+        reservationExpiresAt?: string | null;
       };
+      if (
+        response.status === 409 &&
+        (payload.error === "founding_just_secured" ||
+          payload.error === "founding_unavailable")
+      ) {
+        const proceed = window.confirm(
+          payload.message ??
+            "Founding places have been secured. Continue at £129/month?"
+        );
+        if (!proceed) {
+          setNotice(
+            payload.message ??
+              "Founding pricing is no longer available. You can subscribe at £129/month when ready."
+          );
+          setIsActing(false);
+          return;
+        }
+        await startCheckout(true);
+        return;
+      }
       if (!response.ok || !payload.ok || !payload.url) {
         setErrorMessage(
           payload.error === "already_subscribed"
@@ -222,6 +248,17 @@ export default function SubscriptionSection({
         );
         setIsActing(false);
         return;
+      }
+      if (
+        payload.pricingTier === "founding" &&
+        payload.reservationExpiresAt
+      ) {
+        const until = new Date(payload.reservationExpiresAt);
+        if (!Number.isNaN(until.getTime())) {
+          setNotice(
+            `Your £99 founding place is reserved until ${until.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}. Complete Checkout before then.`
+          );
+        }
       }
       window.location.href = payload.url;
     } catch {
@@ -314,9 +351,10 @@ export default function SubscriptionSection({
             {view.detail}
           </p>
           <p className="mt-3 text-xs text-slate-500">
-            Founding {EA_FOUNDING_MONTHLY_LABEL} · Standard{" "}
-            {EA_STANDARD_MONTHLY_LABEL}. Server selects the correct price at
-            Checkout.
+            Founding {EA_FOUNDING_MONTHLY_LABEL} while places remain · Standard{" "}
+            {EA_STANDARD_MONTHLY_LABEL} thereafter. The server selects the price
+            at Checkout; founding places are secured only when reservation
+            succeeds.
           </p>
 
           <div className="mt-5 flex flex-wrap gap-3">

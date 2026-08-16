@@ -41,6 +41,8 @@ export type EaBranch = {
   postcode: string;
   region_code: string;
   is_head_office: boolean;
+  /** Day 1 authoritative Stripe Customer for this branch (nullable until Checkout). */
+  stripe_customer_id?: string | null;
   created_at: string;
   updated_at: string;
 };

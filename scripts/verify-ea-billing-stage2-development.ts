@@ -146,6 +146,47 @@ function runStatic(): void {
       webhook.includes("invalid_signature")
   );
 
+  const webhookLib = readFileSync(
+    join(process.cwd(), "lib/billing/eaStripeWebhook.ts"),
+    "utf8"
+  );
+  record(
+    "Webhook claim uses retryable RPC (P0)",
+    webhookLib.includes("claim_stripe_webhook_event") &&
+      webhookLib.includes("already_succeeded") &&
+      webhookLib.includes("event_in_progress")
+  );
+
+  const p0Migration = join(
+    process.cwd(),
+    "supabase/migrations/20260816200000_billing_p0_webhook_claim_retry.sql"
+  );
+  record("P0 webhook claim/retry migration exists", existsSync(p0Migration));
+
+  const p1Migration = join(
+    process.cwd(),
+    "supabase/migrations/20260816210000_billing_p1_authoritative_grace_expiry.sql"
+  );
+  record("P1 authoritative grace expiry migration exists", existsSync(p1Migration));
+
+  const p1CustomerMigration = join(
+    process.cwd(),
+    "supabase/migrations/20260816220000_billing_p1_branch_stripe_customer.sql"
+  );
+  record(
+    "P1 branch Stripe Customer isolation migration exists",
+    existsSync(p1CustomerMigration)
+  );
+
+  const portalLib = readFileSync(
+    join(process.cwd(), "lib/billing/eaPortal.ts"),
+    "utf8"
+  );
+  record(
+    "Portal uses branch-level Stripe Customer",
+    portalLib.includes("branchStripeCustomerId")
+  );
+
   record(
     "Stripe package is installed",
     existsSync(join(process.cwd(), "node_modules/stripe/package.json"))
