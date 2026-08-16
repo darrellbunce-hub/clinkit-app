@@ -191,7 +191,7 @@ Verifier: `scripts/verify-ea-billing-portal-isolation-development.ts`
 
 Lightweight safety net (no Datadog/PagerDuty/Redis):
 
-- Cron: `GET/POST /api/cron/billing-health` every 30 minutes (`vercel.json`), auth via `CRON_SECRET`
+- Cron: `GET/POST /api/cron/billing-health` once daily at 04:00 UTC (`0 4 * * *` in `vercel.json`) for Vercel Hobby compatibility; auth via `CRON_SECRET`. Intended future cadence is every 30 minutes when infrastructure allows it.
 - Signals: failed `stripe_webhook_events`, stale `processing` (>10m), `founding_reconcile_exception`
 - Not alerted: normal `invoice.payment_failed`, cancellations, Checkout abandon, Portal use, founding exhaustion
 - Dedupe: `billing_ops_alert_state` (incident_key + 6h cooldown)
