@@ -169,7 +169,7 @@ const faqs = [
   },
   {
     title: "What does the founding branch offer include?",
-    text: "The Professional founding offer is £99/month (normally £129/month), limited to the first 20 paying branches. Founding branches keep £99/month while their subscription remains active.",
+    text: "The Professional founding offer is £99/month (normally £129/month), limited to the first 20 paying branches. Founding branches lock in £99/month for the duration of that branch's continuous subscription. A founding place is permanently consumed when secured and is not returned if the subscription later ends. Founding status is not transferable.",
   },
   {
     title: "Do homeowners need to pay?",
@@ -177,7 +177,7 @@ const faqs = [
   },
   {
     title: "When does billing start?",
-    text: "Register your branch now to be ready for client invitations and founding branch pricing. Billing will be enabled as subscriptions go live — founding rates are reserved for early adopters.",
+    text: "After your branch is registered, an authorised branch owner can start a monthly subscription through Stripe Checkout from the account subscription section. Keynetic may use Stripe test (Sandbox) mode during development and staging before Production charging is enabled. Founding rates apply only while founding places remain available under the first-20 offer.",
   },
   {
     title: "Does the whole chain need to be connected?",
@@ -722,7 +722,7 @@ export default function EaLandingPage({
           </div>
 
           <p className="mt-6 text-sm text-slate-500">
-            £99/month founding offer (billing not yet live) · Homeowners start
+            £99/month founding offer (first 20 branches) · Homeowners start
             free · Your CRM stays in place
           </p>
         </div>

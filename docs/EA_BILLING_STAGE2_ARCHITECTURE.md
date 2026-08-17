@@ -18,6 +18,8 @@
 | Grace | 7 days after unrecovered payment failure |
 | Enforcement | `EA_BILLING_ENTITLEMENT_ENFORCEMENT_ENABLED = false` |
 
+**Legal commercial locks (Phase 2A):** [LAUNCH_LEGAL_FOUNDER_DECISIONS.md](./LAUNCH_LEGAL_FOUNDER_DECISIONS.md) — founding places are permanently consumed when secured (cancel does not reopen £99); non-transferable; multi-branch of same company may each take a place while available; cancel-at-period-end; no ordinary partial refund. Public “20 founding places secured” milestone then ~1-month site sunset is **BACKLOG** (D-C1), not implemented as automatic removal.
+
 ## Flow
 
 ```

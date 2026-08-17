@@ -88,7 +88,7 @@ export const privacyPolicyContent: LegalDocumentContent = {
         "Vercel — website and application hosting.",
         "Resend — transactional email delivery.",
         "Upstash — server-side caching or rate limiting where enabled in production.",
-        "Stripe — payment processing is planned but not active at launch; we will update this policy before payment processing begins.",
+        "Stripe — payment processing for estate agent branch subscriptions (Checkout, Customer Portal, and related billing). Keynetic may use Stripe in test (Sandbox) mode during development and staging. This policy will be updated again if processor details change before or when Production charging is enabled.",
       ],
     },
     {
@@ -103,6 +103,7 @@ export const privacyPolicyContent: LegalDocumentContent = {
       title: "Retention",
       paragraphs: [
         "We retain personal information only for as long as necessary for the purposes described in this policy, including while your account is active, while you participate in a transaction, and for defined periods afterwards where required for audit, legal or operational reasons.",
+        "Keynetic distinguishes identifiable (un-anonymised) operational data from genuinely anonymised data. Exact retention periods will follow an internal data-retention policy once approved.",
         "Retention varies by category. Some shared transaction records may be retained in anonymised or reduced form after a transaction ends. Backups may retain information for a limited period before expiry or overwrite.",
         "See our Data Retention information for a public summary. Formal erasure requests are handled separately — see Your rights below.",
       ],

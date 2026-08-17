@@ -191,14 +191,24 @@ assertExcludes(
   "Break Chain Connection"
 );
 
-// Pricing CTA clarity
+// Pricing / billing stage messaging (Phase 2A/2B: do not claim billing inactive)
 const eaLanding = readProjectFile(
   "components/estate-agents/EaLandingPage.tsx"
 );
-assertIncludes(
-  "EA landing billing not live note",
+assertExcludes(
+  "EA landing must not say billing is not yet live",
+  eaLanding,
+  "billing not yet live"
+);
+assertExcludes(
+  "EA landing must not say billing is not yet live (alt)",
   eaLanding,
   "billing is not yet live"
+);
+assertIncludes(
+  "EA landing founding offer price present",
+  eaLanding,
+  "£99/month"
 );
 
 // Chain Intelligence — timing_v1 model (Stage 3.5; penalty-from-85 retired)

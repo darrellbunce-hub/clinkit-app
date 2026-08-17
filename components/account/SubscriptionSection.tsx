@@ -43,7 +43,7 @@ function describeSummary(summary: EaBranchSubscriptionSummary | null): {
     return {
       title: "No subscription",
       detail:
-        "Subscribe to Keynetic for this branch when you are ready. Billing is in Sandbox test mode during Stage 2.",
+        "Subscribe to Keynetic for this Branch when you are ready. Recurring monthly billing is handled through Stripe. This environment may use Stripe test (Sandbox) mode before Production charging is enabled.",
       tone: "neutral",
     };
   }
@@ -70,10 +70,10 @@ function describeSummary(summary: EaBranchSubscriptionSummary | null): {
   if (summary.entitlement_status === "grace") {
     const grace = formatDate(summary.grace_ends_at ?? null);
     return {
-      title: "Payment issue",
+      title: "Payment issue — grace period",
       detail: grace
-        ? `There is a problem with the latest payment. Please update your payment method. Grace continues until ${grace}.`
-        : "There is a problem with the latest payment. Please update your payment method.",
+        ? `The latest recurring payment failed. Please update your payment method. Your Branch remains in a payment-recovery grace period until ${grace}. If payment is not recovered by then, commercial subscription access for this Branch ends.`
+        : "The latest recurring payment failed. Please update your payment method during the payment-recovery grace period.",
       tone: "danger",
     };
   }
@@ -351,10 +351,11 @@ export default function SubscriptionSection({
             {view.detail}
           </p>
           <p className="mt-3 text-xs text-slate-500">
-            Founding {EA_FOUNDING_MONTHLY_LABEL} while places remain · Standard{" "}
-            {EA_STANDARD_MONTHLY_LABEL} thereafter. The server selects the price
-            at Checkout; founding places are secured only when reservation
-            succeeds.
+            Founding {EA_FOUNDING_MONTHLY_LABEL} for the first 20 Branches ·
+            Standard {EA_STANDARD_MONTHLY_LABEL} thereafter. Price is set at
+            Checkout. Founding places are secured only when reservation succeeds
+            and are not returned if a founding subscription later ends.
+            Cancellation takes effect at period end via Manage subscription.
           </p>
 
           <div className="mt-5 flex flex-wrap gap-3">

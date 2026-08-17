@@ -12,6 +12,7 @@ export const dataRetentionContent: LegalDocumentContent = {
       title: "Retention principles",
       paragraphs: [
         "We retain personal information only for as long as necessary for the purposes for which it was collected, including providing the service, maintaining audit records, and meeting legal obligations.",
+        "Keynetic distinguishes identifiable (un-anonymised) operational data from genuinely anonymised data. Exact retention periods for each category will be defined in an internal data-retention policy and reflected here once approved by the founder and/or legal counsel.",
         "Retention periods vary by data category. Some operational or shared records may need different treatment because property chains involve multiple participants.",
         "The periods below reflect our proposed internal schedule. They are not legally final until approved by the founder and/or legal counsel.",
       ],

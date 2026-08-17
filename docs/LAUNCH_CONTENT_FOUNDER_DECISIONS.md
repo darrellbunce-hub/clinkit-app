@@ -7,6 +7,8 @@
 Decisions below supersede conflicting recommendations in the original audit and Stage 2 report where this register states an override.  
 **Do not begin Stage 3 or Stage 3.5 without explicit founder approval.**
 
+**Legal / billing commercial decisions (Phase 2A):** see [LAUNCH_LEGAL_FOUNDER_DECISIONS.md](./LAUNCH_LEGAL_FOUNDER_DECISIONS.md) for locked founding, cancellation, and related legal decisions (D-F*, D-B*, D-S*, D-D1, D-A1, D-G1, D-C1). That register is authoritative for Terms drafting; do not invent OPEN items (VAT, liability caps, retention periods, DPA).
+
 ---
 
 ## Decision status key
@@ -131,6 +133,7 @@ Decisions below supersede conflicting recommendations in the original audit and 
 | **Affected** | `EaLandingPage.tsx`, EA signup, future checkout, EA Business Terms |
 | **Legal review** | Yes (subscription/pricing claims when published) |
 | **SUPERSEDED PRICING (2026-07-29)** | Founder-approved Billing Stage 1: **£99 founding / £129 standard** per branch (first 20). Historical £79/£99 figures above retained for audit trail. See `docs/EA_BILLING_STAGE1_ARCHITECTURE.md`. |
+| **LEGAL PHASE 2A (2026-08)** | Founding permanence, non-transfer, multi-branch eligibility, cancel-at-period-end, and related locked decisions: [LAUNCH_LEGAL_FOUNDER_DECISIONS.md](./LAUNCH_LEGAL_FOUNDER_DECISIONS.md). VAT / final list-price confirmation remain OPEN. |
 
 ---
 

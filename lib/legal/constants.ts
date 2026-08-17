@@ -13,7 +13,7 @@ export const LEGAL_LAST_UPDATED = "June 2026";
 export const LEGAL_DOCUMENT_VERSIONS = {
   privacyPolicy: "2026-06-v1",
   termsOfUse: "2026-06-v1",
-  estateAgentTerms: "2026-06-v1",
+  estateAgentTerms: "2026-08-v2",
 } as const;
 
 export type SignupTermsDocument =
