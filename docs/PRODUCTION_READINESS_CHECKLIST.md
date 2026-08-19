@@ -524,7 +524,7 @@ The **Launch Content programme** (Stages 3–6) is **FOUNDER_APPROVED_COMPLETE**
 | Performance / concurrency | **OPEN** — not started (§14.3 C) |
 | **Platform security architecture review** | **`SECURITY_PHASE1_REMEDIATED_AND_VERIFIED_ON_DEVELOPMENT`** — [Phase 1 remediation](./PRELAUNCH_PLATFORM_SECURITY_REMEDIATION_PHASE1.md) · Dev **13/13 + 36/36 PASS** · Production parity **OPEN** |
 | Google OAuth assessment | **OPEN** — not implemented (§14.3 G) |
-| Address lookup assessment | **OPEN** — not implemented (§14.3 H) |
+| Address lookup assessment | **IMPLEMENTED IN REPO (Ideal Postcodes)** — **not** Production-approved; DPA/subprocessor review **OPEN** (§14.3 H · [ADDRESS_LOOKUP_IDEAL_POSTCODES.md](./ADDRESS_LOOKUP_IDEAL_POSTCODES.md)) |
 | Browser / brand assets | **OPEN** (§14.3 I) |
 | Stripe / commercial readiness | **PARTIAL** — Billing Stage 1 schema/domain foundation; Checkout Stage 2 OPEN (§14.3 J) |
 | Serverless vs containers review | **Future evidence-based review** (§14.3 K) |
@@ -564,7 +564,7 @@ The **Launch Content programme** (Stages 3–6) is **FOUNDER_APPROVED_COMPLETE**
 | 19 | Unwired email templates (Welcome · Property connected) | **OPEN** — documented inactive |
 | 20 | Concurrent-user / performance validation | **OPEN** — §14.3 C |
 | 21 | Google OAuth via Supabase Auth | **OPEN** — §14.3 G |
-| 22 | UK address lookup provider | **OPEN** — §14.3 H |
+| 22 | UK address lookup provider | **IMPLEMENTED IN REPO** — Ideal Postcodes server-side; DPA/Production approval **OPEN** (§14.3 H) |
 | 23 | Favicon / browser & social brand assets | **OPEN** — §14.3 I |
 | 24 | Serverless vs containers architecture review (evidence-based) | **OPEN** — §14.3 K |
 | 25 | **FD-042** — Existing-account invitation UX | **OPEN** — not an EA Access security blocker |
@@ -673,11 +673,11 @@ Google OAuth via Supabase · retain email/password · linking · duplicate preve
 
 **Status:** **OPEN**
 
-#### H. Address lookup (assessment only)
+#### H. Address lookup
 
-UK provider · pricing/limits/quality · GDPR · API key security · client vs server · fallback · standardisation · property data impact. **Do not implement yet.**
+UK provider (Ideal Postcodes, UK PAF) · server-side suggest/resolve · `IDEAL_POSTCODES_API_KEY` · manual fallback · no schema change · no Redis required · cost controls (debounce, min length, resolve-on-select, in-process rate limits). See [ADDRESS_LOOKUP_IDEAL_POSTCODES.md](./ADDRESS_LOOKUP_IDEAL_POSTCODES.md).
 
-**Status:** **OPEN**
+**Status:** **IMPLEMENTED IN REPO** — **not** Production-approved (DPA / retention / subprocessor review required).
 
 #### I. Browser / brand assets
 
@@ -723,7 +723,7 @@ Retain Vercel + Supabase for launch · measure post-launch · compare when susta
 |----------|-------|
 | **P0** | **Production Supabase/RLS parity** (SEC-102) · **Production Phase 1 migration apply** · Production email/app URL config · Legal/FD-004/privacy@ · EA access **Production migration** |
 | **P1** | Production external observability config (Sentry + uptime) · Stripe/billing · Performance baseline · Favicon/brand assets · Full cost/unit-economics model |
-| **P2** | Google OAuth assessment · Address lookup assessment · Analytics decision · Unwired email template decision |
+| **P2** | Google OAuth assessment · Address lookup **Production DPA/approval** · Analytics decision · Unwired email template decision |
 | **P3** | Serverless vs containers review · DPA completion (if parallel) |
 
 **Recommended next workstream (25 Jul 2026):** **Production security parity** — founder-approved Production catalog pre-flight (SEC-102, SEC-105) + apply `20260725120000_platform_security_rpc_authorisation_hardening.sql` on Production + live verifier re-run — **after** SEC-103 merge path agreed. See [audit §25.6](./PRELAUNCH_PLATFORM_SECURITY_ARCHITECTURE_AUDIT.md). **Do not start without founder approval.**

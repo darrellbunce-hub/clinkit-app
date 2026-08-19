@@ -16,6 +16,8 @@ import { generateAccessCode } from "@/lib/accessCode";
 import { attachSearchingPlaceholderToSale } from "@/lib/searchingPlaceholder";
 import CollectionPointNotice from "@/components/legal/CollectionPointNotice";
 import DuplicatePropertyDialog from "@/components/onboarding/DuplicatePropertyDialog";
+import PropertyAddressLookup from "@/components/address/PropertyAddressLookup";
+import { formatUkPostcodeForStorage } from "@/lib/address/normalize";
 
 type PendingDuplicateJoin = {
   chainId: number;
@@ -138,11 +140,13 @@ export default function StartMovePage() {
 
         // SELLING PROPERTY
         if (!notSelling && sellingAddress) {
+          const sellingPostcodeStored =
+            formatUkPostcodeForStorage(sellingPostcode);
           const { data: sellingCheck } = await supabase.rpc(
             "validate_onboarding_property_address",
             {
               p_address: sellingAddress,
-              p_postcode: sellingPostcode,
+              p_postcode: sellingPostcodeStored,
               p_chain_id: chainId,
             }
           );
@@ -167,7 +171,7 @@ export default function StartMovePage() {
     
               address: sellingAddress,
     
-              postcode: sellingPostcode,
+              postcode: sellingPostcodeStored,
     
               stage: "property_listed",
     
@@ -229,11 +233,13 @@ export default function StartMovePage() {
         let buyerReadyPropertyId = null;
         // BUYING PROPERTY
         if (!notBuying && buyingAddress) {
+          const buyingPostcodeStored =
+            formatUkPostcodeForStorage(buyingPostcode);
           const { data: buyingCheck } = await supabase.rpc(
             "validate_onboarding_property_address",
             {
               p_address: buyingAddress,
-              p_postcode: buyingPostcode,
+              p_postcode: buyingPostcodeStored,
               p_chain_id: chainId,
             }
           );
@@ -258,7 +264,7 @@ export default function StartMovePage() {
     
               address: buyingAddress,
     
-              postcode: buyingPostcode,
+              postcode: buyingPostcodeStored,
     
               stage: "offer_accepted",
     
@@ -452,36 +458,14 @@ export default function StartMovePage() {
 {!notSelling && (
 
   <div className="mt-8">
-
-    <input
-      type="text"
-      value={sellingAddress}
-      onChange={(event) =>
-        setSellingAddress(
-          event.target.value
-        )
-        
-      }
-      onBlur={() => window.scrollTo(0, 0)}
-  autoComplete="off"
-      placeholder="Selling property address"
-      className="w-full border border-slate-300 text-base text-slate-900 rounded-2xl px-4 py-4"
+    <PropertyAddressLookup
+      idPrefix="start-move-selling"
+      label="Property address"
+      address={sellingAddress}
+      postcode={sellingPostcode}
+      onAddressChange={setSellingAddress}
+      onPostcodeChange={setSellingPostcode}
     />
-
-    <input
-      type="text"
-      value={sellingPostcode}
-      onChange={(event) =>
-        setSellingPostcode(
-          event.target.value
-        )
-      }
-      onBlur={() => window.scrollTo(0, 0)}
-  autoComplete="off"
-      placeholder="Selling postcode"
-      className="mt-4 w-full border border-slate-300 text-base text-slate-900 rounded-2xl px-4 py-4"
-    />
-
   </div>
 
 )}
@@ -558,35 +542,14 @@ export default function StartMovePage() {
 {!notBuying && !searchingForProperty && (
 
   <div className="mt-8">
-
-    <input
-      type="text"
-      value={buyingAddress}
-      onChange={(event) =>
-        setBuyingAddress(
-          event.target.value
-        )
-      }
-      onBlur={() => window.scrollTo(0, 0)}
-  autoComplete="off"
-      placeholder="Buying property address"
-      className="w-full border border-slate-300 text-base text-slate-900 rounded-2xl px-4 py-4"
+    <PropertyAddressLookup
+      idPrefix="start-move-buying"
+      label="Property address"
+      address={buyingAddress}
+      postcode={buyingPostcode}
+      onAddressChange={setBuyingAddress}
+      onPostcodeChange={setBuyingPostcode}
     />
-
-    <input
-      type="text"
-      value={buyingPostcode}
-      onChange={(event) =>
-        setBuyingPostcode(
-          event.target.value
-        )
-      }
-      onBlur={() => window.scrollTo(0, 0)}
-  autoComplete="off"
-      placeholder="Buying postcode"
-      className="mt-4 w-full border border-slate-300 text-base text-slate-900 rounded-2xl px-4 py-4"
-    />
-
   </div>
 
 )}

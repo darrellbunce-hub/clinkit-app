@@ -72,8 +72,8 @@ function describeSummary(summary: EaBranchSubscriptionSummary | null): {
     return {
       title: "Payment issue — grace period",
       detail: grace
-        ? `The latest recurring payment failed. Please update your payment method. Your Branch remains in a payment-recovery grace period until ${grace}. If payment is not recovered by then, commercial subscription access for this Branch ends.`
-        : "The latest recurring payment failed. Please update your payment method during the payment-recovery grace period.",
+        ? `The latest recurring payment failed. Please update your payment method. Your Branch remains in a payment-recovery grace period until ${grace}. If payment is not recovered by then, commercial subscription access for this Branch ends. Billing is monthly.`
+        : "The latest recurring payment failed. Please update your payment method during the payment-recovery grace period. Billing is monthly.",
       tone: "danger",
     };
   }
@@ -102,11 +102,15 @@ function describeSummary(summary: EaBranchSubscriptionSummary | null): {
 
   if (summary.cancel_at_period_end && summary.current_period_end) {
     const end = formatDate(summary.current_period_end);
+    const foundingNote =
+      summary.pricing_tier === "founding"
+        ? " Founding status ends permanently when this cancellation takes effect."
+        : "";
     return {
       title: `Active — ${tierLabel} ${priceLabel}`,
       detail: end
-        ? `Cancels on ${end}.`
-        : "Cancellation is scheduled at the end of the current period.",
+        ? `Monthly billing. Cancels on ${end}.${foundingNote}`
+        : `Cancellation is scheduled at the end of the current period.${foundingNote}`,
       tone: "warning",
     };
   }
@@ -116,11 +120,15 @@ function describeSummary(summary: EaBranchSubscriptionSummary | null): {
     summary.stripe_status === "active"
   ) {
     const renews = formatDate(summary.current_period_end ?? null);
+    const foundingNote =
+      summary.pricing_tier === "founding"
+        ? " Founding price remains while this subscription stays continuously active."
+        : "";
     return {
       title: `Active — ${tierLabel} ${priceLabel}`,
       detail: renews
-        ? `Next billing date: ${renews}.`
-        : "Your branch subscription is active.",
+        ? `Monthly billing. Next payment date: ${renews}.${foundingNote}`
+        : `Your branch subscription is active (monthly billing).${foundingNote}`,
       tone: "success",
     };
   }

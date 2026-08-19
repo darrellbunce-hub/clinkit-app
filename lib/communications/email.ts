@@ -8,6 +8,11 @@ import { buildDormancyWarningPropertyUrl } from "@/lib/communications/dormancyWa
 import {
   renderClaimSuccessful,
   renderDormancyWarning,
+  renderEaGraceFinalWarning,
+  renderEaGraceReminder,
+  renderEaPaymentFailed,
+  renderEaSubscriptionCancelled,
+  renderEaSubscriptionConfirmation,
   renderEstateAgentInvitation,
   renderHomeownerInvitation,
   renderPasswordReset,
@@ -17,6 +22,11 @@ import { createResendProvider } from "@/lib/communications/resend";
 import type {
   ClaimSuccessfulEmailParams,
   DormancyWarningEmailParams,
+  EaGraceFinalWarningEmailParams,
+  EaGraceReminderEmailParams,
+  EaPaymentFailedEmailParams,
+  EaSubscriptionCancelledEmailParams,
+  EaSubscriptionConfirmationEmailParams,
   EmailEventMetadata,
   EmailProvider,
   EmailTemplateId,
@@ -239,5 +249,85 @@ export async function sendDormancyWarningEmail(
       template: "lifecycle-dormancy-warning",
       metadata,
     }
+  );
+}
+
+export async function sendEaSubscriptionConfirmation(
+  params: EaSubscriptionConfirmationEmailParams,
+  metadata?: EmailEventMetadata
+): Promise<SendEmailResult> {
+  const rendered = await renderEaSubscriptionConfirmation(params);
+  return deliverEmail(
+    {
+      to: params.to,
+      subject: rendered.subject,
+      html: rendered.html,
+      text: rendered.text,
+    },
+    { template: "ea-subscription-confirmation", metadata }
+  );
+}
+
+export async function sendEaPaymentFailed(
+  params: EaPaymentFailedEmailParams,
+  metadata?: EmailEventMetadata
+): Promise<SendEmailResult> {
+  const rendered = await renderEaPaymentFailed(params);
+  return deliverEmail(
+    {
+      to: params.to,
+      subject: rendered.subject,
+      html: rendered.html,
+      text: rendered.text,
+    },
+    { template: "ea-payment-failed", metadata }
+  );
+}
+
+export async function sendEaGraceReminder(
+  params: EaGraceReminderEmailParams,
+  metadata?: EmailEventMetadata
+): Promise<SendEmailResult> {
+  const rendered = await renderEaGraceReminder(params);
+  return deliverEmail(
+    {
+      to: params.to,
+      subject: rendered.subject,
+      html: rendered.html,
+      text: rendered.text,
+    },
+    { template: "ea-grace-reminder", metadata }
+  );
+}
+
+export async function sendEaGraceFinalWarning(
+  params: EaGraceFinalWarningEmailParams,
+  metadata?: EmailEventMetadata
+): Promise<SendEmailResult> {
+  const rendered = await renderEaGraceFinalWarning(params);
+  return deliverEmail(
+    {
+      to: params.to,
+      subject: rendered.subject,
+      html: rendered.html,
+      text: rendered.text,
+    },
+    { template: "ea-grace-final-warning", metadata }
+  );
+}
+
+export async function sendEaSubscriptionCancelled(
+  params: EaSubscriptionCancelledEmailParams,
+  metadata?: EmailEventMetadata
+): Promise<SendEmailResult> {
+  const rendered = await renderEaSubscriptionCancelled(params);
+  return deliverEmail(
+    {
+      to: params.to,
+      subject: rendered.subject,
+      html: rendered.html,
+      text: rendered.text,
+    },
+    { template: "ea-subscription-cancelled", metadata }
   );
 }

@@ -9,7 +9,22 @@
  * Does not expose PII — reports counts only.
  */
 import { readFileSync } from "fs";
+import Module from "module";
 import { join } from "path";
+
+// Allow importing server-only modules from this Node script.
+const moduleWithLoad = Module as typeof Module & {
+  _load: (request: string, parent: unknown, isMain: boolean) => unknown;
+};
+const originalLoad = moduleWithLoad._load.bind(Module);
+moduleWithLoad._load = function patchedLoad(
+  request: string,
+  parent: unknown,
+  isMain: boolean
+) {
+  if (request === "server-only") return {};
+  return originalLoad(request, parent, isMain);
+};
 
 import { createServiceRoleSupabaseClient } from "../lib/supabase/serviceRole";
 import { STAGES } from "../data/stages";

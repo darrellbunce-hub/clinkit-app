@@ -7,6 +7,7 @@ import {
   amountGbpMinorForTier,
   type EaPricingTier,
 } from "@/lib/billing/eaBranchPricing";
+import { dispatchBillingCustomerEmailsForTransition } from "@/lib/billing/eaBillingCustomerEmails";
 import {
   computeGraceEndsAt,
   mapStripeSubscriptionToKeynetic,
@@ -277,6 +278,8 @@ async function reconcileStripeSubscription(
     fromPaymentFailure?: boolean;
     /** Stripe event.created chronology — required for stale-event protection. */
     eventChronologyAt: Date;
+    /** Optional invoice id for payment-failed email idempotency. */
+    invoiceId?: string | null;
   }
 ): Promise<{ applied: boolean; reason?: string }> {
   const config = getStripeServerConfig();
@@ -327,7 +330,7 @@ async function reconcileStripeSubscription(
   let existingQuery = admin
     .from("ea_branch_subscriptions")
     .select(
-      "id, stripe_object_updated_at, entitlement_status, grace_ends_at, pricing_tier, founding_slot_number, ended_at"
+      "id, stripe_object_updated_at, entitlement_status, grace_ends_at, pricing_tier, founding_slot_number, ended_at, cancel_at_period_end"
     )
     .eq("branch_id", branchId)
     .is("ended_at", null);
@@ -336,7 +339,7 @@ async function reconcileStripeSubscription(
     existingQuery = admin
       .from("ea_branch_subscriptions")
       .select(
-        "id, stripe_object_updated_at, entitlement_status, grace_ends_at, pricing_tier, founding_slot_number, ended_at"
+        "id, stripe_object_updated_at, entitlement_status, grace_ends_at, pricing_tier, founding_slot_number, ended_at, cancel_at_period_end"
       )
       .eq("id", rowId);
   }
@@ -426,6 +429,9 @@ async function reconcileStripeSubscription(
           : null;
     }
   }
+
+  const previousEntitlement = existing.entitlement_status as string | null;
+  const previousCancelAtPeriodEnd = Boolean(existing.cancel_at_period_end);
 
   let graceEndsAt: string | null = (existing.grace_ends_at as string) ?? null;
   if (options.fromPaymentFailure || mapped.enterGrace) {
@@ -535,6 +541,36 @@ async function reconcileStripeSubscription(
       event_chronology_at: chronologyIso,
     },
   });
+
+  const becameEntitled =
+    previousEntitlement !== "entitled" &&
+    mapped.entitlementStatus === "entitled" &&
+    !mapped.ended;
+  const enteredGrace =
+    previousEntitlement !== "grace" &&
+    mapped.entitlementStatus === "grace" &&
+    Boolean(graceEndsAt);
+  // Only treat as new cancellation when cancel_at_period_end flips false → true.
+  const cancellationScheduled =
+    !previousCancelAtPeriodEnd &&
+    mapped.cancelAtPeriodEnd &&
+    Boolean(periodEnd);
+
+  if (becameEntitled || enteredGrace || cancellationScheduled) {
+    await dispatchBillingCustomerEmailsForTransition(admin, {
+      branchId,
+      subscriptionRowId: existing.id as string,
+      stripeSubscriptionId: subscription.id,
+      pricingTier,
+      amountGbpMinor: amountGbpMinorForTier(pricingTier),
+      currentPeriodEnd: periodEnd,
+      graceEndsAt,
+      becameEntitled,
+      enteredGrace,
+      cancellationScheduled,
+      invoiceId: options.invoiceId ?? null,
+    });
+  }
 
   return { applied: true };
 }
@@ -740,6 +776,7 @@ export async function processStripeWebhookEvent(
         await reconcileStripeSubscription(admin, subscription, {
           fromPaymentFailure: true,
           eventChronologyAt: stripeEventChronologyAt(event),
+          invoiceId: invoice.id,
         });
         break;
       }

@@ -63,6 +63,8 @@ import {
   convertSearchingPlaceholder,
   resolveConvertibleSearchingPlaceholder,
 } from "@/lib/searchingPlaceholder";
+import PropertyAddressLookup from "@/components/address/PropertyAddressLookup";
+import { formatUkPostcodeForStorage } from "@/lib/address/normalize";
 import CompletionScheduledBanner from "@/components/CompletionScheduledBanner";
 import ChainCompletedBanner from "@/components/ChainCompletedBanner";
 import ParticipantDataLoadingState from "@/components/loading/ParticipantDataLoadingState";
@@ -597,7 +599,7 @@ export default function ChainPage() {
           chainId,
           salePropertyId: saleOperationalPropertyId,
           address: newAddress,
-          postcode: newPostcode,
+          postcode: formatUkPostcodeForStorage(newPostcode),
           updatedBy:
             accountType === "estate_agent"
               ? "estate_agent"
@@ -1484,29 +1486,15 @@ export default function ChainPage() {
             Only add your onward purchase once your offer has been accepted.
           </p>
 
-          <input
-            type="text"
-            value={newAddress}
-            onChange={(event) =>
-              setNewAddress(
-                event.target.value
-              )
-            }
-            placeholder="Property address"
-            className="mt-6 w-full border border-slate-300 text-slate-900 rounded-2xl px-4 py-4"
-          />
-
-          <input
-            type="text"
-            value={newPostcode}
-            onChange={(event) =>
-              setNewPostcode(
-                event.target.value
-              )
-            }
-            placeholder="Postcode"
-            className="mt-4 w-full border border-slate-300 text-slate-900 rounded-2xl px-4 py-4"
-          />
+          <div className="mt-6">
+            <PropertyAddressLookup
+              idPrefix="chain-onward"
+              address={newAddress}
+              postcode={newPostcode}
+              onAddressChange={setNewAddress}
+              onPostcodeChange={setNewPostcode}
+            />
+          </div>
 
           <button
             onClick={handleAddProperty}

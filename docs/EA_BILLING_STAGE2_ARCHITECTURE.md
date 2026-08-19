@@ -202,6 +202,17 @@ Lightweight safety net (no Datadog/PagerDuty/Redis):
 
 Verifier: `scripts/verify-ea-billing-operational-alerting-development.ts`
 
+## Customer billing communications (transactional)
+
+See [EA_BILLING_CUSTOMER_COMMUNICATIONS.md](./EA_BILLING_CUSTOMER_COMMUNICATIONS.md).
+
+- Confirmation / payment-failed / cancel emails after successful reconcile transitions
+- Grace mid + final reminders from `/api/cron/billing-health` (same daily cron)
+- Atomic dispatch ledger: `billing_customer_email_dispatches`
+- **No** monthly Keynetic successful-payment emails — configure Stripe Dashboard receipts/invoices for Production
+
+Verifier: `scripts/verify-ea-billing-customer-communications-development.ts`
+
 ## Stage 3 (not started)
 
 Flip entitlement enforcement and gate `/agent`, origination, EA operational surfaces via `getEaBranchEntitlement()`.

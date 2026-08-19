@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { runBillingHealthCheck } from "@/lib/billing/eaBillingHealthCheck";
+import { processEaBillingGraceReminderEmails } from "@/lib/billing/eaBillingCustomerEmails";
 import { isAuthorizedLifecycleCronRequest } from "@/lib/lifecycle/cronAuth";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/serviceRole";
 
@@ -28,6 +29,7 @@ export async function GET(request: Request) {
   try {
     const admin = createServiceRoleSupabaseClient();
     const result = await runBillingHealthCheck({ admin });
+    const graceReminders = await processEaBillingGraceReminderEmails(admin);
 
     return NextResponse.json({
       ...result.publicReport,
@@ -37,6 +39,10 @@ export async function GET(request: Request) {
       alertsFailed: result.alertsFailed,
       alertsSkipped: result.alertsSkipped,
       recoveriesSent: result.recoveriesSent,
+      graceRemindersScanned: graceReminders.scanned,
+      graceMidSent: graceReminders.midSent,
+      graceFinalSent: graceReminders.finalSent,
+      graceRemindersSkipped: graceReminders.skipped,
     });
   } catch (error) {
     console.error("[billing-health] check failed:", error);

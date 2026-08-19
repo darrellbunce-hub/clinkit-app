@@ -30,6 +30,8 @@ import {
   SURFACE_PANEL_HOVER_CLASS,
 } from "@/lib/theme/themeTokens";
 import { supabase } from "@/lib/supabase";
+import PropertyAddressLookup from "@/components/address/PropertyAddressLookup";
+import { formatUkPostcodeForStorage } from "@/lib/address/normalize";
 
 type OriginateMode = "new_chain" | "join_chain";
 
@@ -117,6 +119,13 @@ export default function AgentOriginatePage() {
       return;
     }
 
+    if (!saleAddress.trim() || !salePostcode.trim()) {
+      setErrorMessage(
+        "Enter the sale property address and postcode."
+      );
+      return;
+    }
+
     if (
       requiresOnwardPurchaseAddress(onwardPlan) &&
       (!onwardAddress.trim() ||
@@ -144,6 +153,12 @@ export default function AgentOriginatePage() {
       return;
     }
 
+    const salePostcodeStored =
+      formatUkPostcodeForStorage(salePostcode);
+    const onwardPostcodeStored = onwardPostcode.trim()
+      ? formatUkPostcodeForStorage(onwardPostcode)
+      : "";
+
     let chainId: number | null = null;
     let propertyId: number | null = null;
 
@@ -154,7 +169,7 @@ export default function AgentOriginatePage() {
           accessCode,
           relationshipType: "sale",
           address: saleAddress,
-          postcode: salePostcode,
+          postcode: salePostcodeStored,
           branchId: context.branch.id,
           homeownerOnlyUpdates,
           inviteEmail: inviteEmail || null,
@@ -225,7 +240,7 @@ export default function AgentOriginatePage() {
           chainId,
           relationshipType: "sale",
           address: saleAddress,
-          postcode: salePostcode,
+          postcode: salePostcodeStored,
           branchId: context.branch.id,
           homeownerOnlyUpdates,
           inviteEmail: inviteEmail || null,
@@ -262,7 +277,7 @@ export default function AgentOriginatePage() {
           homeownerOnlyUpdates,
           onwardPlan,
           onwardAddress,
-          onwardPostcode,
+          onwardPostcode: onwardPostcodeStored,
         }
       );
 
@@ -364,18 +379,13 @@ export default function AgentOriginatePage() {
                 />
               ) : null}
 
-              <Field
+              <PropertyAddressLookup
+                idPrefix="ea-originate-sale"
                 label="Sale address"
-                value={saleAddress}
-                onChange={setSaleAddress}
-                required
-              />
-
-              <Field
-                label="Postcode"
-                value={salePostcode}
-                onChange={setSalePostcode}
-                required
+                address={saleAddress}
+                postcode={salePostcode}
+                onAddressChange={setSaleAddress}
+                onPostcodeChange={setSalePostcode}
               />
 
               <Field
@@ -453,22 +463,13 @@ export default function AgentOriginatePage() {
                 onwardPlan
               ) ? (
                 <div className="space-y-6 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                  <p className="text-sm font-medium text-slate-900">
-                    Onward purchase address
-                  </p>
-
-                  <Field
-                    label="Address"
-                    value={onwardAddress}
-                    onChange={setOnwardAddress}
-                    required
-                  />
-
-                  <Field
-                    label="Postcode"
-                    value={onwardPostcode}
-                    onChange={setOnwardPostcode}
-                    required
+                  <PropertyAddressLookup
+                    idPrefix="ea-originate-onward"
+                    label="Onward purchase address"
+                    address={onwardAddress}
+                    postcode={onwardPostcode}
+                    onAddressChange={setOnwardAddress}
+                    onPostcodeChange={setOnwardPostcode}
                   />
                 </div>
               ) : null}

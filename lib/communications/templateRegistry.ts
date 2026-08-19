@@ -53,6 +53,46 @@ export const EMAIL_TEMPLATE_REGISTRY: EmailTemplateDefinition[] = [
     available: true,
   },
   {
+    id: "ea-subscription-confirmation",
+    title: "EA Subscription Confirmation",
+    description:
+      "Transactional — sent when an Estate Agent branch subscription first becomes active/entitled.",
+    category: "transactional",
+    available: true,
+  },
+  {
+    id: "ea-payment-failed",
+    title: "EA Payment Failed",
+    description:
+      "Transactional — sent when recurring payment fails and the branch enters the 7-day grace period (BL-01).",
+    category: "transactional",
+    available: true,
+  },
+  {
+    id: "ea-grace-reminder",
+    title: "EA Grace Reminder",
+    description:
+      "Transactional — mid-grace reminder to update payment details during payment recovery.",
+    category: "transactional",
+    available: true,
+  },
+  {
+    id: "ea-grace-final-warning",
+    title: "EA Grace Final Warning",
+    description:
+      "Transactional — final warning before payment-recovery grace expiry.",
+    category: "transactional",
+    available: true,
+  },
+  {
+    id: "ea-subscription-cancelled",
+    title: "EA Subscription Cancelled",
+    description:
+      "Transactional — sent when cancellation is first scheduled for period end.",
+    category: "transactional",
+    available: true,
+  },
+  {
     id: "chain-update",
     title: "Chain Update",
     description: "Future template — chain progress updates.",

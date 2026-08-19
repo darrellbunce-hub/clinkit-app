@@ -1,8 +1,11 @@
+import "server-only";
+
 import { createClient } from "@supabase/supabase-js";
 
 /**
  * Service-role Supabase client for trusted server-side operations only.
  * Never import this module from client components or expose it to the browser.
+ * Enforced by `server-only` — bundlers fail if this is pulled into client code.
  */
 export function createServiceRoleSupabaseClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();

@@ -2,18 +2,28 @@ import { buildAbsoluteAssetUrl } from "@/lib/communications/config";
 import type {
   ClaimSuccessfulEmailParams,
   DormancyWarningEmailParams,
+  EaGraceFinalWarningEmailParams,
+  EaGraceReminderEmailParams,
+  EaPaymentFailedEmailParams,
+  EaSubscriptionCancelledEmailParams,
+  EaSubscriptionConfirmationEmailParams,
   EstateAgentInvitationEmailParams,
   HomeownerInvitationEmailParams,
   PasswordResetEmailParams,
   WelcomeEmailParams,
 } from "@/lib/communications/types";
 import { buildDormancyWarningPropertyUrl } from "@/lib/communications/dormancyWarningLinks";
+import {
+  EA_FOUNDING_MONTHLY_LABEL,
+  EA_STANDARD_MONTHLY_LABEL,
+} from "@/lib/billing/eaBranchPricing";
 
 const SAMPLE_INVITATION_LINK =
   "https://app.keynetic.co.uk/claim?token=sample-invitation-token";
 const SAMPLE_RESET_LINK =
   "https://app.keynetic.co.uk/auth/confirm?token=sample-reset-token";
 const SAMPLE_DASHBOARD_LINK = "https://app.keynetic.co.uk/dashboard";
+const SAMPLE_BILLING_LINK = "https://app.keynetic.co.uk/account#subscription";
 
 export const EMAIL_SAMPLE_DATA = {
   propertyAddress: "42 Maple Grove, Bristol BS8 4LN",
@@ -82,6 +92,69 @@ export function getSampleDormancyWarningParams(): DormancyWarningEmailParams {
   return {
     to: EMAIL_SAMPLE_DATA.recipientEmail,
     confirmationLink: buildDormancyWarningPropertyUrl(42),
+  };
+}
+
+export function getSampleEaSubscriptionConfirmationParams(): EaSubscriptionConfirmationEmailParams {
+  return {
+    to: "owner@northgate-estates.example",
+    recipientName: EMAIL_SAMPLE_DATA.estateAgentName,
+    branchName: EMAIL_SAMPLE_DATA.branchName,
+    manageBillingUrl: SAMPLE_BILLING_LINK,
+    planLabel: "Founding",
+    priceLabel: EA_FOUNDING_MONTHLY_LABEL,
+    nextBillingDateLabel: "18 September 2026",
+    isFounding: true,
+  };
+}
+
+export function getSampleEaPaymentFailedParams(): EaPaymentFailedEmailParams {
+  return {
+    to: "owner@northgate-estates.example",
+    recipientName: EMAIL_SAMPLE_DATA.estateAgentName,
+    branchName: EMAIL_SAMPLE_DATA.branchName,
+    manageBillingUrl: SAMPLE_BILLING_LINK,
+    graceEndsAtLabel: "25 August 2026",
+  };
+}
+
+export function getSampleEaGraceReminderParams(): EaGraceReminderEmailParams {
+  return {
+    to: "owner@northgate-estates.example",
+    recipientName: EMAIL_SAMPLE_DATA.estateAgentName,
+    branchName: EMAIL_SAMPLE_DATA.branchName,
+    manageBillingUrl: SAMPLE_BILLING_LINK,
+    graceEndsAtLabel: "25 August 2026",
+  };
+}
+
+export function getSampleEaGraceFinalWarningParams(): EaGraceFinalWarningEmailParams {
+  return {
+    to: "owner@northgate-estates.example",
+    recipientName: EMAIL_SAMPLE_DATA.estateAgentName,
+    branchName: EMAIL_SAMPLE_DATA.branchName,
+    manageBillingUrl: SAMPLE_BILLING_LINK,
+    graceEndsAtLabel: "25 August 2026",
+  };
+}
+
+export function getSampleEaSubscriptionCancelledParams(): EaSubscriptionCancelledEmailParams {
+  return {
+    to: "owner@northgate-estates.example",
+    recipientName: EMAIL_SAMPLE_DATA.estateAgentName,
+    branchName: EMAIL_SAMPLE_DATA.branchName,
+    manageBillingUrl: SAMPLE_BILLING_LINK,
+    accessEndsAtLabel: "18 September 2026",
+    isFounding: true,
+  };
+}
+
+export function getSampleStandardSubscriptionConfirmationParams(): EaSubscriptionConfirmationEmailParams {
+  return {
+    ...getSampleEaSubscriptionConfirmationParams(),
+    planLabel: "Standard",
+    priceLabel: EA_STANDARD_MONTHLY_LABEL,
+    isFounding: false,
   };
 }
 

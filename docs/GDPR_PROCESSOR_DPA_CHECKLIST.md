@@ -45,7 +45,7 @@ Do **not** mark DPA **confirmed** without evidence.
 | **Deletion API verified?** | **Not verified in repo** — do not claim until confirmed from current Resend docs |
 | **Pre-launch actions** | [ ] Sign DPA [ ] Confirm retention [ ] Document erasure procedure [ ] Confirm webhook payload PII |
 
-**In-repo integration:** `lib/communications/resend.ts`, `email_events` audit table.
+**In-repo:** `lib/communications/resend.ts`, `email_events` audit table. Billing customer lifecycle templates (`ea-subscription-confirmation`, `ea-payment-failed`, grace reminders, `ea-subscription-cancelled`) also use Resend — see [EA_BILLING_CUSTOMER_COMMUNICATIONS.md](./EA_BILLING_CUSTOMER_COMMUNICATIONS.md).
 
 ### Vercel (hosting, cron, logs)
 
@@ -74,16 +74,31 @@ Do **not** mark DPA **confirmed** without evidence.
 | **Deletion API verified?** | Key delete via REST — **yes if enabled** |
 | **Pre-launch actions** | [ ] Confirm if enabled in Production [ ] Sign DPA if enabled [ ] Document purge procedure |
 
+### Ideal Postcodes (UK address lookup)
+
+| Item | Detail |
+|------|--------|
+| **DPA status** | **needs_acceptance** — **not** Production-approved |
+| **Enabled?** | Development integration in repo — see [ADDRESS_LOOKUP_IDEAL_POSTCODES.md](./ADDRESS_LOOKUP_IDEAL_POSTCODES.md) |
+| **Data processed** | Address / postcode search queries and resolved address selections (sent to Ideal Postcodes for autocomplete/retrieve) |
+| **Data location** | Ideal Postcodes infrastructure — **verify DPA / retention settings before Production** |
+| **Retention** | **Not verified in repo** — configure Ideal Postcodes account retention / logging; legal review required |
+| **Erasure propagation** | Provider-side retention is outside Keynetic DB erasure — confirm Ideal Postcodes deletion/retention options |
+| **Deletion API verified?** | **Not verified in repo** |
+| **Pre-launch actions** | [ ] Sign DPA [ ] Configure retention / logging minimisation [ ] Add to public subprocessors list after legal review [ ] Confirm Production env has server-only `IDEAL_POSTCODES_API_KEY` |
+
+**In-repo:** `lib/address/providers/idealPostcodes.ts`, `POST /api/address/suggest`, `POST /api/address/resolve`. Key must never be `NEXT_PUBLIC_*`.
+
 ---
 
 ## Planned / not implemented
 
 | Processor | Evidence | Pre-launch |
 |-----------|----------|------------|
-| **Stripe** | `EaCompany.stripe_customer_id` field; landing page pricing copy only | DPA + deletion API when billing implemented |
+| **Stripe** | Billing Stage 2 Sandbox integration; Production not live | DPA + deletion API before Production billing |
 | **Future analytics** | Phase 3 benchmarks — not integrated | DPIA before integration |
 | **Affiliate providers** | Not in repo | N/A |
-| **Sentry / error monitoring** | Not in repo | N/A if not added |
+| **Sentry / error monitoring** | Optional observability wiring — Production config open | Confirm DPA if Production-enabled |
 
 ---
 
@@ -96,6 +111,7 @@ Do **not** mark DPA **confirmed** without evidence.
 | Resend | Manual deletion/suppression request |
 | Vercel | Rely on log expiry; minimise logged PII |
 | Upstash | Delete cache keys if enabled |
+| Ideal Postcodes | Confirm provider retention/deletion options before claiming RTBF completeness |
 | Stripe (future) | Customer delete via Stripe API |
 
 ---

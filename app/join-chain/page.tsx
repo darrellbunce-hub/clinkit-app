@@ -20,6 +20,8 @@ import {
   establishConnectedHopAfterSellerJoinsPurchase,
 } from "@/lib/chainConnection";
 import { ensureBuyerReadyOnJoin } from "@/lib/ensureBuyerReadyOnJoin";
+import PropertyAddressLookup from "@/components/address/PropertyAddressLookup";
+import { formatUkPostcodeForStorage } from "@/lib/address/normalize";
 
 function JoinChainContent() {
   const searchParams =
@@ -60,7 +62,7 @@ function JoinChainContent() {
     } = await supabase.rpc("join_chain_property", {
       p_access_code: accessCode,
       p_address: address,
-      p_postcode: postcode,
+      p_postcode: formatUkPostcodeForStorage(postcode),
     });
 
     if (joinError) {
@@ -301,29 +303,15 @@ function JoinChainContent() {
             className="w-full border border-slate-300 text-base text-slate-900 rounded-2xl px-4 py-4"
           />
 
-          <input
-            type="text"
-            value={address}
-            onChange={(event) =>
-              setAddress(
-                event.target.value
-              )
-            }
-            placeholder="Property address"
-            className="mt-4 w-full border border-slate-300 text-base text-slate-900 text-slate-900 rounded-2xl px-4 py-4"
-          />
-
-          <input
-            type="text"
-            value={postcode}
-            onChange={(event) =>
-              setPostcode(
-                event.target.value
-              )
-            }
-            placeholder="Property postcode"
-            className="mt-4 w-full border border-slate-300 text-base text-slate-900 rounded-2xl px-4 py-4"
-          />
+          <div className="mt-4">
+            <PropertyAddressLookup
+              idPrefix="join-chain"
+              address={address}
+              postcode={postcode}
+              onAddressChange={setAddress}
+              onPostcodeChange={setPostcode}
+            />
+          </div>
 
           <label className="mt-6 flex items-center gap-3">
 

@@ -114,13 +114,50 @@ export type DormancyWarningEmailParams = {
   confirmationLink: string;
 };
 
+export type EaBillingEmailCommonParams = {
+  to: string;
+  recipientName: string;
+  branchName: string;
+  manageBillingUrl: string;
+};
+
+export type EaSubscriptionConfirmationEmailParams =
+  EaBillingEmailCommonParams & {
+    planLabel: string;
+    priceLabel: string;
+    nextBillingDateLabel: string | null;
+    isFounding: boolean;
+  };
+
+export type EaPaymentFailedEmailParams = EaBillingEmailCommonParams & {
+  graceEndsAtLabel: string | null;
+};
+
+export type EaGraceReminderEmailParams = EaBillingEmailCommonParams & {
+  graceEndsAtLabel: string | null;
+};
+
+export type EaGraceFinalWarningEmailParams = EaBillingEmailCommonParams & {
+  graceEndsAtLabel: string | null;
+};
+
+export type EaSubscriptionCancelledEmailParams = EaBillingEmailCommonParams & {
+  accessEndsAtLabel: string;
+  isFounding: boolean;
+};
+
 export type EmailTemplateId =
   | "homeowner-invitation"
   | "estate-agent-invitation"
   | "password-reset"
   | "welcome"
   | "property-claimed"
-  | "lifecycle-dormancy-warning";
+  | "lifecycle-dormancy-warning"
+  | "ea-subscription-confirmation"
+  | "ea-payment-failed"
+  | "ea-grace-reminder"
+  | "ea-grace-final-warning"
+  | "ea-subscription-cancelled";
 
 export type FutureEmailTemplateId =
   | "chain-update"

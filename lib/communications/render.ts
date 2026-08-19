@@ -20,15 +20,42 @@ import PropertyClaimedEmail, {
 import WelcomeEmail, {
   getWelcomeEmailSubject,
 } from "@/emails/templates/WelcomeEmail";
+import EaSubscriptionConfirmationEmail, {
+  getEaSubscriptionConfirmationSubject,
+} from "@/emails/templates/EaSubscriptionConfirmation";
+import EaPaymentFailedEmail, {
+  getEaPaymentFailedSubject,
+} from "@/emails/templates/EaPaymentFailed";
+import EaGraceReminderEmail, {
+  getEaGraceReminderSubject,
+} from "@/emails/templates/EaGraceReminder";
+import EaGraceFinalWarningEmail, {
+  getEaGraceFinalWarningSubject,
+} from "@/emails/templates/EaGraceFinalWarning";
+import EaSubscriptionCancelledEmail, {
+  getEaSubscriptionCancelledSubject,
+} from "@/emails/templates/EaSubscriptionCancelled";
 import {
   getSampleClaimSuccessfulParams,
   getSampleDormancyWarningParams,
+  getSampleEaGraceFinalWarningParams,
+  getSampleEaGraceReminderParams,
+  getSampleEaPaymentFailedParams,
+  getSampleEaSubscriptionCancelledParams,
+  getSampleEaSubscriptionConfirmationParams,
   getSampleEstateAgentInvitationParams,
   getSampleHomeownerInvitationParams,
   getSamplePasswordResetParams,
   getSampleWelcomeEmailParams,
 } from "@/lib/communications/sampleData";
-import type { DormancyWarningEmailParams } from "@/lib/communications/types";
+import type {
+  DormancyWarningEmailParams,
+  EaGraceFinalWarningEmailParams,
+  EaGraceReminderEmailParams,
+  EaPaymentFailedEmailParams,
+  EaSubscriptionCancelledEmailParams,
+  EaSubscriptionConfirmationEmailParams,
+} from "@/lib/communications/types";
 
 export type RenderedEmail = {
   html: string;
@@ -104,6 +131,51 @@ export async function renderDormancyWarning(
   );
 }
 
+export async function renderEaSubscriptionConfirmation(
+  props: EaSubscriptionConfirmationEmailParams = getSampleEaSubscriptionConfirmationParams()
+): Promise<RenderedEmail> {
+  return renderEmailTemplate(
+    EaSubscriptionConfirmationEmail(props),
+    getEaSubscriptionConfirmationSubject(props)
+  );
+}
+
+export async function renderEaPaymentFailed(
+  props: EaPaymentFailedEmailParams = getSampleEaPaymentFailedParams()
+): Promise<RenderedEmail> {
+  return renderEmailTemplate(
+    EaPaymentFailedEmail(props),
+    getEaPaymentFailedSubject()
+  );
+}
+
+export async function renderEaGraceReminder(
+  props: EaGraceReminderEmailParams = getSampleEaGraceReminderParams()
+): Promise<RenderedEmail> {
+  return renderEmailTemplate(
+    EaGraceReminderEmail(props),
+    getEaGraceReminderSubject()
+  );
+}
+
+export async function renderEaGraceFinalWarning(
+  props: EaGraceFinalWarningEmailParams = getSampleEaGraceFinalWarningParams()
+): Promise<RenderedEmail> {
+  return renderEmailTemplate(
+    EaGraceFinalWarningEmail(props),
+    getEaGraceFinalWarningSubject()
+  );
+}
+
+export async function renderEaSubscriptionCancelled(
+  props: EaSubscriptionCancelledEmailParams = getSampleEaSubscriptionCancelledParams()
+): Promise<RenderedEmail> {
+  return renderEmailTemplate(
+    EaSubscriptionCancelledEmail(props),
+    getEaSubscriptionCancelledSubject()
+  );
+}
+
 export async function renderEmailTemplateById(
   templateId: EmailTemplateId
 ): Promise<RenderedEmail> {
@@ -120,6 +192,16 @@ export async function renderEmailTemplateById(
       return renderClaimSuccessful();
     case "lifecycle-dormancy-warning":
       return renderDormancyWarning();
+    case "ea-subscription-confirmation":
+      return renderEaSubscriptionConfirmation();
+    case "ea-payment-failed":
+      return renderEaPaymentFailed();
+    case "ea-grace-reminder":
+      return renderEaGraceReminder();
+    case "ea-grace-final-warning":
+      return renderEaGraceFinalWarning();
+    case "ea-subscription-cancelled":
+      return renderEaSubscriptionCancelled();
     default:
       throw new Error(`Unknown email template: ${templateId satisfies never}`);
   }
