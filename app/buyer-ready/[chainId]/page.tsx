@@ -35,7 +35,6 @@ import {
   getOperationalWorkspaceSubtitle,
   getOperationalWorkspaceTitle,
   formatAlreadyRecordedStatusMessage,
-  formatAlreadyRecordedUpdateMessage,
 } from "@/lib/operationalPresentation";
 import {
   resolveOperationalSubject,
@@ -73,10 +72,13 @@ import { canAmendChainCompletionDate } from "@/lib/amendChainCompletionDate";
 import { canConfirmChainCompletion } from "@/lib/confirmChainCompletion";
 import {
   daysSinceLastActivity,
-  getLatestDelayReport,
   hasActiveDelayReport,
   type OperationalActivity,
 } from "@/lib/activityIntelligence";
+import {
+  OPERATIONAL_DELAY_REASONS,
+  type OperationalDelayReason,
+} from "@/lib/operationalDelays";
 import type { CompletionAmendmentReasonCode } from "@/lib/completionLifecycle";
 
 type BuyerReadyActivity = {
@@ -94,6 +96,11 @@ type BuyerReadyChainNode = {
   status?: string;
   progress?: number;
   activities?: BuyerReadyActivity[];
+  activeDelay?: {
+    id: number;
+    reason: OperationalDelayReason;
+  } | null;
+  hasActiveOperationalDelay?: boolean;
 };
 
 function formatTimeAgo(timestamp: string) {
@@ -142,8 +149,9 @@ export default function BuyerReadyPage() {
     message: string;
   };
 
-  const [updateType, setUpdateType] = useState("");
-  const [delayReason, setDelayReason] = useState("");
+  const [delayReason, setDelayReason] = useState<
+    "" | OperationalDelayReason
+  >("");
   const [draftStage, setDraftStage] = useState("");
   const [sectionFeedback, setSectionFeedback] =
     useState<SectionFeedback | null>(null);
@@ -165,6 +173,8 @@ export default function BuyerReadyPage() {
     chainNodes,
     chains,
     addStructuredUpdate,
+    reportOperationalDelay,
+    resolveOperationalDelay,
     currentUserId,
     accountType,
     estateAgentOperationalAssignments,
@@ -580,15 +590,21 @@ export default function BuyerReadyPage() {
     updated_by: activity.updated_by ?? undefined,
   }));
 
-  const latestDelay = getLatestDelayReport(nodeActivities);
-  const activeDelayReport = hasActiveDelayReport(nodeActivities);
+  const activeDelay = workflowNode.activeDelay ?? null;
+  const activeDelayReport = hasActiveDelayReport(
+    nodeActivities,
+    {
+      authoritativeActiveDelay:
+        workflowNode.hasActiveOperationalDelay,
+    }
+  );
   const buyerLastUpdatedDays =
     daysSinceLastActivity(nodeActivities);
 
   const actionPanel = getBuyerReadyActionMessage({
     access,
     activeDelayReport,
-    latestDelayUpdate: latestDelay?.update ?? null,
+    latestDelayUpdate: activeDelay?.reason ?? null,
     buyerLastUpdatedDays,
     isCompletionLifecycleFrozen,
   });
@@ -628,44 +644,42 @@ export default function BuyerReadyPage() {
           : "normal",
     });
 
-  async function handleStructuredUpdate() {
-    if (!updateType || !access.canEdit) {
+  async function handleReportDelay() {
+    if (!delayReason || !access.canEdit) {
       return;
     }
 
-    let updateMessage = "General Update";
-
-    if (updateType === "delay" && delayReason) {
-      updateMessage = `Delay Reported: ${delayReason}`;
-    } else if (updateType === "documents") {
-      updateMessage = "Awaiting Documents";
-    } else if (updateType === "survey") {
-      updateMessage = "Survey Update Added";
-    } else if (updateType === "mortgage") {
-      updateMessage = "Mortgage Update Added";
-    } else if (updateType === "milestone") {
-      updateMessage = "Milestone Reached";
-    }
-
-    const latestActivity = workflowNode.activities?.[0];
-
-    if (latestActivity?.update === updateMessage) {
+    if (workflowNode.activeDelay) {
       showSectionFeedback({
         section: "update",
         variant: "warning",
-        message: formatAlreadyRecordedUpdateMessage(),
+        message:
+          "An active delay is already reported. Resolve it before flagging another.",
       });
-
       return;
     }
 
-    await addStructuredUpdate(
-      workflowNode.id,
-      updateMessage,
-      "buyer_ready"
-    );
+    const result = await reportOperationalDelay({
+      reason: delayReason,
+      chainNodeId: workflowNode.id,
+    });
 
-    setUpdateType("");
+    if (!result.ok) {
+      showSectionFeedback({
+        section: "update",
+        variant: "warning",
+        message:
+          result.error === "forbidden"
+            ? "You do not have permission to report a delay here."
+            : result.error === "delay_already_active"
+              ? "An active delay is already reported."
+              : result.error === "invalid_reason"
+                ? "Select a valid structured delay reason."
+                : "Could not report the delay. Please try again.",
+      });
+      return;
+    }
+
     setDelayReason("");
     showSectionFeedback({
       section: "update",
@@ -674,6 +688,34 @@ export default function BuyerReadyPage() {
         accountType,
         "structured_update"
       ),
+    });
+  }
+
+  async function handleResolveDelay() {
+    if (!workflowNode.activeDelay || !access.canEdit) {
+      return;
+    }
+
+    const result = await resolveOperationalDelay(
+      workflowNode.activeDelay.id
+    );
+
+    if (!result.ok) {
+      showSectionFeedback({
+        section: "update",
+        variant: "warning",
+        message:
+          result.error === "forbidden"
+            ? "You do not have permission to resolve this delay."
+            : "Could not resolve the delay. Please try again.",
+      });
+      return;
+    }
+
+    showSectionFeedback({
+      section: "update",
+      variant: "success",
+      message: "Delay resolved.",
     });
   }
 
@@ -974,56 +1016,59 @@ export default function BuyerReadyPage() {
                 {getShareUpdatesIntro(access.viewerRole)}
               </p>
 
-              <select
-                value={updateType}
-                onChange={(event) =>
-                  setUpdateType(event.target.value)
-                }
-                className="mt-6 w-full border border-slate-300 text-slate-900 rounded-xl px-4 py-4"
-              >
-                <option value="">Select update type</option>
-                <option value="delay">Delay</option>
-                <option value="documents">Awaiting Documents</option>
-                <option value="survey">Survey Update</option>
-                <option value="mortgage">Mortgage Update</option>
-                <option value="milestone">Milestone Reached</option>
-              </select>
-
-              {updateType === "delay" && (
-                <select
-                  value={delayReason}
-                  onChange={(event) =>
-                    setDelayReason(event.target.value)
-                  }
-                  className="mt-4 w-full border border-slate-300 text-slate-900 rounded-xl px-4 py-4"
-                >
-                  <option value="">Select delay reason</option>
-                  <option value="Awaiting Searches">
-                    Awaiting Searches
-                  </option>
-                  <option value="Awaiting Mortgage Offer">
-                    Awaiting Mortgage Offer
-                  </option>
-                  <option value="Awaiting Signed Documents">
-                    Awaiting Signed Documents
-                  </option>
-                  <option value="Awaiting Survey Results">
-                    Awaiting Survey Results
-                  </option>
-                  <option value="Awaiting Management Pack">
-                    Awaiting Management Pack
-                  </option>
-                </select>
+              {activeDelay ? (
+                <div className="mt-6 space-y-4">
+                  <div className="rounded-2xl bg-amber-50 border border-amber-200 px-5 py-4">
+                    <p className="text-sm font-semibold text-amber-800">
+                      Delay reported
+                    </p>
+                    <p className="mt-1 text-slate-800">
+                      {activeDelay.reason}
+                    </p>
+                  </div>
+                  {renderSectionAlert("update")}
+                  <button
+                    onClick={handleResolveDelay}
+                    className={`mt-2 ${BTN_PRIMARY_CLASS} px-6 py-4`}
+                  >
+                    Resolve Delay
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <p className="mt-6 text-slate-700 font-medium">
+                    Flag a Delay
+                  </p>
+                  <select
+                    value={delayReason}
+                    onChange={(event) =>
+                      setDelayReason(
+                        event.target.value as
+                          | ""
+                          | OperationalDelayReason
+                      )
+                    }
+                    className="mt-4 w-full border border-slate-300 text-slate-900 rounded-xl px-4 py-4"
+                  >
+                    <option value="">Select delay reason</option>
+                    {OPERATIONAL_DELAY_REASONS.map(
+                      (reason) => (
+                        <option key={reason} value={reason}>
+                          {reason}
+                        </option>
+                      )
+                    )}
+                  </select>
+                  {renderSectionAlert("update")}
+                  <button
+                    onClick={handleReportDelay}
+                    disabled={!delayReason}
+                    className={`mt-6 ${BTN_PRIMARY_CLASS} px-6 py-4 disabled:opacity-50 disabled:cursor-not-allowed`}
+                  >
+                    Confirm delay
+                  </button>
+                </>
               )}
-
-              {renderSectionAlert("update")}
-
-              <button
-                onClick={handleStructuredUpdate}
-                className={`mt-6 ${BTN_PRIMARY_CLASS} px-6 py-4`}
-              >
-                Add Update
-              </button>
             </div>
           </>
         )}

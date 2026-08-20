@@ -51,6 +51,18 @@ import {
   type OperationalActivity,
 } from "@/lib/activityIntelligence";
 import {
+  formatDelayReportedActivity,
+  formatDelayResolvedActivity,
+  isOperationalDelayReason,
+  mapOperationalDelayRow,
+  parseReportOperationalDelayResult,
+  parseResolveOperationalDelayResult,
+  type OperationalDelay,
+  type OperationalDelayReason,
+  type ReportOperationalDelayResult,
+  type ResolveOperationalDelayResult,
+} from "@/lib/operationalDelays";
+import {
   getAccountType,
   type AccountType,
 } from "@/lib/accountType";
@@ -95,6 +107,9 @@ members: {
   user_id: string;
   role: string;
 }[];
+  /** Authoritative active delay when present. */
+  activeDelay: OperationalDelay | null;
+  hasActiveOperationalDelay: boolean;
 };
 type Chain = {
   id: number;
@@ -130,6 +145,16 @@ type ChainContextType = {
     updateMessage: string,
     targetType?: "property" | "buyer_ready"
   ) => Promise<void>;
+
+  reportOperationalDelay: (params: {
+    reason: OperationalDelayReason;
+    propertyId?: number;
+    chainNodeId?: number;
+  }) => Promise<ReportOperationalDelayResult>;
+
+  resolveOperationalDelay: (
+    delayId: number
+  ) => Promise<ResolveOperationalDelayResult>;
   
   breakChainConnection: (
     propertyId: number,
@@ -236,10 +261,71 @@ async function loadParticipantDataset(
     }
   }
 
+  const participantChainIds = [
+    ...new Set(
+      (participantProperties || []).map(
+        (property) => Number(property.chain_id)
+      )
+    ),
+  ];
+
+  const activeDelaysByPropertyId = new Map<
+    number,
+    OperationalDelay
+  >();
+  const activeDelaysByChainNodeId = new Map<
+    number,
+    OperationalDelay
+  >();
+
+  if (participantChainIds.length > 0) {
+    const {
+      data: delayRows,
+      error: delaysError,
+    } = await supabase
+      .from("operational_delays")
+      .select(
+        "id, chain_id, property_id, chain_node_id, reason, status, created_at, resolved_at, created_by_user_id, resolved_by_user_id, created_by_role, resolved_by_role"
+      )
+      .in("chain_id", participantChainIds)
+      .eq("status", "active");
+
+    if (isStale()) {
+      return null;
+    }
+
+    if (delaysError) {
+      // Migration may be pending — continue without authoritative delays.
+      console.error(delaysError);
+    } else {
+      for (const row of delayRows || []) {
+        const mapped = mapOperationalDelayRow(row);
+        if (!mapped) {
+          continue;
+        }
+        if (mapped.propertyId != null) {
+          activeDelaysByPropertyId.set(
+            mapped.propertyId,
+            mapped
+          );
+        }
+        if (mapped.chainNodeId != null) {
+          activeDelaysByChainNodeId.set(
+            mapped.chainNodeId,
+            mapped
+          );
+        }
+      }
+    }
+  }
+
   const formattedProperties =
     (participantProperties || []).map((property) => {
       const activities =
         activitiesByPropertyId.get(property.id) || [];
+      const activeDelay =
+        activeDelaysByPropertyId.get(property.id) ??
+        null;
 
       return {
         id: property.id,
@@ -275,16 +361,10 @@ async function loadParticipantDataset(
         activities: sortActivitiesNewestFirst(
           activities
         ),
+        activeDelay,
+        hasActiveOperationalDelay: activeDelay != null,
       };
     });
-
-  const participantChainIds = [
-    ...new Set(
-      formattedProperties.map(
-        (property) => property.chainId
-      )
-    ),
-  ];
 
   const chainNodesQuery = supabase
     .from("chain_nodes")
@@ -316,7 +396,22 @@ async function loadParticipantDataset(
 
   const chainNodes =
     !chainNodesError && chainNodesData
-      ? chainNodesData
+      ? chainNodesData.map((node) => {
+          const activeDelay =
+            activeDelaysByChainNodeId.get(
+              Number(node.id)
+            ) ?? null;
+
+          return {
+            ...node,
+            activities: sortActivitiesNewestFirst(
+              node.activities || []
+            ),
+            activeDelay,
+            hasActiveOperationalDelay:
+              activeDelay != null,
+          };
+        })
       : [];
 
   if (chainNodesError) {
@@ -1123,6 +1218,293 @@ async function addStructuredUpdate(
   }
 }
 
+const reportOperationalDelay = async (params: {
+  reason: OperationalDelayReason;
+  propertyId?: number;
+  chainNodeId?: number;
+}): Promise<ReportOperationalDelayResult> => {
+  if (!isOperationalDelayReason(params.reason)) {
+    return { ok: false, error: "invalid_reason" };
+  }
+
+  const targetType =
+    params.propertyId != null
+      ? "property"
+      : params.chainNodeId != null
+        ? "buyer_ready"
+        : null;
+
+  if (
+    targetType === "property" &&
+    params.propertyId != null
+  ) {
+    const property = properties.find(
+      (entry) => entry.id === params.propertyId
+    );
+
+    if (
+      !canEditProperty(
+        property,
+        currentUserId,
+        mapToOperationalProperties(properties),
+        chainNodes,
+        getMutationContext()
+      )
+    ) {
+      return { ok: false, error: "forbidden" };
+    }
+  } else if (
+    targetType === "buyer_ready" &&
+    params.chainNodeId != null
+  ) {
+    const buyerReadyNode = chainNodes.find(
+      (node) => node.id === params.chainNodeId
+    );
+
+    if (
+      !buyerReadyNode ||
+      !canEditBuyerReady(
+        params.chainNodeId,
+        buyerReadyNode.chain_id,
+        currentUserId,
+        mapToOperationalProperties(properties),
+        chainNodes,
+        getMutationContext()
+      )
+    ) {
+      return { ok: false, error: "forbidden" };
+    }
+  } else {
+    return { ok: false, error: "invalid_target" };
+  }
+
+  const { data, error } = await supabase.rpc(
+    "report_operational_delay",
+    {
+      p_reason: params.reason,
+      p_property_id: params.propertyId ?? null,
+      p_chain_node_id: params.chainNodeId ?? null,
+      p_actor_role: getActivityUpdaterRole(),
+    }
+  );
+
+  if (error) {
+    console.error(error);
+    return { ok: false, error: "rpc_failed" };
+  }
+
+  const parsed = parseReportOperationalDelayResult(data);
+
+  if (!parsed.ok) {
+    return parsed;
+  }
+
+  const activityMessage =
+    parsed.activityMessage ||
+    formatDelayReportedActivity(parsed.reason);
+
+  const now = new Date().toISOString();
+  const optimisticDelay: OperationalDelay = {
+    id: parsed.delayId,
+    chainId:
+      params.propertyId != null
+        ? (properties.find(
+            (entry) => entry.id === params.propertyId
+          )?.chainId ?? 0)
+        : (chainNodes.find(
+            (node) => node.id === params.chainNodeId
+          )?.chain_id ?? 0),
+    propertyId: params.propertyId ?? null,
+    chainNodeId: params.chainNodeId ?? null,
+    reason: parsed.reason,
+    status: "active",
+    createdAt: parsed.createdAt || now,
+    resolvedAt: null,
+    createdByRole: getActivityUpdaterRole(),
+  };
+
+  if (params.propertyId != null) {
+    setProperties((previousProperties) =>
+      previousProperties.map((property) => {
+        if (property.id !== params.propertyId) {
+          return property;
+        }
+
+        return {
+          ...property,
+          activeDelay: optimisticDelay,
+          hasActiveOperationalDelay: true,
+          activities: [
+            {
+              id: Date.now(),
+              timestamp: now,
+              update: activityMessage,
+              updated_by: getActivityUpdaterRole(),
+            },
+            ...property.activities,
+          ],
+        };
+      })
+    );
+  } else if (params.chainNodeId != null) {
+    setChainNodes((previousNodes) =>
+      previousNodes.map((node) => {
+        if (node.id !== params.chainNodeId) {
+          return node;
+        }
+
+        return {
+          ...node,
+          activeDelay: optimisticDelay,
+          hasActiveOperationalDelay: true,
+          activities: [
+            {
+              id: Date.now(),
+              timestamp: now,
+              update: activityMessage,
+              updated_by: getActivityUpdaterRole(),
+            },
+            ...(node.activities || []),
+          ],
+        };
+      })
+    );
+  }
+
+  const refreshChainId = optimisticDelay.chainId;
+  if (refreshChainId) {
+    await refreshOperationalSummariesForChain(
+      Number(refreshChainId)
+    );
+  }
+
+  return parsed;
+};
+
+const resolveOperationalDelay = async (
+  delayId: number
+): Promise<ResolveOperationalDelayResult> => {
+  const propertyWithDelay = properties.find(
+    (property) => property.activeDelay?.id === delayId
+  );
+  const nodeWithDelay = chainNodes.find(
+    (node) => node.activeDelay?.id === delayId
+  );
+
+  if (propertyWithDelay) {
+    if (
+      !canEditProperty(
+        propertyWithDelay,
+        currentUserId,
+        mapToOperationalProperties(properties),
+        chainNodes,
+        getMutationContext()
+      )
+    ) {
+      return { ok: false, error: "forbidden" };
+    }
+  } else if (nodeWithDelay) {
+    if (
+      !canEditBuyerReady(
+        nodeWithDelay.id,
+        nodeWithDelay.chain_id,
+        currentUserId,
+        mapToOperationalProperties(properties),
+        chainNodes,
+        getMutationContext()
+      )
+    ) {
+      return { ok: false, error: "forbidden" };
+    }
+  }
+
+  const { data, error } = await supabase.rpc(
+    "resolve_operational_delay",
+    {
+      p_delay_id: delayId,
+      p_actor_role: getActivityUpdaterRole(),
+    }
+  );
+
+  if (error) {
+    console.error(error);
+    return { ok: false, error: "rpc_failed" };
+  }
+
+  const parsed = parseResolveOperationalDelayResult(data);
+
+  if (!parsed.ok) {
+    return parsed;
+  }
+
+  const activityMessage =
+    parsed.activityMessage ||
+    formatDelayResolvedActivity(parsed.reason);
+  const now = parsed.resolvedAt || new Date().toISOString();
+
+  setProperties((previousProperties) =>
+    previousProperties.map((property) => {
+      if (property.activeDelay?.id !== delayId) {
+        return property;
+      }
+
+      return {
+        ...property,
+        activeDelay: null,
+        hasActiveOperationalDelay: false,
+        activities: parsed.alreadyResolved
+          ? property.activities
+          : [
+              {
+                id: Date.now(),
+                timestamp: now,
+                update: activityMessage,
+                updated_by: getActivityUpdaterRole(),
+              },
+              ...property.activities,
+            ],
+      };
+    })
+  );
+
+  setChainNodes((previousNodes) =>
+    previousNodes.map((node) => {
+      if (node.activeDelay?.id !== delayId) {
+        return node;
+      }
+
+      return {
+        ...node,
+        activeDelay: null,
+        hasActiveOperationalDelay: false,
+        activities: parsed.alreadyResolved
+          ? node.activities || []
+          : [
+              {
+                id: Date.now(),
+                timestamp: now,
+                update: activityMessage,
+                updated_by: getActivityUpdaterRole(),
+              },
+              ...(node.activities || []),
+            ],
+      };
+    })
+  );
+
+  const refreshChainId =
+    propertyWithDelay?.chainId ??
+    nodeWithDelay?.chain_id;
+
+  if (refreshChainId != null) {
+    await refreshOperationalSummariesForChain(
+      Number(refreshChainId)
+    );
+  }
+
+  return parsed;
+};
+
 async function breakChainConnection(
   propertyId: number,
   breakReason: string
@@ -1512,6 +1894,8 @@ return (
         refreshParticipantData,
         updatePropertyStage,
         addStructuredUpdate,
+        reportOperationalDelay,
+        resolveOperationalDelay,
         breakChainConnection,
         recordChainCompletionDate,
         amendChainCompletionDate,
@@ -1531,6 +1915,17 @@ export function useChain() {
   if (!context) {
     throw new Error(
       "useChain must be used inside ChainProvider"
+    );
+  }
+
+  if (
+    typeof context.reportOperationalDelay !==
+      "function" ||
+    typeof context.resolveOperationalDelay !==
+      "function"
+  ) {
+    throw new Error(
+      "ChainProvider is missing operational delay actions. Perform a full page reload."
     );
   }
 

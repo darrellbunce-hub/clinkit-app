@@ -67,6 +67,8 @@ export type OperationalRefreshProperty = {
     update: string;
     updated_by?: string;
   }[];
+  /** Authoritative active operational delay when loaded. */
+  hasActiveOperationalDelay?: boolean;
 };
 
 export type OperationalRefreshChainNode = {
@@ -84,6 +86,8 @@ export type OperationalRefreshChainNode = {
     update: string;
     updated_by?: string;
   }[];
+  /** Authoritative active operational delay when loaded. */
+  hasActiveOperationalDelay?: boolean;
 };
 
 export type OperationalRefreshChain = {

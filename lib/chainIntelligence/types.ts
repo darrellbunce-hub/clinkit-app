@@ -10,6 +10,12 @@ export type IntelligenceProperty = {
   activities: OperationalActivity[];
   /** Authoritative DB clock when available. */
   stageEnteredAt?: string | null;
+  /**
+   * Authoritative operational delay lifecycle.
+   * When true/false, timing_v1 uses this instead of parsing activity text.
+   * When undefined/null, falls back to legacy latest-activity delay detection.
+   */
+  hasActiveOperationalDelay?: boolean | null;
 };
 
 export type StageDefinition = {

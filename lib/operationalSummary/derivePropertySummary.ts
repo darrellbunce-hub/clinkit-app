@@ -56,7 +56,11 @@ export function derivePropertySummary(params: {
 
   const buyerReadyDelayed = buyerReadyNode
     ? hasActiveDelayReport(
-        buyerReadyNode.activities
+        buyerReadyNode.activities,
+        {
+          authoritativeActiveDelay:
+            buyerReadyNode.hasActiveOperationalDelay,
+        }
       )
     : false;
 
@@ -90,7 +94,11 @@ export function derivePropertySummary(params: {
       daysSinceLastUpdate,
       staleUpdate,
       hasActivePropertyDelay: hasActiveDelayReport(
-        property.activities
+        property.activities,
+        {
+          authoritativeActiveDelay:
+            property.hasActiveOperationalDelay,
+        }
       ),
       buyerReadyDelayed,
       buyerReadyStale,

@@ -203,34 +203,6 @@ export default function ChainPage() {
     null
   );
 
-      const recentActivities =
-
-  chainProperties
-    .flatMap((property) =>
-
-      property.activities.map(
-        (activity) => ({
-
-          ...activity,
-
-
-        })
-      )
-    )
-    .sort(
-      (a, b) =>
-
-        new Date(
-          b.timestamp || 0
-        ).getTime()
-
-        -
-
-        new Date(
-          a.timestamp || 0
-        ).getTime()
-    );
-
   const currentChain =
     chains.find(
       (chain) =>
@@ -331,6 +303,28 @@ export default function ChainPage() {
   const buyerReadyActivities =
     buyerReadyNode?.activities ?? [];
 
+  const recentActivities = [
+    ...chainProperties.flatMap((property) =>
+      property.activities.map((activity) => ({
+        ...activity,
+      }))
+    ),
+    ...buyerReadyActivities.map(
+      (activity: {
+        id?: number;
+        timestamp: string;
+        update: string;
+        updated_by?: string;
+      }) => ({
+        ...activity,
+      })
+    ),
+  ].sort(
+    (a, b) =>
+      new Date(b.timestamp || 0).getTime() -
+      new Date(a.timestamp || 0).getTime()
+  );
+
   const saleOperationalPropertyId =
     operationalPosition?.kind === "sale"
       ? operationalPosition.propertyId
@@ -377,6 +371,11 @@ export default function ChainPage() {
               (buyerReadyNode as { stage_entered_at?: string | null })
                 .stage_entered_at ?? null,
             activities: buyerReadyActivities,
+            hasActiveOperationalDelay:
+              Boolean(
+                (buyerReadyNode as { hasActiveOperationalDelay?: boolean })
+                  .hasActiveOperationalDelay
+              ),
           }
         : null,
       stages: STAGES,
@@ -867,6 +866,55 @@ export default function ChainPage() {
         </div>
 {!isCompletionLifecycleFrozen && (
 <>
+{/* Active operational delay (neutral presentation) */}
+{(() => {
+  const chainActiveDelays = [
+    ...chainProperties
+      .filter(
+        (property) =>
+          property.hasActiveOperationalDelay &&
+          property.activeDelay
+      )
+      .map((property) => ({
+        key: `property-${property.id}`,
+        reason: property.activeDelay!.reason,
+      })),
+    ...(buyerReadyNode?.hasActiveOperationalDelay &&
+    buyerReadyNode.activeDelay
+      ? [
+          {
+            key: `node-${buyerReadyNode.id}`,
+            reason: buyerReadyNode.activeDelay.reason as string,
+          },
+        ]
+      : []),
+  ];
+
+  if (chainActiveDelays.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className={`mt-10 ${CARD_CLASS_NO_PADDING} ${CARD_PADDING_CLASS}`}>
+      <p className="text-sm font-medium text-slate-500">
+        Operational update
+      </p>
+      <h2 className={`mt-2 ${SECTION_TITLE_CLASS}`}>
+        Delay reported
+      </h2>
+      <div className="mt-4 space-y-2">
+        {chainActiveDelays.map((delay) => (
+          <p
+            key={delay.key}
+            className="text-slate-700"
+          >
+            {delay.reason}
+          </p>
+        ))}
+      </div>
+    </div>
+  );
+})()}
 {/* Estimated Chain Completion */}
 <div className={`mt-10 ${CARD_CLASS_NO_PADDING} ${CARD_PADDING_CLASS}`}>
   <EstimatedCompletionWindowPanel

@@ -255,19 +255,70 @@ function check(id: string, name: string, pass: boolean, detail: string) {
   );
 }
 
-// Explicit delay prevents Strong
+// Option 2: active delay must not directly change Chain Confidence
 {
-  const r = computeRefinedChainIntelligence({
+  const onTime = computeRefinedChainIntelligence({
     ...ctx,
     dependencies: [
-      dep({ id: "p1", stageEnteredAt: daysAgo(2), operationalState: "explicit_delay" }),
+      dep({ id: "p1", stageEnteredAt: daysAgo(2), operationalState: "normal" }),
+    ],
+  });
+  const onTimeWithDelay = computeRefinedChainIntelligence({
+    ...ctx,
+    dependencies: [
+      dep({
+        id: "p1",
+        stageEnteredAt: daysAgo(2),
+        operationalState: "explicit_delay",
+      }),
     ],
   });
   check(
     "delay",
-    "Explicit delay prevents Strong",
-    r.band !== "Strong",
-    `score=${r.score} band=${r.band}`
+    "Option 2: within-timing delay does not change confidence vs no delay",
+    onTime.score === onTimeWithDelay.score &&
+      onTime.band === onTimeWithDelay.band &&
+      onTime.band === "Strong",
+    `noDelay=${onTime.score}/${onTime.band} delay=${onTimeWithDelay.score}/${onTimeWithDelay.band}`
+  );
+
+  const overdue = computeRefinedChainIntelligence({
+    ...ctx,
+    dependencies: [
+      dep({
+        id: "p1",
+        stage: "searches_ordered",
+        stageEnteredAt: daysAgo(60),
+        operationalState: "normal",
+      }),
+    ],
+  });
+  const overdueWithDelay = computeRefinedChainIntelligence({
+    ...ctx,
+    dependencies: [
+      dep({
+        id: "p1",
+        stage: "searches_ordered",
+        stageEnteredAt: daysAgo(60),
+        operationalState: "explicit_delay",
+      }),
+    ],
+  });
+  check(
+    "delay-overdue",
+    "Option 2: overdue + delay matches overdue timing-only (no double-count)",
+    overdue.score === overdueWithDelay.score &&
+      overdue.band === overdueWithDelay.band,
+    `overdue=${overdue.score}/${overdue.band} delay=${overdueWithDelay.score}/${overdueWithDelay.band}`
+  );
+
+  check(
+    "delay-eta",
+    "Option 2: active delay still qualifies ETA wording",
+    (onTimeWithDelay.estimatedCompletionWindow || "").includes(
+      "reported delays may extend"
+    ),
+    onTimeWithDelay.estimatedCompletionWindow
   );
 }
 

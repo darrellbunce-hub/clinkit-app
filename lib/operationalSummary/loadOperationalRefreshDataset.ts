@@ -12,6 +12,39 @@ import type {
   OperationalRefreshProperty,
 } from "@/lib/operationalSummary/types";
 
+async function loadActiveOperationalDelayFlags(
+  supabase: SupabaseClient,
+  chainId: number
+): Promise<{
+  propertyIds: Set<number>;
+  chainNodeIds: Set<number>;
+}> {
+  const propertyIds = new Set<number>();
+  const chainNodeIds = new Set<number>();
+
+  const { data, error } = await supabase
+    .from("operational_delays")
+    .select("property_id, chain_node_id")
+    .eq("chain_id", chainId)
+    .eq("status", "active");
+
+  // Table may not exist until migration is applied — treat as no delays.
+  if (error || !data) {
+    return { propertyIds, chainNodeIds };
+  }
+
+  for (const row of data) {
+    if (row.property_id != null) {
+      propertyIds.add(Number(row.property_id));
+    }
+    if (row.chain_node_id != null) {
+      chainNodeIds.add(Number(row.chain_node_id));
+    }
+  }
+
+  return { propertyIds, chainNodeIds };
+}
+
 export function buildOperationalRefreshDataset(params: {
   chain: OperationalRefreshChain;
   properties: OperationalRefreshProperty[];
@@ -198,6 +231,12 @@ export async function loadOperationalRefreshDataset(
     }
   }
 
+  const activeDelayFlags =
+    await loadActiveOperationalDelayFlags(
+      supabase,
+      chainId
+    );
+
   const properties: OperationalRefreshProperty[] =
     participantProperties.map((property) => ({
       id: property.id,
@@ -210,6 +249,9 @@ export async function loadOperationalRefreshDataset(
       activities: sortActivitiesNewestFirst(
         activitiesByPropertyId.get(property.id) ||
           []
+      ),
+      hasActiveOperationalDelay: activeDelayFlags.propertyIds.has(
+        property.id
       ),
     }));
 
@@ -226,6 +268,9 @@ export async function loadOperationalRefreshDataset(
       stageEnteredAt: node.stage_entered_at ?? null,
       activities: sortActivitiesNewestFirst(
         activitiesByChainNodeId.get(node.id) || []
+      ),
+      hasActiveOperationalDelay: activeDelayFlags.chainNodeIds.has(
+        node.id
       ),
     }));
 
@@ -375,6 +420,12 @@ export async function loadOperationalRefreshDatasetForWorker(
     }
   }
 
+  const activeDelayFlags =
+    await loadActiveOperationalDelayFlags(
+      supabase,
+      chainId
+    );
+
   const properties: OperationalRefreshProperty[] =
     propertiesData.map((property) => ({
       id: property.id,
@@ -386,6 +437,9 @@ export async function loadOperationalRefreshDatasetForWorker(
       stageEnteredAt: property.stage_entered_at ?? null,
       activities: sortActivitiesNewestFirst(
         activitiesByPropertyId.get(property.id) || []
+      ),
+      hasActiveOperationalDelay: activeDelayFlags.propertyIds.has(
+        property.id
       ),
     }));
 
@@ -401,6 +455,9 @@ export async function loadOperationalRefreshDatasetForWorker(
       stageEnteredAt: node.stage_entered_at ?? null,
       activities: sortActivitiesNewestFirst(
         activitiesByChainNodeId.get(node.id) || []
+      ),
+      hasActiveOperationalDelay: activeDelayFlags.chainNodeIds.has(
+        node.id
       ),
     }));
 

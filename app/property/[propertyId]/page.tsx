@@ -35,7 +35,6 @@ import {
   getOperationalWorkspaceSubtitle,
   getOperationalWorkspaceTitle,
   formatAlreadyRecordedStatusMessage,
-  formatAlreadyRecordedUpdateMessage,
 } from "@/lib/operationalPresentation";
 import {
   applyOperationalSubjectLens,
@@ -83,10 +82,13 @@ import {
 } from "@/lib/completionLifecycle";
 import {
   daysSinceLastActivity,
-  getLatestDelayReport,
   hasActiveDelayReport,
   STALE_DAYS_PAGE_ALERT,
 } from "@/lib/activityIntelligence";
+import {
+  OPERATIONAL_DELAY_REASONS,
+  type OperationalDelayReason,
+} from "@/lib/operationalDelays";
 export default function PropertyPage() {
 
   type SectionFeedback = {
@@ -95,11 +97,8 @@ export default function PropertyPage() {
     message: string;
   };
 
-  const [updateType, setUpdateType] =
-    useState("");
-
   const [delayReason, setDelayReason] =
-    useState("");
+    useState<"" | OperationalDelayReason>("");
     const [draftStage, setDraftStage] =
   useState("");
   const [sectionFeedback, setSectionFeedback] =
@@ -130,7 +129,8 @@ const [breakReason, setBreakReason] =
     chainNodes,
     chains,
     updatePropertyStage,
-    addStructuredUpdate,
+    reportOperationalDelay,
+    resolveOperationalDelay,
     breakChainConnection,
     currentUserId,
     accountType,
@@ -443,13 +443,15 @@ const [breakReason, setBreakReason] =
       stage.value === currentProperty.stage
   );
 
-const latestDelay =
-  getLatestDelayReport(
-    currentProperty.activities
-  );
+const activeDelay =
+  currentProperty.activeDelay ?? null;
 const activeDelayReport =
   hasActiveDelayReport(
-    currentProperty.activities
+    currentProperty.activities,
+    {
+      authoritativeActiveDelay:
+        currentProperty.hasActiveOperationalDelay,
+    }
   );
 const propertyLastUpdatedDays =
   daysSinceLastActivity(
@@ -465,13 +467,13 @@ let actionMessage =
 let actionColour =
   "bg-green-100 text-green-700";
 
-if (activeDelayReport && latestDelay) {
+if (activeDelayReport && activeDelay) {
 
   actionTitle =
-    "Delay Reported";
+    "Delay reported";
 
   actionMessage =
-    latestDelay.update;
+    activeDelay.reason;
 
   actionColour =
     "bg-amber-100 text-amber-700";
@@ -527,80 +529,42 @@ const estimatedCompletion = computeScopeEstimatedCompletionWindow({
           ? "pending_connection"
           : "normal",
 });
-async function handleStructuredUpdate() {
-      if (!updateType) {
+async function handleReportDelay() {
+      if (!delayReason || !currentProperty) {
         return;
       }
-    
-      let updateMessage =
-        "General Update";
-    
-      if (
-        updateType === "delay" &&
-        delayReason
-      ) {
-    
-        updateMessage =
-          `Delay Reported: ${delayReason}`;
-    
-      }
-      else if (
-        updateType === "documents"
-      ) {
-    
-        updateMessage =
-          "Awaiting Documents";
-    
-      }
-      else if (
-        updateType === "survey"
-      ) {
-    
-        updateMessage =
-          "Survey Update Added";
-    
-      }
-      else if (
-        updateType === "mortgage"
-      ) {
-    
-        updateMessage =
-          "Mortgage Update Added";
-    
-      }
-      else if (
-        updateType === "milestone"
-      ) {
-    
-        updateMessage =
-          "Milestone Reached";
-    
-      }
-    
-      if (!currentProperty) {
+
+      if (currentProperty.activeDelay) {
+        showSectionFeedback({
+          section: "update",
+          variant: "warning",
+          message:
+            "An active delay is already reported. Resolve it before flagging another.",
+        });
         return;
       }
-      const latestActivity =
-  currentProperty.activities?.[0];
 
-if (
-  latestActivity?.update ===
-  updateMessage
-) {
+      const result = await reportOperationalDelay({
+        reason: delayReason,
+        propertyId: currentProperty.id,
+      });
 
-  showSectionFeedback({
-    section: "update",
-    variant: "warning",
-    message: formatAlreadyRecordedUpdateMessage(),
-  });
+      if (!result.ok) {
+        showSectionFeedback({
+          section: "update",
+          variant: "warning",
+          message:
+            result.error === "forbidden"
+              ? "You do not have permission to report a delay here."
+              : result.error === "delay_already_active"
+                ? "An active delay is already reported."
+                : result.error === "invalid_reason"
+                  ? "Select a valid structured delay reason."
+                  : "Could not report the delay. Please try again.",
+        });
+        return;
+      }
 
-  return;
-
-}
-      await addStructuredUpdate(
-        currentProperty.id,
-        updateMessage
-      );
       showSectionFeedback({
         section: "update",
         variant: "success",
@@ -609,9 +573,37 @@ if (
           "structured_update"
         ),
       });
-      setUpdateType("");
       setDelayReason("");
     }
+
+    async function handleResolveDelay() {
+      if (!currentProperty?.activeDelay) {
+        return;
+      }
+
+      const result = await resolveOperationalDelay(
+        currentProperty.activeDelay.id
+      );
+
+      if (!result.ok) {
+        showSectionFeedback({
+          section: "update",
+          variant: "warning",
+          message:
+            result.error === "forbidden"
+              ? "You do not have permission to resolve this delay."
+              : "Could not resolve the delay. Please try again.",
+        });
+        return;
+      }
+
+      showSectionFeedback({
+        section: "update",
+        variant: "success",
+        message: "Delay resolved.",
+      });
+    }
+
     async function handlePropertyStageUpdate() {
 
       if (!currentProperty) {
@@ -1068,7 +1060,7 @@ if (
 </button>
         </div>
 
-        {/* Structured Updates */}
+        {/* Structured Updates — Flag / Resolve Delay */}
         <div className={`mt-10 bg-surface-card rounded-3xl shadow-sm border border-surface-card-border ${CARD_PADDING_CLASS}`}>
 
           <h2 className="text-3xl font-bold text-slate-900">
@@ -1079,88 +1071,64 @@ if (
             {getShareUpdatesIntro(access.viewerRole)}
           </p>
 
-          <select
-            value={updateType}
-            onChange={(event) =>
-              setUpdateType(event.target.value)
-            }
-            className="mt-6 w-full border border-slate-300 text-slate-900 rounded-xl px-4 py-4"
-          >
-
-            <option value="">
-              Select update type
-            </option>
-
-            <option value="delay">
-              Delay
-            </option>
-
-            <option value="documents">
-              Awaiting Documents
-            </option>
-
-            <option value="survey">
-              Survey Update
-            </option>
-
-            <option value="mortgage">
-              Mortgage Update
-            </option>
-
-            <option value="milestone">
-              Milestone Reached
-            </option>
-
-          </select>
-
-          {updateType === "delay" && (
-
-            <select
-              value={delayReason}
-              onChange={(event) =>
-                setDelayReason(
-                  event.target.value
-                )
-              }
-              className="mt-4 w-full border border-slate-300 text-slate-900 rounded-xl px-4 py-4"
-            >
-
-              <option value="">
-                Select delay reason
-              </option>
-
-              <option value="Awaiting Searches">
-                Awaiting Searches
-              </option>
-
-              <option value="Awaiting Mortgage Offer">
-                Awaiting Mortgage Offer
-              </option>
-
-              <option value="Awaiting Signed Documents">
-                Awaiting Signed Documents
-              </option>
-
-              <option value="Awaiting Survey Results">
-                Awaiting Survey Results
-              </option>
-
-              <option value="Awaiting Management Pack">
-                Awaiting Management Pack
-              </option>
-
-            </select>
-
+          {activeDelay ? (
+            <div className="mt-6 space-y-4">
+              <div className="rounded-2xl bg-amber-50 border border-amber-200 px-5 py-4">
+                <p className="text-sm font-semibold text-amber-800">
+                  Delay reported
+                </p>
+                <p className="mt-1 text-slate-800">
+                  {activeDelay.reason}
+                </p>
+              </div>
+              {renderSectionAlert("update")}
+              <button
+                onClick={handleResolveDelay}
+                className={`mt-2 ${BTN_PRIMARY_CLASS} px-6 py-4`}
+              >
+                Resolve Delay
+              </button>
+            </div>
+          ) : (
+            <>
+              <p className="mt-6 text-slate-700 font-medium">
+                Flag a Delay
+              </p>
+              <select
+                value={delayReason}
+                onChange={(event) =>
+                  setDelayReason(
+                    event.target.value as
+                      | ""
+                      | OperationalDelayReason
+                  )
+                }
+                className="mt-4 w-full border border-slate-300 text-slate-900 rounded-xl px-4 py-4"
+              >
+                <option value="">
+                  Select delay reason
+                </option>
+                {OPERATIONAL_DELAY_REASONS.map(
+                  (reason) => (
+                    <option
+                      key={reason}
+                      value={reason}
+                    >
+                      {reason}
+                    </option>
+                  )
+                )}
+              </select>
+              {renderSectionAlert("update")}
+              <button
+                onClick={handleReportDelay}
+                disabled={!delayReason}
+                className={`mt-6 ${BTN_PRIMARY_CLASS} px-6 py-4 disabled:opacity-50 disabled:cursor-not-allowed`}
+              >
+                Confirm delay
+              </button>
+            </>
           )}
-
-          {renderSectionAlert("update")}
-
-<button
-  onClick={handleStructuredUpdate}
-            className={`mt-6 ${BTN_PRIMARY_CLASS} px-6 py-4`}
-          >
-            Add Update
-          </button>
 
         </div>
 {/* Disconnect from chain */}

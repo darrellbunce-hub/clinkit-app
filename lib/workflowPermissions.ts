@@ -370,7 +370,7 @@ export function getBuyerReadyActionMessage(params: {
 
   if (activeDelayReport && latestDelayUpdate) {
     return {
-      title: "Delay Reported",
+      title: "Delay reported",
       message: latestDelayUpdate,
       colour: "bg-amber-100 text-amber-700",
     };

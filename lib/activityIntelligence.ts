@@ -1,3 +1,4 @@
+/** @deprecated Prefer DELAY_REPORTED_ACTIVITY_PREFIX from operationalDelays */
 export const DELAY_REPORTED_PREFIX =
   "Delay Reported";
 
@@ -12,10 +13,42 @@ export type OperationalActivity = {
   updated_by?: string;
 };
 
+/**
+ * True when an activity text is a delay *report* event (legacy or lifecycle).
+ * Resolve events ("Delay resolved — …") are not report events.
+ */
 export function isDelayReportUpdate(
   update: string
 ): boolean {
-  return update.includes(DELAY_REPORTED_PREFIX);
+  const normalised = update.toLowerCase();
+
+  if (normalised.includes("delay resolved")) {
+    return false;
+  }
+
+  return (
+    normalised.includes("delay reported") ||
+    update.includes(DELAY_REPORTED_PREFIX)
+  );
+}
+
+/**
+ * Authoritative active-delay check when lifecycle state is known.
+ * Falls back to legacy "latest activity is a delay report" only when
+ * authoritativeActiveDelay is undefined/null (pre-lifecycle / unset).
+ */
+export function targetHasActiveOperationalDelay(params: {
+  activities?: OperationalActivity[] | null;
+  authoritativeActiveDelay?: boolean | null;
+}): boolean {
+  if (
+    typeof params.authoritativeActiveDelay ===
+    "boolean"
+  ) {
+    return params.authoritativeActiveDelay;
+  }
+
+  return hasActiveDelayReport(params.activities);
 }
 
 export function sortActivitiesNewestFirst<
@@ -59,8 +92,18 @@ export function getLatestDelayReport<
 }
 
 export function hasActiveDelayReport(
-  activities: OperationalActivity[] | null | undefined
+  activities: OperationalActivity[] | null | undefined,
+  options?: {
+    authoritativeActiveDelay?: boolean | null;
+  }
 ): boolean {
+  if (
+    typeof options?.authoritativeActiveDelay ===
+    "boolean"
+  ) {
+    return options.authoritativeActiveDelay;
+  }
+
   const latestActivity =
     getLatestActivity(activities);
 
@@ -106,17 +149,32 @@ export function countActiveDelayReports(params: {
   buyerReadyActivities?:
     | OperationalActivity[]
     | null;
+  propertyAuthoritativeActiveDelays?:
+    | Array<boolean | null | undefined>
+    | null;
+  buyerReadyAuthoritativeActiveDelay?:
+    | boolean
+    | null;
 }): number {
   const propertyDelayCount =
     params.propertyActivitiesList.filter(
-      (activities) =>
-        hasActiveDelayReport(activities)
+      (activities, index) =>
+        hasActiveDelayReport(activities, {
+          authoritativeActiveDelay:
+            params.propertyAuthoritativeActiveDelays?.[
+              index
+            ],
+        })
     ).length;
 
   const buyerReadyDelayCount =
     params.buyerReadyActivities &&
     hasActiveDelayReport(
-      params.buyerReadyActivities
+      params.buyerReadyActivities,
+      {
+        authoritativeActiveDelay:
+          params.buyerReadyAuthoritativeActiveDelay,
+      }
     )
       ? 1
       : 0;

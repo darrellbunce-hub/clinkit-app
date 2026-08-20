@@ -5,7 +5,7 @@
  * - Timing-based confidence with hybrid grace + progressive degradation
  * - Buyer Ready as critical chain dependency
  * - Critical-dependency caps (blocked, lost buyer)
- * - Explicit delay prevents Strong band
+ * - Explicit delay is operational only (Option 2 — no direct confidence penalty)
  * - Bottleneck-weighted aggregation with caps
  * - Critical-path Estimated Completion window
  *
@@ -100,7 +100,10 @@ function computeOperationalAdjustment(
 ): number {
   switch (state) {
     case "explicit_delay":
-      return timingZone === "within" || timingZone === "grace" ? -8 : -12;
+      // Option 2: operational signal only — no direct confidence adjustment.
+      void timingZone;
+      void hasTimingScore;
+      return 0;
     case "blocked":
       return -35;
     case "lost":
@@ -267,10 +270,6 @@ export function aggregateDependencyScores(params: {
     (result) => result.operationalState === "lost"
   );
 
-  const hasExplicitDelay = params.results.some(
-    (result) => result.operationalState === "explicit_delay"
-  );
-
   if (hasLostCritical) {
     chainScore = Math.min(chainScore, 35);
     capsApplied.push("lost_critical_dependency_cap_35");
@@ -281,10 +280,7 @@ export function aggregateDependencyScores(params: {
     capsApplied.push(`blocked_critical_dependency_cap_${blockedCap}`);
   }
 
-  if (hasExplicitDelay && !hasBlockedCritical && !hasLostCritical) {
-    chainScore = Math.min(chainScore, 79);
-    capsApplied.push("explicit_delay_prevents_strong_cap_79");
-  }
+  // Option 2: no explicit_delay confidence cap.
 
   if (buyerReadyOverdue?.zone === "severely_overdue") {
     chainScore = Math.min(chainScore, 45);

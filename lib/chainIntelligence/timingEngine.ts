@@ -21,7 +21,6 @@ import {
 } from "@/lib/chainIntelligence/dependencyScoring";
 import { computeEstimatedCompletionWindow, appendEtaLimitedCoverageQualifier } from "@/lib/chainIntelligence/estimatedCompletion";
 import {
-  applyExplicitDelayBandCap,
   capCustomerDisplayScore,
   confidenceBand,
   confidencePresentation,
@@ -75,7 +74,12 @@ function mapPropertyOperationalState(
     return "pending_connection";
   }
 
-  if (hasActiveDelayReport(property.activities)) {
+  if (
+    hasActiveDelayReport(property.activities, {
+      authoritativeActiveDelay:
+        property.hasActiveOperationalDelay,
+    })
+  ) {
     return "explicit_delay";
   }
 
@@ -86,6 +90,7 @@ function mapBuyerReadyOperationalState(params: {
   status: string;
   activities: OperationalActivity[];
   authoritativeLost?: boolean;
+  hasActiveOperationalDelay?: boolean | null;
 }): DependencyOperationalState {
   if (params.authoritativeLost) {
     return "lost";
@@ -99,7 +104,12 @@ function mapBuyerReadyOperationalState(params: {
     return "broken_connection";
   }
 
-  if (hasActiveDelayReport(params.activities)) {
+  if (
+    hasActiveDelayReport(params.activities, {
+      authoritativeActiveDelay:
+        params.hasActiveOperationalDelay,
+    })
+  ) {
     return "explicit_delay";
   }
 
@@ -115,6 +125,7 @@ export function buildChainDependencies(params: {
     stageEnteredAt?: string | null;
     activities: OperationalActivity[];
     authoritativeLost?: boolean;
+    hasActiveOperationalDelay?: boolean | null;
   } | null;
 }): ChainDependencyInput[] {
   const dependencies: ChainDependencyInput[] = [];
@@ -164,6 +175,8 @@ export function buildChainDependencies(params: {
         activities: params.buyerReadyNode.activities,
         authoritativeLost:
           params.buyerReadyNode.authoritativeLost,
+        hasActiveOperationalDelay:
+          params.buyerReadyNode.hasActiveOperationalDelay,
       }),
       isCritical: true,
     });
@@ -181,6 +194,7 @@ export function computeTimingChainIntelligence(params: {
     stageEnteredAt?: string | null;
     activities: OperationalActivity[];
     authoritativeLost?: boolean;
+    hasActiveOperationalDelay?: boolean | null;
   } | null;
   buyerReadySummary?: ChainNodesChainSummary | null;
   referenceDate?: Date;
@@ -224,15 +238,8 @@ export function computeTimingChainIntelligence(params: {
     dependencyResults
   );
 
-  const hasExplicitDelay = dependencyResults.some(
-    (result) => result.operationalState === "explicit_delay"
-  );
-
   let displayScore = roundDisplayScore(score);
-  displayScore = applyExplicitDelayBandCap(
-    displayScore,
-    hasExplicitDelay
-  );
+  // Option 2: active delay must not force the displayed confidence band down.
   displayScore = capCustomerDisplayScore(displayScore);
 
   const band = confidenceBand(displayScore);

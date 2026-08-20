@@ -101,7 +101,11 @@ export function getDelayReportedProperties<
   T extends IntelligenceProperty
 >(properties: T[]): T[] {
   return getConfidenceScopeProperties(properties).filter(
-    (property) => hasActiveDelayReport(property.activities)
+    (property) =>
+      hasActiveDelayReport(property.activities, {
+        authoritativeActiveDelay:
+          property.hasActiveOperationalDelay,
+      })
   );
 }
 
@@ -361,7 +365,11 @@ export function selectBottleneckProperty<
   }
 
   const delayedProperty = inScopeProperties.find(
-    (property) => hasActiveDelayReport(property.activities)
+    (property) =>
+      hasActiveDelayReport(property.activities, {
+        authoritativeActiveDelay:
+          property.hasActiveOperationalDelay,
+      })
   );
 
   if (delayedProperty) {
@@ -385,6 +393,7 @@ export type BuyerReadyIntelligenceNode = {
   activities?: OperationalActivity[];
   /** Only when product provides an authoritative lost-buyer signal. */
   authoritativeLost?: boolean;
+  hasActiveOperationalDelay?: boolean | null;
 };
 
 export function computeChainIntelligence<
@@ -418,7 +427,11 @@ export function computeChainIntelligence<
   );
 
   const buyerReadyHasActiveDelay = hasActiveDelayReport(
-    params.buyerReadyActivities
+    params.buyerReadyActivities,
+    {
+      authoritativeActiveDelay:
+        params.buyerReadyNode?.hasActiveOperationalDelay,
+    }
   );
 
   const activeDelayCount = countActiveDelayReports({
@@ -426,6 +439,12 @@ export function computeChainIntelligence<
       (property) => property.activities
     ),
     buyerReadyActivities: params.buyerReadyActivities,
+    propertyAuthoritativeActiveDelays:
+      inScopeProperties.map(
+        (property) => property.hasActiveOperationalDelay
+      ),
+    buyerReadyAuthoritativeActiveDelay:
+      params.buyerReadyNode?.hasActiveOperationalDelay,
   });
 
   const brokenConnectionProperties = inScopeProperties.filter(
@@ -483,6 +502,8 @@ export function computeChainIntelligence<
             resolvedBuyerReadyNode.activities ?? [],
           authoritativeLost:
             resolvedBuyerReadyNode.authoritativeLost,
+          hasActiveOperationalDelay:
+            resolvedBuyerReadyNode.hasActiveOperationalDelay,
         }
       : null,
     buyerReadySummary: params.buyerReadySummary,

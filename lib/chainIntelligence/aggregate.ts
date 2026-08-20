@@ -139,10 +139,6 @@ export function aggregateDependencyScores(params: {
     (result) => result.operationalState === "lost"
   );
 
-  const hasExplicitDelay = params.results.some(
-    (result) => result.operationalState === "explicit_delay"
-  );
-
   if (hasLostCritical) {
     chainScore = Math.min(chainScore, caps.lostCritical);
     capsApplied.push(`lost_critical_dependency_cap_${caps.lostCritical}`);
@@ -153,19 +149,8 @@ export function aggregateDependencyScores(params: {
     capsApplied.push(`blocked_critical_dependency_cap_${blockedCap}`);
   }
 
-  if (
-    hasExplicitDelay &&
-    !hasBlockedCritical &&
-    !hasLostCritical
-  ) {
-    chainScore = Math.min(
-      chainScore,
-      caps.explicitDelayMaxScore
-    );
-    capsApplied.push(
-      `explicit_delay_prevents_strong_cap_${caps.explicitDelayMaxScore}`
-    );
-  }
+  // Option 2: active explicit_delay does not cap Chain Confidence.
+  // Delay remains visible via health / bottleneck / ETA / alerts.
 
   if (buyerReadyOverdue?.zone === "severely_overdue") {
     chainScore = Math.min(

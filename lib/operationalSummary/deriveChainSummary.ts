@@ -68,6 +68,8 @@ function toIntelligenceProperty(
     ),
     activities: property.activities,
     stageEnteredAt: property.stageEnteredAt,
+    hasActiveOperationalDelay:
+      property.hasActiveOperationalDelay,
   };
 }
 
@@ -107,6 +109,8 @@ export function deriveChainSummary(
           status: buyerReadyNode.status,
           stageEnteredAt: buyerReadyNode.stageEnteredAt,
           activities: buyerReadyNode.activities,
+          hasActiveOperationalDelay:
+            buyerReadyNode.hasActiveOperationalDelay,
         }
       : null,
     stages: STAGES,

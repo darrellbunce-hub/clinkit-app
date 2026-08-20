@@ -197,11 +197,12 @@ const scenarios: Scenario[] = [
     },
   },
   {
-    name: "6. Explicit delay reported (1 active delay, fresh buyer-ready → 75%)",
+    name: "6. Explicit delay reported (Option 2: same confidence as on-time without delay)",
     run: () => {
       const result = computeChainIntelligence({
         chainProperties: [
           baseProperty({
+            hasActiveOperationalDelay: true,
             activities: [
               {
                 timestamp: daysAgo(0),
@@ -219,7 +220,7 @@ const scenarios: Scenario[] = [
       return {
         score: result.confidenceScore,
         label: result.confidenceLabel,
-        note: "PENALTY_DELAYED=10 only when buyer-ready not stale",
+        note: "Option 2: delay is operational only — timing_v1 confidence unchanged",
       };
     },
   },
@@ -311,11 +312,24 @@ function runFloorTests() {
     "OLD: Baseline 85 → NEW: on-time timing score Strong (>=85)"
   );
 
+  const withoutDelay = computeChainIntelligence({
+    chainProperties: [
+      baseProperty({
+        stage: "offer_accepted",
+        stageEnteredAt: daysAgo(2),
+        hasActiveOperationalDelay: false,
+      }),
+    ],
+    buyerReadySummary: null,
+    stages: STAGES,
+  });
+
   const explicitDelay = computeChainIntelligence({
     chainProperties: [
       baseProperty({
         stage: "offer_accepted",
         stageEnteredAt: daysAgo(2),
+        hasActiveOperationalDelay: true,
         activities: [
           {
             timestamp: daysAgo(0),
@@ -329,8 +343,16 @@ function runFloorTests() {
   });
 
   assert(
-    explicitDelay.confidenceBand !== "Strong",
-    "OLD: delay -10 → NEW: explicit delay prevents Strong band"
+    explicitDelay.confidenceScore === withoutDelay.confidenceScore &&
+      explicitDelay.confidenceBand === withoutDelay.confidenceBand &&
+      explicitDelay.confidenceBand === "Strong",
+    "Option 2: within-timing active delay must not change confidence vs no delay"
+  );
+
+  assert(
+    explicitDelay.delayedCount === 1 &&
+      explicitDelay.bottleneckProperty?.id === 1,
+    "Option 2: active delay still feeds operational delay count / bottleneck"
   );
 
   const stale = computeChainIntelligence({

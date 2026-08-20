@@ -22,8 +22,13 @@ export const CHAIN_INTELLIGENCE_CONFIG = {
   },
 
   operationalModifiers: {
-    explicitDelayWithinGrace: -8,
-    explicitDelayOverdue: -12,
+    /**
+     * Product Option 2: active delay is an operational signal only.
+     * Confidence uses timing_v1 elapsed-time zones; delay must not add a
+     * direct score adjustment (avoids double-counting once overdue).
+     */
+    explicitDelayWithinGrace: 0,
+    explicitDelayOverdue: 0,
     blocked: -35,
     blockedDependencyMaxScore: 45,
     brokenConnection: -20,
@@ -42,7 +47,11 @@ export const CHAIN_INTELLIGENCE_CONFIG = {
   caps: {
     blockedCritical: 50,
     lostCritical: 35,
-    explicitDelayMaxScore: 79,
+    /**
+     * Unused for confidence (Option 2). Kept for reference / design docs;
+     * aggregation no longer applies an explicit-delay score cap.
+     */
+    explicitDelayMaxScore: 100,
     buyerReadyOverdue: 65,
     buyerReadySeverelyOverdue: 45,
     approximateClockMaxScore: 85,

@@ -59,9 +59,10 @@ function computeOperationalAdjustment(
 
   switch (state) {
     case "explicit_delay":
-      return timingZone === "within" || timingZone === "grace"
-        ? mods.explicitDelayWithinGrace
-        : mods.explicitDelayOverdue;
+      // Option 2: delay remains an operational state for health/bottleneck/ETA
+      // but does not adjust Chain Confidence (timing_v1 owns score movement).
+      void timingZone;
+      return mods.explicitDelayWithinGrace;
     case "blocked":
       return mods.blocked;
     case "lost":

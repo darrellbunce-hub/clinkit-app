@@ -68,19 +68,16 @@ export function confidenceBand(
   return "Needs attention";
 }
 
-/** Product rule: active explicit delay must not display Strong band. */
+/**
+ * @deprecated Option 2 — active delay must not force confidence below Strong.
+ * Kept as a no-op so historical call sites / design docs do not reintroduce a
+ * delay band cap accidentally.
+ */
 export function applyExplicitDelayBandCap(
   score: number | null,
-  hasExplicitDelay: boolean
+  _hasExplicitDelay: boolean
 ): number | null {
-  if (score == null || !hasExplicitDelay) {
-    return score;
-  }
-
-  const maxScore =
-    CHAIN_INTELLIGENCE_CONFIG.bands.strongMin - 1;
-
-  return Math.min(score, maxScore);
+  return score;
 }
 
 export function mapBandLabels(band: ConfidenceBand): {
