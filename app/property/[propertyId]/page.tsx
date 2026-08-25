@@ -1,62 +1,194 @@
 "use client";
 
-import {
-  useParams,
-  useRouter,
-} from "next/navigation";
+import { useParams } from "next/navigation";
 import {
   useState,
   useEffect,
 } from "react";
 import Link from "next/link";
+import {
+  CARD_PADDING_CLASS,
+  PAGE_TITLE_CLASS,
+  SECTION_TITLE_CLASS,
+} from "@/components/mobileStandards";
+import {
+  MobileAlert,
+  MobileAlertStack,
+  MobilePageNavRow,
+  MobilePanelHeader,
+} from "@/components/mobile/MobileLayout";
 import Navbar from "@/components/Navbar";
+import OperationalContextStrip from "@/components/operational/OperationalContextStrip";
+import OperationalManagerBanner from "@/components/operational/OperationalManagerBanner";
+import WorkflowReadOnlyBanner from "@/components/WorkflowReadOnlyBanner";
+import { useOperationalWorkspaceLabels } from "@/hooks/useOperationalWorkspaceLabels";
 import { useChain } from "@/context/ChainContext";
 import { STAGES } from "@/data/stages";
-import { supabase } from "@/lib/supabase";
+import { ROUTES } from "@/lib/auth/routes";
+import { isEstateAgent } from "@/lib/accountType";
+import {
+  resolveWorkflowAccess,
+} from "@/lib/propertyPermissions";
+import {
+  getOperationalEditingModeLabelForViewer,
+  getOperationalUpdateSuccessMessage,
+  getOperationalWorkspaceSubtitle,
+  getOperationalWorkspaceTitle,
+  formatAlreadyRecordedStatusMessage,
+} from "@/lib/operationalPresentation";
+import {
+  applyOperationalSubjectLens,
+  pickEstateAgentAssignmentInChain,
+  resolveOperationalSubject,
+  resolveSubjectOperationalPosition,
+} from "@/lib/operationalSubject";
+import {
+  getActionAlertBadgeLabel,
+  getNextMilestoneHint,
+  getShareUpdatesIntro,
+} from "@/lib/customerFacingLabels";
+import { getEstateAgentManagementModeForOperationalAssignment } from "@/lib/estateAgent/managementModePresentation";
+import { computeScopeEstimatedCompletionWindow } from "@/lib/chainIntelligence/scopeEstimate";
+import { resolvePropertyStageClock } from "@/lib/chainIntelligence/stageClock";
+import { EstimatedCompletionWindowPanel } from "@/components/chainIntelligence/EstimatedCompletionWindowPanel";
+import OperationalCompletionDatePanel from "@/components/OperationalCompletionDatePanel";
+import PropertyEstateAgentAssignment from "@/components/estate-agents/PropertyEstateAgentAssignment";
+import ParticipationDelinkPanel from "@/components/participation/ParticipationDelinkPanel";
+import PropertyLifecycleDormancySection from "@/components/lifecycle/PropertyLifecycleDormancySection";
+import {
+  mapToOperationalProperties,
+} from "@/lib/operationalPosition";
+import PageHeaderBand from "@/components/theme/PageHeaderBand";
+import ParticipantDataLoadingState from "@/components/loading/ParticipantDataLoadingState";
+import {
+  BTN_PRIMARY_CLASS,
+  CARD_CLASS_NO_PADDING,
+  PAGE_BG_CLASS,
+  SURFACE_INSET_CLASS,
+} from "@/lib/theme/themeTokens";
+import {
+  canShowOperationalCompletionDateEntry,
+} from "@/lib/recordChainCompletionDate";
+import {
+  canAmendChainCompletionDate,
+} from "@/lib/amendChainCompletionDate";
+import {
+  canConfirmChainCompletion,
+} from "@/lib/confirmChainCompletion";
+import type { CompletionAmendmentReasonCode } from "@/lib/completionLifecycle";
+import {
+  isChainInCompletedCompletionMode,
+  isChainInScheduledCompletionMode,
+} from "@/lib/completionLifecycle";
+import {
+  daysSinceLastActivity,
+  hasActiveDelayReport,
+  STALE_DAYS_PAGE_ALERT,
+} from "@/lib/activityIntelligence";
+import {
+  OPERATIONAL_DELAY_REASONS,
+  type OperationalDelayReason,
+} from "@/lib/operationalDelays";
 export default function PropertyPage() {
 
-  const [updateType, setUpdateType] =
-    useState("");
+  type SectionFeedback = {
+    section: "status" | "update" | "lifecycle";
+    variant: "success" | "warning";
+    message: string;
+  };
 
   const [delayReason, setDelayReason] =
-    useState("");
-    const [breakReason, setBreakReason] =
+    useState<"" | OperationalDelayReason>("");
+    const [draftStage, setDraftStage] =
+  useState("");
+  const [sectionFeedback, setSectionFeedback] =
+  useState<SectionFeedback | null>(null);
+
+  function showSectionFeedback(
+    feedback: SectionFeedback
+  ) {
+    setSectionFeedback(feedback);
+
+    setTimeout(() => {
+      setSectionFeedback(null);
+    }, 4000);
+  }
+
+const [breakReason, setBreakReason] =
     useState("");
   const params = useParams();
-  const router = useRouter();
   const propertyId = Number(
     Array.isArray(params.propertyId)
       ? params.propertyId[0]
       : params.propertyId
+      
   );
 
   const {
     properties,
+    chainNodes,
+    chains,
     updatePropertyStage,
-    addStructuredUpdate,
+    reportOperationalDelay,
+    resolveOperationalDelay,
     breakChainConnection,
     currentUserId,
+    accountType,
+    authLoading,
+    participantDataReady,
+    refreshParticipantData,
+    estateAgentOperationalAssignments,
+    recordChainCompletionDate,
+    amendChainCompletionDate,
+    confirmChainCompletion,
   } = useChain();
-  useEffect(() => {
 
-    async function checkAuth() {
-  
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-  
-      if (!user) {
-  
-        router.push("/login");
-      }
-    }
-  
-    checkAuth();
-  
-  }, []);
   const currentProperty = properties.find(
     (property) => property.id === propertyId
   );
+
+  const chainPropertiesForCompletion =
+    mapToOperationalProperties(
+      properties.filter(
+        (property) =>
+          currentProperty != null &&
+          property.chainId === currentProperty.chainId
+      )
+    );
+
+  const operationalSubject =
+    currentProperty && currentUserId
+      ? resolveOperationalSubject({
+          viewerUserId: currentUserId,
+          accountType,
+          chainId: currentProperty.chainId,
+          chainProperties: chainPropertiesForCompletion,
+          estateAgentAssignments:
+            estateAgentOperationalAssignments,
+        })
+      : null;
+
+  const workspaceLabels = useOperationalWorkspaceLabels({
+    assignedPropertyId:
+      operationalSubject?.assignedPropertyId ?? null,
+    subjectUserId:
+      operationalSubject?.subjectUserId ?? null,
+    accountType,
+    currentUserId,
+  });
+
+  useEffect(() => {
+
+    if (currentProperty) {
+  
+      setDraftStage(
+        currentProperty.stage
+      );
+  
+    }
+  
+  }, [currentProperty]);
+  
 
   function formatTimeAgo(
     timestamp: string
@@ -96,30 +228,234 @@ export default function PropertyPage() {
     return `${days} days ago`;
   }
 
-  if (!currentProperty) {
+  if (authLoading || !participantDataReady) {
     return (
-      <div className="p-10 text-2xl">
-        Property not found
-      </div>
+      <ParticipantDataLoadingState message="Loading property…" />
     );
   }
-  const canEdit =
-  currentProperty.members?.some(
-    (member) =>
-      member.user_id === currentUserId
+
+  if (!currentProperty) {
+    return (
+      <main className={PAGE_BG_CLASS}>
+        <Navbar />
+        <PageHeaderBand />
+
+        <div className="max-w-4xl mx-auto px-6 py-12">
+          <div
+            className={`bg-surface-card rounded-3xl shadow-sm border border-surface-card-border ${CARD_PADDING_CLASS}`}
+            role="status"
+          >
+            <h1 className={PAGE_TITLE_CLASS}>
+              Property not found
+            </h1>
+
+            <p className="mt-3 text-slate-600">
+              We could not find this property in your account. It may have
+              been removed or you may not have access.
+            </p>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  const access = resolveWorkflowAccess(
+    {
+      kind: "property",
+      chainId: currentProperty.chainId,
+      propertyId: currentProperty.id,
+    },
+    {
+      userId: currentUserId,
+      chainProperties: chainPropertiesForCompletion,
+      chainNodes,
+      accountType,
+      estateAgentAssignments:
+        estateAgentOperationalAssignments,
+    }
   );
+
+  const mutationContext = {
+    accountType,
+    estateAgentAssignments:
+      estateAgentOperationalAssignments,
+  };
+
+  const canEdit = access.canEdit;
+
+  const subjectChainProperties =
+    applyOperationalSubjectLens(
+      chainPropertiesForCompletion,
+      operationalSubject
+    );
+
+  const operationalDisplayPosition =
+    resolveSubjectOperationalPosition({
+      subject: operationalSubject,
+      chainId: currentProperty.chainId,
+      chainProperties: chainPropertiesForCompletion,
+      chainNodes,
+    }).position;
+
+  const isOperationalDisplay =
+    operationalDisplayPosition?.kind === "sale" &&
+    operationalDisplayPosition.propertyId ===
+      currentProperty.id;
+
+
+  const homeHref = isEstateAgent({
+    account_type: accountType ?? "homeowner",
+  })
+    ? ROUTES.agentHome
+    : ROUTES.homeownerDashboard;
+
+  const homeLabel = isEstateAgent({
+    account_type: accountType ?? "homeowner",
+  })
+    ? "Agent Home"
+    : "Dashboard";
+
+  const currentChain = chains.find(
+    (chain) =>
+      chain.id === currentProperty.chainId
+  );
+
+  const isScheduledCompletionMode =
+    isChainInScheduledCompletionMode({
+      completionLifecycleStatus:
+        currentChain?.completionLifecycleStatus,
+      completionScheduledDate:
+        currentChain?.completionScheduledDate,
+    });
+
+  const isCompletedCompletionMode =
+    isChainInCompletedCompletionMode({
+      completionLifecycleStatus:
+        currentChain?.completionLifecycleStatus,
+      completionScheduledDate:
+        currentChain?.completionScheduledDate,
+    });
+
+  const isCompletionLifecycleFrozen =
+    isScheduledCompletionMode ||
+    isCompletedCompletionMode;
+
+  const showOperationalCompletionEntry =
+    access.canEdit &&
+    canShowOperationalCompletionDateEntry({
+      chainScheduledDate:
+        currentChain?.completionScheduledDate,
+      userId: currentUserId,
+      chainId: currentProperty.chainId,
+      chainProperties:
+        chainPropertiesForCompletion,
+      chainNodes: chainNodes,
+      mutationContext,
+    });
+
+  const showOperationalCompletionPanel =
+    isCompletedCompletionMode ||
+    !!currentChain?.completionScheduledDate ||
+    showOperationalCompletionEntry;
+
+  const propertyChainId = currentProperty.chainId;
+
+  const showAmendCompletionDate =
+    access.canEdit &&
+    canAmendChainCompletionDate({
+      chainScheduledDate:
+        currentChain?.completionScheduledDate,
+      chainLifecycleStatus:
+        currentChain?.completionLifecycleStatus,
+      userId: currentUserId,
+      chainId: propertyChainId,
+      chainProperties:
+        chainPropertiesForCompletion,
+      chainNodes: chainNodes,
+      mutationContext,
+    });
+
+  const showConfirmCompletion =
+    access.canEdit &&
+    canConfirmChainCompletion({
+      completionLifecycleStatus:
+        currentChain?.completionLifecycleStatus,
+      completionScheduledDate:
+        currentChain?.completionScheduledDate,
+      userId: currentUserId,
+      chainId: propertyChainId,
+      chainProperties:
+        chainPropertiesForCompletion,
+      chainNodes: chainNodes,
+      mutationContext,
+    });
+
+  async function handleRecordCompletionDate(
+    scheduledDate: string
+  ) {
+    const result = await recordChainCompletionDate(
+      propertyChainId,
+      scheduledDate
+    );
+
+    return {
+      ok: result.ok,
+      message: result.ok
+        ? undefined
+        : result.message,
+    };
+  }
+
+  async function handleAmendCompletionDate(
+    newScheduledDate: string,
+    reasonCode: CompletionAmendmentReasonCode
+  ) {
+    const result = await amendChainCompletionDate(
+      propertyChainId,
+      newScheduledDate,
+      reasonCode
+    );
+
+    return {
+      ok: result.ok,
+      message: result.ok
+        ? undefined
+        : result.message,
+    };
+  }
+
+  async function handleConfirmCompletion() {
+    const result = await confirmChainCompletion(
+      propertyChainId
+    );
+
+    return {
+      ok: result.ok,
+      message: result.ok
+        ? undefined
+        : result.message,
+    };
+  }
+
   const currentStage =
   STAGES.find(
     (stage) =>
       stage.value === currentProperty.stage
   );
 
-const latestDelay =
-  currentProperty.activities.find(
-    (activity) =>
-      activity.update.includes(
-        "Delay Reported"
-      )
+const activeDelay =
+  currentProperty.activeDelay ?? null;
+const activeDelayReport =
+  hasActiveDelayReport(
+    currentProperty.activities,
+    {
+      authoritativeActiveDelay:
+        currentProperty.hasActiveOperationalDelay,
+    }
+  );
+const propertyLastUpdatedDays =
+  daysSinceLastActivity(
+    currentProperty.activities
   );
 
 let actionTitle =
@@ -131,27 +467,28 @@ let actionMessage =
 let actionColour =
   "bg-green-100 text-green-700";
 
-if (latestDelay) {
+if (activeDelayReport && activeDelay) {
 
   actionTitle =
-    "Delay Reported";
+    "Delay reported";
 
   actionMessage =
-    latestDelay.update;
+    activeDelay.reason;
 
   actionColour =
     "bg-amber-100 text-amber-700";
 }
 
 if (
-  currentProperty.lastUpdatedDays > 14
+  !isCompletionLifecycleFrozen &&
+  propertyLastUpdatedDays > STALE_DAYS_PAGE_ALERT
 ) {
 
   actionTitle =
     "Update Recommended";
 
   actionMessage =
-    `No updates have been added for ${currentProperty.lastUpdatedDays} days. Consider checking progress with your estate agent or conveyancer.`;
+    `No updates have been added for ${propertyLastUpdatedDays} days. Consider checking progress with your estate agent or conveyancer.`;
 
   actionColour =
     "bg-red-100 text-red-700";
@@ -170,177 +507,359 @@ const completedStages =
   );
  
 
-let estimatedCompletion =
-  "16–20 weeks remaining";
+const propertyClock = resolvePropertyStageClock({
+  stage: currentProperty.stage,
+  persistedStageEnteredAt:
+    (currentProperty as { stage_entered_at?: string | null })
+      .stage_entered_at ?? null,
+  activities: currentProperty.activities,
+});
 
-const progress =
-  currentStage?.progress || 0;
-
-if (progress >= 20) {
-  estimatedCompletion =
-    "12–16 weeks remaining";
-}
-
-if (progress >= 40) {
-  estimatedCompletion =
-    "8–12 weeks remaining";
-}
-
-if (progress >= 60) {
-  estimatedCompletion =
-    "4–8 weeks remaining";
-}
-
-if (progress >= 80) {
-  estimatedCompletion =
-    "1–3 weeks remaining";
-}
-
-if (latestDelay) {
-
-  estimatedCompletion =
-    `${estimatedCompletion} (delay detected)`;
-}
-
-if (
-  currentProperty.lastUpdatedDays > 14
-) {
-
-  estimatedCompletion =
-    `${estimatedCompletion} (stale activity)`;
-}
-async function handleStructuredUpdate() {
-      if (!updateType) {
+const estimatedCompletion = computeScopeEstimatedCompletionWindow({
+  propertyStage: currentProperty.stage,
+  propertyStageEnteredAt: propertyClock.stageEnteredAt,
+  propertyClockQuality: propertyClock.clockQuality,
+  propertyOperationalState: activeDelayReport
+    ? "explicit_delay"
+    : currentProperty.status === "blocked"
+      ? "blocked"
+      : currentProperty.status === "broken_connection"
+        ? "broken_connection"
+        : currentProperty.status === "pending_connection"
+          ? "pending_connection"
+          : "normal",
+});
+async function handleReportDelay() {
+      if (!delayReason || !currentProperty) {
         return;
       }
-    
-      let updateMessage =
-        "General Update";
-    
-      if (
-        updateType === "delay" &&
-        delayReason
-      ) {
-    
-        updateMessage =
-          `Delay Reported: ${delayReason}`;
-    
+
+      if (currentProperty.activeDelay) {
+        showSectionFeedback({
+          section: "update",
+          variant: "warning",
+          message:
+            "An active delay is already reported. Resolve it before flagging another.",
+        });
+        return;
       }
-      else if (
-        updateType === "documents"
-      ) {
-    
-        updateMessage =
-          "Awaiting Documents";
-    
+
+      const result = await reportOperationalDelay({
+        reason: delayReason,
+        propertyId: currentProperty.id,
+      });
+
+      if (!result.ok) {
+        showSectionFeedback({
+          section: "update",
+          variant: "warning",
+          message:
+            result.error === "forbidden"
+              ? "You do not have permission to report a delay here."
+              : result.error === "delay_already_active"
+                ? "An active delay is already reported."
+                : result.error === "invalid_reason"
+                  ? "Select a valid structured delay reason."
+                  : "Could not report the delay. Please try again.",
+        });
+        return;
       }
-      else if (
-        updateType === "survey"
-      ) {
-    
-        updateMessage =
-          "Survey Update Added";
-    
+
+      showSectionFeedback({
+        section: "update",
+        variant: "success",
+        message: getOperationalUpdateSuccessMessage(
+          accountType,
+          "structured_update"
+        ),
+      });
+      setDelayReason("");
+    }
+
+    async function handleResolveDelay() {
+      if (!currentProperty?.activeDelay) {
+        return;
       }
-      else if (
-        updateType === "mortgage"
-      ) {
-    
-        updateMessage =
-          "Mortgage Update Added";
-    
+
+      const result = await resolveOperationalDelay(
+        currentProperty.activeDelay.id
+      );
+
+      if (!result.ok) {
+        showSectionFeedback({
+          section: "update",
+          variant: "warning",
+          message:
+            result.error === "forbidden"
+              ? "You do not have permission to resolve this delay."
+              : "Could not resolve the delay. Please try again.",
+        });
+        return;
       }
-      else if (
-        updateType === "milestone"
-      ) {
-    
-        updateMessage =
-          "Milestone Reached";
-    
-      }
-    
+
+      showSectionFeedback({
+        section: "update",
+        variant: "success",
+        message: "Delay resolved.",
+      });
+    }
+
+    async function handlePropertyStageUpdate() {
+
       if (!currentProperty) {
         return;
       }
-      
-      await addStructuredUpdate(
+    
+      if (
+        currentProperty.stage === draftStage
+      ) {
+        const stageLabel =
+          STAGES.find(
+            (stage) => stage.value === draftStage
+          )?.label ?? "recorded";
+
+        showSectionFeedback({
+          section: "status",
+          variant: "warning",
+          message:
+            formatAlreadyRecordedStatusMessage(
+              stageLabel
+            ),
+        });
+
+        return;
+
+      }
+
+      if (
+        draftStage === "searching" &&
+        (currentProperty.address ||
+          currentProperty.postcode)
+      ) {
+        showSectionFeedback({
+          section: "status",
+          variant: "warning",
+          message:
+            "An agreed purchase cannot be changed back to searching.",
+        });
+
+        return;
+      }
+    
+      await updatePropertyStage(
         currentProperty.id,
-        updateMessage
+        draftStage
       );
     
-      setUpdateType("");
-      setDelayReason("");
+      showSectionFeedback({
+        section: "status",
+        variant: "success",
+        message: getOperationalUpdateSuccessMessage(
+          accountType,
+          "property_stage"
+        ),
+      });
+    
     }
+  const workspaceTitle = getOperationalWorkspaceTitle({
+    surface: "property",
+    isOperationalDisplay,
+    viewerRole: access.viewerRole,
+  });
+
+  const workspaceSubtitle = getOperationalWorkspaceSubtitle({
+    surface: "property",
+    isOperationalDisplay,
+    viewerRole: access.viewerRole,
+    canEdit,
+  });
+
+  const editingModeLabel =
+    getOperationalEditingModeLabelForViewer({
+      viewerRole: access.viewerRole,
+      mode: access.mode,
+    });
+
+  const chainAssignment =
+    access.viewerRole === "estate_agent"
+      ? pickEstateAgentAssignmentInChain(
+          estateAgentOperationalAssignments,
+          currentProperty.chainId,
+          chainPropertiesForCompletion
+        )
+      : null;
+
+  const managementMode =
+    getEstateAgentManagementModeForOperationalAssignment(
+      chainAssignment
+    );
+
+  const showOperationalManager =
+    access.viewerRole === "estate_agent" && canEdit;
+
+  const showOperationalContextStrip =
+    isOperationalDisplay ||
+    access.viewerRole === "estate_agent";
+
+  function renderSectionAlert(
+    section: SectionFeedback["section"]
+  ) {
+    if (
+      !sectionFeedback ||
+      sectionFeedback.section !== section
+    ) {
+      return null;
+    }
+
+    return (
+      <div className="mb-4">
+        <MobileAlertStack>
+          <MobileAlert
+            variant={
+              sectionFeedback.variant === "success"
+                ? "success"
+                : "warning"
+            }
+          >
+            {sectionFeedback.variant === "success"
+              ? "✓ "
+              : "⚠ "}
+            {sectionFeedback.message}
+          </MobileAlert>
+        </MobileAlertStack>
+      </div>
+    );
+  }
+
   return (
-    <main className="min-h-screen bg-slate-100">
+    <main className={PAGE_BG_CLASS}>
 
       <Navbar />
+      <PageHeaderBand />
 
       <div className="max-w-4xl mx-auto px-6 py-12">
-      <div className="flex items-center gap-4 mb-6">
+        <MobilePageNavRow
+          links={[
+            {
+              href: `/chain/${currentProperty.chainId}`,
+              label: "← Back to Chain",
+            },
+            {
+              href: homeHref,
+              label: homeLabel,
+            },
+          ]}
+        />
 
-<Link
-  href={`/chain/${currentProperty.chainId}`}
-  className="
-    inline-flex items-center
-    text-slate-600 hover:text-slate-900
-  "
->
-  ← Back to Chain
-</Link>
+        <div
+          className={`bg-surface-card rounded-3xl shadow-sm border border-surface-card-border ${CARD_PADDING_CLASS}`}
+        >
 
-<Link
-  href="/dashboard"
-  className="
-    inline-flex items-center
-    text-slate-600 hover:text-slate-900
-  "
->
-  Dashboard
-</Link>
+<h1 className={PAGE_TITLE_CLASS}>
 
-</div>
-        {/* Header */}
-        <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
+  {workspaceTitle}
 
-          <h1 className="text-5xl font-bold text-slate-900">
-            Property {currentProperty.id}
-          </h1>
+</h1>
 
-          <p className="text-slate-600 mt-3 text-lg">
-            Chain position #{currentProperty.id}
-          </p>
+<p className="text-slate-600 mt-2 text-base">
 
-        </div>
+  {workspaceSubtitle}
 
-        {/* Current Status */}
-<div className="mt-8 bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
+</p>
 
-<div className="flex items-start justify-between gap-6">
-
-  <div>
-
-    <p className="text-sm font-medium text-slate-500">
-      Current Status
-    </p>
-
-    <h2 className="mt-3 text-4xl font-bold text-slate-900">
-      {currentStage?.label}
-    </h2>
-
-    <p className="mt-4 text-slate-600 max-w-2xl">
-      Your property transaction is currently progressing through this stage of the chain process.
-    </p>
-
-  </div>
-
-  <div className="bg-green-100 text-green-700 px-5 py-3 rounded-2xl text-lg font-semibold">
-
-    {currentStage?.progress}% Complete
-
-  </div>
+{showOperationalContextStrip && (
+  <OperationalContextStrip
+    labels={workspaceLabels}
+    editingMode={editingModeLabel}
+    showManager={
+      access.viewerRole === "estate_agent"
+    }
+    managementMode={managementMode}
+    viewerRole={access.viewerRole}
+  />
+)}
 
 </div>
+
+        {showOperationalManager && (
+          <OperationalManagerBanner
+            viewerRole={access.viewerRole}
+          />
+        )}
+
+        {access.canView &&
+          !access.canEdit &&
+          access.bannerMessage && (
+          <WorkflowReadOnlyBanner
+            message={access.bannerMessage}
+          />
+        )}
+
+        {renderSectionAlert("lifecycle")}
+
+        <PropertyLifecycleDormancySection
+          propertyId={propertyId}
+          currentUserId={currentUserId}
+          onConfirmed={refreshParticipantData}
+          onSuccessMessage={(message) =>
+            showSectionFeedback({
+              section: "lifecycle",
+              variant: "success",
+              message,
+            })
+          }
+        />
+
+        {!isCompletedCompletionMode && (
+          <div
+            className={`mt-8 bg-surface-card rounded-3xl shadow-sm border border-surface-card-border ${CARD_PADDING_CLASS}`}
+          >
+            <MobilePanelHeader
+              aside={
+                <div
+                  className={`${actionColour} px-5 py-3 rounded-2xl text-sm font-semibold whitespace-nowrap`}
+                >
+                  {getActionAlertBadgeLabel(access.viewerRole)}
+                </div>
+              }
+            >
+              <p className="text-sm font-medium text-slate-500">
+                Action Required
+              </p>
+
+              <h2 className={`mt-3 ${SECTION_TITLE_CLASS}`}>
+                {actionTitle}
+              </h2>
+
+              <p className="mt-4 text-slate-600 max-w-2xl">
+                {actionMessage}
+              </p>
+            </MobilePanelHeader>
+          </div>
+        )}
+
+        <div
+          className={`mt-8 bg-surface-card rounded-3xl shadow-sm border border-surface-card-border ${CARD_PADDING_CLASS}`}
+        >
+          <MobilePanelHeader
+            aside={
+              <div className="bg-green-100 text-green-700 px-5 py-3 rounded-2xl text-base sm:text-lg font-semibold whitespace-nowrap">
+                {currentStage?.progress}% Complete
+              </div>
+            }
+          >
+            <p className="text-sm font-medium text-slate-500">
+              Current Status
+            </p>
+
+            <h2 className={`mt-3 ${SECTION_TITLE_CLASS}`}>
+              {currentStage?.label}
+            </h2>
+
+            <p className="mt-4 text-slate-600 max-w-2xl">
+              Your property transaction is currently progressing through this stage of the chain process.
+            </p>
+          </MobilePanelHeader>
 
 {/* Progress Bar */}
 <div className="mt-10">
@@ -366,13 +885,29 @@ async function handleStructuredUpdate() {
 
   <div className="mt-5 grid gap-4">
 
-    {completedStages.map((stage) => (
+  {completedStages.length === 0 && (
+
+    <div
+      className="
+        bg-surface-inset rounded-2xl
+        px-5 py-5
+        text-slate-500
+      "
+    >
+
+      Milestones completed during your move will appear here as your transaction progresses.
+
+    </div>
+
+  )}
+
+  {completedStages.map((stage) => (
 
       <div
         key={stage.value}
         className="
           flex items-center gap-4
-          bg-slate-50 rounded-2xl
+          bg-surface-inset rounded-2xl
           px-5 py-4
         "
       >
@@ -401,26 +936,20 @@ async function handleStructuredUpdate() {
   </div>
 
 </div>
+{!isCompletionLifecycleFrozen && (
+<>
 {/* Estimated Completion */}
 <div className="mt-10 bg-blue-50 border border-blue-200 rounded-3xl p-6">
-
-  <p className="text-sm font-medium text-blue-700">
-    Estimated Completion Window
-  </p>
-
-  <h3 className="mt-3 text-3xl font-bold text-slate-900">
-    {estimatedCompletion}
-  </h3>
-
-  <p className="mt-3 text-slate-600">
-    Estimated timelines are based on current transaction stage, reported delays and recent chain activity.
-  </p>
-
+  <EstimatedCompletionWindowPanel
+    rawWindow={estimatedCompletion}
+    title="Estimated Completion Window"
+    titleClassName="text-blue-700"
+  />
 </div>
 {/* Operational Info */}
 <div className="grid md:grid-cols-2 gap-8 mt-10">
 
-  <div className="bg-slate-50 rounded-2xl p-6">
+  <div className="bg-surface-inset rounded-2xl p-6">
 
     <p className="text-sm text-slate-500">
       Expected Next Step
@@ -431,12 +960,12 @@ async function handleStructuredUpdate() {
     </p>
 
     <p className="mt-3 text-slate-600">
-      This is typically the next operational milestone in the property transaction.
+      {getNextMilestoneHint(access.viewerRole)}
     </p>
 
   </div>
 
-  <div className="bg-slate-50 rounded-2xl p-6">
+  <div className="bg-surface-inset rounded-2xl p-6">
 
     <p className="text-sm text-slate-500">
       Typical Timeframe
@@ -453,76 +982,64 @@ async function handleStructuredUpdate() {
   </div>
 
 </div>
-
-</div>
-
-
-{/* Action Required */}
-<div className="mt-8 bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
-
-  <div className="flex items-start justify-between gap-6">
-
-    <div>
-
-      <p className="text-sm font-medium text-slate-500">
-        Action Required
-      </p>
-
-      <h2 className="mt-3 text-3xl font-bold text-slate-900">
-        {actionTitle}
-      </h2>
-
-      <p className="mt-4 text-slate-600 max-w-2xl">
-        {actionMessage}
-      </p>
-
-    </div>
-
-    <div
-      className={`
-        ${actionColour}
-        px-5 py-3 rounded-2xl text-sm font-semibold
-      `}
-    >
-
-      Operational Alert
-
-    </div>
-
-  </div>
-
-</div>
-{!canEdit && (
-
-<div className="mt-8 bg-amber-50 border border-amber-200 rounded-3xl p-6">
-
-  <p className="text-amber-700 font-semibold">
-    You can view this property but only the property owner can make operational updates.
-  </p>
-
-</div>
-
+</>
 )}
+
+</div>
+
+{showOperationalCompletionPanel && (
+  <OperationalCompletionDatePanel
+    chainScheduledDate={
+      currentChain?.completionScheduledDate
+    }
+    chainLifecycleStatus={
+      currentChain?.completionLifecycleStatus
+    }
+    completionConfirmedAt={
+      currentChain?.completionConfirmedAt
+    }
+    showEntryForm={
+      showOperationalCompletionEntry
+    }
+    showChangeButton={
+      showAmendCompletionDate
+    }
+    showConfirmButton={
+      showConfirmCompletion
+    }
+    onSubmit={handleRecordCompletionDate}
+    onChangeDate={handleAmendCompletionDate}
+    onConfirmCompletion={
+      handleConfirmCompletion
+    }
+  />
+)}
+
+        {access.canEdit && !isCompletedCompletionMode && (
+        <>
         {/* Update Status */}
-        <div className="mt-8 bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
+        <div className={`mt-10 bg-surface-card rounded-3xl shadow-sm border border-surface-card-border ${CARD_PADDING_CLASS}`}>
 
           <h2 className="text-3xl font-bold text-slate-900">
             Update Status
           </h2>
 
           <select
-          disabled={!canEdit}
-            value={currentProperty.stage}
-            onChange={(event) =>
-              updatePropertyStage(
-                currentProperty.id,
-                event.target.value
-              )
-            }
-            className="mt-6 w-full border border-slate-300 rounded-xl px-4 py-4 text-lg"
+          value={draftStage}
+          onChange={(event) =>
+            setDraftStage(event.target.value)
+          }
+            className="mt-6 w-full border border-slate-300 text-slate-900 rounded-xl px-4 py-4 text-lg"
           >
 
-            {STAGES.map((stage) => (
+            {STAGES.filter(
+              (stage) =>
+                !(
+                  stage.value ===
+                    "searching" &&
+                  currentProperty.address
+                )
+            ).map((stage) => (
 
               <option
                 key={stage.value}
@@ -534,129 +1051,109 @@ async function handleStructuredUpdate() {
             ))}
 
           </select>
-
+          {renderSectionAlert("status")}
+          <button
+  onClick={handlePropertyStageUpdate}
+  className={`mt-4 ${BTN_PRIMARY_CLASS} rounded-xl px-6 py-3`}
+>
+  Submit Status Update
+</button>
         </div>
 
-        {/* Structured Updates */}
-        <div className="mt-8 bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
+        {/* Structured Updates — Flag / Resolve Delay */}
+        <div className={`mt-10 bg-surface-card rounded-3xl shadow-sm border border-surface-card-border ${CARD_PADDING_CLASS}`}>
 
           <h2 className="text-3xl font-bold text-slate-900">
             Add Update
           </h2>
 
           <p className="text-slate-500 mt-2">
-            Share operational updates with
-            the chain.
+            {getShareUpdatesIntro(access.viewerRole)}
           </p>
 
-          <select
-          disabled={!canEdit}
-            value={updateType}
-            onChange={(event) =>
-              setUpdateType(event.target.value)
-            }
-            className="mt-6 w-full border border-slate-300 rounded-xl px-4 py-4"
-          >
-
-            <option value="">
-              Select update type
-            </option>
-
-            <option value="delay">
-              Delay
-            </option>
-
-            <option value="documents">
-              Awaiting Documents
-            </option>
-
-            <option value="survey">
-              Survey Update
-            </option>
-
-            <option value="mortgage">
-              Mortgage Update
-            </option>
-
-            <option value="milestone">
-              Milestone Reached
-            </option>
-
-          </select>
-
-          {updateType === "delay" && (
-
-            <select
-            disabled={!canEdit}
-              value={delayReason}
-              onChange={(event) =>
-                setDelayReason(
-                  event.target.value
-                )
-              }
-              className="mt-4 w-full border border-slate-300 rounded-xl px-4 py-4"
-            >
-
-              <option value="">
-                Select delay reason
-              </option>
-
-              <option value="Awaiting Searches">
-                Awaiting Searches
-              </option>
-
-              <option value="Awaiting Mortgage Offer">
-                Awaiting Mortgage Offer
-              </option>
-
-              <option value="Awaiting Signed Documents">
-                Awaiting Signed Documents
-              </option>
-
-              <option value="Awaiting Survey Results">
-                Awaiting Survey Results
-              </option>
-
-              <option value="Awaiting Management Pack">
-                Awaiting Management Pack
-              </option>
-
-            </select>
-
+          {activeDelay ? (
+            <div className="mt-6 space-y-4">
+              <div className="rounded-2xl bg-amber-50 border border-amber-200 px-5 py-4">
+                <p className="text-sm font-semibold text-amber-800">
+                  Delay reported
+                </p>
+                <p className="mt-1 text-slate-800">
+                  {activeDelay.reason}
+                </p>
+              </div>
+              {renderSectionAlert("update")}
+              <button
+                onClick={handleResolveDelay}
+                className={`mt-2 ${BTN_PRIMARY_CLASS} px-6 py-4`}
+              >
+                Resolve Delay
+              </button>
+            </div>
+          ) : (
+            <>
+              <p className="mt-6 text-slate-700 font-medium">
+                Flag a Delay
+              </p>
+              <select
+                value={delayReason}
+                onChange={(event) =>
+                  setDelayReason(
+                    event.target.value as
+                      | ""
+                      | OperationalDelayReason
+                  )
+                }
+                className="mt-4 w-full border border-slate-300 text-slate-900 rounded-xl px-4 py-4"
+              >
+                <option value="">
+                  Select delay reason
+                </option>
+                {OPERATIONAL_DELAY_REASONS.map(
+                  (reason) => (
+                    <option
+                      key={reason}
+                      value={reason}
+                    >
+                      {reason}
+                    </option>
+                  )
+                )}
+              </select>
+              {renderSectionAlert("update")}
+              <button
+                onClick={handleReportDelay}
+                disabled={!delayReason}
+                className={`mt-6 ${BTN_PRIMARY_CLASS} px-6 py-4 disabled:opacity-50 disabled:cursor-not-allowed`}
+              >
+                Confirm delay
+              </button>
+            </>
           )}
 
-<button
-  onClick={handleStructuredUpdate}
-            className="mt-6 bg-slate-900 text-white px-6 py-4 rounded-2xl font-semibold hover:bg-slate-700 transition"
-          >
-            Add Update
-          </button>
-
         </div>
-{/* Break Chain Connection */}
-<div className="mt-8 bg-white rounded-3xl shadow-sm border border-red-200 p-8">
+{/* Disconnect from chain */}
+<div className={`mt-8 bg-white rounded-3xl shadow-sm border border-red-200 ${CARD_PADDING_CLASS}`}>
 
   <h2 className="text-3xl font-bold text-slate-900">
-    Break Chain Connection
+    Disconnect from chain
   </h2>
 
   <p className="mt-4 text-slate-600 max-w-2xl">
-    This should only be used after discussions with estate agents or solicitors. Breaking a chain connection may impact confidence scoring and overall chain progression.
+    Use this only after discussions with estate agents or solicitors. Disconnecting affects the Keynetic connection between properties, not your real-world property transaction. It may impact confidence scoring and overall chain progression.
   </p>
 
   <select
-  disabled={!canEdit}
     value={breakReason}
     onChange={(event) =>
       setBreakReason(
         event.target.value
       )
     }
-    className="mt-6 w-full border border-slate-300 rounded-2xl px-4 py-4"
+    className="mt-6 w-full border border-slate-300 text-slate-900 rounded-2xl px-4 py-4"
   >
 
     <option value="">
-      Select break reason
+      Select disconnect reason
     </option>
 
     <option value="buyer_side">
@@ -672,7 +1169,7 @@ async function handleStructuredUpdate() {
   <button
     onClick={() => {
 
-      if (!breakReason) {
+      if (!breakReason || !canEdit) {
         return;
       }
 
@@ -684,13 +1181,34 @@ async function handleStructuredUpdate() {
     className="mt-6 bg-red-600 hover:bg-red-700 text-white px-6 py-4 rounded-2xl font-semibold transition"
   >
 
-    Break Chain Connection
+    Disconnect from chain
 
   </button>
 
 </div>
+        </>
+        )}
+
+        {canEdit && (
+          <div className="mt-8">
+            <PropertyEstateAgentAssignment
+              propertyId={currentProperty.id}
+            />
+          </div>
+        )}
+
+        <div className="mt-8">
+          <ParticipationDelinkPanel
+            propertyId={currentProperty.id}
+            accountType={accountType}
+            onCompleted={async () => {
+              await refreshParticipantData();
+            }}
+          />
+        </div>
+
         {/* Activity Timeline */}
-        <div className="mt-8 bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
+        <div className={`mt-8 bg-surface-card rounded-3xl shadow-sm border border-surface-card-border ${CARD_PADDING_CLASS}`}>
 
           <h2 className="text-3xl font-bold text-slate-900">
             Activity Timeline

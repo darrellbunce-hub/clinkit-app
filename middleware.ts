@@ -1,45 +1,135 @@
+import { createServerClient } from "@supabase/ssr";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-const protectedRoutes = [
-  "/dashboard",
-  "/start-move",
-  "/join-chain",
-];
+import { evaluateProtectedRouteAccess } from "@/lib/auth/routeGuards";
+import {
+  isAccountGatedRoute,
+  normalizePathname,
+  ROUTES,
+} from "@/lib/auth/routes";
+import { fetchCurrentUserContextFromUser } from "@/lib/currentUserContext";
 
-export function middleware(
+export async function middleware(
   request: NextRequest
 ) {
+  let response = NextResponse.next({
+    request,
+  });
 
-  const token =
-    request.cookies.get(
-      "sb-access-token"
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name) {
+          return request.cookies.get(name)?.value;
+        },
+
+        set(name, value, options) {
+          response.cookies.set({
+            name,
+            value,
+            ...options,
+          });
+        },
+
+        remove(name, options) {
+          response.cookies.set({
+            name,
+            value: "",
+            ...options,
+          });
+        },
+      },
+    }
+  );
+
+  const pathname = normalizePathname(
+    request.nextUrl.pathname
+  );
+
+  if (!isAccountGatedRoute(pathname)) {
+    return response;
+  }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    const guardResult =
+      await evaluateProtectedRouteAccess(
+        null,
+        request.nextUrl,
+        pathname,
+        supabase
+      );
+
+    if (!guardResult.allowed) {
+      return NextResponse.redirect(
+        new URL(
+          guardResult.redirectTo,
+          request.url
+        )
+      );
+    }
+
+    return response;
+  }
+
+  const context =
+    await fetchCurrentUserContextFromUser(
+      supabase,
+      user
     );
 
-  const isProtectedRoute =
-    protectedRoutes.some((route) =>
-      request.nextUrl.pathname.startsWith(route)
+  if (!context) {
+    const loginUrl = new URL(
+      ROUTES.homeownerLogin,
+      request.url
+    );
+    loginUrl.searchParams.set(
+      "error",
+      "profile_setup_failed"
     );
 
-  if (
-    isProtectedRoute &&
-    !token
-  ) {
+    return NextResponse.redirect(loginUrl);
+  }
 
+  const guardResult =
+    await evaluateProtectedRouteAccess(
+      context,
+      request.nextUrl,
+      pathname,
+      supabase
+    );
+
+  if (!guardResult.allowed) {
     return NextResponse.redirect(
-      new URL("/login", request.url)
+      new URL(
+        guardResult.redirectTo,
+        request.url
+      )
     );
   }
 
-  return NextResponse.next();
+  return response;
 }
 
 export const config = {
-
   matcher: [
+    "/account/:path*",
     "/dashboard/:path*",
     "/start-move/:path*",
     "/join-chain/:path*",
+    "/my-chains/:path*",
+    "/claim/:path*",
+    "/chain/:path*",
+    "/property/:path*",
+    "/buyer-ready/:path*",
+    "/agent/:path*",
+    "/estate-agents/onboarding/:path*",
+    "/admin/:path*",
   ],
-
 };

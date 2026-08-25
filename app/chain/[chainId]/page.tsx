@@ -1,20 +1,131 @@
 "use client";
-
+import ChainNode from "@/components/ChainNode";
 import { useState, useEffect } from "react";
 import Navbar from "@/components/Navbar";
 import {
-  useParams,
-  useRouter,
-} from "next/navigation";
+  CARD_PADDING_CLASS,
+  PAGE_TITLE_CLASS,
+  STAT_VALUE_CLASS,
+  SECTION_TITLE_CLASS,
+} from "@/components/mobileStandards";
+import { MobilePanelHeader } from "@/components/mobile/MobileLayout";
+import { MobileChainScrollRegion } from "@/components/mobile/MobileChainScrollRegion";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useChain } from "@/context/ChainContext";
+import { isEstateAgent } from "@/lib/accountType";
 import { supabase } from "@/lib/supabase";
 import { STAGES } from "@/data/stages";
+import {
+  buildChainTopology,
+  getLinkedPropertyGapState,
+  isSearchingPlaceholder,
+} from "@/lib/buildChainTopology";
+import { computeChainIntelligence } from "@/lib/chainIntelligence";
+import {
+  CHAIN_CONFIDENCE_TOOLTIP,
+  CHAIN_PROGRESS_TOOLTIP,
+} from "@/lib/chainIntelligence/presentation";
+import {
+  CHAIN_STATUS_EXPLAINER,
+  CHAIN_STATUS_LABEL,
+} from "@/lib/customerFacingLabels";
+import { EstimatedCompletionWindowPanel } from "@/components/chainIntelligence/EstimatedCompletionWindowPanel";
+import { resolveBuyerReadyStageLabel } from "@/lib/chainIntelligence/buyerReadyLabels";
+import {
+  CHAIN_TILE_LABEL,
+  getChainTileDisplayTitle,
+  getDashboardChainTitle,
+  mapToOperationalProperties,
+} from "@/lib/operationalPosition";
+import {
+  applyOperationalSubjectLens,
+  resolveOperationalSubject,
+  resolveSubjectOperationalPosition,
+} from "@/lib/operationalSubject";
+import PageHeaderBand from "@/components/theme/PageHeaderBand";
+import {
+  chainAwaitingBuyerConnectorClasses,
+  chainConnectorClasses,
+} from "@/lib/theme/chainViz";
+import {
+  BTN_PRIMARY_CLASS,
+  CARD_CLASS_NO_PADDING,
+  CHAIN_PROGRESS_FILL_CLASS,
+  CHAIN_PROGRESS_TRACK_CLASS,
+  CHAIN_VIZ_CANVAS_CLASS,
+  PAGE_BG_CLASS,
+} from "@/lib/theme/themeTokens";
+import {
+  type ChainNodesChainSummary,
+} from "@/lib/chainNodesSummary";
+import {
+  convertSearchingPlaceholder,
+  resolveConvertibleSearchingPlaceholder,
+} from "@/lib/searchingPlaceholder";
+import PropertyAddressLookup from "@/components/address/PropertyAddressLookup";
+import { formatUkPostcodeForStorage } from "@/lib/address/normalize";
+import CompletionScheduledBanner from "@/components/CompletionScheduledBanner";
+import ChainCompletedBanner from "@/components/ChainCompletedBanner";
+import ParticipantDataLoadingState from "@/components/loading/ParticipantDataLoadingState";
+import PropertyEstateAgentAssignment from "@/components/estate-agents/PropertyEstateAgentAssignment";
+import RecordCompletionDateForm from "@/components/RecordCompletionDateForm";
+import { canShowCompletionSchedulingForm } from "@/lib/recordChainCompletionDate";
+import { canEditProperty } from "@/lib/propertyPermissions";
+import { canAmendChainCompletionDate } from "@/lib/amendChainCompletionDate";
+import { canConfirmChainCompletion } from "@/lib/confirmChainCompletion";
+import type { CompletionAmendmentReasonCode } from "@/lib/completionLifecycle";
+import {
+  COMPLETION_SCHEDULED_CONFIDENCE_NOTE,
+  isChainInCompletedCompletionMode,
+  isChainInScheduledCompletionMode,
+} from "@/lib/completionLifecycle";
+import {
+  findBuyerReadySummaryForAnchor,
+  resolveUpstreamPurchaserState,
+  shouldRenderUpstreamPurchaserBeforeProperty,
+} from "@/lib/resolveUpstreamPurchaser";
+import type {
+  OperationalBuyerReadyNode,
+  OperationalPosition,
+} from "@/lib/operationalPosition";
+
+function resolveOwnerBuyerReadyChainNode(
+  operationalPosition: OperationalPosition | null,
+  chainNodes: {
+    id: number;
+    chain_id: number;
+    node_type: string;
+    linked_property_id?: number | null;
+    stage?: string;
+    status?: string;
+    progress?: number;
+  }[]
+) {
+  if (operationalPosition?.kind !== "buyer_ready") {
+    return null;
+  }
+
+  return (
+    chainNodes.find(
+      (node) => node.id === operationalPosition.nodeId
+    ) ?? null
+  );
+}
+
+function resolveOwnerBuyerReadyStageLabel(
+  node: { stage?: string } | null,
+  summary: ChainNodesChainSummary | null
+): string {
+  return resolveBuyerReadyStageLabel({
+    stage: node?.stage,
+    publicStageLabel: summary?.public_stage_label,
+  });
+}
 
 export default function ChainPage() {
 
   const params = useParams();
-  const router = useRouter();
   const chainId =
     parseInt(
       params.chainId as string
@@ -23,29 +134,59 @@ export default function ChainPage() {
     const {
       properties,
       chains,
+      chainNodes,
       currentUserId,
+      accountType,
+      authLoading,
+      participantDataReady,
+      estateAgentOperationalAssignments,
+      recordChainCompletionDate,
+      amendChainCompletionDate,
+      confirmChainCompletion,
     } = useChain();
 
+  const isEstateAgentViewer =
+    isEstateAgent({
+      account_type: accountType ?? "homeowner",
+    });
+
+    const [
+      buyerReadySummaries,
+      setBuyerReadySummaries,
+    ] = useState<ChainNodesChainSummary[]>(
+      []
+    );
     useEffect(() => {
 
-      async function checkAuth() {
+      async function loadBuyerReadySummaries() {
     
         const {
-          data: { user },
-        } = await supabase.auth.getUser();
+          data: summaryData,
+          error: summaryError,
+        } = await supabase
+        .from("chain_nodes_chain_summary")
+        .select("*")
+          .eq("chain_id", Number(chainId))
+          .eq("node_type", "buyer_ready")
+          .order("position");
     
-        if (!user) {
+        if (!summaryError && summaryData) {
     
-          router.push("/login");
+          setBuyerReadySummaries(summaryData);
+    
+        } else {
+    
+          setBuyerReadySummaries([]);
+    
         }
       }
     
-      checkAuth();
+      loadBuyerReadySummaries();
     
-    }, []);
+    }, [chainId]);
+    
+    const chainProperties =
 
-  const chainProperties =
-  
     properties
       .filter(
         (property) =>
@@ -56,52 +197,12 @@ export default function ChainPage() {
           a.chainPosition -
           b.chainPosition
       );
-      const staleProperties =
-      chainProperties.filter(
-        (property) =>
-          property.lastUpdatedDays > 21
-      );
-    
-    const delayedProperties =
-      chainProperties.filter(
-        (property) =>
-          property.activities.some(
-            (activity) =>
-              activity.update.includes(
-                "Delay Reported"
-              )
-          )
-      );
-    
-    let chainHealth =
-      "Stable";
-    
-    let chainHealthMessage =
-      "Most properties updated recently with no major delays reported.";
-    
-    if (
-      staleProperties.length >= 1 ||
-      delayedProperties.length >= 1
-    ) {
-    
-      chainHealth =
-        "Active";
-    
-      chainHealthMessage =
-        "Some delays or stale updates detected within the chain.";
-    }
-    
-    if (
-      staleProperties.length >= 2 ||
-      delayedProperties.length >= 2
-    ) {
-    
-      chainHealth =
-        "At Risk";
-    
-      chainHealthMessage =
-        "Multiple delays or stale properties may impact chain progression.";
-    }
+
+  const topology = buildChainTopology(
+    chainProperties,
+    null
+  );
+
   const currentChain =
     chains.find(
       (chain) =>
@@ -109,196 +210,338 @@ export default function ChainPage() {
         Number(chainId)
     );
 
+  const isScheduledCompletionMode =
+    isChainInScheduledCompletionMode({
+      completionLifecycleStatus:
+        currentChain?.completionLifecycleStatus,
+      completionScheduledDate:
+        currentChain?.completionScheduledDate,
+    });
+
+  const isCompletedCompletionMode =
+    isChainInCompletedCompletionMode({
+      completionLifecycleStatus:
+        currentChain?.completionLifecycleStatus,
+      completionScheduledDate:
+        currentChain?.completionScheduledDate,
+    });
+
+  const isCompletionLifecycleFrozen =
+    isScheduledCompletionMode ||
+    isCompletedCompletionMode;
+
+  const chainOperationalProperties =
+    mapToOperationalProperties(chainProperties);
+
+  const operationalSubject =
+    resolveOperationalSubject({
+      viewerUserId: currentUserId,
+      accountType,
+      chainId,
+      chainProperties: chainOperationalProperties,
+      estateAgentAssignments:
+        estateAgentOperationalAssignments,
+    });
+
+  const subjectChainProperties =
+    applyOperationalSubjectLens(
+      chainOperationalProperties,
+      operationalSubject
+    );
+
+  const operationalPositionResult =
+    resolveSubjectOperationalPosition({
+      subject: operationalSubject,
+      chainId,
+      chainProperties: chainOperationalProperties,
+      chainNodes: chainNodes as OperationalBuyerReadyNode[],
+    });
+
+  if (operationalPositionResult.ambiguity) {
+    console.warn(
+      "[chain] operational position ambiguity for chain",
+      chainId
+    );
+  }
+
+  const operationalPosition =
+    operationalPositionResult.position;
+
+  const ownerOperationalBuyerReadyNode =
+    resolveOwnerBuyerReadyChainNode(
+      operationalPosition,
+      chainNodes
+    );
+
+  const ownerOperationalBuyerReadySummary =
+    ownerOperationalBuyerReadyNode
+      ? buyerReadySummaries.find(
+          (summary) =>
+            summary.id ===
+            ownerOperationalBuyerReadyNode.id
+        ) ?? null
+      : null;
+
+  const ownerBuyerReadyLinkedPropertyId =
+    ownerOperationalBuyerReadyNode?.linked_property_id ??
+    ownerOperationalBuyerReadySummary?.linked_property_id ??
+    null;
+
+  const showOwnerOperationalBuyerReady =
+    operationalPosition?.kind === "buyer_ready" &&
+    ownerOperationalBuyerReadyNode != null;
+
+  const buyerReadyNode =
+    ownerOperationalBuyerReadyNode ??
+    chainNodes.find(
+      (node) =>
+        Number(node.chain_id) ===
+          Number(chainId) &&
+        node.node_type === "buyer_ready"
+    );
+
+  const buyerReadyActivities =
+    buyerReadyNode?.activities ?? [];
+
+  const recentActivities = [
+    ...chainProperties.flatMap((property) =>
+      property.activities.map((activity) => ({
+        ...activity,
+      }))
+    ),
+    ...buyerReadyActivities.map(
+      (activity: {
+        id?: number;
+        timestamp: string;
+        update: string;
+        updated_by?: string;
+      }) => ({
+        ...activity,
+      })
+    ),
+  ].sort(
+    (a, b) =>
+      new Date(b.timestamp || 0).getTime() -
+      new Date(a.timestamp || 0).getTime()
+  );
+
+  const saleOperationalPropertyId =
+    operationalPosition?.kind === "sale"
+      ? operationalPosition.propertyId
+      : null;
+
+  const buyerReadyForAnchor =
+    findBuyerReadySummaryForAnchor(
+      buyerReadySummaries,
+      saleOperationalPropertyId
+    );
+
+  const buyerReadySummaryForIntelligence =
+    buyerReadyForAnchor ??
+    buyerReadySummaries[0] ??
+    null;
+
+  const upstreamPurchaser =
+    resolveUpstreamPurchaserState({
+      operationalSalePropertyId:
+        saleOperationalPropertyId,
+      chainProperties: chainProperties.map(
+        (property) => ({
+          id: property.id,
+          buyer_connected:
+            property.buyer_connected,
+        })
+      ),
+      buyerReadyForAnchor,
+    });
+
+  const intelligence =
+    computeChainIntelligence({
+      chainProperties,
+      buyerReadySummary:
+        buyerReadySummaryForIntelligence,
+      buyerReadyActivities,
+      buyerReadyNode: buyerReadyNode?.stage
+        ? {
+            id: Number(buyerReadyNode.id),
+            stage: buyerReadyNode.stage,
+            status:
+              buyerReadyNode.status ?? "healthy",
+            stageEnteredAt:
+              (buyerReadyNode as { stage_entered_at?: string | null })
+                .stage_entered_at ?? null,
+            activities: buyerReadyActivities,
+            hasActiveOperationalDelay:
+              Boolean(
+                (buyerReadyNode as { hasActiveOperationalDelay?: boolean })
+                  .hasActiveOperationalDelay
+              ),
+          }
+        : null,
+      stages: STAGES,
+      scheduledCompletionMode:
+        isCompletionLifecycleFrozen,
+    });
+
+  const {
+    staleProperties,
+    chainHealth,
+    chainHealthMessage,
+    averageProgress,
+    confidenceScore,
+    confidenceLabel,
+    confidenceColour,
+    confidenceBg,
+    confidenceUnavailable,
+    confidenceUnavailableMessage,
+    coverageLabel,
+    dataCoverage,
+    estimatedChainCompletion,
+    bottleneckProperty,
+  } = intelligence;
+
+  const chainPropertiesForCompletion =
+    mapToOperationalProperties(
+      chainProperties
+    );
+
+  const mutationContext = {
+    accountType,
+    estateAgentAssignments:
+      estateAgentOperationalAssignments,
+  };
+
+  const salePropertyForOnwardPurchase =
+    saleOperationalPropertyId != null
+      ? chainOperationalProperties.find(
+          (property) =>
+            property.id ===
+            saleOperationalPropertyId
+        ) ?? null
+      : null;
+
+  const convertibleSearchingPlaceholder =
+    saleOperationalPropertyId != null
+      ? resolveConvertibleSearchingPlaceholder(
+          topology.renderableProperties,
+          saleOperationalPropertyId
+        )
+      : null;
+
+  const canAddOnwardPurchase =
+    salePropertyForOnwardPurchase != null &&
+    currentUserId != null &&
+    convertibleSearchingPlaceholder != null &&
+    canEditProperty(
+      salePropertyForOnwardPurchase,
+      currentUserId,
+      chainOperationalProperties,
+      chainNodes as OperationalBuyerReadyNode[],
+      mutationContext
+    );
+
+  const showCompletionScheduledBanner =
+    isScheduledCompletionMode;
+
+  const showCompletedBanner =
+    isCompletedCompletionMode &&
+    !!currentChain?.completionScheduledDate &&
+    !!currentChain?.completionConfirmedAt;
+
+  const showCompletionSchedulingForm =
+    !isCompletedCompletionMode &&
+    canShowCompletionSchedulingForm({
+      chainScheduledDate:
+        currentChain?.completionScheduledDate,
+      userId: currentUserId,
+      chainId,
+      chainProperties:
+        chainPropertiesForCompletion,
+      chainNodes: chainNodes,
+      mutationContext,
+    });
+
+  const showAmendCompletionDate =
+    canAmendChainCompletionDate({
+      chainScheduledDate:
+        currentChain?.completionScheduledDate,
+      chainLifecycleStatus:
+        currentChain?.completionLifecycleStatus,
+      userId: currentUserId,
+      chainId,
+      chainProperties:
+        chainPropertiesForCompletion,
+      chainNodes: chainNodes,
+      mutationContext,
+    });
+
+  const showConfirmCompletion =
+    canConfirmChainCompletion({
+      completionLifecycleStatus:
+        currentChain?.completionLifecycleStatus,
+      completionScheduledDate:
+        currentChain?.completionScheduledDate,
+      userId: currentUserId,
+      chainId,
+      chainProperties:
+        chainPropertiesForCompletion,
+      chainNodes: chainNodes,
+      mutationContext,
+    });
+
+  async function handleRecordCompletionDate(
+    scheduledDate: string
+  ) {
+    const result = await recordChainCompletionDate(
+      chainId,
+      scheduledDate
+    );
+
+    return {
+      ok: result.ok,
+      message: result.ok
+        ? undefined
+        : result.message,
+    };
+  }
+
+  async function handleAmendCompletionDate(
+    newScheduledDate: string,
+    reasonCode: CompletionAmendmentReasonCode
+  ) {
+    const result = await amendChainCompletionDate(
+      chainId,
+      newScheduledDate,
+      reasonCode
+    );
+
+    return {
+      ok: result.ok,
+      message: result.ok
+        ? undefined
+        : result.message,
+    };
+  }
+
+  async function handleConfirmCompletion() {
+    const result = await confirmChainCompletion(
+      chainId
+    );
+
+    return {
+      ok: result.ok,
+      message: result.ok
+        ? undefined
+        : result.message,
+    };
+  }
+
   const [newAddress, setNewAddress] =
     useState("");
-
+    
   const [newPostcode, setNewPostcode] =
     useState("");
 
-  const totalProgress =
-    chainProperties.reduce(
-      (total, property) => {
-
-        const stage = STAGES.find(
-          (stage) =>
-            stage.value === property.stage
-        );
-
-        if (!stage) {
-          return total;
-        }
-
-        return total + (stage.progress || 0);
-
-      },
-      0
-    );
-
-  const averageProgress =
-    chainProperties.length > 0
-      ? Math.round(
-          totalProgress /
-          chainProperties.length
-        )
-      : 0;
-
-  
-
-  const blockedCount =
-    chainProperties.filter(
-      (property) =>
-        property.status === "blocked"
-    ).length;
-
-  const delayedCount =
-    chainProperties.filter(
-      (property) =>
-        property.status === "delayed"
-    ).length;
-
-  let confidenceScore =
-    averageProgress;
-
-  confidenceScore -= blockedCount * 25;
-  confidenceScore -= delayedCount * 10;
-  confidenceScore -= staleProperties.length * 5;
-
-  if (confidenceScore < 0) {
-    confidenceScore = 0;
-  }
-
-  let confidenceLabel =
-    "High Risk";
-
-  let confidenceColour =
-    "text-red-700";
-
-  let confidenceBg =
-    "bg-red-100";
-
-  if (confidenceScore >= 70) {
-
-    confidenceLabel = "Healthy";
-    confidenceColour = "text-green-700";
-    confidenceBg = "bg-green-100";
-
-  }
-  else if (confidenceScore >= 40) {
-
-    confidenceLabel = "Moderate";
-    confidenceColour = "text-amber-700";
-    confidenceBg = "bg-amber-100";
-
-  }
-  let estimatedChainCompletion =
-  "16–20 weeks";
-
-if (averageProgress >= 20) {
-  estimatedChainCompletion =
-    "12–16 weeks";
-}
-
-if (averageProgress >= 40) {
-  estimatedChainCompletion =
-    "8–12 weeks";
-}
-
-if (averageProgress >= 60) {
-  estimatedChainCompletion =
-    "4–8 weeks";
-}
-
-if (averageProgress >= 80) {
-  estimatedChainCompletion =
-    "1–3 weeks";
-}
-
-if (blockedCount > 0) {
-
-  estimatedChainCompletion =
-    `${estimatedChainCompletion} (blocked property detected)`;
-}
-
-else if (delayedCount > 0) {
-
-  estimatedChainCompletion =
-    `${estimatedChainCompletion} (delays reported)`;
-}
-
-else if (staleProperties.length > 0) {
-
-  estimatedChainCompletion =
-    `${estimatedChainCompletion} (awaiting updates)`;
-}
-let bottleneckProperty =
-  null;
-
-const blockedProperty =
-  chainProperties.find(
-    (property) =>
-      property.status === "blocked"
-  );
-
-const delayedProperty =
-  chainProperties.find(
-    (property) =>
-      property.activities.some(
-        (activity) =>
-          activity.update.includes(
-            "Delay Reported"
-          )
-      )
-  );
-
-const staleProperty =
-  chainProperties.find(
-    (property) =>
-      property.lastUpdatedDays > 14
-  );
-
-if (blockedProperty) {
-
-  bottleneckProperty =
-    blockedProperty;
-}
-
-else if (delayedProperty) {
-
-  bottleneckProperty =
-    delayedProperty;
-}
-
-else if (staleProperty) {
-
-  bottleneckProperty =
-    staleProperty;
-}
-
-else {
-
-  bottleneckProperty =
-    [...chainProperties].sort(
-      (a, b) => {
-
-        const stageA =
-          STAGES.find(
-            (stage) =>
-              stage.value === a.stage
-          );
-
-        const stageB =
-          STAGES.find(
-            (stage) =>
-              stage.value === b.stage
-          );
-
-        return (
-          (stageA?.progress || 0) -
-          (stageB?.progress || 0)
-        );
-      }
-    )[0];
-}
   async function handleAddProperty() {
 
     if (!newAddress || !newPostcode) {
@@ -308,75 +551,168 @@ else {
       return;
     }
 
-    const nextPosition =
-      chainProperties.length + 1;
+    if (!currentUserId) {
 
-      const {
-        data: propertyData,
-        error,
-      } =
-      await supabase
-        .from("properties")
-        .insert({
-
-          chain_id: chainId,
-
-          chain_position:
-            nextPosition,
-
-          address: newAddress,
-
-          postcode: newPostcode,
-
-          stage: "property_listed",
-
-          status:
-            "pending_connection",
-
-          is_current_user: true,
-          owner_user_id:
-          currentUserId,
-          last_updated_days: 0,
-
-        })
-        .select()
-        .single();
-
-    if (error) {
-
-      alert(error.message);
+      alert(
+        "Please log in to add your onward purchase."
+      );
 
       return;
     }
-    await supabase
-    .from("activities")
-    .insert({
-  
-      property_id:
-        propertyData.id,
-  
-      update:
-        "Onward purchase added",
-  
-    });
+
+    if (!saleOperationalPropertyId) {
+
+      alert(
+        "Only a participant at a Sale position can add an onward purchase."
+      );
+
+      return;
+    }
+
+    const saleProperty =
+      chainOperationalProperties.find(
+        (property) =>
+          property.id === saleOperationalPropertyId
+      );
+
+    if (
+      !canEditProperty(
+        saleProperty,
+        currentUserId,
+        chainOperationalProperties,
+        chainNodes as OperationalBuyerReadyNode[],
+        mutationContext
+      )
+    ) {
+      alert(
+        "You do not have permission to add an onward purchase for this chain position."
+      );
+
+      return;
+    }
+
+    const result =
+      await convertSearchingPlaceholder(
+        supabase,
+        {
+          chainId,
+          salePropertyId: saleOperationalPropertyId,
+          address: newAddress,
+          postcode: formatUkPostcodeForStorage(newPostcode),
+          updatedBy:
+            accountType === "estate_agent"
+              ? "estate_agent"
+              : "homeowner",
+        }
+      );
+
+    if (!result.ok) {
+
+      if (
+        result.reason ===
+        "duplicate_address"
+      ) {
+        alert(
+          "This property already exists within an active chain."
+        );
+      } else if (
+        result.reason === "not_found"
+      ) {
+        alert(
+          "We couldn't save your onward purchase right now. Please refresh the page and try again."
+        );
+      } else if (
+        result.reason === "not_authorized"
+      ) {
+        alert(
+          "You do not have permission to add an onward purchase for this chain position."
+        );
+      } else {
+        alert(
+          "Could not add your onward purchase. Please try again."
+        );
+        console.error(
+          "convertSearchingPlaceholder failed",
+          {
+            reason: result.reason,
+            diagnostics: result.error,
+          }
+        );
+      }
+
+      return;
+    }
+
     window.location.reload();
   }
 
+  if (authLoading || !participantDataReady) {
+    return (
+      <ParticipantDataLoadingState message="Loading chain…" />
+    );
+  }
+
   return (
-    <main className="min-h-screen bg-slate-100">
+    <main className={PAGE_BG_CLASS}>
 
       <Navbar />
+      <PageHeaderBand />
 
       <div className="max-w-6xl mx-auto px-6 py-12">
 
         <div>
 
-          <h1 className="text-5xl font-bold text-slate-900">
-            Chain #{chainId}
+          <h1 className={PAGE_TITLE_CLASS}>
+            {getDashboardChainTitle(
+              chainId,
+              chainProperties
+            )}
           </h1>
-          <div className="mt-8 bg-white rounded-3xl border border-slate-200 p-8">
 
-<div className="flex items-center gap-4">
+        {showCompletedBanner &&
+          currentChain?.completionScheduledDate &&
+          currentChain?.completionConfirmedAt && (
+            <ChainCompletedBanner
+              scheduledDate={
+                currentChain.completionScheduledDate
+              }
+              confirmedAt={
+                currentChain.completionConfirmedAt
+              }
+              layout="primary"
+            />
+          )}
+
+        {showCompletionScheduledBanner &&
+          currentChain?.completionScheduledDate && (
+            <CompletionScheduledBanner
+              scheduledDate={
+                currentChain.completionScheduledDate
+              }
+              layout="primary"
+              showChangeButton={
+                showAmendCompletionDate
+              }
+              showConfirmButton={
+                showConfirmCompletion
+              }
+              onChangeDate={
+                handleAmendCompletionDate
+              }
+              onConfirmCompletion={
+                handleConfirmCompletion
+              }
+            />
+          )}
+
+          {!isCompletedCompletionMode && (
+          <div className={`mt-8 ${CARD_CLASS_NO_PADDING} ${CARD_PADDING_CLASS}`}>
+
+<p className="text-sm font-medium text-slate-500">
+  {CHAIN_STATUS_LABEL}
+</p>
+
+<div className="mt-3 flex items-center gap-4">
 
   <div
     className={`
@@ -394,17 +730,23 @@ else {
     `}
   >
 
-    Chain Health: {chainHealth}
+    {chainHealth}
 
   </div>
 
 </div>
+
+<p className="mt-3 text-xs text-slate-500 max-w-2xl leading-relaxed">
+  {CHAIN_STATUS_EXPLAINER}
+</p>
 
 <p className="mt-4 text-slate-600">
   {chainHealthMessage}
 </p>
 
 </div>
+          )}
+
           <p className="text-slate-600 mt-3 text-lg">
             Live property chain progress tracking
           </p>
@@ -428,33 +770,40 @@ else {
 
         </div>
 
+        {showCompletionSchedulingForm && (
+          <RecordCompletionDateForm
+            onSubmit={handleRecordCompletionDate}
+          />
+        )}
+
+        {!isCompletedCompletionMode && (
+        <>
         {/* Progress */}
-        <div className="mt-10 bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
+        <div className={`mt-10 ${CARD_CLASS_NO_PADDING} ${CARD_PADDING_CLASS}`}>
 
-          <div className="flex items-center justify-between">
+          <MobilePanelHeader
+            aside={
+              <div className={STAT_VALUE_CLASS}>
+                {averageProgress}%
+              </div>
+            }
+          >
+            <h2 className={SECTION_TITLE_CLASS}>
+              Chain Progress
+            </h2>
 
-            <div>
+            <p className="text-slate-600 mt-2">
+              How far the visible chain has moved through its tracked stages
+            </p>
+            <p className="text-xs text-slate-500 mt-2 max-w-xl">
+              {CHAIN_PROGRESS_TOOLTIP}
+            </p>
+          </MobilePanelHeader>
 
-              <h2 className="text-3xl font-bold text-slate-900">
-                Chain Progress
-              </h2>
-
-              <p className="text-slate-600 mt-2">
-                Overall chain completion estimate
-              </p>
-
-            </div>
-
-            <div className="text-4xl font-bold text-slate-900">
-              {averageProgress}%
-            </div>
-
-          </div>
-
-          <div className="mt-8 w-full h-6 bg-slate-200 rounded-full overflow-hidden">
+          <div className={`mt-8 ${CHAIN_PROGRESS_TRACK_CLASS}`}>
 
             <div
-              className="h-full bg-green-500 rounded-full"
+              className={CHAIN_PROGRESS_FILL_CLASS}
               style={{
                 width: `${averageProgress}%`,
               }}
@@ -465,126 +814,160 @@ else {
         </div>
 
         {/* Confidence */}
-        <div className="mt-10 bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
+        <div className={`mt-10 ${CARD_CLASS_NO_PADDING} ${CARD_PADDING_CLASS}`}>
 
-          <div className="flex items-center justify-between">
+          <MobilePanelHeader
+            aside={
+              <div
+                className={`${confidenceBg} px-6 py-4 rounded-2xl`}
+              >
+                {confidenceUnavailable ? (
+                  <>
+                    <p className="text-lg sm:text-xl font-semibold text-text-muted">
+                      Unavailable
+                    </p>
+                    <p className="text-sm mt-2 text-text-muted max-w-xs">
+                      {confidenceUnavailableMessage}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className={`text-2xl sm:text-3xl font-bold ${confidenceColour}`}>
+                      {confidenceScore}%
+                    </p>
 
-            <div>
+                    <p className={`text-sm mt-1 ${confidenceColour}`}>
+                      {confidenceLabel}
+                    </p>
+                  </>
+                )}
 
-              <h2 className="text-3xl font-bold text-slate-900">
-                Chain Confidence
-              </h2>
+                <p className="text-xs text-slate-500 mt-4 max-w-xs">
+                  {isScheduledCompletionMode
+                    ? COMPLETION_SCHEDULED_CONFIDENCE_NOTE
+                    : CHAIN_CONFIDENCE_TOOLTIP}
+                </p>
 
-            </div>
-
-            <div
-              className={`
-                ${confidenceBg}
-                px-6 py-4 rounded-2xl
-              `}
-            >
-
-              <p className={`text-3xl font-bold ${confidenceColour}`}>
-                {confidenceScore}%
-              </p>
-
-              <p className={`text-sm mt-1 ${confidenceColour}`}>
-                {confidenceLabel}
-              </p>
-              <p className="text-xs text-slate-500 mt-4 max-w-xs">
-  Confidence is calculated using
-  chain progress, recent activity,
-  delayed updates and blocked
-  transactions.
-</p>
-            </div>
-
-          </div>
+                {!confidenceUnavailable &&
+                  dataCoverage !== "full" &&
+                  coverageLabel && (
+                    <p className="text-xs text-slate-500 mt-2 max-w-xs">
+                      {coverageLabel}
+                    </p>
+                  )}
+              </div>
+            }
+          >
+            <h2 className={SECTION_TITLE_CLASS}>
+              Chain Confidence
+            </h2>
+          </MobilePanelHeader>
 
         </div>
-{/* Estimated Chain Completion */}
-<div className="mt-10 bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
+{!isCompletionLifecycleFrozen && (
+<>
+{/* Active operational delay (neutral presentation) */}
+{(() => {
+  const chainActiveDelays = [
+    ...chainProperties
+      .filter(
+        (property) =>
+          property.hasActiveOperationalDelay &&
+          property.activeDelay
+      )
+      .map((property) => ({
+        key: `property-${property.id}`,
+        reason: property.activeDelay!.reason,
+      })),
+    ...(buyerReadyNode?.hasActiveOperationalDelay &&
+    buyerReadyNode.activeDelay
+      ? [
+          {
+            key: `node-${buyerReadyNode.id}`,
+            reason: buyerReadyNode.activeDelay.reason as string,
+          },
+        ]
+      : []),
+  ];
 
-  <div className="flex items-start justify-between gap-6">
+  if (chainActiveDelays.length === 0) {
+    return null;
+  }
 
-    <div>
-
+  return (
+    <div className={`mt-10 ${CARD_CLASS_NO_PADDING} ${CARD_PADDING_CLASS}`}>
       <p className="text-sm font-medium text-slate-500">
-        Estimated Chain Completion
+        Operational update
       </p>
-
-      <h2 className="mt-3 text-4xl font-bold text-slate-900">
-        {estimatedChainCompletion}
+      <h2 className={`mt-2 ${SECTION_TITLE_CLASS}`}>
+        Delay reported
       </h2>
-
-      <p className="mt-4 text-slate-600 max-w-2xl">
-        Estimated completion is based on overall chain progression, delays, stale activity and blocked transactions.
-      </p>
-
+      <div className="mt-4 space-y-2">
+        {chainActiveDelays.map((delay) => (
+          <p
+            key={delay.key}
+            className="text-slate-700"
+          >
+            {delay.reason}
+          </p>
+        ))}
+      </div>
     </div>
-
-    <div className="bg-blue-100 text-blue-700 px-5 py-3 rounded-2xl text-sm font-semibold">
-
-      Forecast Engine
-
-    </div>
-
-  </div>
-
+  );
+})()}
+{/* Estimated Chain Completion */}
+<div className={`mt-10 ${CARD_CLASS_NO_PADDING} ${CARD_PADDING_CLASS}`}>
+  <EstimatedCompletionWindowPanel
+    rawWindow={estimatedChainCompletion}
+  />
 </div>
 {/* Chain Bottleneck */}
 {bottleneckProperty && (
 
-<div className="mt-10 bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
+<div className={`mt-10 ${CARD_CLASS_NO_PADDING} ${CARD_PADDING_CLASS}`}>
 
-  <div className="flex items-start justify-between gap-6">
-
-    <div>
-
-      <p className="text-sm font-medium text-slate-500">
-        Chain Bottleneck
-      </p>
-
-      <h2 className="mt-3 text-3xl font-bold text-slate-900">
-        Property {bottleneckProperty.chainPosition}
-      </h2>
-
-      <p className="mt-4 text-slate-600">
-        This property currently appears to be slowing overall chain progression.
-      </p>
-
-      <div className="mt-6 space-y-2">
-
-        <p className="text-slate-900 font-medium">
-          {bottleneckProperty.address}
-        </p>
-
-        <p className="text-slate-500">
-          Last updated {bottleneckProperty.lastUpdatedDays} days ago
-        </p>
-
+  <MobilePanelHeader
+    aside={
+      <div className="bg-amber-100 text-amber-700 px-5 py-3 rounded-2xl text-sm font-semibold whitespace-nowrap">
+        Bottleneck Detected
       </div>
+    }
+  >
+    <p className="text-sm font-medium text-slate-500">
+      Chain Bottleneck
+    </p>
 
+    <h2 className={`mt-3 ${SECTION_TITLE_CLASS}`}>
+      Property {bottleneckProperty.chainPosition}
+    </h2>
+
+    <p className="mt-4 text-slate-600">
+      This property currently appears to be slowing overall chain progression.
+    </p>
+
+    <div className="mt-6 space-y-2">
+      <p className="text-slate-900 font-medium"></p>
+
+      <p className="text-slate-500">
+        Last updated {bottleneckProperty.lastUpdatedDays} days ago
+      </p>
     </div>
-
-    <div className="bg-amber-100 text-amber-700 px-5 py-3 rounded-2xl text-sm font-semibold">
-
-      Bottleneck Detected
-
-    </div>
-
-  </div>
+  </MobilePanelHeader>
 
 </div>
 
 )}
+</>
+)}
         {/* Warning */}
-        {staleProperties.length > 0 && (
+        {!isCompletionLifecycleFrozen &&
+        staleProperties.length > 0 && (
 
           <div className="mt-10 bg-amber-100 border border-amber-300 rounded-3xl p-6">
 
             <p className="text-amber-700 font-semibold">
-              Property {staleProperties[0].id} has not updated for{" "}
+              A property at position{" "}
+              {staleProperties[0].chainPosition} has not updated for{" "}
               {staleProperties[0].lastUpdatedDays} days.
             </p>
 
@@ -592,270 +975,607 @@ else {
 
         )}
 
+        </>
+        )}
+
         {/* Chain */}
-        <div className="mt-12 bg-white rounded-3xl shadow-sm border border-slate-200 p-8 overflow-x-auto">
+        <div
+          className={`mt-12 ${CARD_CLASS_NO_PADDING} ${CARD_PADDING_CLASS}`}
+        >
+          <MobileChainScrollRegion>
+            <div className={`${CHAIN_VIZ_CANVAS_CLASS} flex items-center min-w-max pr-4 md:pr-0`}>
+  {showOwnerOperationalBuyerReady &&
+    ownerOperationalBuyerReadyNode && (
 
-          <div className="flex items-center min-w-max">
+    <div className="flex items-center">
 
-            {chainProperties.map((property, index) => {
+      <Link
+        href={`/buyer-ready/${chainId}`}
+        className="hover:scale-105 transition"
+      >
 
-              const stage = STAGES.find(
-                (stage) =>
-                  stage.value === property.stage
-              );
+        <ChainNode
+          propertyNumber={0}
+          displayTitle={
+            CHAIN_TILE_LABEL.buyerReady
+          }
+          stageLabel={resolveOwnerBuyerReadyStageLabel(
+            ownerOperationalBuyerReadyNode,
+            ownerOperationalBuyerReadySummary
+          )}
+          progress={
+            ownerOperationalBuyerReadyNode.progress ??
+            ownerOperationalBuyerReadySummary?.progress ??
+            0
+          }
+          updatedDaysAgo={0}
+          currentUserRole="buyer"
+          status={
+            ownerOperationalBuyerReadyNode.status ??
+            ownerOperationalBuyerReadySummary?.status ??
+            "healthy"
+          }
+          buyer_connected={true}
+          seller_connected={true}
+          isOperationalPosition={true}
+          positionKind="buyer_ready"
+        />
 
-              if (!stage) {
-                return null;
-              }
+      </Link>
 
-              return (
+      <div className="flex items-center mx-5">
 
-                <div
-                  key={property.id}
-                  className="flex items-center"
-                >
+        <div
+          className={chainConnectorClasses(
+            "connected"
+          )}
+        />
 
-                  <Link
-                    href={`/property/${property.id}`}
-                    className="flex flex-col items-center text-center hover:scale-105 transition"
-                  >
-
-                    <div
-                      className={`
-                        relative
-                        flex
-                        items-center
-                        justify-center
-
-                        ${
-                          property.isCurrentUser
-                            ? "w-28 h-28 rounded-3xl border-4 text-6xl"
-                            : "w-24 h-24 rounded-2xl border-2 text-5xl"
-                        }
-
-                        ${
-                          property.status === "healthy"
-                            ? "bg-green-100 border-green-500"
-
-                            : property.status === "pending_connection"
-                            ? "bg-slate-100 border-slate-400"
-
-                            : property.status === "delayed"
-                            ? "bg-amber-100 border-amber-500"
-
-                            : "bg-red-100 border-red-500"
-                        }
-                      `}
-                    >
-
-{
-  property.status ===
-  "pending_connection"
-
-    ? "🔗"
-
-  : property.status ===
-    "broken_connection"
-
-    ? "⛓️"
-
-    : "🏠"
-}
-
-                    </div>
-
-                    <p className="mt-4 font-semibold text-slate-900">
-                      Property {property.chainPosition}
-                    </p>
-
-                    <p className="text-sm mt-1 text-slate-600">
-
-  {
-    property.status ===
-    "pending_connection"
-
-      ? "Awaiting seller connection"
-
-    : property.status ===
-      "broken_connection"
-
-      ? "Reconnect required"
-
-      : stage.label
-  }
-    </p>                      
-                  
-<div className="mt-3 w-32 h-2 bg-slate-200 rounded-full overflow-hidden">
-
-<div
-  className="h-full bg-green-500 rounded-full"
-  style={{
-    width: `${stage.progress}%`,
-  }}
-></div>
-
-</div>
-
-<p className="text-xs mt-1 text-slate-500">
-{stage.progress}% complete
-</p>
-                    
-
-                    <p className="text-xs mt-1 text-slate-500">
-                      {property.address}
-                    </p>
-
-                    <p className="text-xs text-slate-400">
-                      {property.postcode}
-                    </p>
-                    <p
-  className={`
-    text-xs mt-2 font-medium
-
-    ${
-      property.lastUpdatedDays > 14
-        ? "text-red-500"
-        : property.lastUpdatedDays > 7
-        ? "text-amber-500"
-        : "text-slate-400"
-    }
-  `}
->
-  Updated {property.lastUpdatedDays} day
-  {property.lastUpdatedDays !== 1 && "s"} ago
-</p>
-                  </Link>
-
-                  {index < chainProperties.length - 1 && (
-
-                    <div
-                      className={`
-                        w-24
-                        border-t-4
-                        border-dashed
-                        mx-4
-
-                        ${
-                          property.status === "healthy"
-                            ? "border-green-400"
-                        
-                            : property.status === "pending_connection"
-                            ? "border-slate-400"
-                        
-                            : property.status === "broken_connection"
-                            ? "border-red-500"
-                        
-                            : property.status === "delayed"
-                            ? "border-amber-400"
-                        
-                            : "border-red-400"
-                        }
-                      `}
-                    ></div>
-
-                  )}
-
-                </div>
-
-              );
-            })}
-{chainProperties.length === 1 && (
-
-<div className="flex items-center">
-
-  <div
-    className="
-      w-24
-      border-t-4
-      border-dashed
-      border-slate-300
-      mx-4
-    "
-  ></div>
-
-  <div className="flex flex-col items-center text-center">
-
-    <div
-      className="
-        w-24
-        h-24
-        rounded-2xl
-        border-2
-        border-slate-300
-        bg-slate-100
-        flex
-        items-center
-        justify-center
-        text-5xl
-      "
-    >
-
-      🔍
+      </div>
 
     </div>
 
-    <p className="mt-4 font-semibold text-slate-700">
-      Searching
-    </p>
+  )}
+  {topology.segments.map((segment, segmentIndex) => {
 
-    <p className="text-sm mt-1 text-slate-500">
-      Searching for forever home
-    </p>
+    const segmentGapState =
+      segment.gapBefore;
+
+    return (
+
+      <div
+        key={`segment-${segmentIndex}`}
+        className="flex items-center"
+      >
+
+        {segmentGapState === "broken" && (
+
+          <div
+            className="flex flex-col items-center mx-10 shrink-0"
+            aria-label="Chain break"
+          >
+
+            <div
+              className="
+                h-20
+                border-l-4
+                border-dashed
+                border-red-400
+              "
+            />
+
+            <p
+              className="
+                mt-2
+                text-xs
+                font-semibold
+                text-red-600
+                whitespace-nowrap
+              "
+            >
+              Chain break
+            </p>
+
+          </div>
+
+        )}
+
+        {segmentGapState ===
+          "awaiting_connection" && (
+
+          <div
+            className="flex flex-col items-center mx-10 shrink-0"
+            aria-label="Awaiting connection"
+          >
+
+            <div
+              className="
+                h-20
+                border-l-4
+                border-dashed
+                border-amber-400
+              "
+            />
+
+            <p
+              className="
+                mt-2
+                text-xs
+                font-semibold
+                text-amber-700
+                whitespace-nowrap
+              "
+            >
+              Awaiting connection
+            </p>
+
+          </div>
+
+        )}
+
+        {segmentGapState ===
+          "connected" && (
+
+          <div className="flex items-center mx-5">
+
+            <div
+              className={chainConnectorClasses("connected")}
+            />
+
+          </div>
+
+        )}
+
+        {segment.propertyNodes.map((property, propertyIndex) => {
+
+    const stage = STAGES.find(
+      (stage) =>
+        stage.value === property.stage
+    );
+
+    const searchingPlaceholder =
+      isSearchingPlaceholder(property);
+
+    const isOperationalPosition =
+      operationalPosition?.kind === "sale" &&
+      operationalPosition.propertyId ===
+        property.id;
+
+    const showUpstreamPurchaserBeforeSale =
+      shouldRenderUpstreamPurchaserBeforeProperty(
+        upstreamPurchaser,
+        property.id,
+        isOperationalPosition
+      );
+
+    const subjectProperty =
+      subjectChainProperties.find(
+        (row) => row.id === property.id
+      ) ?? property;
+
+    const displayTitle =
+      ownerBuyerReadyLinkedPropertyId !=
+        null &&
+      Number(property.id) ===
+        Number(ownerBuyerReadyLinkedPropertyId)
+        ? CHAIN_TILE_LABEL.connectedPurchase
+        : getChainTileDisplayTitle(
+            subjectProperty,
+            isOperationalPosition
+          );
+
+    let displayStage = "In Progress";
+
+    if (searchingPlaceholder) {
+
+      displayStage =
+        "Onward purchase not yet identified";
+
+    } else if (property.awaiting_buyer) {
+
+      displayStage = "Awaiting buyer";
+
+    } else if (
+      property.status === "pending_connection" &&
+      property.relationship_type ===
+        "purchase"
+    ) {
+
+      displayStage = "Awaiting seller connection";
+
+    } else if (stage?.label) {
+
+      displayStage = stage.label;
+
+    }
+    
+    return (
+
+      <div
+        key={property.id}
+        className="flex items-center"
+      >
+
+        {showUpstreamPurchaserBeforeSale &&
+          upstreamPurchaser?.kind ===
+            "awaiting_buyer" && (
+
+          <div
+            className="flex items-center"
+            aria-label="Awaiting buyer, no purchaser connected yet"
+          >
+
+            <ChainNode
+              propertyNumber={0}
+              displayTitle={
+                CHAIN_TILE_LABEL.awaitingBuyer
+              }
+              stageLabel="No purchaser connected yet"
+              progress={0}
+              updatedDaysAgo={0}
+              currentUserRole={null}
+              status="pending_connection"
+              buyer_connected={false}
+              seller_connected={false}
+              positionKind="awaiting_buyer"
+            />
+
+            <div className="flex items-center mx-5">
+
+              <div
+                className={chainAwaitingBuyerConnectorClasses()}
+              />
+
+            </div>
+
+          </div>
+
+        )}
+
+        {showUpstreamPurchaserBeforeSale &&
+          upstreamPurchaser?.kind ===
+            "buyer_ready" && (
+
+          <div
+            className="flex items-center"
+            aria-label={`Buyer ready, ${resolveOwnerBuyerReadyStageLabel(
+              chainNodes.find(
+                (node) =>
+                  node.id === upstreamPurchaser.summary.id
+              ) ?? null,
+              upstreamPurchaser.summary
+            )}`}
+          >
+
+            <Link
+              href={`/buyer-ready/${chainId}`}
+              className="hover:scale-105 transition"
+            >
+
+            <ChainNode
+              propertyNumber={0}
+              displayTitle={
+                CHAIN_TILE_LABEL.buyerReady
+              }
+              stageLabel={resolveOwnerBuyerReadyStageLabel(
+                chainNodes.find(
+                  (node) =>
+                    node.id === upstreamPurchaser.summary.id
+                ) ?? null,
+                upstreamPurchaser.summary
+              )}
+              progress={
+                upstreamPurchaser.summary.progress
+              }
+              updatedDaysAgo={0}
+              currentUserRole={null}
+              status={
+                upstreamPurchaser.summary.status
+              }
+              buyer_connected={true}
+              seller_connected={true}
+              positionKind="buyer_ready"
+            />
+
+            </Link>
+
+            <div className="flex items-center mx-5">
+
+              <div
+                className={chainConnectorClasses(
+                  "connected"
+                )}
+              />
+
+            </div>
+
+          </div>
+
+        )}
+
+        {searchingPlaceholder ? (
+
+          <ChainNode
+            propertyNumber={
+              property.chainPosition
+            }
+            displayTitle={displayTitle}
+            stageLabel={displayStage}
+            progress={stage?.progress || 0}
+            updatedDaysAgo={
+              property.lastUpdatedDays
+            }
+            currentUserRole={
+              property.currentUserRole
+            }
+            status={property.status}
+            buyer_connected={
+              property.buyer_connected
+            }
+            seller_connected={
+              property.seller_connected
+            }
+            isOperationalPosition={
+              isOperationalPosition
+            }
+            positionKind={
+              isOperationalPosition
+                ? "sale"
+                : undefined
+            }
+          />
+
+        ) : (
+
+        <Link
+          href={`/property/${property.id}`}
+          className="hover:scale-105 transition"
+        >
+
+          <ChainNode
+            propertyNumber={
+              property.chainPosition
+            }
+            displayTitle={displayTitle}
+            stageLabel={
+              property.status ===
+              "pending_connection"
+                ? "Awaiting seller connection"
+                : property.status ===
+                  "broken_connection"
+                ? "Reconnect required"
+                : displayStage
+            }
+            progress={stage?.progress || 0}
+            updatedDaysAgo={
+              property.lastUpdatedDays
+            }
+            currentUserRole={
+              property.currentUserRole
+            }
+            status={property.status}
+            buyer_connected={
+              property.buyer_connected
+            }
+            seller_connected={
+              property.seller_connected
+            }
+            isOperationalPosition={
+              isOperationalPosition
+            }
+            positionKind={
+              isOperationalPosition
+                ? "sale"
+                : undefined
+            }
+          />
+
+        </Link>
+
+        )}
+
+        {propertyIndex < segment.propertyNodes.length - 1 && (() => {
+          const nextProperty =
+            segment.propertyNodes[
+              propertyIndex + 1
+            ];
+          const linkGapState =
+            getLinkedPropertyGapState(
+              property,
+              nextProperty
+            );
+
+          return (
+          <div className="flex items-center mx-5">
+
+            <div
+              className={chainConnectorClasses(
+                linkGapState === "connected"
+                  ? "connected"
+                  : linkGapState === "broken"
+                  ? "broken"
+                  : "awaiting"
+              )}
+            />
+
+          </div>
+          );
+        })()}
+
+      </div>
+
+    );
+  })}
+
+      </div>
+
+    );
+  })}
+
+  {topology.syntheticTerminus && (
+  <div className="flex items-center">
+
+    <div className="flex items-center mx-5">
+
+      <div
+        className="
+          w-24
+          border-t-4
+          border-dashed
+          border-slate-300
+        "
+      ></div>
+
+    </div>
+
+    <ChainNode
+      propertyNumber={
+        topology.syntheticTerminus.propertyNumber
+      }
+      displayTitle={
+        topology.syntheticTerminus.terminus ===
+        "end_of_chain"
+          ? "End Of Chain"
+          : CHAIN_TILE_LABEL.nextHomeSearch
+      }
+      stageLabel={
+        topology.syntheticTerminus.terminus ===
+        "end_of_chain"
+          ? "No onward purchase"
+          : "Searching for forever home"
+      }
+      progress={
+        topology.syntheticTerminus.terminus ===
+        "end_of_chain"
+          ? 100
+          : 0
+      }
+      updatedDaysAgo={0}
+      currentUserRole={null}
+      status={
+        topology.syntheticTerminus.terminus ===
+        "end_of_chain"
+          ? "healthy"
+          : "pending_connection"
+      }
+      buyer_connected={false}
+      seller_connected={false}
+    />
+
+  </div>
+  )}
+
+            </div>
+          </MobileChainScrollRegion>
+        </div>
+{/* Recent Activity Feed */}
+
+<div className={`mt-10 bg-white border border-slate-200 rounded-3xl ${CARD_PADDING_CLASS}`}>
+
+  <h2 className={SECTION_TITLE_CLASS}>
+    Recent Chain Activity
+  </h2>
+
+  <div className="mt-6 space-y-4">
+    {recentActivities.length === 0 && (
+
+      <p className="text-slate-500">
+        Updates from chain participants will appear here as progress is made.
+      </p>
+
+    )}
+
+    {recentActivities.map((activity, index) => (
+
+      <div
+        key={`${activity.id}-${index}`}
+        className="border border-slate-200 rounded-2xl p-5"
+      >
+
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+
+          <div className="min-w-0">
+
+            <p className="font-semibold text-slate-900">
+              {activity.update}
+            </p>
+
+            <p className="text-xs text-slate-400 mt-2">
+            Updated by {activity.updated_by || "homeowner"}
+            </p>
+
+          </div>
+
+          <div className="text-xs text-slate-400 shrink-0">
+
+            {new Date(
+              activity.timestamp
+            ).toLocaleDateString()}
+
+          </div>
+
+        </div>
+
+      </div>
+
+    ))}
 
   </div>
 
 </div>
-
-)}
-          </div>
-
-          
-
-        </div>
-
-        {/* Add Property */}
-        <div className="mt-10 bg-white rounded-3xl border border-slate-200 p-8">
+        {canAddOnwardPurchase && (
+        <div className={`mt-10 ${CARD_CLASS_NO_PADDING} ${CARD_PADDING_CLASS}`}>
 
           <h2 className="text-2xl font-bold text-slate-900">
             Add Onward Purchase
           </h2>
 
           <p className="mt-2 text-slate-600">
-            Continue building your property chain
+            Only add your onward purchase once your offer has been accepted.
           </p>
 
-          <input
-            type="text"
-            value={newAddress}
-            onChange={(event) =>
-              setNewAddress(
-                event.target.value
-              )
-            }
-            placeholder="Property address"
-            className="mt-6 w-full border border-slate-300 rounded-2xl px-4 py-4"
-          />
-
-          <input
-            type="text"
-            value={newPostcode}
-            onChange={(event) =>
-              setNewPostcode(
-                event.target.value
-              )
-            }
-            placeholder="Postcode"
-            className="mt-4 w-full border border-slate-300 rounded-2xl px-4 py-4"
-          />
+          <div className="mt-6">
+            <PropertyAddressLookup
+              idPrefix="chain-onward"
+              address={newAddress}
+              postcode={newPostcode}
+              onAddressChange={setNewAddress}
+              onPostcodeChange={setNewPostcode}
+            />
+          </div>
 
           <button
             onClick={handleAddProperty}
-            className="mt-6 bg-slate-900 text-white px-6 py-4 rounded-2xl font-semibold"
+            className={`mt-6 ${BTN_PRIMARY_CLASS} px-6 py-4`}
           >
             Add Property
           </button>
 
         </div>
+        )}
+        {!isEstateAgentViewer && (
+          <div className="mt-8">
+            {saleOperationalPropertyId ? (
+              <PropertyEstateAgentAssignment
+                propertyId={
+                  saleOperationalPropertyId
+                }
+              />
+            ) : (
+              <div className={`${CARD_CLASS_NO_PADDING} ${CARD_PADDING_CLASS}`}>
+                <h2 className="text-2xl font-bold text-slate-900">
+                  Estate Agent
+                </h2>
+
+                <p className="text-slate-500 mt-2">
+                  Assign an estate agent from your sale
+                  property page when you have an editable
+                  sale position in this chain.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
 
       </div>
 
