@@ -1,6 +1,8 @@
 # EA billing customer communications
 
-**Status:** **IMPLEMENTED IN REPO** — Development/Staging apply of migration + Resend required before live sends. **Not** Production-approved.
+**Status:** **DEVELOPMENT BASELINE COMPLETE** — Development execute verifier **29/29 passed** (dispatch ledger migration treated as applied on Development). **Not** Production-approved. Live customer sends still depend on Resend / env configuration per environment.
+
+**Freeze reference:** [DEVELOPMENT_BASELINE_FREEZE.md](./DEVELOPMENT_BASELINE_FREEZE.md) (`62e81eb`).
 
 ## Scope (this phase)
 
@@ -13,7 +15,7 @@ Keynetic transactional emails (Resend):
 5. `ea-subscription-cancelled` — first `cancel_at_period_end` transition
 
 **Not** sent by Keynetic: routine monthly successful-payment emails.  
-**Stripe Dashboard (Production):** enable Customer receipt / invoice emails before live charging.
+**Stripe Dashboard (Production):** enable Customer receipt / invoice emails before live charging — **Required before public charging**.
 
 ## Architecture
 
@@ -29,8 +31,23 @@ Keynetic transactional emails (Resend):
 - Delivered via **Resend** (existing transactional processor).
 - Stripe may separately email receipts/invoices (Stripe-controlled).
 - Update Privacy Policy / DPA review before Production publication — do not invent legal conclusions here.
-- EA Terms still mention payment-failure email backlog in published draft — **update before publication**.
+- EA Terms draft still mentions payment-failure email backlog in places — **update before publication** (legal wording not changed by this documentation update).
 
 ## Migration
 
 `supabase/migrations/20260819210000_billing_customer_email_dispatches.sql`
+
+| Environment | Status |
+|-------------|--------|
+| Development | **Evidenced** — customer communications execute verifier **29/29** |
+| Production | **Not applied / not approved** — Production parity required |
+
+## Classification
+
+| Item | Classification |
+|------|----------------|
+| Templates + dispatch ledger on Development | Development baseline complete |
+| Production migration + Resend Production config | Production parity required / Required before public launch |
+| Stripe receipt/invoice Dashboard emails | Required before public charging |
+| EA Terms backlog wording vs implemented emails | Required before public launch (publication) |
+| Entitlement enforcement | Required before entitlement enforcement (separate; still OFF) |

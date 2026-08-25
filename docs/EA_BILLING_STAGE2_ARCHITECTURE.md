@@ -1,8 +1,14 @@
 # EA Billing Stage 2 — Stripe Sandbox Checkout, Webhooks & Portal
 
-**Status:** Implemented in repo (Sandbox). Entitlement enforcement remains **OFF**.  
-**Production:** untouched.  
-**Paid billing Production-ready:** **NO** until Sandbox E2E + webhook secret configured.
+**Status:** Implemented in repo (Sandbox). Entitlement enforcement remains **OFF**.
+
+**Customer billing communications:** Development baseline complete (**29/29** execute) — [EA_BILLING_CUSTOMER_COMMUNICATIONS.md](./EA_BILLING_CUSTOMER_COMMUNICATIONS.md).
+
+**Production:** untouched.
+
+**Paid billing Production-ready:** **NO** until Production parity + charging configuration.
+
+**Freeze:** [DEVELOPMENT_BASELINE_FREEZE.md](./DEVELOPMENT_BASELINE_FREEZE.md).
 
 ## Commercial
 

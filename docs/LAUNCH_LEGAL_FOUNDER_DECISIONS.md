@@ -100,7 +100,7 @@ Do **not** invent VAT treatment, liability caps, retention periods, or DPA concl
 | **Status** | **LOCKED** (policy) · email **BACKLOG** |
 | **Date/phase** | Phase 2A (2026-08) |
 | **Rationale** | Fairness and complaint reduction before entitlement enforcement. |
-| **Implementation consequence** | Account UI surfaces grace. **Keynetic payment-failure / grace emails are implemented in repo** (immediate + mid + final). Do not claim Production-enabled until Resend + dispatch migration are live in that environment. Stripe-hosted receipts remain separate (Dashboard config). EA Terms still mention backlog until publication update. |
+| **Implementation consequence** | Account UI surfaces grace. **Keynetic payment-failure / grace emails are Development-baseline complete** (immediate + mid + final; Dev execute **29/29**). Do not claim Production-enabled until Resend + dispatch objects are live in that environment. Stripe-hosted receipts remain separate (Dashboard config). EA Terms draft may still mention backlog until publication update. |
 
 ### D-B5 — Amounts due remain payable
 
@@ -193,7 +193,7 @@ Do **not** invent VAT treatment, liability caps, retention periods, or DPA concl
 
 | ID | Item | Notes |
 |----|------|-------|
-| BL-01 | Payment-failure / grace customer email (D-B4) | **IMPLEMENTED IN REPO** (2026-08) — Resend templates + atomic dispatch ledger; Production Stripe receipt Dashboard config + EA Terms backlog wording update still required before publication |
+| BL-01 | Payment-failure / grace customer email (D-B4) | **DEVELOPMENT BASELINE COMPLETE** (2026-08) — Dev execute **29/29**; Resend templates + atomic dispatch ledger. Production parity + Stripe receipt Dashboard config + EA Terms publication wording update still required before publication / charging |
 | BL-02 | In-app or documented “undo scheduled cancellation” (D-B2) | Portal may already allow depending on Stripe Dashboard; no dedicated Keynetic control |
 | BL-03 | Founding public milestone ~1-month sunset (D-C1) | Manual ops or scheduled content flag; not implemented |
 | BL-04 | Internal data-retention policy document (D-D1) | Prerequisite before finalising public retention periods |

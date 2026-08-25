@@ -134,7 +134,7 @@
 | Locked founding / cancel decisions D-F1–F5, D-B2–B3 | **LOCKED** — see LAUNCH_LEGAL_FOUNDER_DECISIONS.md |
 | VAT-inclusive vs exclusive (OPEN-VAT) | **OPEN** — do not invent |
 | Final Production list-price confirmation (OPEN-PRICE) | **OPEN** — £99/£129 remain current product constants |
-| Payment-failure / grace email (D-B4) | **IMPLEMENTED IN REPO** BL-01 — Terms backlog wording still needs publication update |
+| Payment-failure / grace email (D-B4) | **DEVELOPMENT BASELINE COMPLETE** BL-01 — Dev **29/29**; Terms publication wording + Production config still required |
 | Undo scheduled cancellation UX (D-B2) | **BACKLOG** BL-02 |
 | Founding milestone ~1-month public sunset (D-C1) | **BACKLOG** BL-03 |
 | Internal data-retention policy (D-D1) | **BACKLOG** BL-04 |

@@ -1,8 +1,14 @@
 # EA Billing Stage 1 — Branch Subscription Architecture
 
-**Status:** Stage 1 foundation implemented (schema + domain types).  
-**Stripe Checkout / Portal / webhooks / entitlement enforcement:** not started (Stage 2).  
+**Status:** Stage 1 foundation implemented (schema + domain types).
+
+**Stage 2:** Implemented in repo (Sandbox Checkout / Portal / webhooks) — see [EA_BILLING_STAGE2_ARCHITECTURE.md](./EA_BILLING_STAGE2_ARCHITECTURE.md). Customer billing emails: [EA_BILLING_CUSTOMER_COMMUNICATIONS.md](./EA_BILLING_CUSTOMER_COMMUNICATIONS.md) (Development **29/29**).
+
+**Entitlement enforcement:** still **OFF** (Stage 3).
+
 **Production:** not modified by Stage 1 apply process (Development-first).
+
+**Freeze:** [DEVELOPMENT_BASELINE_FREEZE.md](./DEVELOPMENT_BASELINE_FREEZE.md).
 
 ## Commercial model (founder-approved)
 
