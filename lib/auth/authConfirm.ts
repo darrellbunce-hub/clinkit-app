@@ -20,6 +20,7 @@ export const AUTH_CONFIRM_ALLOWED_DESTINATIONS = [
 const AUTH_CONFIRM_STRIPPED_PARAMS = [
   "token_hash",
   "type",
+  "code",
   "next",
   "error",
   "error_code",
