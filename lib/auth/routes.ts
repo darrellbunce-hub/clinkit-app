@@ -246,7 +246,9 @@ export function isAccountGatedRoute(
 }
 
 /**
- * Middleware matcher paths — keep in sync with middleware config export.
+ * Account-auth route prefixes historically matched by middleware.
+ * Middleware now uses a broad matcher for the optional launch gate; these
+ * remain the paths that still run account-type auth checks.
  */
 export const MIDDLEWARE_MATCHER = [
   "/account/:path*",
