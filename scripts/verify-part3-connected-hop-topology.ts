@@ -395,13 +395,15 @@ assert(
 );
 
 assertEqual(
-  "User A labels: Your Sale / Connected Purchase / Next Home Search",
+  "User A labels: Awaiting Buyer / Your Sale / Connected Purchase / Next Home Search",
   [
+    CHAIN_TILE_LABEL.awaitingBuyer,
     getChainTileDisplayTitle(userACuckoo2, true),
     getChainTileDisplayTitle(userACrofton, false),
     getChainTileDisplayTitle(userANextHome, false),
   ],
   [
+    CHAIN_TILE_LABEL.awaitingBuyer,
     CHAIN_TILE_LABEL.yourSale,
     CHAIN_TILE_LABEL.connectedPurchase,
     CHAIN_TILE_LABEL.nextHomeSearch,
@@ -409,13 +411,15 @@ assertEqual(
 );
 
 assertEqual(
-  "User B labels: Connected Buyer / Your Sale / Next Home Search",
+  "User B labels: Awaiting Buyer / Connected Buyer / Your Sale / Next Home Search",
   [
+    CHAIN_TILE_LABEL.awaitingBuyer,
     getChainTileDisplayTitle(userBUpstreamCuckooRedacted, false),
     getChainTileDisplayTitle(userBCroftonSale, true),
     getChainTileDisplayTitle(userBNextHome, false),
   ],
   [
+    CHAIN_TILE_LABEL.awaitingBuyer,
     CHAIN_TILE_LABEL.connectedBuyer,
     CHAIN_TILE_LABEL.yourSale,
     CHAIN_TILE_LABEL.nextHomeSearch,
@@ -436,12 +440,34 @@ assertEqual(
   resolveUpstreamPurchaserState({
     operationalSalePropertyId: 34,
     chainProperties: [
-      { id: 34, buyer_connected: false },
-      { id: 35, buyer_connected: true },
+      { id: 34, buyer_connected: false, relationship_type: "sale" },
+      { id: 35, buyer_connected: true, relationship_type: "purchase" },
     ],
     buyerReadyForAnchor: null,
   }),
   { kind: "awaiting_buyer", anchorPropertyId: 34 }
+);
+
+assertEqual(
+  "User B still gets Awaiting Buyer for upstream Cuckoo (not B's operational sale)",
+  resolveUpstreamPurchaserState({
+    operationalSalePropertyId: 34,
+    chainProperties: [
+      { id: 34, buyer_connected: false, relationship_type: "sale" },
+      { id: 35, buyer_connected: true, relationship_type: "purchase" },
+    ],
+    buyerReadyForAnchor: null,
+  }),
+  { kind: "awaiting_buyer", anchorPropertyId: 34 }
+);
+
+assert(
+  "Structural Awaiting Buyer renders before upstream sale even when not operational",
+  shouldRenderUpstreamPurchaserBeforeProperty(
+    { kind: "awaiting_buyer", anchorPropertyId: 34 },
+    34,
+    false
+  )
 );
 
 // Truncation regression: if upstream were dropped, roots would start at 35.

@@ -1,6 +1,8 @@
 import type { ChainNodesChainSummary } from "../lib/chainNodesSummary";
 import {
   findBuyerReadySummaryForAnchor,
+  resolvePurchaserStateForProperty,
+  resolvePurchaserStatesByPropertyId,
   resolveUpstreamPurchaserState,
   shouldRenderAwaitingBuyerBeforeProperty,
   shouldRenderUpstreamPurchaserBeforeProperty,
@@ -36,9 +38,9 @@ function assertEqual<T>(
 const operationalSaleId = 10;
 
 const sellAndBuyChain = [
-  { id: 10, buyer_connected: false },
-  { id: 11, buyer_connected: true },
-  { id: 12, buyer_connected: false },
+  { id: 10, buyer_connected: false, relationship_type: "sale" as const },
+  { id: 11, buyer_connected: true, relationship_type: "purchase" as const },
+  { id: 12, buyer_connected: false, relationship_type: "purchase" as const },
 ];
 
 const buyerReadySummaryForSale: ChainNodesChainSummary =
@@ -62,7 +64,7 @@ const buyerReadySummaryOtherAnchor: ChainNodesChainSummary =
   };
 
 assertEqual(
-  "Awaiting buyer when operational sale has no purchaser",
+  "Awaiting buyer when sale has no purchaser",
   resolveUpstreamPurchaserState({
     operationalSalePropertyId: operationalSaleId,
     chainProperties: sellAndBuyChain,
@@ -79,8 +81,8 @@ assertEqual(
   resolveUpstreamPurchaserState({
     operationalSalePropertyId: operationalSaleId,
     chainProperties: [
-      { id: 10, buyer_connected: true },
-      { id: 11, buyer_connected: true },
+      { id: 10, buyer_connected: true, relationship_type: "sale" },
+      { id: 11, buyer_connected: true, relationship_type: "purchase" },
     ],
     buyerReadyForAnchor: buyerReadySummaryForSale,
   }),
@@ -96,8 +98,8 @@ assertEqual(
   resolveUpstreamPurchaserState({
     operationalSalePropertyId: operationalSaleId,
     chainProperties: [
-      { id: 10, buyer_connected: true },
-      { id: 11, buyer_connected: true },
+      { id: 10, buyer_connected: true, relationship_type: "sale" },
+      { id: 11, buyer_connected: true, relationship_type: "purchase" },
     ],
     buyerReadyForAnchor: null,
   }),
@@ -105,7 +107,7 @@ assertEqual(
 );
 
 assertEqual(
-  "No upstream purchaser without operational sale id",
+  "No upstream purchaser without property id",
   resolveUpstreamPurchaserState({
     operationalSalePropertyId: null,
     chainProperties: sellAndBuyChain,
@@ -157,7 +159,7 @@ const buyerReadyState = {
 };
 
 assert(
-  "Render awaiting buyer immediately before operational sale tile",
+  "Render awaiting buyer immediately before anchored sale tile",
   shouldRenderUpstreamPurchaserBeforeProperty(
     awaitingState,
     10,
@@ -166,7 +168,7 @@ assert(
 );
 
 assert(
-  "Render buyer ready immediately before operational sale tile",
+  "Render buyer ready immediately before anchored sale tile",
   shouldRenderUpstreamPurchaserBeforeProperty(
     buyerReadyState,
     10,
@@ -175,7 +177,16 @@ assert(
 );
 
 assert(
-  "Do not render upstream purchaser before non-operational tiles",
+  "Structural state still renders when property is not the viewer operational sale",
+  shouldRenderUpstreamPurchaserBeforeProperty(
+    awaitingState,
+    10,
+    false
+  )
+);
+
+assert(
+  "Do not render purchaser synthetic before a different property",
   !shouldRenderUpstreamPurchaserBeforeProperty(
     buyerReadyState,
     11,
@@ -215,13 +226,83 @@ assert(
   resolveUpstreamPurchaserState({
     operationalSalePropertyId: operationalSaleId,
     chainProperties: [
-      { id: 10, buyer_connected: true },
+      { id: 10, buyer_connected: true, relationship_type: "sale" },
     ],
     buyerReadyForAnchor: findBuyerReadySummaryForAnchor(
       [buyerReadySummaryOtherAnchor],
       operationalSaleId
     ),
   }) === null
+);
+
+assertEqual(
+  "Per-property resolve matches map entry for unresolved sale",
+  resolvePurchaserStateForProperty({
+    propertyId: 10,
+    chainProperties: sellAndBuyChain,
+    buyerReadySummaries: [],
+  }),
+  { kind: "awaiting_buyer", anchorPropertyId: 10 }
+);
+
+assertEqual(
+  "Purchase hop does not get Awaiting Buyer structural state",
+  resolvePurchaserStateForProperty({
+    propertyId: 12,
+    chainProperties: sellAndBuyChain,
+    buyerReadySummaries: [],
+  }),
+  null
+);
+
+const multiHopChain = [
+  { id: 1, buyer_connected: false, relationship_type: "sale" as const },
+  { id: 2, buyer_connected: true, relationship_type: "purchase" as const },
+  { id: 3, buyer_connected: true, relationship_type: "sale" as const },
+  { id: 4, buyer_connected: true, relationship_type: "purchase" as const },
+  {
+    id: 5,
+    buyer_connected: false,
+    relationship_type: "purchase" as const,
+    stage: "searching",
+    address: null,
+  },
+];
+
+const states = resolvePurchaserStatesByPropertyId({
+  chainProperties: multiHopChain,
+  buyerReadySummaries: [],
+});
+
+assert(
+  "Full-chain map includes Awaiting Buyer for P1 only",
+  states.size === 1 &&
+    states.get(1)?.kind === "awaiting_buyer"
+);
+
+assert(
+  "Searching placeholder is not an Awaiting Buyer anchor",
+  !states.has(5)
+);
+
+const summaryAnchoredToP1: ChainNodesChainSummary = {
+  ...buyerReadySummaryForSale,
+  linked_property_id: 1,
+};
+
+const connectedWithReady = resolvePurchaserStatesByPropertyId({
+  chainProperties: [
+    { id: 1, buyer_connected: true, relationship_type: "sale" },
+    { id: 2, buyer_connected: true, relationship_type: "purchase" },
+    { id: 3, buyer_connected: true, relationship_type: "sale" },
+  ],
+  buyerReadySummaries: [summaryAnchoredToP1],
+});
+
+assert(
+  "Buyer Ready attaches to summary anchor property, not viewer ops sale",
+  connectedWithReady.size === 1 &&
+    connectedWithReady.get(1)?.kind === "buyer_ready"
 );
 
 console.log(

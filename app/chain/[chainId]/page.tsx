@@ -82,7 +82,7 @@ import {
 } from "@/lib/completionLifecycle";
 import {
   findBuyerReadySummaryForAnchor,
-  resolveUpstreamPurchaserState,
+  resolvePurchaserStatesByPropertyId,
   shouldRenderUpstreamPurchaserBeforeProperty,
 } from "@/lib/resolveUpstreamPurchaser";
 import type {
@@ -341,18 +341,18 @@ export default function ChainPage() {
     buyerReadySummaries[0] ??
     null;
 
-  const upstreamPurchaser =
-    resolveUpstreamPurchaserState({
-      operationalSalePropertyId:
-        saleOperationalPropertyId,
+  const purchaserStatesByPropertyId =
+    resolvePurchaserStatesByPropertyId({
       chainProperties: chainProperties.map(
         (property) => ({
           id: property.id,
-          buyer_connected:
-            property.buyer_connected,
+          buyer_connected: property.buyer_connected,
+          relationship_type: property.relationship_type,
+          stage: property.stage,
+          address: property.address,
         })
       ),
-      buyerReadyForAnchor,
+      buyerReadySummaries,
     });
 
   const intelligence =
@@ -1141,11 +1141,14 @@ export default function ChainPage() {
       operationalPosition.propertyId ===
         property.id;
 
+    const upstreamPurchaser =
+      purchaserStatesByPropertyId.get(property.id) ??
+      null;
+
     const showUpstreamPurchaserBeforeSale =
       shouldRenderUpstreamPurchaserBeforeProperty(
         upstreamPurchaser,
-        property.id,
-        isOperationalPosition
+        property.id
       );
 
     const subjectProperty =
