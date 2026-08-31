@@ -1,6 +1,7 @@
 import type { PostgrestError, SupabaseClient } from "@supabase/supabase-js";
 
 import {
+  isRenderableTopologyProperty,
   isSearchingPlaceholder,
   walkLinkedPropertySegment,
 } from "@/lib/buildChainTopology";
@@ -47,9 +48,7 @@ export function resolveConvertibleSearchingPlaceholder<
   }
 
   const renderableProperties = chainProperties.filter(
-    (property) =>
-      !!property.address ||
-      isSearchingPlaceholder(property)
+    isRenderableTopologyProperty
   );
 
   const saleInRenderable = renderableProperties.find(

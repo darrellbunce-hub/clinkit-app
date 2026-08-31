@@ -18,7 +18,6 @@ import { join } from "path";
 
 import {
   buildChainTopology,
-  isPrivacyRedactedPeerProperty,
   isRenderableTopologyProperty,
   isSearchingPlaceholder,
   type TopologyProperty,
@@ -273,35 +272,77 @@ assert(
 );
 
 // ---------------------------------------------------------------------------
-// Part 3 scenario — User B after join (privacy-redacted upstream Cuckoo)
+// Fresh scenario — 2 Cuckoo / 69 Crofton (chain 692 shape)
+// User A: sale Cuckoo + purchase Crofton
+// User B: seller counterparty on Crofton + Next Home Search
+// Both must see the same property-node topology; only labels/redaction differ.
 // ---------------------------------------------------------------------------
 
-const userBCuckooRedacted = baseProperty({
-  id: 31,
+const CUCKOO2 = "2 Cuckoo Lane, Fareham";
+const CROFTON = "69 Crofton Lane, Fareham";
+
+const userACuckoo2 = baseProperty({
+  id: 34,
   chainPosition: 1,
+  stage: "property_listed",
+  address: CUCKOO2,
+  relationship_type: "sale",
+  buyer_connected: false,
+  seller_connected: true,
+  linked_property_id: 35,
+  currentUserRole: "seller",
+});
+
+const userACrofton = baseProperty({
+  id: 35,
+  chainPosition: 2,
   stage: "offer_accepted",
+  address: CROFTON,
+  relationship_type: "purchase",
+  buyer_connected: true,
+  seller_connected: true,
+  linked_property_id: 36,
+  currentUserRole: "buyer",
+});
+
+const userANextHome = baseProperty({
+  id: 36,
+  chainPosition: 3,
+  stage: "searching",
+  address: null,
+  relationship_type: "purchase",
+  buyer_connected: false,
+  seller_connected: true,
+  linked_property_id: null,
+  is_searching: true,
+});
+
+const userBUpstreamCuckooRedacted = baseProperty({
+  id: 34,
+  chainPosition: 1,
+  stage: "property_listed",
   address: null,
   relationship_type: "sale",
   buyer_connected: false,
   seller_connected: true,
-  linked_property_id: 32,
+  linked_property_id: 35,
   currentUserRole: null,
 });
 
-const userBDowning = baseProperty({
-  id: 32,
+const userBCroftonSale = baseProperty({
+  id: 35,
   chainPosition: 2,
   stage: "offer_accepted",
-  address: DOWNING_ADDRESS,
+  address: CROFTON,
   relationship_type: "purchase",
   buyer_connected: true,
   seller_connected: true,
-  linked_property_id: 33,
+  linked_property_id: 36,
   currentUserRole: "seller",
 });
 
-const userBSearching = baseProperty({
-  id: 33,
+const userBNextHome = baseProperty({
+  id: 36,
   chainPosition: 3,
   stage: "searching",
   address: null,
@@ -313,89 +354,111 @@ const userBSearching = baseProperty({
   currentUserRole: "buyer",
 });
 
-assert(
-  "redacted Cuckoo is classified as privacy-redacted peer",
-  isPrivacyRedactedPeerProperty(userBCuckooRedacted)
+const topologyA = buildChainTopology(
+  [userACuckoo2, userACrofton, userANextHome],
+  null
 );
-
-assert(
-  "redacted Cuckoo is renderable in topology",
-  isRenderableTopologyProperty(userBCuckooRedacted)
-);
-
-assert(
-  "searching placeholder is not classified as privacy-redacted peer",
-  !isPrivacyRedactedPeerProperty(userBSearching) &&
-    isSearchingPlaceholder(userBSearching)
-);
-
-const userBTopology = buildChainTopology(
-  [userBCuckooRedacted, userBDowning, userBSearching],
+const topologyB = buildChainTopology(
+  [userBUpstreamCuckooRedacted, userBCroftonSale, userBNextHome],
   null
 );
 
 assertEqual(
-  "User B topology contains upstream Cuckoo + Downing + Next Home Search",
-  userBTopology.flatPropertyNodes.map((p) => p.id),
-  [31, 32, 33]
+  "User A topology: Cuckoo → Crofton → Next Home Search",
+  topologyA.flatPropertyNodes.map((p) => p.id),
+  [34, 35, 36]
 );
 
-const cuckooInBView = userBTopology.flatPropertyNodes.find(
-  (p) => p.id === 31
+assertEqual(
+  "User B topology: same property nodes as User A (privacy-redacted upstream)",
+  topologyB.flatPropertyNodes.map((p) => p.id),
+  [34, 35, 36]
+);
+
+assertEqual(
+  "Viewer-asymmetric address redaction must not change topology node set",
+  topologyA.flatPropertyNodes.map((p) => p.id),
+  topologyB.flatPropertyNodes.map((p) => p.id)
 );
 
 assert(
-  "User B topology retains Cuckoo without exposing address",
-  cuckooInBView != null && cuckooInBView.address === null
+  "User B upstream Cuckoo remains address-null in topology",
+  topologyB.flatPropertyNodes.find((p) => p.id === 34)?.address ===
+    null
 );
 
 assert(
-  "User B still sees Next Home Search node",
-  userBTopology.flatPropertyNodes.some(
-    (p) => p.id === 33 && isSearchingPlaceholder(p)
+  "User B still has Next Home Search node",
+  topologyB.flatPropertyNodes.some(
+    (p) => p.id === 36 && isSearchingPlaceholder(p)
   )
 );
 
-const cuckooTileTitle = getChainTileDisplayTitle(
-  {
-    relationship_type: "sale",
-    stage: "offer_accepted",
-    address: null,
-    currentUserRole: null,
-    isOwnProperty: false,
-    chainPosition: 1,
-  },
-  false
+assertEqual(
+  "User A labels: Your Sale / Connected Purchase / Next Home Search",
+  [
+    getChainTileDisplayTitle(userACuckoo2, true),
+    getChainTileDisplayTitle(userACrofton, false),
+    getChainTileDisplayTitle(userANextHome, false),
+  ],
+  [
+    CHAIN_TILE_LABEL.yourSale,
+    CHAIN_TILE_LABEL.connectedPurchase,
+    CHAIN_TILE_LABEL.nextHomeSearch,
+  ]
+);
+
+assertEqual(
+  "User B labels: Connected Buyer / Your Sale / Next Home Search",
+  [
+    getChainTileDisplayTitle(userBUpstreamCuckooRedacted, false),
+    getChainTileDisplayTitle(userBCroftonSale, true),
+    getChainTileDisplayTitle(userBNextHome, false),
+  ],
+  [
+    CHAIN_TILE_LABEL.connectedBuyer,
+    CHAIN_TILE_LABEL.yourSale,
+    CHAIN_TILE_LABEL.nextHomeSearch,
+  ]
 );
 
 assert(
-  "redacted Cuckoo tile title does not leak real address",
-  !cuckooTileTitle.includes("Cuckoo") &&
-    !cuckooTileTitle.includes(CUCKOO_ADDRESS)
+  "User B rendered labels must not contain 2 Cuckoo Lane",
+  ![
+    getChainTileDisplayTitle(userBUpstreamCuckooRedacted, false),
+    getChainTileDisplayTitle(userBCroftonSale, true),
+    getChainTileDisplayTitle(userBNextHome, false),
+  ].some((label) => label.includes("Cuckoo") || label.includes(CUCKOO2))
+);
+
+assertEqual(
+  "User A still gets Awaiting Buyer for unresolved Cuckoo purchaser",
+  resolveUpstreamPurchaserState({
+    operationalSalePropertyId: 34,
+    chainProperties: [
+      { id: 34, buyer_connected: false },
+      { id: 35, buyer_connected: true },
+    ],
+    buyerReadyForAnchor: null,
+  }),
+  { kind: "awaiting_buyer", anchorPropertyId: 34 }
+);
+
+// Truncation regression: if upstream were dropped, roots would start at 35.
+const truncatedAsIfUpstreamDropped = buildChainTopology(
+  [userBCroftonSale, userBNextHome],
+  null
+);
+assertEqual(
+  "Without upstream peer, walk wrongly starts at Crofton (documents truncation)",
+  truncatedAsIfUpstreamDropped.flatPropertyNodes.map((p) => p.id),
+  [35, 36]
 );
 
 assert(
-  "searching tile remains Next Home Search label",
-  getChainTileDisplayTitle(
-    {
-      relationship_type: "purchase",
-      stage: "searching",
-      address: null,
-      currentUserRole: "buyer",
-      isOwnProperty: true,
-      chainPosition: 3,
-    },
-    false
-  ) === CHAIN_TILE_LABEL.nextHomeSearch
-);
-
-// Pre-fix regression: without privacy-redacted peer support, Cuckoo would drop.
-assert(
-  "legacy address-only rule would have dropped redacted Cuckoo",
-  !(
-    !!userBCuckooRedacted.address ||
-    isSearchingPlaceholder(userBCuckooRedacted)
-  )
+  "address-null sale/purchase peers remain renderable regardless of address",
+  isRenderableTopologyProperty(userBUpstreamCuckooRedacted) &&
+    isRenderableTopologyProperty(userBNextHome)
 );
 
 if (process.exitCode && process.exitCode !== 0) {

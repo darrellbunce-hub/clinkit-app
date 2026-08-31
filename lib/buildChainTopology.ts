@@ -232,17 +232,17 @@ export function isPrivacyRedactedPeerProperty<
 }
 
 /**
- * Addressed properties, searching placeholders, and privacy-redacted peers
- * participate in linked_property_id walks.
+ * Every property loaded for the chain participates in linked_property_id walks.
+ *
+ * Privacy may null address/postcode for non-owned peers; that must not remove
+ * the node from topology or change walk roots for other participants.
+ * Labelling stays privacy-safe via getHomeownerPropertyLabel / chain tiles.
  */
 export function isRenderableTopologyProperty<
   T extends TopologyProperty
 >(property: T): boolean {
-  return (
-    !!property.address ||
-    isSearchingPlaceholder(property) ||
-    isPrivacyRedactedPeerProperty(property)
-  );
+  void property;
+  return true;
 }
 
 function getRenderableProperties<
