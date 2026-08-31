@@ -238,10 +238,7 @@ export function isPrivacyRedactedPeerProperty<
  * the node from topology or change walk roots for other participants.
  * Labelling stays privacy-safe via getHomeownerPropertyLabel / chain tiles.
  */
-export function isRenderableTopologyProperty<
-  T extends TopologyProperty
->(property: T): boolean {
-  void property;
+export function isRenderableTopologyProperty<T>(_property: T): boolean {
   return true;
 }
 
