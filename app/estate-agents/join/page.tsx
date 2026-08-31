@@ -15,7 +15,9 @@ import {
   type EaBranchInvitationPreview,
 } from "@/lib/estateAgent/branchTeam";
 import { formatEaBranchMemberRoleLabel } from "@/lib/estateAgent/branchTeamPresentation";
+import { bootstrapAuthenticatedEstateAgentProfile } from "@/lib/estateAgent/flushPendingEstateAgentProfile";
 import { fetchAuthenticatedProfileAccountFields } from "@/lib/currentUserContext";
+import { flushPendingSignupLegalAcceptance } from "@/lib/legal/recordSignupLegalAcceptance";
 import { supabase } from "@/lib/supabase";
 
 function JoinBranchContent() {
@@ -72,6 +74,15 @@ function JoinBranchContent() {
 
       if (user) {
         setCurrentUserId(user.id);
+
+        const profileBootstrap =
+          await bootstrapAuthenticatedEstateAgentProfile(
+            supabase
+          );
+
+        if (profileBootstrap.ok) {
+          await flushPendingSignupLegalAcceptance(supabase);
+        }
 
         const profile =
           await fetchAuthenticatedProfileAccountFields(

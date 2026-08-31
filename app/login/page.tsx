@@ -24,15 +24,19 @@ import {
 } from "@/components/auth/authStyles";
 import CollectionPointNotice from "@/components/legal/CollectionPointNotice";
 import LegalAcceptanceFields from "@/components/legal/LegalAcceptanceFields";
-import { getAccountType } from "@/lib/accountType";
+import { getAccountType, isEstateAgent } from "@/lib/accountType";
 import {
   mapAuthSignInError,
   mapAuthSignUpError,
 } from "@/lib/auth/authErrors";
 import { validatePasswordForSignUp } from "@/lib/auth/passwordPolicy";
-import { resolveLoginNextDestination } from "@/lib/auth/redirects";
+import {
+  resolveLoginNextDestination,
+  resolvePostLoginRedirect,
+} from "@/lib/auth/redirects";
 import { ROUTES } from "@/lib/auth/routes";
 import { fetchAuthenticatedProfileAccountFields } from "@/lib/currentUserContext";
+import { bootstrapAuthenticatedEstateAgentProfile } from "@/lib/estateAgent/flushPendingEstateAgentProfile";
 import {
   LEGAL_DOCUMENT_VERSIONS,
   SIGNUP_LEGAL_ACCEPTANCE_ERROR,
@@ -110,9 +114,10 @@ export default function LoginPage() {
         return;
       }
 
-      const profileEnsure = await ensureUserProfile(supabase);
+      const profileBootstrap =
+        await bootstrapAuthenticatedEstateAgentProfile(supabase);
 
-      if (!profileEnsure.ok) {
+      if (!profileBootstrap.ok) {
         setErrorMessage(
           "Your account is signed in but we could not finish profile setup. Try again or contact support."
         );
@@ -145,11 +150,20 @@ export default function LoginPage() {
               userId
             );
 
-          destination =
-            await resolveHomeownerPostAuthDestination(
-              supabase,
-              getAccountType(profile)
+          if (isEstateAgent(profile)) {
+            destination = resolvePostLoginRedirect(
+              profile ?? {
+                account_type: "estate_agent",
+                onboarding_completed_at: null,
+              }
             );
+          } else {
+            destination =
+              await resolveHomeownerPostAuthDestination(
+                supabase,
+                getAccountType(profile)
+              );
+          }
         }
       }
 
