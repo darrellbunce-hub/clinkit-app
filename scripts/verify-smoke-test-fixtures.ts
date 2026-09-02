@@ -96,8 +96,35 @@ assert(
 
 assert(
   "Cleanup does not delete linked properties/chains",
-  cleanup.includes("Linked object — not deleted") &&
-    cleanup.includes('objectType === "property"')
+  cleanup.includes("Linked object — not deleted by fixture cleanup") &&
+    cleanup.includes("ownership !== \"owned\"") &&
+    cleanup.includes("revoke_assignment")
+);
+
+assert(
+  "Cleanup avoids explicit owned member delete when owned branch cascades",
+  cleanup.includes('action: "expect_cascade"') &&
+    cleanup.includes("preserves owner invariant") &&
+    /"ea_branch",\s*"ea_branch_member"/.test(cleanup)
+);
+
+assert(
+  "Cleanup treats Auth user-not-found as idempotent success",
+  cleanup.includes("isAuthUserNotFoundError") &&
+    cleanup.includes("already_absent")
+);
+
+assert(
+  "Cleanup returns structured results on partial failure",
+  cleanup.includes("cleanup_execution_result") &&
+    cleanup.includes("consistency_errors") &&
+    cleanup.includes("cleanup_partial_failure")
+);
+
+assert(
+  "Cleanup verifies owned objects absent before fixture_cleaned",
+  cleanup.includes("verifyOwnedObjectsAbsent") &&
+    cleanup.includes("owned_still_present")
 );
 
 assert(

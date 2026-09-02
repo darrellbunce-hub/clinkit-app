@@ -66,6 +66,19 @@ export type SmokeTestCleanupAction =
       reason: string;
     }
   | {
+      /**
+       * Owned member whose owned parent branch is also in the plan.
+       * Do not delete explicitly (would trip the one-owner invariant);
+       * expect CASCADE from the branch delete instead.
+       */
+      action: "expect_cascade";
+      object_type: "ea_branch_member";
+      object_id: string;
+      parent_object_type: "ea_branch";
+      parent_object_id: string;
+      reason: string;
+    }
+  | {
       action: "skip";
       object_type: SmokeTestObjectType;
       object_id: string;
@@ -78,3 +91,48 @@ export type SmokeTestCleanupPlan = {
   actions: SmokeTestCleanupAction[];
   refusals: string[];
 };
+
+/** Per-action cleanup outcome for API + audit. */
+export type SmokeTestCleanupOutcome =
+  | "deleted"
+  | "already_absent"
+  | "cascaded"
+  | "skipped"
+  | "revoked"
+  | "already_revoked"
+  | "refused"
+  | "failed";
+
+export type SmokeTestCleanupActionResult = {
+  action: SmokeTestCleanupAction["action"];
+  object_type: SmokeTestObjectType;
+  object_id: string;
+  outcome: SmokeTestCleanupOutcome;
+  error?: string;
+  detail?: string;
+  parent_object_type?: SmokeTestObjectType;
+  parent_object_id?: string;
+};
+
+export type SmokeTestCleanupSuccess = {
+  ok: true;
+  plan: SmokeTestCleanupPlan;
+  results: SmokeTestCleanupActionResult[];
+  /** Actions that did not fail (compat). */
+  executed: SmokeTestCleanupAction[];
+  errors: string[];
+};
+
+export type SmokeTestCleanupFailure = {
+  ok: false;
+  error: string;
+  plan?: SmokeTestCleanupPlan;
+  results?: SmokeTestCleanupActionResult[];
+  executed?: SmokeTestCleanupAction[];
+  errors?: string[];
+  consistency_errors?: string[];
+};
+
+export type SmokeTestCleanupResult =
+  | SmokeTestCleanupSuccess
+  | SmokeTestCleanupFailure;
