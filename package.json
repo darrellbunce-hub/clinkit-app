@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "verify:ea-prop-authz": "npx tsx scripts/verify-create-ea-operational-property-authz-development.ts"
   },
   "dependencies": {
     "@react-email/components": "^1.0.12",
