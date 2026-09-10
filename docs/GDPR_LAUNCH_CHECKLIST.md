@@ -81,7 +81,7 @@
 | Data class | Policy needed | Current behaviour |
 |------------|---------------|-------------------|
 | Operational transaction | Lifecycle automation (90/150/30 day defaults) | **Implemented** |
-| `email_events` | Defined retention + erasure | **Indefinite — gap** |
+| `email_events` | Defined retention + erasure | **Implemented working policy** — 90d redact / 24mo delete redacted (`retain_email_events_batch`); RTBF redacts immediately |
 | Analytics snapshots | Permanent anonymised | **By design** |
 | Auth accounts | Until deletion request | Indefinite |
 | Backups | 7-day Supabase Pro (verify) | See [Backup Runbook](./GDPR_BACKUP_ERASURE_RUNBOOK.md) |
@@ -205,7 +205,7 @@
 2. [ ] Privacy contact channel
 3. [ ] Erasure request process (manual minimum)
 4. [ ] DPAs: Supabase + Resend (+ Vercel, Upstash if used)
-5. [ ] `email_events` retention policy decided
+5. [x] `email_events` retention policy decided (working product policy) + automated job implemented (not yet Production-applied)
 6. [ ] De-link / lifecycle / erasure distinction in user-facing docs
 7. [ ] Remove PII console logging (`start-move`)
 

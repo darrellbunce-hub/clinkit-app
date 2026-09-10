@@ -70,7 +70,7 @@ auth.users (id, email, metadata)
 | Question | Answer |
 |----------|--------|
 | Can Keynetic discover **all** records for one authenticated user? | **Mostly yes** via `user_id` FK graph + email match for invite/comm rows |
-| Can erasure miss data? | **Yes** — JSONB metadata, `activities.update`, Redis cache, Resend, backups, logs |
+| Can erasure miss data? | **Partially mitigated** — JSONB metadata, historical activities, Redis cache, Resend, backups, logs still need ops care; `activities.update` now DB-enforced structured |
 | Orphan if `auth.users` deleted first? | **Yes** — `email_events.sent_by` nulls; email-based correlation harder; impact report lost |
 
 ### Recommended order of operations

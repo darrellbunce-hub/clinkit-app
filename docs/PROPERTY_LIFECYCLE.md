@@ -203,6 +203,8 @@ All periods are configurable — **never hardcode** in cleanup jobs.
 - Idempotent analytics snapshots (`source_property_id`, `snapshot_kind` unique)
 - Migration: `supabase/migrations/20260714190000_property_lifecycle_automation.sql`
 
+**Related (separate system):** data retention for email/billing/invitation metadata uses `/api/cron/data-retention` (`30 3 * * *`) — see [GDPR Data Retention Schedule](./GDPR_DATA_RETENTION_SCHEDULE.md). Do not merge into the property lifecycle state machine.
+
 **Environment variables:**
 
 | Variable | Default | Purpose |

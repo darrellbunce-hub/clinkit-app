@@ -174,11 +174,11 @@
 
 | Field | Category | Access | Retention | Lifecycle anonymisation | Proposed erasure |
 |-------|----------|--------|-----------|-------------------------|------------------|
-| `update` | **High PII risk** (text) | RLS participants | Documented: scrub-or-delete post-archive; **not automated** | No | Delete user-attributable rows OR replace with generic system text |
+| `update` | Structured/system text (not free-form messaging) | RLS participants | Retained historically; scrub-on-anonymise still optional hardening | No | Prefer retain generic system labels; RTBF may still require manual review of edge cases |
 | `updated_by` | Indirect (role label) | Participants | Retained | No | Retain generic role only |
 | `property_id`, `timestamp` | Operational | Participants | Retained | No | Retain on shared property |
 
-**App behaviour:** `ChainContext.tsx` inserts system-formatted stage labels (e.g. "Contracts Exchanged"), not user prose. **Risk:** future features or bugs could insert free text.
+**App behaviour:** `ChainContext.tsx` and RPCs insert system-formatted stage labels / fixed templates / allowlisted delay reasons — not user prose. **DB enforcement:** `is_allowed_structured_activity_update` + trigger (migration `20260910210000`) rejects arbitrary free text.
 
 ---
 
@@ -337,7 +337,7 @@ Erasure must update underlying tables; views inherit corrected data.
 | `auth.users` deleted before DB scan | Cannot resolve email for `email_events` matching | **Impact report before Auth delete** |
 | Email-only invitees without accounts | PII in `invite_email` without `user_id` | Erasure by verified email match across tables |
 | JSONB metadata unconstrained | Hidden PII | Schema allow-list + erasure scrub pass |
-| `activities.update` free-text policy not enforced in DB | Hidden PII | CHECK constraint or app-only structured inserts |
+| `activities.update` free-text policy | Mitigated | Trigger + `is_allowed_structured_activity_update` (`20260910210000`) |
 | Multiple users on one property | Over-erasure | Shared-data assessment step in workflow |
 | Backups | PII reappears on restore | Suppression ledger — see backup runbook |
 

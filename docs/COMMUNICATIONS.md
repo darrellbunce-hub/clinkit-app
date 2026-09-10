@@ -120,4 +120,18 @@ Uses mocked sends by default — does not consume Resend quota during automated 
 
 ## GDPR / retention
 
-`email_events.recipient_email` is personal data. Lifecycle anonymisation does **not** redact email audit rows. Formal Right to Erasure treatment is defined in [GDPR Data Inventory](./GDPR_DATA_INVENTORY.md) and [GDPR Right to Erasure Architecture](./GDPR_RIGHT_TO_ERASURE_ARCHITECTURE.md). Proposed retention periods: [GDPR Data Retention Schedule](./GDPR_DATA_RETENTION_SCHEDULE.md). No automated purge exists today.
+`email_events.recipient_email` is personal data. Keynetic does **not** store email HTML/subject bodies in the application database (Resend holds content).
+
+**Working automated retention** (migration `20260910210000`, cron `/api/cron/data-retention`):
+
+- `email_events`: redact identifiable fields after 90 days; delete already-redacted rows after 24 months
+- `billing_customer_email_dispatches`: redact `recipient_email` after 24 months; keep ledger rows
+- Invitation invite emails: redact 30 days after expiry when no active invitation remains
+
+Property lifecycle anonymisation does **not** redact email audit rows. Formal Right to Erasure remains a separate workflow (see GDPR docs). Resend provider deletion is **manual / not Keynetic-automated**.
+
+Details: [GDPR Data Retention Schedule](./GDPR_DATA_RETENTION_SCHEDULE.md).
+
+### Structured activities (no free-text messaging)
+
+`activities.update` is restricted to structured/system-generated values via `is_allowed_structured_activity_update` + insert/update trigger. Product UI has no user-to-user free-text messaging.

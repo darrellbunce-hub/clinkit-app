@@ -286,7 +286,7 @@ async function main() {
 
   await ho2.from("activities").insert({
     property_id: activePropertyId,
-    update: "Meaningful homeowner update",
+    update: "Offer Accepted",
     updated_by: "homeowner",
   });
 

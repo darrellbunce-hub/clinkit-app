@@ -44,6 +44,16 @@
     { "schema": "public", "name": "_trg_touch_operational_activity_from_activity", "args": "" },
     { "schema": "public", "name": "_trg_touch_operational_activity_from_claim", "args": "" },
     { "schema": "public", "name": "_trg_touch_operational_activity_from_counterparty", "args": "" },
-    { "schema": "public", "name": "_trg_touch_operational_activity_from_property", "args": "" }
+    { "schema": "public", "name": "_trg_touch_operational_activity_from_property", "args": "" },
+    { "schema": "public", "name": "_gdpr_redact_billing_customer_email_dispatches", "args": "text" },
+    { "schema": "public", "name": "begin_maintenance_job_run", "args": "text, jsonb" },
+    { "schema": "public", "name": "complete_maintenance_job_run", "args": "uuid, text, integer, integer, integer, integer, jsonb, text" },
+    { "schema": "public", "name": "retain_email_events_batch", "args": "integer" },
+    { "schema": "public", "name": "preview_retain_email_events_batch", "args": "integer" },
+    { "schema": "public", "name": "retain_billing_email_dispatches_batch", "args": "integer" },
+    { "schema": "public", "name": "preview_retain_billing_email_dispatches_batch", "args": "integer" },
+    { "schema": "public", "name": "retain_invitation_pii_batch", "args": "integer" },
+    { "schema": "public", "name": "preview_retain_invitation_pii_batch", "args": "integer" },
+    { "schema": "public", "name": "trg_enforce_structured_activity_update", "args": "" }
   ]
 }
