@@ -1,14 +1,8 @@
-import type { Metadata } from "next";
+import { permanentRedirect } from "next/navigation";
 
-import { LegalDocumentPage } from "@/components/legal/LegalDocumentPage";
-import { dataRetentionContent } from "@/lib/legal/content/dataRetention";
+import { LEGACY_LEGAL_REDIRECTS } from "@/lib/legal/constants";
 
-export const metadata: Metadata = {
-  title: "Data Retention | Keynetic",
-  description:
-    "How long Keynetic retains different categories of information.",
-};
-
-export default function DataRetentionPage() {
-  return <LegalDocumentPage content={dataRetentionContent} />;
+/** Legacy route — permanently redirects to Data Protection & Platform Terms. */
+export default function DataRetentionLegacyPage() {
+  permanentRedirect(LEGACY_LEGAL_REDIRECTS.dataRetention.to);
 }

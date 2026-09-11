@@ -1,14 +1,16 @@
 import type { Metadata } from "next";
 
 import { LegalDocumentPage } from "@/components/legal/LegalDocumentPage";
-import { privacyPolicyContent } from "@/lib/legal/content/privacyPolicy";
+import { loadLegalMarkdown } from "@/lib/legal/legalSource";
 
 export const metadata: Metadata = {
   title: "Privacy Policy | Keynetic",
   description:
-    "How Keynetic collects, uses and protects personal information.",
+    "How Keynetic collects, uses, shares and protects personal information.",
 };
 
 export default function PrivacyPolicyPage() {
-  return <LegalDocumentPage content={privacyPolicyContent} />;
+  return (
+    <LegalDocumentPage markdown={loadLegalMarkdown("privacyPolicy")} />
+  );
 }

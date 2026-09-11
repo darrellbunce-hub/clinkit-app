@@ -188,7 +188,7 @@ function EstateAgentSignupContent() {
     const acceptedAt = new Date().toISOString();
     const legalAcceptance =
       buildEstateAgentSignupLegalAcceptance(
-        LEGAL_DOCUMENT_VERSIONS.estateAgentTerms,
+        LEGAL_DOCUMENT_VERSIONS.termsOfService,
         LEGAL_DOCUMENT_VERSIONS.privacyPolicy,
         acceptedAt
       );

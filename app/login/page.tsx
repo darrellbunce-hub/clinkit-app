@@ -221,7 +221,7 @@ export default function LoginPage() {
 
     const acceptedAt = new Date().toISOString();
     const legalAcceptance = buildHomeownerSignupLegalAcceptance(
-      LEGAL_DOCUMENT_VERSIONS.termsOfUse,
+      LEGAL_DOCUMENT_VERSIONS.termsOfService,
       LEGAL_DOCUMENT_VERSIONS.privacyPolicy,
       acceptedAt
     );

@@ -22,16 +22,8 @@ export default function LegalAcceptanceFields({
   onPrivacyAcceptedChange,
   disabled = false,
 }: LegalAcceptanceFieldsProps) {
-  const termsHref =
-    variant === "homeowner"
-      ? LEGAL_ROUTES.terms
-      : LEGAL_ROUTES.estateAgentTerms;
-
-  const termsLabel =
-    variant === "homeowner"
-      ? "Terms of Use"
-      : "Estate Agent Terms";
-
+  // Both homeowner and estate-agent signup accept the same Terms of Service.
+  void variant;
   return (
     <fieldset
       className="space-y-3 rounded-2xl border border-surface-card-border bg-slate-50 px-4 py-4"
@@ -55,12 +47,12 @@ export default function LegalAcceptanceFields({
         <span>
           I agree to the{" "}
           <Link
-            href={termsHref}
+            href={LEGAL_ROUTES.terms}
             target="_blank"
             rel="noopener noreferrer"
             className={TERMS_LINK_CLASS}
           >
-            {termsLabel}
+            Terms of Service
           </Link>
         </span>
       </label>
