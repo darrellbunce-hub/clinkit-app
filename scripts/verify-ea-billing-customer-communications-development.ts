@@ -227,10 +227,11 @@ async function runStatic() {
       docs.includes("Not** Production-approved")
   );
 
-  const terms = read("lib/legal/content/estateAgentTerms.ts");
+  const terms = read("docs/legal-source/TERMS_OF_SERVICE_V1.0.md");
   record(
-    "EA Terms still flag backlog wording (publication update required)",
-    terms.includes("launch readiness backlog")
+    "Terms of Service source present for billing communications",
+    terms.includes("Keynetic Terms of Service") &&
+      terms.includes("Version:** 1.0")
   );
 }
 
