@@ -8,10 +8,6 @@ import {
   PRIVACY_MAILTO,
 } from "@/lib/legal/constants";
 
-const POLICY_LINKS = LEGAL_NAV_ITEMS.filter(
-  (item) => item.href !== LEGAL_ROUTES.estateAgentTerms
-);
-
 export default function LegalPrivacySection() {
   return (
     <section
@@ -29,7 +25,7 @@ export default function LegalPrivacySection() {
         </p>
 
         <ul className="mt-6 space-y-3">
-          {POLICY_LINKS.map((policy) => (
+          {LEGAL_NAV_ITEMS.map((policy) => (
             <li key={policy.href}>
               <Link
                 href={policy.href}
@@ -41,21 +37,6 @@ export default function LegalPrivacySection() {
               </Link>
             </li>
           ))}
-
-          <li>
-            <Link
-              href={LEGAL_ROUTES.estateAgentTerms}
-              className="block rounded-2xl border border-slate-200 bg-white px-4 py-4 transition hover:border-slate-300 hover:bg-slate-50"
-            >
-              <p className="font-medium text-slate-900">
-                Estate Agent Terms of Service
-              </p>
-
-              <p className="mt-1 text-sm text-slate-600">
-                For estate agent branch subscriptions.
-              </p>
-            </Link>
-          </li>
         </ul>
 
         <div className="mt-8 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-5">

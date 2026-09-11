@@ -61,10 +61,10 @@ export function BillingEmailShell({
         <EmailSection style={{ paddingTop: 0, paddingBottom: 24 }}>
           <Text style={{ ...textStyle, marginBottom: 8, fontSize: 14 }}>
             <Link
-              href={`${appUrl}${LEGAL_ROUTES.estateAgentTerms}`}
+              href={`${appUrl}${LEGAL_ROUTES.terms}`}
               style={{ color: EMAIL_BRAND.teal, textDecoration: "underline" }}
             >
-              Estate Agent Terms
+              Terms of Service
             </Link>
             {" · "}
             <Link

@@ -38,6 +38,15 @@ function assertTruthy(name: string, value: unknown) {
   }
 }
 
+function assertFalsey(name: string, value: unknown) {
+  if (value) {
+    console.error("FAIL:", name, "— expected falsey, got", value);
+    process.exitCode = 1;
+  } else {
+    console.log("PASS:", name);
+  }
+}
+
 function assertIncludes(name: string, haystack: string, needle: string) {
   if (!haystack.includes(needle)) {
     console.error("FAIL:", name, "— missing:", needle);
@@ -75,6 +84,7 @@ const legalPages = [
   "app/privacy/page.tsx",
   "app/terms/page.tsx",
   "app/cookies/page.tsx",
+  "app/data-protection/page.tsx",
   "app/data-retention/page.tsx",
   "app/estate-agents/terms/page.tsx",
   "app/estate-agents/pricing/page.tsx",
@@ -84,18 +94,50 @@ for (const page of legalPages) {
   assertTruthy(`Legal page exists: ${page}`, existsSync(join(ROOT, page)));
 }
 
-// Content modules exist
-const contentModules = [
-  "lib/legal/content/privacyPolicy.ts",
-  "lib/legal/content/termsOfUse.ts",
-  "lib/legal/content/estateAgentTerms.ts",
-  "lib/legal/content/cookiePolicy.ts",
-  "lib/legal/content/dataRetention.ts",
+// Approved legal source files
+const legalSources = [
+  "docs/legal-source/PRIVACY_POLICY_V1.1.md",
+  "docs/legal-source/TERMS_OF_SERVICE_V1.0.md",
+  "docs/legal-source/DATA_PROTECTION_PLATFORM_TERMS_V1.0.md",
+  "docs/legal-source/COOKIES_POLICY_V1.0.md",
 ];
 
-for (const mod of contentModules) {
-  assertTruthy(`Content module exists: ${mod}`, existsSync(join(ROOT, mod)));
+for (const source of legalSources) {
+  assertTruthy(`Legal source exists: ${source}`, existsSync(join(ROOT, source)));
 }
+
+const dataRetentionPage = readProjectFile("app/data-retention/page.tsx");
+assertIncludes(
+  "Legacy /data-retention permanently redirects",
+  dataRetentionPage,
+  "permanentRedirect"
+);
+assertIncludes(
+  "Legacy /data-retention redirects to data protection",
+  dataRetentionPage,
+  "LEGACY_LEGAL_REDIRECTS.dataRetention.to"
+);
+
+const eaTermsPage = readProjectFile("app/estate-agents/terms/page.tsx");
+assertIncludes(
+  "Legacy /estate-agents/terms permanently redirects",
+  eaTermsPage,
+  "permanentRedirect"
+);
+assertIncludes(
+  "Legacy /estate-agents/terms redirects to terms",
+  eaTermsPage,
+  "LEGACY_LEGAL_REDIRECTS.estateAgentTerms.to"
+);
+
+assertFalsey(
+  "No legacy Estate Agent Terms content module",
+  existsSync(join(ROOT, "lib/legal/content/estateAgentTerms.ts"))
+);
+assertFalsey(
+  "No legacy Data Retention Information content module",
+  existsSync(join(ROOT, "lib/legal/content/dataRetention.ts"))
+);
 
 // Account legal section — no Coming soon placeholders
 const legalSection = readProjectFile(

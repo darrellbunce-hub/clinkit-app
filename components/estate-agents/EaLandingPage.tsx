@@ -779,10 +779,7 @@ export default function EaLandingPage({
             </div>
           </div>
 
-          <LegalFooterLinks
-            className="mt-10 text-slate-400"
-            showEstateAgentTerms
-          />
+          <LegalFooterLinks className="mt-10 text-slate-400" />
 
           <p className="mt-10 text-sm text-slate-500">
             © {new Date().getFullYear()} Keynetic. Collaboration that

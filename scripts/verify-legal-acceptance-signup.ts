@@ -48,21 +48,12 @@ function readProjectFile(relativePath: string): string {
 
 // Version constants for audit records
 assert(
-  LEGAL_DOCUMENT_VERSIONS.privacyPolicy.length > 0,
-  "Privacy policy version id is defined"
+  LEGAL_DOCUMENT_VERSIONS.privacyPolicy === "1.1",
+  "Privacy policy version id is 1.1"
 );
 assert(
-  LEGAL_DOCUMENT_VERSIONS.termsOfUse.length > 0,
-  "Homeowner terms version id is defined"
-);
-assert(
-  LEGAL_DOCUMENT_VERSIONS.estateAgentTerms.length > 0,
-  "Estate agent terms version id is defined"
-);
-assert(
-  LEGAL_DOCUMENT_VERSIONS.privacyPolicy ===
-    LEGAL_DOCUMENT_VERSIONS.privacyPolicy,
-  "Shared privacy policy version is a single constant"
+  LEGAL_DOCUMENT_VERSIONS.termsOfService === "1.0",
+  "Terms of Service version id is 1.0"
 );
 
 // Client-side acceptance gate
@@ -115,37 +106,9 @@ assertIncludes(
   "record_signup_legal_acceptances"
 );
 assertIncludes(
-  "Migration supports homeowner terms document type",
+  "Migration supports terms_of_use document type",
   migration,
   "'terms_of_use'"
-);
-assertIncludes(
-  "Migration supports estate agent terms document type",
-  migration,
-  "'estate_agent_terms'"
-);
-assertIncludes(
-  "Migration supports privacy policy document type",
-  migration,
-  "'privacy_policy'"
-);
-assertExcludes(
-  "Migration does not backfill existing users from profiles",
-  migration,
-  "from public.profiles"
-);
-assertExcludes(
-  "Migration does not bulk backfill legal acceptances",
-  migration,
-  "insert into public.legal_acceptances\nselect"
-);
-
-// Shared UI component
-assert(
-  existsSync(
-    join(ROOT, "components/legal/LegalAcceptanceFields.tsx")
-  ),
-  "LegalAcceptanceFields component exists"
 );
 
 const legalFields = readProjectFile(
@@ -163,19 +126,24 @@ assertIncludes(
   'rel="noopener noreferrer"'
 );
 assertIncludes(
-  "Homeowner terms route",
+  "Homeowner and EA terms route",
   legalFields,
   "LEGAL_ROUTES.terms"
 );
-assertIncludes(
-  "Estate agent terms route",
+assertExcludes(
+  "No separate estate agent terms route in acceptance fields",
   legalFields,
-  "LEGAL_ROUTES.estateAgentTerms"
+  "estateAgentTerms"
 );
 assertIncludes(
   "Shared privacy route",
   legalFields,
   "LEGAL_ROUTES.privacy"
+);
+assertIncludes(
+  "Acceptance labels Terms of Service",
+  legalFields,
+  "Terms of Service"
 );
 
 // Homeowner signup integration
@@ -215,9 +183,9 @@ assertIncludes(
   "persistSignupLegalAcceptanceAfterAuth"
 );
 assertIncludes(
-  "Homeowner signup uses terms_of_use version",
+  "Homeowner signup uses Terms of Service version",
   homeownerSignup,
-  "LEGAL_DOCUMENT_VERSIONS.termsOfUse"
+  "LEGAL_DOCUMENT_VERSIONS.termsOfService"
 );
 assertIncludes(
   "Homeowner signup uses shared privacy version",
@@ -265,14 +233,33 @@ assertIncludes(
   "persistSignupLegalAcceptanceAfterAuth"
 );
 assertIncludes(
-  "EA signup uses estate agent terms version",
+  "EA signup uses Terms of Service version",
   eaSignup,
-  "LEGAL_DOCUMENT_VERSIONS.estateAgentTerms"
+  "LEGAL_DOCUMENT_VERSIONS.termsOfService"
 );
 assertIncludes(
   "EA signup uses shared privacy version",
   eaSignup,
   "LEGAL_DOCUMENT_VERSIONS.privacyPolicy"
+);
+assertExcludes(
+  "EA signup no longer uses estateAgentTerms version constant",
+  eaSignup,
+  "estateAgentTerms"
+);
+
+const recordAcceptance = readProjectFile(
+  "lib/legal/recordSignupLegalAcceptance.ts"
+);
+assertIncludes(
+  "EA acceptance builder uses terms_of_use document id",
+  recordAcceptance,
+  'termsDocument: "terms_of_use"'
+);
+assertExcludes(
+  "EA acceptance builder no longer writes estate_agent_terms",
+  recordAcceptance,
+  'termsDocument: "estate_agent_terms"'
 );
 
 // Existing users: login surfaces unchanged

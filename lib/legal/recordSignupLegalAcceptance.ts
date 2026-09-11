@@ -129,6 +129,7 @@ export function buildHomeownerSignupLegalAcceptance(
   acceptedAt?: string
 ): PendingSignupLegalAcceptance {
   return {
+    // Internal DB document id — public document is Terms of Service.
     termsDocument: "terms_of_use",
     termsVersion,
     privacyVersion,
@@ -142,7 +143,9 @@ export function buildEstateAgentSignupLegalAcceptance(
   acceptedAt?: string
 ): PendingSignupLegalAcceptance {
   return {
-    termsDocument: "estate_agent_terms",
+    // EA acceptance uses the same Terms of Service document as homeowners.
+    // Retains existing RPC allowlist value `terms_of_use` (no migration).
+    termsDocument: "terms_of_use",
     termsVersion,
     privacyVersion,
     acceptedAt: acceptedAt ?? new Date().toISOString(),

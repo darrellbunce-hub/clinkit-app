@@ -1,19 +1,8 @@
-import type { Metadata } from "next";
+import { permanentRedirect } from "next/navigation";
 
-import { LegalDocumentPage } from "@/components/legal/LegalDocumentPage";
-import { estateAgentTermsContent } from "@/lib/legal/content/estateAgentTerms";
+import { LEGACY_LEGAL_REDIRECTS } from "@/lib/legal/constants";
 
-export const metadata: Metadata = {
-  title: "Estate Agent Terms | Keynetic",
-  description:
-    "Business terms for estate agent branches using Keynetic.",
-};
-
-export default function EstateAgentTermsPage() {
-  return (
-    <LegalDocumentPage
-      content={estateAgentTermsContent}
-      showEstateAgentTerms
-    />
-  );
+/** Legacy route — permanently redirects to Terms of Service. */
+export default function EstateAgentTermsLegacyPage() {
+  permanentRedirect(LEGACY_LEGAL_REDIRECTS.estateAgentTerms.to);
 }
