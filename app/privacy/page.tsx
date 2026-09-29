@@ -4,9 +4,9 @@ import { LegalDocumentPage } from "@/components/legal/LegalDocumentPage";
 import { loadLegalMarkdown } from "@/lib/legal/legalSource";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy | Keynetic",
+  title: "Privacy Policy | MoveLoop",
   description:
-    "How Keynetic collects, uses, shares and protects personal information.",
+    "How MoveLoop collects, uses, shares and protects personal information.",
 };
 
 export default function PrivacyPolicyPage() {

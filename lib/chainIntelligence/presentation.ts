@@ -152,7 +152,7 @@ export function confidencePresentation(params: {
 }
 
 export const CHAIN_CONFIDENCE_TOOLTIP =
-  "Keynetic calculates Chain Confidence using the timing and chain information available for your property chain. It reflects whether visible steps are progressing within expected timescales — not how far through the chain you are. It is a system-generated indication and is not independently verified or a guarantee that your move will complete.";
+  "MoveLoop calculates Chain Confidence using the timing and chain information available for your property chain. It reflects whether visible steps are progressing within expected timescales — not how far through the chain you are. It is a system-generated indication and is not independently verified or a guarantee that your move will complete.";
 
 export const CHAIN_CONFIDENCE_UNAVAILABLE_MESSAGE =
   "We don't yet have enough timing information to calculate Chain Confidence for this chain.";
@@ -161,16 +161,16 @@ export const CHAIN_PROGRESS_TOOLTIP =
   "Chain Progress is an average of stage completion across visible chain steps. It is separate from Chain Confidence, which reflects timing health for steps where reliable timing data is available.";
 
 export const ESTIMATED_COMPLETION_TOOLTIP =
-  "Estimated completion window is a system-generated indication based on expected stage timings and the information visible on Keynetic. It is not independently verified or a guaranteed completion date.";
+  "Estimated completion window is a system-generated indication based on expected stage timings and the information visible on MoveLoop. It is not independently verified or a guaranteed completion date.";
 
 export const ESTIMATED_COMPLETION_DISCLAIMER =
-  "This is a system-generated estimate based on expected stage timings and the information visible on Keynetic. It is not independently verified or a guaranteed completion date.";
+  "This is a system-generated estimate based on expected stage timings and the information visible on MoveLoop. It is not independently verified or a guaranteed completion date.";
 
 export const ESTIMATED_COMPLETION_DISCLAIMER_WITH_LIMITED_COVERAGE =
   "This is a system-generated estimate. It is not independently verified or a guaranteed completion date.";
 
 export const ESTIMATED_COMPLETION_LIMITED_COVERAGE_SUFFIX =
-  "Based on timing information currently available in Keynetic.";
+  "Based on timing information currently available in MoveLoop.";
 
 export type EstimatedCompletionPresentation = {
   primaryValue: string;

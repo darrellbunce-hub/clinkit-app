@@ -409,7 +409,7 @@ export default function StartMovePage() {
         </h1>
 
         <p className="mt-3 text-lg text-slate-600">
-          Tell Keynetic about your move — free for homeowners. You&apos;ll get a
+          Tell MoveLoop about your move — free for homeowners. You&apos;ll get a
           shared view of progress across connected parts of your chain as
           participants share updates.
         </p>

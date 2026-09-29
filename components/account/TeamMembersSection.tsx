@@ -133,7 +133,7 @@ export default function TeamMembersSection({
       return {
         title: `Remove access for ${confirmAction.member.contact_name}?`,
         description:
-          "This person will no longer be able to access this branch or its properties in Keynetic. Their previous activity may remain in branch history.",
+          "This person will no longer be able to access this branch or its properties in MoveLoop. Their previous activity may remain in branch history.",
         confirmLabel: "Remove access",
       };
     }

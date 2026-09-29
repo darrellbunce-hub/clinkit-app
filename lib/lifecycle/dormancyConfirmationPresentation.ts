@@ -2,7 +2,7 @@ export const DORMANCY_WARNING_PANEL_TITLE =
   "Is your transaction still active?";
 
 export const DORMANCY_WARNING_PANEL_BODY =
-  "We haven't seen any transaction activity for a while. Please confirm that your move is still active to keep this property connected to your Keynetic transaction.";
+  "We haven't seen any transaction activity for a while. Please confirm that your move is still active to keep this property connected to your MoveLoop transaction.";
 
 export const DORMANCY_WARNING_PANEL_CONSEQUENCE =
   "If we don't receive confirmation before the deadline, the property may be released from the active transaction so the address can be used again in the future.";

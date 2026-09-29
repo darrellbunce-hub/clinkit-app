@@ -43,7 +43,7 @@ function describeSummary(summary: EaBranchSubscriptionSummary | null): {
     return {
       title: "No subscription",
       detail:
-        "Subscribe to Keynetic for this Branch when you are ready. Recurring monthly billing is handled through Stripe. This environment may use Stripe test (Sandbox) mode before Production charging is enabled.",
+        "Subscribe to MoveLoop for this Branch when you are ready. Recurring monthly billing is handled through Stripe. This environment may use Stripe test (Sandbox) mode before Production charging is enabled.",
       tone: "neutral",
     };
   }
@@ -95,7 +95,7 @@ function describeSummary(summary: EaBranchSubscriptionSummary | null): {
     }
     return {
       title: "Subscription ended",
-      detail: "This branch no longer has an active Keynetic subscription.",
+      detail: "This branch no longer has an active MoveLoop subscription.",
       tone: "neutral",
     };
   }
@@ -324,7 +324,7 @@ export default function SubscriptionSection({
     <section id="subscription" className={accountSectionClassName}>
       <h2 className="text-lg font-semibold text-slate-900">Subscription</h2>
       <p className="mt-1 text-sm text-slate-600">
-        Keynetic Estate Agent branch billing
+        MoveLoop Estate Agent branch billing
         {branchName ? ` · ${branchName}` : ""}.
       </p>
 

@@ -51,12 +51,12 @@ const outcomes = [
   {
     icon: Users,
     title: "Collaboration from either side",
-    text: "A homeowner may start their move and invite your branch — or your team may start and invite them. However the journey begins, connected participants share one chain view on Keynetic.",
+    text: "A homeowner may start their move and invite your branch — or your team may start and invite them. However the journey begins, connected participants share one chain view on MoveLoop.",
   },
   {
     icon: Clock3,
     title: "Reduce chasing",
-    text: "Designed to help reduce routine status calls. See what may need attention before the phone rings — whether your client started on Keynetic or your branch did.",
+    text: "Designed to help reduce routine status calls. See what may need attention before the phone rings — whether your client started on MoveLoop or your branch did.",
   },
   {
     icon: MessageSquare,
@@ -71,12 +71,12 @@ const outcomes = [
   {
     icon: Sparkles,
     title: "Better customer experience",
-    text: "Give clients clarity and confidence. Homeowners can use Keynetic for free while your branch complements its existing CRM.",
+    text: "Give clients clarity and confidence. Homeowners can use MoveLoop for free while your branch complements its existing CRM.",
   },
   {
     icon: Workflow,
     title: "Works alongside your CRM",
-    text: "Keynetic is a collaborative coordination layer, not estate agency software. Your CRM stays your system of record.",
+    text: "MoveLoop is a collaborative coordination layer, not estate agency software. Your CRM stays your system of record.",
   },
 ];
 
@@ -90,7 +90,7 @@ const problems = [
 
 const solutions = [
   "Collaboration can begin from the homeowner or the estate agent",
-  "Homeowners can use Keynetic independently and invite your branch when ready",
+  "Homeowners can use MoveLoop independently and invite your branch when ready",
   "Your branch can create properties and invite clients — or join moves they started",
   "Connected participants share the same shared operational workspace, alongside your CRM",
   "Useful visibility begins with connected parts of the chain — and improves as more connects",
@@ -100,7 +100,7 @@ const entryPaths = [
   {
     number: "A",
     title: "Homeowner creates their move",
-    text: "Your client sets up their property on Keynetic for free, tracks their transaction, and invites your branch to collaborate.",
+    text: "Your client sets up their property on MoveLoop for free, tracks their transaction, and invites your branch to collaborate.",
   },
   {
     number: "B",
@@ -117,7 +117,7 @@ const entryPaths = [
 const pricingFeatures = [
   "Unlimited team members",
   "Unlimited properties",
-  "Collaborate with homeowners already on Keynetic",
+  "Collaborate with homeowners already on MoveLoop",
   "Command Centre & operational workspace",
   "Delegated updates with audit trail",
   "Founding price locked while subscription stays active",
@@ -148,16 +148,16 @@ const comingSoon = [
 
 const faqs = [
   {
-    title: "Can homeowners use Keynetic if my branch hasn't signed up?",
-    text: "Yes. Homeowners can use Keynetic independently — creating their property for free, tracking their transaction, and inviting their estate agent to collaborate. Likewise, estate agents can create properties and invite homeowners. Keynetic is designed so collaboration can begin from either side.",
+    title: "Can homeowners use MoveLoop if my branch hasn't signed up?",
+    text: "Yes. Homeowners can use MoveLoop independently — creating their property for free, tracking their transaction, and inviting their estate agent to collaborate. Likewise, estate agents can create properties and invite homeowners. MoveLoop is designed so collaboration can begin from either side.",
   },
   {
-    title: "Does Keynetic replace our CRM?",
-    text: "No. Keynetic is a collaborative operational layer for property transactions and chains — not estate agency software. Your CRM remains your system of record for contacts, listings and pipeline.",
+    title: "Does MoveLoop replace our CRM?",
+    text: "No. MoveLoop is a collaborative operational layer for property transactions and chains — not estate agency software. Your CRM remains your system of record for contacts, listings and pipeline.",
   },
   {
     title: "What if a client invites us before we've registered?",
-    text: "That's expected. Homeowners can start on Keynetic and invite your branch when they're ready. Register your branch so you're prepared to accept invitations and collaborate from the same shared workspace.",
+    text: "That's expected. Homeowners can start on MoveLoop and invite your branch when they're ready. Register your branch so you're prepared to accept invitations and collaborate from the same shared workspace.",
   },
   {
     title: "Who can see transaction information?",
@@ -173,15 +173,15 @@ const faqs = [
   },
   {
     title: "Do homeowners need to pay?",
-    text: "No. Homeowners can use Keynetic for free. When your branch collaborates on a transaction, homeowner access is included — whether they started the move or your team did.",
+    text: "No. Homeowners can use MoveLoop for free. When your branch collaborates on a transaction, homeowner access is included — whether they started the move or your team did.",
   },
   {
     title: "When does billing start?",
-    text: "After your branch is registered, an authorised branch owner can start a monthly subscription through Stripe Checkout from the account subscription section. Keynetic may use Stripe test (Sandbox) mode during development and staging before Production charging is enabled. Founding rates apply only while founding places remain available under the first-20 offer.",
+    text: "After your branch is registered, an authorised branch owner can start a monthly subscription through Stripe Checkout from the account subscription section. MoveLoop may use Stripe test (Sandbox) mode during development and staging before Production charging is enabled. Founding rates apply only while founding places remain available under the first-20 offer.",
   },
   {
     title: "Does the whole chain need to be connected?",
-    text: "No. Keynetic can provide useful operational visibility before every participant is connected. Connected parts of a chain can share progress from day one, and visibility improves as more of the chain connects. Keynetic only shows information for properties and participants connected to the platform.",
+    text: "No. MoveLoop can provide useful operational visibility before every participant is connected. Connected parts of a chain can share progress from day one, and visibility improves as more of the chain connects. MoveLoop only shows information for properties and participants connected to the platform.",
   },
 ];
 
@@ -320,7 +320,7 @@ export default function EaLandingPage({
               </h1>
 
               <p className="mt-8 text-lg md:text-xl text-slate-300 leading-relaxed max-w-xl">
-                Keynetic is a collaborative platform — not estate agency
+                MoveLoop is a collaborative platform — not estate agency
                 software. Whether your client starts their move or your
                 branch introduces a property, connected participants work
                 from the same shared chain model — without replacing your CRM.
@@ -384,9 +384,9 @@ export default function EaLandingPage({
       <section className={SECTION_BG_CLASS}>
         <div className={SECTION_CONTENT_CLASS}>
           <SectionIntro
-            eyebrow="Why Keynetic is different"
-            title="Traditional tools wait for the agency. Keynetic meets everyone where the move starts."
-            description="Most estate agency software assumes your branch must adopt first before homeowners benefit. Keynetic is a collaborative platform — homeowners and estate agents can each begin the journey, and connected participants converge on the same shared operational workspace."
+            eyebrow="Why MoveLoop is different"
+            title="Traditional tools wait for the agency. MoveLoop meets everyone where the move starts."
+            description="Most estate agency software assumes your branch must adopt first before homeowners benefit. MoveLoop is a collaborative platform — homeowners and estate agents can each begin the journey, and connected participants converge on the same shared operational workspace."
             align="center"
           />
 
@@ -416,7 +416,7 @@ export default function EaLandingPage({
               <div className="flex items-center gap-3">
                 <CheckCircle2 className="h-8 w-8 text-status-success" />
                 <h3 className="text-2xl font-bold text-slate-900">
-                  The Keynetic model
+                  The MoveLoop model
                 </h3>
               </div>
 
@@ -444,7 +444,7 @@ export default function EaLandingPage({
           <SectionIntro
             eyebrow="How it works"
             title="Collaboration starts wherever the move starts"
-            description="Whether your client starts with Keynetic or your branch does, connected participants work from the same shared operational view — without replacing your CRM."
+            description="Whether your client starts with MoveLoop or your branch does, connected participants work from the same shared operational view — without replacing your CRM."
           />
 
           <div className="mt-16 grid gap-8 md:grid-cols-3">
@@ -482,7 +482,7 @@ export default function EaLandingPage({
           />
 
           <p className="mt-8 max-w-3xl mx-auto text-center text-lg text-slate-500 leading-relaxed">
-            Keynetic cannot show updates for participants or properties that are not
+            MoveLoop cannot show updates for participants or properties that are not
             connected. That is normal — and connecting more of the chain over time
             strengthens branch-level visibility.
           </p>
@@ -495,7 +495,7 @@ export default function EaLandingPage({
           <SectionIntro
             eyebrow="Outcomes that matter"
             title="A collaborative platform your branch and your clients both benefit from"
-            description="Keynetic reduces chasing and improves communication — whether adoption begins with a homeowner inviting your branch or your team inviting a client."
+            description="MoveLoop reduces chasing and improves communication — whether adoption begins with a homeowner inviting your branch or your team inviting a client."
           />
 
           <div className="mt-16 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
@@ -668,7 +668,7 @@ export default function EaLandingPage({
           <SectionIntro
             eyebrow="FAQ"
             title="Questions estate agents ask before they start"
-            description="Straight answers on how Keynetic's two-sided collaboration model fits alongside your CRM and your clients."
+            description="Straight answers on how MoveLoop's two-sided collaboration model fits alongside your CRM and your clients."
           />
 
           <div className="mt-16 space-y-6">
@@ -700,9 +700,9 @@ export default function EaLandingPage({
           </h2>
 
           <p className="mt-8 text-xl text-slate-600 leading-relaxed max-w-3xl mx-auto">
-            Join Keynetic as a founding branch and be prepared whether your
+            Join MoveLoop as a founding branch and be prepared whether your
             team introduces a property or a client invites you in. Connected
-            participants share one chain view on Keynetic.
+            participants share one chain view on MoveLoop.
           </p>
 
           <div className="mt-12 flex flex-col sm:flex-row justify-center gap-4">

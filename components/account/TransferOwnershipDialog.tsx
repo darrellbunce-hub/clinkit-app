@@ -72,7 +72,7 @@ export default function TransferOwnershipDialog({
     }
 
     if (outgoingAction === "leave_branch") {
-      return `${selectedMember.contact_name} will become the branch Owner and take over team administration. You will lose access to this branch and its Keynetic information once the transfer completes.`;
+      return `${selectedMember.contact_name} will become the branch Owner and take over team administration. You will lose access to this branch and its MoveLoop information once the transfer completes.`;
     }
 
     return `${selectedMember.contact_name} will become the branch Owner and take over team administration. You will remain in the branch as Staff.`;
@@ -251,7 +251,7 @@ export default function TransferOwnershipDialog({
                   </span>
                   <span className="mt-1 block text-slate-600">
                     You will lose access to this branch and its
-                    Keynetic information after the transfer succeeds.
+                    MoveLoop information after the transfer succeeds.
                   </span>
                 </span>
               </label>

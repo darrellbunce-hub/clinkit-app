@@ -6,11 +6,11 @@ import {
 } from "@/lib/theme/themeTokens";
 
 const expectations = [
-  "Keynetic does not guarantee completion.",
-  "Keynetic does not guarantee completion dates.",
-  "Keynetic cannot prevent every delay.",
-  "Keynetic cannot prevent every chain break.",
-  "Keynetic complements estate agents and conveyancers — it does not replace them.",
+  "MoveLoop does not guarantee completion.",
+  "MoveLoop does not guarantee completion dates.",
+  "MoveLoop cannot prevent every delay.",
+  "MoveLoop cannot prevent every chain break.",
+  "MoveLoop complements estate agents and conveyancers — it does not replace them.",
 ];
 
 export default function TrustPositioningSection() {
@@ -22,14 +22,14 @@ export default function TrustPositioningSection() {
       <div className="grid lg:grid-cols-2 gap-12 items-start">
         <div>
           <p className="text-sm font-semibold uppercase tracking-wide text-brand-primary">
-            What Keynetic is — and is not
+            What MoveLoop is — and is not
           </p>
 
           <h2
             id="trust-positioning-heading"
             className={`mt-4 ${MARKETING_SECTION_TITLE_CLASS} leading-tight`}
           >
-            Keynetic doesn&apos;t replace the professionals progressing your move.
+            MoveLoop doesn&apos;t replace the professionals progressing your move.
           </h2>
 
           <p className="mt-6 text-lg md:text-xl text-slate-600 leading-relaxed">

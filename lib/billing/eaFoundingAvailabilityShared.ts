@@ -50,7 +50,7 @@ export function describeFoundingPublicDisplay(
       placesRemaining: 0,
       headline: "Our 20 founding places have now been secured.",
       detail:
-        "Keynetic Professional is £129/month per branch. Founding Member pricing is no longer available for new subscriptions.",
+        "MoveLoop Professional is £129/month per branch. Founding Member pricing is no longer available for new subscriptions.",
     };
   }
 

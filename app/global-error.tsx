@@ -32,7 +32,7 @@ export default function GlobalErrorPage({
             </h1>
 
             <p className="mt-4 text-lg text-slate-600">
-              Keynetic hit an unexpected problem. Please try again.
+              MoveLoop hit an unexpected problem. Please try again.
             </p>
 
             <button

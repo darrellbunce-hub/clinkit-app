@@ -201,13 +201,13 @@ export function appendEtaLimitedCoverageQualifier(
 
   if (
     window.includes(
-      "Based on timing information currently available in Keynetic"
+      "Based on timing information currently available in"
     )
   ) {
     return window;
   }
 
-  return `${window}. Based on timing information currently available in Keynetic.`;
+  return `${window}. Based on timing information currently available in MoveLoop.`;
 }
 
 export function computePropertyEstimatedCompletionWindow(params: {

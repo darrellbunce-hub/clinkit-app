@@ -53,7 +53,7 @@ const steps = [
   {
     number: 1,
     title: "Start Your Move",
-    text: "Add your sale, purchase, or both to begin building your property chain on Keynetic.",
+    text: "Add your sale, purchase, or both to begin building your property chain on MoveLoop.",
   },
   {
     number: 2,
@@ -72,25 +72,25 @@ const homeownerBenefits = [
   "Understand what's changed as updates are shared",
   "Follow how the connected chain is progressing",
   "Know what may need attention next — without independent verification",
-  "Use Keynetic free as a homeowner",
+  "Use MoveLoop free as a homeowner",
 ];
 
 const faqs = [
   {
-    title: "What is Keynetic?",
-    text: "Keynetic is a shared property chain coordination platform. It gives people involved in a move a clearer view of progress — working alongside estate agents' existing CRM systems, not replacing them.",
+    title: "What is MoveLoop?",
+    text: "MoveLoop is a shared property chain coordination platform. It gives people involved in a move a clearer view of progress — working alongside estate agents' existing CRM systems, not replacing them.",
   },
   {
-    title: "Who can use Keynetic?",
-    text: "Homeowners, buyers and sellers participate in connected property chains. Estate agents use Keynetic alongside their existing CRM for operational visibility and coordination — see our estate agent pages to register your branch.",
+    title: "Who can use MoveLoop?",
+    text: "Homeowners, buyers and sellers participate in connected property chains. Estate agents use MoveLoop alongside their existing CRM for operational visibility and coordination — see our estate agent pages to register your branch.",
   },
   {
-    title: "Is Keynetic free for homeowners?",
-    text: "Yes. Homeowners can use Keynetic at no cost. Estate agents use Keynetic for branch-level operational visibility across the chains they manage.",
+    title: "Is MoveLoop free for homeowners?",
+    text: "Yes. Homeowners can use MoveLoop at no cost. Estate agents use MoveLoop for branch-level operational visibility across the chains they manage.",
   },
   {
     title: "Does the whole chain need to be connected?",
-    text: "No. Keynetic can provide useful visibility before every participant is connected. Connected parts of the chain can share progress from day one, and visibility improves as more of the chain connects. Keynetic only shows updates for properties and participants connected to the platform.",
+    text: "No. MoveLoop can provide useful visibility before every participant is connected. Connected parts of the chain can share progress from day one, and visibility improves as more of the chain connects. MoveLoop only shows updates for properties and participants connected to the platform.",
   },
   {
     title: "Can other users edit my property?",
@@ -101,12 +101,12 @@ const faqs = [
     text: "Chains are connected through secure access codes and matching property details provided by transaction participants.",
   },
   {
-    title: "Does Keynetic replace my estate agent or conveyancer?",
-    text: "No. Keynetic does not provide legal advice, independently verify progress, or guarantee that a chain will complete. It is a shared coordination tool — estate agents and conveyancers remain responsible for their professional roles.",
+    title: "Does MoveLoop replace my estate agent or conveyancer?",
+    text: "No. MoveLoop does not provide legal advice, independently verify progress, or guarantee that a chain will complete. It is a shared coordination tool — estate agents and conveyancers remain responsible for their professional roles.",
   },
   {
-    title: "Is Keynetic available on mobile devices?",
-    text: "Yes. Keynetic is designed to work across desktop, tablet and mobile devices.",
+    title: "Is MoveLoop available on mobile devices?",
+    text: "Yes. MoveLoop is designed to work across desktop, tablet and mobile devices.",
   },
 ];
 
@@ -185,7 +185,7 @@ export default function HomePage() {
               </p>
 
               <p className="mt-4 text-base md:text-lg text-slate-300 leading-relaxed">
-                Keynetic gives the people involved a clearer view of the journey
+                MoveLoop gives the people involved a clearer view of the journey
                 they&apos;re already part of — without claiming to remove every
                 delay or replace property professionals.
               </p>
@@ -225,7 +225,7 @@ export default function HomePage() {
       {/* 2–3. Evidence + key insight */}
       <EvidenceSection />
 
-      {/* 4. WHAT Keynetic does */}
+      {/* 4. WHAT MoveLoop does */}
       <section className="max-w-6xl mx-auto px-6 py-20 md:py-24">
         <div className="max-w-3xl mx-auto text-center">
           <h2 className={MARKETING_SECTION_TITLE_CLASS}>
@@ -240,7 +240,7 @@ export default function HomePage() {
           </p>
 
           <p className="mt-4 text-lg md:text-xl text-slate-600 leading-relaxed">
-            Keynetic gives connected participants a clearer shared view of
+            MoveLoop gives connected participants a clearer shared view of
             progress.
           </p>
 
@@ -253,14 +253,14 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 5. HOW Keynetic works */}
+      {/* 5. HOW MoveLoop works */}
       <section className={SECTION_BG_CLASS}>
         <div className={MARKETING_SECTION_GLOW_CLASS} />
 
         <div className={SECTION_CONTENT_CLASS}>
           <div className="text-center">
             <h2 className={MARKETING_SECTION_TITLE_CLASS}>
-              How Keynetic Works
+              How MoveLoop Works
             </h2>
 
             <p className="mt-6 text-lg md:text-xl text-slate-600 max-w-3xl mx-auto">
@@ -309,13 +309,13 @@ export default function HomePage() {
           </h2>
 
           <p className="mt-6 text-lg md:text-xl text-slate-600 leading-relaxed">
-            A property chain does not need to be fully connected before Keynetic
+            A property chain does not need to be fully connected before MoveLoop
             becomes useful. Connected parts can share progress from day one —
             and visibility improves as more of the chain connects.
           </p>
 
           <p className="mt-4 text-base md:text-lg text-slate-500 leading-relaxed">
-            Keynetic cannot show updates for participants or properties that are
+            MoveLoop cannot show updates for participants or properties that are
             not connected to the platform. That is normal — and connecting more
             of the chain over time strengthens the shared view.
           </p>
@@ -438,7 +438,7 @@ export default function HomePage() {
 
             <p className="mt-4 text-slate-600 leading-relaxed">
               Moving home contains dependencies and delays outside any one
-              person&apos;s control. Keynetic does not promise to eliminate those
+              person&apos;s control. MoveLoop does not promise to eliminate those
               things — it provides greater visibility into where the move stands,
               what&apos;s changed, and how the connected chain is progressing.
             </p>
@@ -490,7 +490,7 @@ export default function HomePage() {
               </p>
 
               <p className="mt-4 text-slate-600 leading-relaxed">
-                Keynetic gives the branch a shared operational view of the chains
+                MoveLoop gives the branch a shared operational view of the chains
                 it is already progressing.
               </p>
 
@@ -514,7 +514,7 @@ export default function HomePage() {
               </p>
 
               <p className="mt-4 text-slate-600 leading-relaxed">
-                If Keynetic saves your branch one unnecessary chase a day, what
+                If MoveLoop saves your branch one unnecessary chase a day, what
                 could that time be worth?
               </p>
 
@@ -538,7 +538,7 @@ export default function HomePage() {
                     className="mt-1 h-5 w-5 shrink-0 text-brand-primary"
                     aria-hidden="true"
                   />
-                  <span>Homeowners use Keynetic free when you collaborate</span>
+                  <span>Homeowners use MoveLoop free when you collaborate</span>
                 </li>
               </ul>
 
@@ -571,7 +571,7 @@ export default function HomePage() {
             </h2>
 
             <p className="mt-6 text-lg md:text-xl text-slate-600">
-              Common questions about Keynetic and property chain coordination.
+              Common questions about MoveLoop and property chain coordination.
             </p>
           </div>
 
@@ -642,7 +642,7 @@ export default function HomePage() {
               </Link>
 
               <Link href="/about" className="hover:text-white transition">
-                Why Keynetic?
+                Why MoveLoop?
               </Link>
 
               <Link href="/dashboard" className="hover:text-white transition">

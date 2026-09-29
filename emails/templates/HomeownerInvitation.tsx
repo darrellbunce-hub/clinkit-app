@@ -31,10 +31,10 @@ export default function HomeownerInvitationEmail(
 
   return (
     <EmailLayout
-      preview={`${props.branchName} invited you to connect your property on Keynetic`}
+      preview={`${props.branchName} invited you to connect your property on MoveLoop`}
     >
       <ContentContainer
-        footerReason={`You received this invitation because ${props.branchName} at ${props.companyName} asked you to connect your property on Keynetic.`}
+        footerReason={`You received this invitation because ${props.branchName} at ${props.companyName} asked you to connect your property on MoveLoop.`}
       >
         <EmailSection style={{ paddingTop: 32, paddingBottom: 8 }}>
           <Heading
@@ -70,7 +70,7 @@ export default function HomeownerInvitationEmail(
             }}
           >
             {props.branchName} at {props.companyName} has invited you to connect{" "}
-            <strong>{props.propertyAddress}</strong> on Keynetic.
+            <strong>{props.propertyAddress}</strong> on MoveLoop.
           </Text>
 
           <Text
@@ -81,9 +81,9 @@ export default function HomeownerInvitationEmail(
               lineHeight: "26px",
             }}
           >
-            Keynetic is a shared property chain coordination platform. It gives
+            MoveLoop is a shared property chain coordination platform. It gives
             connected participants one shared view of progress on your move — with
-            live updates as information is shared. Homeowners use Keynetic for
+            live updates as information is shared. Homeowners use MoveLoop for
             free.
           </Text>
 
@@ -96,7 +96,7 @@ export default function HomeownerInvitationEmail(
             }}
           >
             When you connect, you&apos;ll see progress across connected parts of
-            your chain. Visibility improves as more participants connect. Keynetic
+            your chain. Visibility improves as more participants connect. MoveLoop
             does not independently verify information shared by participants.
           </Text>
         </EmailSection>
@@ -166,5 +166,5 @@ export default function HomeownerInvitationEmail(
 export function getHomeownerInvitationSubject(
   props: Pick<HomeownerInvitationEmailParams, "propertyAddress">
 ): string {
-  return `Connect ${props.propertyAddress} on Keynetic`;
+  return `Connect ${props.propertyAddress} on MoveLoop`;
 }

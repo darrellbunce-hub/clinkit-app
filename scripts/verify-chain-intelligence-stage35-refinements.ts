@@ -89,7 +89,7 @@ function daysAgo(days: number): string {
   check(
     "Example C ETA limited-coverage qualifier",
     result.estimatedCompletionWindow ===
-      "28–29 weeks. Based on timing information currently available in Keynetic.",
+      "28–29 weeks. Based on timing information currently available in MoveLoop.",
     result.estimatedCompletionWindow
   );
 }
@@ -376,7 +376,7 @@ check(
 check(
   "ETA limited qualifier appended",
   appendEtaLimitedCoverageQualifier("28–29 weeks", "limited") ===
-    "28–29 weeks. Based on timing information currently available in Keynetic.",
+    "28–29 weeks. Based on timing information currently available in MoveLoop.",
   appendEtaLimitedCoverageQualifier("28–29 weeks", "limited")
 );
 check(
@@ -397,7 +397,7 @@ check(
 check(
   "ETA presentation limited qualifier separate",
   limitedEtaPresentation.limitedCoverageQualifier ===
-    "Based on timing information currently available in Keynetic.",
+    "Based on timing information currently available in MoveLoop.",
   limitedEtaPresentation.limitedCoverageQualifier
 );
 check(

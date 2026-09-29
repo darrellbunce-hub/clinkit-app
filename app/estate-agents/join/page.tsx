@@ -203,7 +203,7 @@ function JoinBranchContent() {
             <span className="font-semibold text-slate-900">
               {preview.companyName}
             </span>{" "}
-            on Keynetic.
+            on MoveLoop.
           </p>
 
           <dl className="mt-6 grid gap-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm">

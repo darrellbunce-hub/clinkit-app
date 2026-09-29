@@ -4,8 +4,8 @@ import { LegalDocumentPage } from "@/components/legal/LegalDocumentPage";
 import { loadLegalMarkdown } from "@/lib/legal/legalSource";
 
 export const metadata: Metadata = {
-  title: "Terms of Service | Keynetic",
-  description: "Terms governing use of the Keynetic website and platform.",
+  title: "Terms of Service | MoveLoop",
+  description: "Terms governing use of the MoveLoop website and platform.",
 };
 
 export default function TermsOfServicePage() {

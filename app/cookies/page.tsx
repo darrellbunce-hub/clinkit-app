@@ -4,9 +4,9 @@ import { LegalDocumentPage } from "@/components/legal/LegalDocumentPage";
 import { loadLegalMarkdown } from "@/lib/legal/legalSource";
 
 export const metadata: Metadata = {
-  title: "Cookies & Similar Technologies Policy | Keynetic",
+  title: "Cookies & Similar Technologies Policy | MoveLoop",
   description:
-    "How Keynetic uses cookies and similar browser technologies.",
+    "How MoveLoop uses cookies and similar browser technologies.",
 };
 
 export default function CookiesPolicyPage() {

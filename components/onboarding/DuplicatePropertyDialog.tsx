@@ -35,7 +35,7 @@ export default function DuplicatePropertyDialog({
           id="duplicate-property-dialog-title"
           className="text-xl font-bold text-text-charcoal"
         >
-          This property is already part of Keynetic
+          This property is already part of MoveLoop
         </h2>
 
         <div

@@ -1139,7 +1139,7 @@ async function handleReportDelay() {
   </h2>
 
   <p className="mt-4 text-slate-600 max-w-2xl">
-    Use this only after discussions with estate agents or solicitors. Disconnecting affects the Keynetic connection between properties, not your real-world property transaction. It may impact confidence scoring and overall chain progression.
+    Use this only after discussions with estate agents or solicitors. Disconnecting affects the MoveLoop connection between properties, not your real-world property transaction. It may impact confidence scoring and overall chain progression.
   </p>
 
   <select

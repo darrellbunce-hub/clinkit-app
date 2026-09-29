@@ -8,8 +8,8 @@ export function getEaSubscriptionConfirmationSubject(
   props: EaSubscriptionConfirmationEmailParams
 ): string {
   return props.isFounding
-    ? "Your Keynetic founding subscription is active"
-    : "Your Keynetic subscription is active";
+    ? "Your MoveLoop founding subscription is active"
+    : "Your MoveLoop subscription is active";
 }
 
 export default function EaSubscriptionConfirmationEmail(
@@ -17,13 +17,13 @@ export default function EaSubscriptionConfirmationEmail(
 ) {
   return (
     <BillingEmailShell
-      preview="Your Keynetic branch subscription is active"
+      preview="Your MoveLoop branch subscription is active"
       title="Subscription confirmed"
-      footerReason="You received this email because a Keynetic Estate Agent subscription was activated for your branch."
+      footerReason="You received this email because a MoveLoop Estate Agent subscription was activated for your branch."
       manageBillingUrl={props.manageBillingUrl}
     >
       <BillingEmailParagraph>
-        Hi{props.recipientName ? ` ${props.recipientName}` : ""}, your Keynetic
+        Hi{props.recipientName ? ` ${props.recipientName}` : ""}, your MoveLoop
         subscription for <strong>{props.branchName}</strong> is now active.
       </BillingEmailParagraph>
 
@@ -43,7 +43,7 @@ export default function EaSubscriptionConfirmationEmail(
 
       <BillingEmailParagraph>
         Your subscription renews automatically each month until you cancel.
-        You can manage billing from your Keynetic account at any time.
+        You can manage billing from your MoveLoop account at any time.
       </BillingEmailParagraph>
 
       {props.isFounding ? (

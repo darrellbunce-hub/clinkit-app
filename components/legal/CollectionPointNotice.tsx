@@ -12,11 +12,11 @@ const CONTEXT_COPY: Record<
   string
 > = {
   homeowner:
-    "We process the information you provide to create your account and provide the Keynetic service.",
+    "We process the information you provide to create your account and provide the MoveLoop service.",
   "estate-agent":
-    "We process business and branch information you provide to register your agency and provide the Keynetic service.",
+    "We process business and branch information you provide to register your agency and provide the MoveLoop service.",
   "property-address":
-    "We process property addresses and transaction details you enter to coordinate your chain on Keynetic. Other authorised chain participants may see relevant information.",
+    "We process property addresses and transaction details you enter to coordinate your chain on MoveLoop. Other authorised chain participants may see relevant information.",
 };
 
 export default function CollectionPointNotice({

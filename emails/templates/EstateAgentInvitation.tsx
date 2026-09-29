@@ -12,10 +12,10 @@ export default function EstateAgentInvitationEmail(
 ) {
   return (
     <EmailLayout
-      preview={`Join ${props.branchName} on Keynetic`}
+      preview={`Join ${props.branchName} on MoveLoop`}
     >
       <ContentContainer
-        footerReason={`You received this invitation to join ${props.branchName} at ${props.companyName} on Keynetic.`}
+        footerReason={`You received this invitation to join ${props.branchName} at ${props.companyName} on MoveLoop.`}
       >
         <EmailSection style={{ paddingTop: 32, paddingBottom: 8 }}>
           <Heading
@@ -28,7 +28,7 @@ export default function EstateAgentInvitationEmail(
               fontWeight: 700,
             }}
           >
-            You&apos;ve been invited to join your branch on Keynetic
+            You&apos;ve been invited to join your branch on MoveLoop
           </Heading>
 
           <Text
@@ -50,7 +50,7 @@ export default function EstateAgentInvitationEmail(
               lineHeight: "26px",
             }}
           >
-            You&apos;ve been invited to join {props.companyName} on Keynetic —
+            You&apos;ve been invited to join {props.companyName} on MoveLoop —
             a shared property chain coordination platform for the{" "}
             {props.branchName} operational workspace.
           </Text>
@@ -63,7 +63,7 @@ export default function EstateAgentInvitationEmail(
               lineHeight: "26px",
             }}
           >
-            Keynetic works alongside your CRM, giving your branch shared
+            MoveLoop works alongside your CRM, giving your branch shared
             operational visibility across connected chains. Accepting this
             invitation lets you collaborate on property moves with homeowners
             from the same workspace.
@@ -132,5 +132,5 @@ export default function EstateAgentInvitationEmail(
 export function getEstateAgentInvitationSubject(
   props: Pick<EstateAgentInvitationEmailParams, "companyName">
 ): string {
-  return `You've been invited to join ${props.companyName} on Keynetic`;
+  return `You've been invited to join ${props.companyName} on MoveLoop`;
 }

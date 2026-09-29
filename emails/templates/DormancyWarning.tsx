@@ -9,8 +9,8 @@ import EmailLayout from "@/emails/layout/EmailLayout";
 
 export default function DormancyWarningEmail(props: DormancyWarningEmailParams) {
   return (
-    <EmailLayout preview="Confirm whether your Keynetic property transaction is still active">
-      <ContentContainer footerReason="You received this email because your property transaction on Keynetic has entered a dormancy warning period.">
+    <EmailLayout preview="Confirm whether your MoveLoop property transaction is still active">
+      <ContentContainer footerReason="You received this email because your property transaction on MoveLoop has entered a dormancy warning period.">
         <EmailSection style={{ paddingTop: 32, paddingBottom: 8 }}>
           <Heading
             as="h1"
@@ -33,7 +33,7 @@ export default function DormancyWarningEmail(props: DormancyWarningEmailParams) 
               lineHeight: "26px",
             }}
           >
-            Your property transaction on Keynetic has not had any recent activity.
+            Your property transaction on MoveLoop has not had any recent activity.
           </Text>
 
           <Text

@@ -5,7 +5,7 @@ import {
 import type { EaGraceFinalWarningEmailParams } from "@/lib/communications/types";
 
 export function getEaGraceFinalWarningSubject(): string {
-  return "Final warning: Keynetic access ending soon";
+  return "Final warning: MoveLoop access ending soon";
 }
 
 export default function EaGraceFinalWarningEmail(
@@ -13,9 +13,9 @@ export default function EaGraceFinalWarningEmail(
 ) {
   return (
     <BillingEmailShell
-      preview="Final warning: Keynetic grace period ending soon"
+      preview="Final warning: MoveLoop grace period ending soon"
       title="Final payment warning"
-      footerReason="You received this email because your Keynetic Estate Agent payment-recovery grace period is ending soon."
+      footerReason="You received this email because your MoveLoop Estate Agent payment-recovery grace period is ending soon."
       manageBillingUrl={props.manageBillingUrl}
     >
       <BillingEmailParagraph>

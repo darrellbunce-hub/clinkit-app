@@ -64,7 +64,7 @@ async function main() {
   assertIncludes(
     "Homeowner invitation free for homeowners",
     homeowner.html,
-    "Homeowners use Keynetic for free"
+    "Homeowners use MoveLoop for free"
   );
   assertIncludes(
     "Homeowner invitation partial chain wording",

@@ -9,8 +9,8 @@ import EmailLayout from "@/emails/layout/EmailLayout";
 
 export default function WelcomeEmail(props: WelcomeEmailParams) {
   return (
-    <EmailLayout preview="Your Keynetic account is ready">
-      <ContentContainer footerReason="You received this email because a Keynetic account was created for you.">
+    <EmailLayout preview="Your MoveLoop account is ready">
+      <ContentContainer footerReason="You received this email because a MoveLoop account was created for you.">
         <EmailSection style={{ paddingTop: 32, paddingBottom: 8 }}>
           <Heading
             as="h1"
@@ -22,7 +22,7 @@ export default function WelcomeEmail(props: WelcomeEmailParams) {
               fontWeight: 700,
             }}
           >
-            Welcome to Keynetic
+            Welcome to MoveLoop
           </Heading>
 
           <Text
@@ -44,7 +44,7 @@ export default function WelcomeEmail(props: WelcomeEmailParams) {
               lineHeight: "26px",
             }}
           >
-            Your Keynetic account is ready. Keynetic gives connected participants
+            Your MoveLoop account is ready. MoveLoop gives connected participants
             a shared view of progress on property moves — with live updates as
             information is shared.
           </Text>
@@ -58,7 +58,7 @@ export default function WelcomeEmail(props: WelcomeEmailParams) {
             }}
           >
             Start your move, join an existing chain, or open your dashboard to
-            see connected parts of your property chain. Homeowners use Keynetic
+            see connected parts of your property chain. Homeowners use MoveLoop
             for free.
           </Text>
         </EmailSection>
@@ -74,5 +74,5 @@ export default function WelcomeEmail(props: WelcomeEmailParams) {
 }
 
 export function getWelcomeEmailSubject(): string {
-  return "Welcome to Keynetic";
+  return "Welcome to MoveLoop";
 }

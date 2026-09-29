@@ -5,15 +5,15 @@ import {
 import type { EaPaymentFailedEmailParams } from "@/lib/communications/types";
 
 export function getEaPaymentFailedSubject(): string {
-  return "Action needed: Keynetic payment failed";
+  return "Action needed: MoveLoop payment failed";
 }
 
 export default function EaPaymentFailedEmail(props: EaPaymentFailedEmailParams) {
   return (
     <BillingEmailShell
-      preview="Your Keynetic payment failed — update your payment method"
+      preview="Your MoveLoop payment failed — update your payment method"
       title="Payment failed"
-      footerReason="You received this email because a recurring payment for your Keynetic Estate Agent subscription failed."
+      footerReason="You received this email because a recurring payment for your MoveLoop Estate Agent subscription failed."
       manageBillingUrl={props.manageBillingUrl}
     >
       <BillingEmailParagraph>

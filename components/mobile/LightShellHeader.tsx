@@ -47,7 +47,7 @@ export default function LightShellHeader({
 
   return (
     <header className="border-b border-slate-200 bg-white sticky top-0 z-50">
-      <div className="max-w-6xl mx-auto px-6 py-4 sm:py-5 flex items-center justify-between gap-3 sm:gap-4">
+      <div className="max-w-6xl mx-auto px-6 py-3 sm:py-4 flex items-center justify-between gap-3 sm:gap-4">
         <Logo
           href={logoHref}
           variant="light"

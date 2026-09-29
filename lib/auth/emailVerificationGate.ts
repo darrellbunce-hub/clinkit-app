@@ -7,7 +7,7 @@ export const EMAIL_VERIFICATION_TRANSACTION_MESSAGE =
   "Verify your email address before participating in a live property transaction.";
 
 export const EMAIL_VERIFICATION_ACCOUNT_ACCESS_MESSAGE =
-  "You can access your Keynetic account now. Verify your email to join or manage live property transactions.";
+  "You can access your MoveLoop account now. Verify your email to join or manage live property transactions.";
 
 export function isEmailVerificationRequiredError(
   error: string | null | undefined

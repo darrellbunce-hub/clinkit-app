@@ -1,6 +1,7 @@
 /**
- * Production Keynetic logo assets — do not modify icon sources.
- * Wordmark PNGs are trimmed to visible letterforms (no excess canvas padding).
+ * Production MoveLoop logo assets — supplied stacked lockup (icon, wordmark, tagline).
+ * Source PNGs are 2:1 with transparent canvas; render with a fixed height and
+ * `w-auto` so the aspect ratio is preserved. Do not crop or re-export.
  */
 export type LogoAssetDimensions = {
   src: string;
@@ -8,61 +9,32 @@ export type LogoAssetDimensions = {
   height: number;
 };
 
-export type LogoVariantAssets = {
-  icon: LogoAssetDimensions;
-  wordmark: LogoAssetDimensions;
-};
-
 export const KEYNETIC_LOGO_ASSETS = {
+  /** Dark lettering — light backgrounds */
   light: {
-    icon: {
-      src: "/logos/keynetic-icon-teal.png",
-      width: 743,
-      height: 760,
-    },
-    wordmark: {
-      src: "/logos/keynetic-wordmark-teal-v2.png",
-      width: 199,
-      height: 53,
-    },
+    src: "/logos/MoveLoop Logo.png",
+    width: 1774,
+    height: 887,
   },
+  /** White lettering — dark backgrounds */
   dark: {
-    icon: {
-      src: "/logos/keynetic-icon-white.png",
-      width: 743,
-      height: 760,
-    },
-    wordmark: {
-      src: "/logos/keynetic-wordmark-white-v2.png",
-      width: 199,
-      height: 53,
-    },
+    src: "/logos/MoveLoop Logo White.png",
+    width: 1774,
+    height: 887,
   },
-} satisfies Record<"light" | "dark", LogoVariantAssets>;
+} satisfies Record<"light" | "dark", LogoAssetDimensions>;
 
-/** Icon: 36px mobile → 40px from sm (nav target ~64px) */
-export const LOGO_ICON_CLASS =
-  "block h-9 w-auto sm:h-10";
+/**
+ * Lockup height (width = 2× height): 60px mobile, 72px from sm, 68px at md so the
+ * full desktop nav fits at 768px, 72px again from lg.
+ */
+export const LOGO_IMAGE_CLASS =
+  "block h-15 w-auto max-w-full object-contain sm:h-18 md:h-17 lg:h-18";
 
-/** Wordmark: 26px mobile → 30px from sm — balanced against icon, not equal height */
-export const LOGO_WORDMARK_CLASS =
-  "block h-[26px] w-auto sm:h-[30px]";
+export const LOGO_IMAGE_SIZES =
+  "(min-width: 1024px) 144px, (min-width: 768px) 136px, (min-width: 640px) 144px, 120px";
 
-/** Icon + wordmark lockup — vertically centred, 10–12px gap */
-export const LOGO_LOCKUP_CLASS =
-  "inline-flex min-w-0 shrink-0 items-center gap-[10px] sm:gap-3";
+export const LOGO_LINK_CLASS = "inline-flex min-w-0 shrink-0 items-center";
 
 /** Brand tagline — FD-039; canonical customer-facing string */
 export const KEYNETIC_TAGLINE = "Moving Made Clear";
-
-const LOGO_TAGLINE_BASE_CLASS =
-  "block font-normal tracking-wide leading-tight";
-
-/** Tagline beneath wordmark — dark backgrounds (navbar, dark footer) */
-export const LOGO_TAGLINE_DARK_CLASS = `${LOGO_TAGLINE_BASE_CLASS} mt-0.5 text-[11px] sm:text-xs text-slate-400`;
-
-/** Tagline beneath wordmark — light backgrounds (EA marketing header) */
-export const LOGO_TAGLINE_LIGHT_CLASS = `${LOGO_TAGLINE_BASE_CLASS} mt-0.5 text-[11px] sm:text-xs text-slate-500`;
-
-/** @deprecated alias — use LOGO_TAGLINE_DARK_CLASS */
-export const LOGO_TAGLINE_CLASS = LOGO_TAGLINE_DARK_CLASS;

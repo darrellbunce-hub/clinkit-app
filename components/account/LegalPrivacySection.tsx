@@ -20,7 +20,7 @@ export default function LegalPrivacySection() {
         </h2>
 
         <p className="mt-2 text-sm text-slate-600">
-          Policy documents and privacy information for Keynetic
+          Policy documents and privacy information for MoveLoop
           users.
         </p>
 
@@ -47,7 +47,7 @@ export default function LegalPrivacySection() {
           <p className="mt-2 text-sm text-slate-600 leading-relaxed">
             You can request deletion of your personal data under
             applicable data protection law. Requests are handled
-            through Keynetic&apos;s privacy process — this is not
+            through MoveLoop&apos;s privacy process — this is not
             instant self-service deletion.
           </p>
 

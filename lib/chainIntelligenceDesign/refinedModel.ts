@@ -361,7 +361,7 @@ export function classifyDependencyCoverage(
 
   return {
     status,
-    label: `Based on ${parts.join(" and ")} visible on Keynetic`,
+    label: `Based on ${parts.join(" and ")} visible on MoveLoop`,
   };
 }
 

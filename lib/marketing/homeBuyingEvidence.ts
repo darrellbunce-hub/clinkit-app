@@ -35,4 +35,4 @@ export const HOME_BUYING_KEY_INSIGHT =
   "The problem isn't that people expect their house move to be instant. They expect to know what's happening.";
 
 export const HOME_BUYING_EVIDENCE_ATTRIBUTION =
-  "Source: UK Government home buying and selling reform roadmap (June 2026). These figures describe the wider market — Keynetic is not government endorsed.";
+  "Source: UK Government home buying and selling reform roadmap (June 2026). These figures describe the wider market — MoveLoop is not government endorsed.";

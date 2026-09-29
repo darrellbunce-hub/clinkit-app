@@ -22,7 +22,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Keynetic",
+  title: "MoveLoop",
   description: "Moving made clear",
 };
 

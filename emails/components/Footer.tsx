@@ -10,7 +10,7 @@ type FooterProps = {
 };
 
 export default function Footer({
-  receivedReason = "You received this email because of activity on your Keynetic account or property move.",
+  receivedReason = "You received this email because of activity on your MoveLoop account or property move.",
 }: FooterProps) {
   const appUrl = getAppBaseUrl();
 
@@ -32,7 +32,7 @@ export default function Footer({
           fontWeight: 600,
         }}
       >
-        Keynetic
+        MoveLoop
       </Text>
 
       <Text
@@ -136,7 +136,7 @@ export default function Footer({
           lineHeight: "16px",
         }}
       >
-        This is a transactional message about your Keynetic account or property
+        This is a transactional message about your MoveLoop account or property
         move — not a marketing email.
       </Text>
     </Section>

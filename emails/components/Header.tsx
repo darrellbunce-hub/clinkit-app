@@ -4,10 +4,8 @@ import { buildAbsoluteAssetUrl } from "@/lib/communications/config";
 import { EMAIL_BRAND, EMAIL_LAYOUT } from "@/emails/brand";
 
 export default function Header() {
-  const iconUrl = buildAbsoluteAssetUrl("/logos/keynetic-icon-white.png");
-  const wordmarkUrl = buildAbsoluteAssetUrl(
-    "/logos/keynetic-wordmark-white-v2.png"
-  );
+  // Encoded: email clients do not reliably handle raw spaces in image URLs.
+  const logoUrl = buildAbsoluteAssetUrl("/logos/MoveLoop%20Logo%20White.png");
 
   return (
     <Section
@@ -18,43 +16,17 @@ export default function Header() {
         padding: "28px 32px",
       }}
     >
-      <table
-        role="presentation"
-        cellPadding={0}
-        cellSpacing={0}
-        style={{ borderCollapse: "collapse" }}
-      >
-        <tbody>
-          <tr>
-            <td style={{ paddingRight: 12, verticalAlign: "middle" }}>
-              <Img
-                src={iconUrl}
-                alt="Keynetic"
-                width={36}
-                height={37}
-                style={{
-                  display: "block",
-                  width: 36,
-                  height: "auto",
-                }}
-              />
-            </td>
-            <td style={{ verticalAlign: "middle" }}>
-              <Img
-                src={wordmarkUrl}
-                alt="Keynetic"
-                width={112}
-                height={30}
-                style={{
-                  display: "block",
-                  width: 112,
-                  height: "auto",
-                }}
-              />
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <Img
+        src={logoUrl}
+        alt="MoveLoop"
+        width={160}
+        height={80}
+        style={{
+          display: "block",
+          width: 160,
+          height: "auto",
+        }}
+      />
     </Section>
   );
 }

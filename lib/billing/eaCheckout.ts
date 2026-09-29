@@ -237,7 +237,7 @@ async function selectPricingTier(input: {
         error: "founding_just_secured",
         status: 409,
         message:
-          "The final founding place has just been secured. Keynetic is now £129/month. Confirm to continue at the standard price.",
+          "The final founding place has just been secured. MoveLoop is now £129/month. Confirm to continue at the standard price.",
       };
     }
     return {

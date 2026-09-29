@@ -12,9 +12,9 @@ export default function PropertyClaimedEmail(
 ) {
   return (
     <EmailLayout
-      preview={`Your property is now connected on Keynetic`}
+      preview={`Your property is now connected on MoveLoop`}
     >
-      <ContentContainer footerReason="You received this email because you successfully connected your property on Keynetic.">
+      <ContentContainer footerReason="You received this email because you successfully connected your property on MoveLoop.">
         <EmailSection style={{ paddingTop: 32, paddingBottom: 8 }}>
           <Heading
             as="h1"
@@ -49,7 +49,7 @@ export default function PropertyClaimedEmail(
             }}
           >
             You have successfully connected{" "}
-            <strong>{props.propertyAddress}</strong> on Keynetic with{" "}
+            <strong>{props.propertyAddress}</strong> on MoveLoop with{" "}
             {props.branchName} at {props.companyName}.
           </Text>
 
@@ -78,5 +78,5 @@ export default function PropertyClaimedEmail(
 }
 
 export function getClaimSuccessfulSubject(): string {
-  return `Your property is connected on Keynetic`;
+  return `Your property is connected on MoveLoop`;
 }

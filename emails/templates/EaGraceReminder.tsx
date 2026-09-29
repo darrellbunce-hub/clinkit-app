@@ -5,15 +5,15 @@ import {
 import type { EaGraceReminderEmailParams } from "@/lib/communications/types";
 
 export function getEaGraceReminderSubject(): string {
-  return "Reminder: update your Keynetic payment details";
+  return "Reminder: update your MoveLoop payment details";
 }
 
 export default function EaGraceReminderEmail(props: EaGraceReminderEmailParams) {
   return (
     <BillingEmailShell
-      preview="Reminder: Keynetic payment recovery grace period is still open"
+      preview="Reminder: MoveLoop payment recovery grace period is still open"
       title="Payment recovery reminder"
-      footerReason="You received this email because your Keynetic Estate Agent subscription is still in a payment-recovery grace period."
+      footerReason="You received this email because your MoveLoop Estate Agent subscription is still in a payment-recovery grace period."
       manageBillingUrl={props.manageBillingUrl}
     >
       <BillingEmailParagraph>

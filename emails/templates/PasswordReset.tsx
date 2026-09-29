@@ -11,8 +11,8 @@ export default function PasswordResetEmail(
   props: PasswordResetEmailParams
 ) {
   return (
-    <EmailLayout preview="Reset your Keynetic password">
-      <ContentContainer footerReason="You received this email because a password reset was requested for your Keynetic account.">
+    <EmailLayout preview="Reset your MoveLoop password">
+      <ContentContainer footerReason="You received this email because a password reset was requested for your MoveLoop account.">
         <EmailSection style={{ paddingTop: 32, paddingBottom: 8 }}>
           <Heading
             as="h1"
@@ -46,7 +46,7 @@ export default function PasswordResetEmail(
               lineHeight: "26px",
             }}
           >
-            We received a request to reset the password for your Keynetic account.
+            We received a request to reset the password for your MoveLoop account.
             Use the button below to choose a new password.
           </Text>
         </EmailSection>
@@ -109,5 +109,5 @@ export default function PasswordResetEmail(
 }
 
 export function getPasswordResetSubject(): string {
-  return "Reset your Keynetic password";
+  return "Reset your MoveLoop password";
 }

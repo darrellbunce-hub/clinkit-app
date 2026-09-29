@@ -62,7 +62,7 @@ const HOMEOWNER_SELF_REASON_OPTIONS: ParticipationDelinkReasonOption[] = [
   { code: HOMEOWNER_SELF_DELINK_REASON.wrongProperty, label: "Wrong property" },
   {
     code: HOMEOWNER_SELF_DELINK_REASON.preferNotToUseKeynetic,
-    label: "Prefer not to use Keynetic",
+    label: "Prefer not to use MoveLoop",
   },
   { code: HOMEOWNER_SELF_DELINK_REASON.other, label: "Other" },
 ];

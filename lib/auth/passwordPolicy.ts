@@ -196,7 +196,7 @@ export function mapPasswordUpdateError(
     normalized.includes("characters") ||
     normalized.includes("password should")
   ) {
-    return `Password does not meet Keynetic requirements. ${PASSWORD_REQUIREMENT_DEFINITIONS.map(
+    return `Password does not meet MoveLoop requirements. ${PASSWORD_REQUIREMENT_DEFINITIONS.map(
       (requirement) => requirement.label.toLowerCase()
     ).join(", ")}.`;
   }
@@ -255,7 +255,7 @@ export function mapAuthSignUpError(message: string): string {
     normalized.includes("password") ||
     normalized.includes("characters")
   ) {
-    return `Password does not meet Keynetic requirements. ${PASSWORD_REQUIREMENT_DEFINITIONS.map(
+    return `Password does not meet MoveLoop requirements. ${PASSWORD_REQUIREMENT_DEFINITIONS.map(
       (requirement) => requirement.label.toLowerCase()
     ).join(", ")}.`;
   }

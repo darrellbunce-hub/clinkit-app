@@ -5,7 +5,7 @@ import {
 import type { EaSubscriptionCancelledEmailParams } from "@/lib/communications/types";
 
 export function getEaSubscriptionCancelledSubject(): string {
-  return "Your Keynetic subscription cancellation is confirmed";
+  return "Your MoveLoop subscription cancellation is confirmed";
 }
 
 export default function EaSubscriptionCancelledEmail(
@@ -13,9 +13,9 @@ export default function EaSubscriptionCancelledEmail(
 ) {
   return (
     <BillingEmailShell
-      preview="Your Keynetic subscription will end at the close of the current billing period"
+      preview="Your MoveLoop subscription will end at the close of the current billing period"
       title="Cancellation confirmed"
-      footerReason="You received this email because a Keynetic Estate Agent subscription cancellation was scheduled for your branch."
+      footerReason="You received this email because a MoveLoop Estate Agent subscription cancellation was scheduled for your branch."
       manageBillingUrl={props.manageBillingUrl}
     >
       <BillingEmailParagraph>

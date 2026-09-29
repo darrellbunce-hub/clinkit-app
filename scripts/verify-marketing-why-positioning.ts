@@ -58,9 +58,9 @@ assert(
 
 const navbar = readProjectFile("components/Navbar.tsx");
 assertIncludes(
-  "Public nav includes Why Keynetic",
+  "Public nav includes Why MoveLoop",
   navbar,
-  "Why Keynetic?"
+  "Why MoveLoop?"
 );
 assertIncludes(
   "Public nav links to /about",
@@ -73,9 +73,9 @@ const authenticatedNav =
   )?.[0]?.replace(/\) : \($/, "") ?? "";
 
 assertExcludes(
-  "Authenticated nav does not add Why Keynetic clutter",
+  "Authenticated nav does not add Why MoveLoop clutter",
   authenticatedNav,
-  "Why Keynetic?"
+  "Why MoveLoop?"
 );
 
 const homepage = readProjectFile("app/page.tsx");
@@ -135,12 +135,12 @@ const aboutPage = readProjectFile("app/about/page.tsx");
 assertIncludes(
   "About page hero",
   aboutPage,
-  "Why Keynetic?"
+  "Why MoveLoop?"
 );
 assertIncludes(
   "About page avoids government endorsement language",
   aboutPage,
-  "does not mean Keynetic has been government endorsed"
+  "does not mean MoveLoop has been government endorsed"
 );
 assertExcludes(
   "About page no government approved claim",

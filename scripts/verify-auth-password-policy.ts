@@ -135,7 +135,7 @@ assert(
 assert(
   mapPasswordUpdateError(
     "Password is too weak"
-  ).includes("Keynetic requirements"),
+  ).includes("MoveLoop requirements"),
   "password update weak error is descriptive"
 );
 

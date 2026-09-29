@@ -48,7 +48,7 @@ async function inspectPage(page, path, variantLabel) {
     waitUntil: "networkidle",
   });
 
-  const logoLink = page.locator('a[aria-label="Keynetic"]').first();
+  const logoLink = page.locator('a[aria-label^="MoveLoop"]').first();
   await logoLink.waitFor({ state: "visible", timeout: 15000 });
 
   const imgs = logoLink.locator("img");
@@ -64,10 +64,8 @@ async function inspectPage(page, path, variantLabel) {
 
   for (let i = 0; i < count; i++) {
     const img = imgs.nth(i);
-    const src = await img.getAttribute("src");
-    const kind = src?.includes("wordmark") ? "wordmark" : "icon";
     imageReports.push(
-      await reportElement(`${variantLabel} ${kind}`, img)
+      await reportElement(`${variantLabel} lockup`, img)
     );
   }
 
@@ -85,7 +83,7 @@ async function inspectMobile(page, path, variantLabel) {
     waitUntil: "networkidle",
   });
 
-  const logoLink = page.locator('a[aria-label="Keynetic"]').first();
+  const logoLink = page.locator('a[aria-label^="MoveLoop"]').first();
   await logoLink.waitFor({ state: "visible", timeout: 15000 });
 
   const imgs = logoLink.locator("img");
@@ -95,10 +93,8 @@ async function inspectMobile(page, path, variantLabel) {
 
   for (let i = 0; i < count; i++) {
     const img = imgs.nth(i);
-    const src = await img.getAttribute("src");
-    const kind = src?.includes("wordmark") ? "wordmark" : "icon";
     imageReports.push(
-      await reportElement(`${variantLabel} ${kind}`, img)
+      await reportElement(`${variantLabel} lockup`, img)
     );
   }
 

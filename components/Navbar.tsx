@@ -54,8 +54,8 @@ export default function Navbar() {
           max-w-6xl
           mx-auto
           px-6
-          py-4
-          sm:py-5
+          py-3
+          sm:py-4
           flex
           items-center
           justify-between
@@ -63,7 +63,7 @@ export default function Navbar() {
           min-w-0
         "
       >
-        <div className="min-w-0 flex-1">
+        <div className="flex min-w-0 flex-1">
           <Logo
             variant="dark"
             priority
@@ -115,7 +115,7 @@ export default function Navbar() {
       href={ROUTES.about}
       className={`${NAV_LINK_DARK_CLASS} px-4 py-2`}
     >
-      Why Keynetic?
+      Why MoveLoop?
     </Link>
 
     <Link
@@ -225,7 +225,7 @@ window.location.href = "/";
         setMobileMenuOpen(false)
       }
     >
-      Why Keynetic?
+      Why MoveLoop?
     </Link>
 
     <Link

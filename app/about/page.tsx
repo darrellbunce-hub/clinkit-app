@@ -45,7 +45,7 @@ export default function AboutPage() {
 
         <div className="relative mx-auto max-w-4xl px-6 py-16 md:py-24 text-center">
           <div className={`${HERO_BADGE_CLASS} mx-auto w-fit`}>
-            Why Keynetic?
+            Why MoveLoop?
           </div>
 
           <h1 className={`mt-6 ${HERO_TITLE_CLASS}`}>
@@ -61,7 +61,7 @@ export default function AboutPage() {
         <h2 className={MARKETING_SECTION_TITLE_CLASS}>Why we exist</h2>
 
         <p className="mt-6 text-lg text-slate-600 leading-relaxed">
-          Keynetic exists to bring clarity to one of life&apos;s biggest moves.
+          MoveLoop exists to bring clarity to one of life&apos;s biggest moves.
         </p>
 
         <p className="mt-4 text-slate-600 leading-relaxed">
@@ -88,8 +88,8 @@ export default function AboutPage() {
               The UK Government&apos;s June 2026 home buying and selling reform
               roadmap identifies limited transparency and fragmented processes as
               part of a wider challenge in residential property moves. The
-              evidence above validates the problem Keynetic is addressing — it
-              does not mean Keynetic has been government endorsed.
+              evidence above validates the problem MoveLoop is addressing — it
+              does not mean MoveLoop has been government endorsed.
             </p>
 
             <p className="mt-4 text-sm text-slate-500">
@@ -127,11 +127,11 @@ export default function AboutPage() {
         <div className={SECTION_CONTENT_CLASS}>
           <div className="max-w-4xl mx-auto">
             <h2 className={MARKETING_SECTION_TITLE_CLASS}>
-              What Keynetic isn&apos;t
+              What MoveLoop isn&apos;t
             </h2>
 
             <p className="mt-6 text-lg text-slate-600 leading-relaxed">
-              Keynetic doesn&apos;t sell certainty.
+              MoveLoop doesn&apos;t sell certainty.
             </p>
 
             <ul className="mt-6 space-y-3 text-slate-700 leading-relaxed">
