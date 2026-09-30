@@ -1,4 +1,4 @@
-const DEFAULT_EMAIL_FROM = "Keynetic <notifications@keynetic.co.uk>";
+const DEFAULT_EMAIL_FROM = "MoveLoop <notifications@moveloop.co.uk>";
 
 export function getEmailFromAddress(): string {
   return process.env.EMAIL_FROM?.trim() || DEFAULT_EMAIL_FROM;
