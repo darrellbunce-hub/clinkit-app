@@ -9,9 +9,9 @@ import {
 } from "@/lib/theme/themeTokens";
 
 export const metadata: Metadata = {
-  title: "Keynetic — Coming soon",
+  title: "MoveLoop — Coming soon",
   description:
-    "Keynetic is preparing to launch. A clearer way to follow your property chain.",
+    "MoveLoop is preparing to launch. A clearer way to follow your property chain.",
   robots: {
     index: false,
     follow: false,
@@ -36,28 +36,15 @@ export default function ComingSoonPage() {
 
       <div className="relative z-10 w-full max-w-xl text-center">
         <div className="mb-10 flex justify-center">
-          <div
-            className="inline-flex items-center gap-3"
-            aria-label="Keynetic"
-          >
-            <Image
-              src={logo.icon.src}
-              alt=""
-              width={logo.icon.width}
-              height={logo.icon.height}
-              className="h-10 w-10"
-              priority
-              aria-hidden
-            />
-            <Image
-              src={logo.wordmark.src}
-              alt="Keynetic"
-              width={logo.wordmark.width}
-              height={logo.wordmark.height}
-              className="h-8 w-auto"
-              priority
-            />
-          </div>
+          <Image
+            src={logo.src}
+            alt="MoveLoop — Moving Made Clear"
+            width={logo.width}
+            height={logo.height}
+            sizes="(min-width: 640px) 192px, 160px"
+            className="block h-20 w-auto max-w-full object-contain sm:h-24"
+            priority
+          />
         </div>
 
         <p className="text-sm font-medium uppercase tracking-[0.18em] text-brand-secondary">
@@ -65,7 +52,7 @@ export default function ComingSoonPage() {
         </p>
 
         <h1 className="mt-4 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
-          Keynetic is nearly ready.
+          MoveLoop is nearly ready.
         </h1>
 
         <p className="mt-5 text-base leading-relaxed text-teal-50/90 sm:text-lg">
