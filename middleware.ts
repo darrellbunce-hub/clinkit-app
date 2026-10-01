@@ -9,13 +9,33 @@ import {
   ROUTES,
 } from "@/lib/auth/routes";
 import { fetchCurrentUserContextFromUser } from "@/lib/currentUserContext";
+import { maybeHandleLaunchGate } from "@/lib/launchGate";
 
 export async function middleware(
   request: NextRequest
 ) {
-  let response = NextResponse.next({
+  const pathname = normalizePathname(
+    request.nextUrl.pathname
+  );
+
+  const launchGateResponse = await maybeHandleLaunchGate(
+    request,
+    pathname
+  );
+
+  if (launchGateResponse) {
+    return launchGateResponse;
+  }
+
+  const response = NextResponse.next({
     request,
   });
+
+  // Public / exempt routes: skip auth client work (unchanged behaviour when
+  // the launch gate is off, and for gated testers on public pages).
+  if (!isAccountGatedRoute(pathname)) {
+    return response;
+  }
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -44,14 +64,6 @@ export async function middleware(
       },
     }
   );
-
-  const pathname = normalizePathname(
-    request.nextUrl.pathname
-  );
-
-  if (!isAccountGatedRoute(pathname)) {
-    return response;
-  }
 
   const {
     data: { user },
@@ -119,17 +131,10 @@ export async function middleware(
 
 export const config = {
   matcher: [
-    "/account/:path*",
-    "/dashboard/:path*",
-    "/start-move/:path*",
-    "/join-chain/:path*",
-    "/my-chains/:path*",
-    "/claim/:path*",
-    "/chain/:path*",
-    "/property/:path*",
-    "/buyer-ready/:path*",
-    "/agent/:path*",
-    "/estate-agents/onboarding/:path*",
-    "/admin/:path*",
+    /*
+     * Match all request paths except Next internals and common static assets.
+     * Launch-gate exemptions (API, auth confirm, etc.) are enforced in code.
+     */
+    "/((?!_next/static|_next/image|_next/data|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|txt|xml|woff|woff2)$).*)",
   ],
 };

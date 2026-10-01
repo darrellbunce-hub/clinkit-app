@@ -35,6 +35,8 @@ import {
   previewEaBranchInvitation,
 } from "@/lib/estateAgent/branchTeam";
 import { createEstateAgentProfile } from "@/lib/estateAgent/createEstateAgentProfile";
+import { queuePendingEstateAgentProfile } from "@/lib/estateAgent/flushPendingEstateAgentProfile";
+import { buildEstateAgentSignupAuthMetadata } from "@/lib/estateAgent/signupAuthMetadata";
 import {
   LEGAL_DOCUMENT_VERSIONS,
   SIGNUP_LEGAL_ACCEPTANCE_ERROR,
@@ -195,6 +197,11 @@ function EstateAgentSignupContent() {
       const { data, error } = await supabase.auth.signUp({
         email: emailValidation.email,
         password,
+        options: {
+          data: buildEstateAgentSignupAuthMetadata(
+            trimmedContactName
+          ),
+        },
       });
 
       if (error) {
@@ -225,6 +232,21 @@ function EstateAgentSignupContent() {
         return;
       }
 
+      if (!data.session) {
+        // Email confirmation required — no authenticated JWT yet.
+        // Queue EA profile fields; never upsert profiles as anon.
+        queuePendingEstateAgentProfile({
+          contactName: trimmedContactName,
+          email: emailValidation.email,
+        });
+
+        window.location.href = inviteToken
+          ? `${ROUTES.estateAgentJoin}?token=${encodeURIComponent(inviteToken)}`
+          : "/verify-email";
+
+        return;
+      }
+
       const profileResult = await createEstateAgentProfile(
         supabase,
         {
@@ -236,14 +258,6 @@ function EstateAgentSignupContent() {
 
       if (profileResult.error) {
         setErrorMessage(profileResult.error);
-
-        return;
-      }
-
-      if (!data.session) {
-        window.location.href = inviteToken
-          ? `${ROUTES.estateAgentJoin}?token=${encodeURIComponent(inviteToken)}`
-          : "/verify-email";
 
         return;
       }

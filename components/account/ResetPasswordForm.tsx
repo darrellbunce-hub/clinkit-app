@@ -29,7 +29,6 @@ import {
 import { resolvePostLoginRedirect } from "@/lib/auth/redirects";
 import { ROUTES } from "@/lib/auth/routes";
 import { fetchAuthenticatedProfileAccountFields } from "@/lib/currentUserContext";
-import { ensureUserProfile } from "@/lib/profile/ensureUserProfile";
 import { supabase } from "@/lib/supabase";
 
 type ResetState =
@@ -78,17 +77,8 @@ export default function ResetPasswordForm() {
         return;
       }
 
-      const profileEnsure = await ensureUserProfile(supabase);
-
-      if (!profileEnsure.ok) {
-        setErrorMessage(
-          "We could not finish profile setup for your account. Try signing in again."
-        );
-        setState("error");
-
-        return;
-      }
-
+      // Recovery must not create/modify profiles — only resolve post-update
+      // navigation when a profile already exists.
       const profile =
         await fetchAuthenticatedProfileAccountFields(
           supabase,

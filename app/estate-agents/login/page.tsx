@@ -31,7 +31,7 @@ import {
 } from "@/lib/auth/redirects";
 import { ROUTES } from "@/lib/auth/routes";
 import { fetchAuthenticatedProfileAccountFields } from "@/lib/currentUserContext";
-import { ensureUserProfile } from "@/lib/profile/ensureUserProfile";
+import { bootstrapAuthenticatedEstateAgentProfile } from "@/lib/estateAgent/flushPendingEstateAgentProfile";
 import { flushPendingSignupLegalAcceptance } from "@/lib/legal/recordSignupLegalAcceptance";
 import { supabase } from "@/lib/supabase";
 
@@ -83,9 +83,10 @@ function EstateAgentLoginContent() {
         return;
       }
 
-      const profileEnsure = await ensureUserProfile(supabase);
+      const profileBootstrap =
+        await bootstrapAuthenticatedEstateAgentProfile(supabase);
 
-      if (!profileEnsure.ok) {
+      if (!profileBootstrap.ok) {
         setIsCheckingSession(false);
         setErrorMessage(
           "We could not finish profile setup for your account. Try again or contact support."
@@ -93,6 +94,8 @@ function EstateAgentLoginContent() {
 
         return;
       }
+
+      await flushPendingSignupLegalAcceptance(supabase);
 
       const profile =
         await fetchAuthenticatedProfileAccountFields(
@@ -159,9 +162,10 @@ function EstateAgentLoginContent() {
         return;
       }
 
-      const profileEnsure = await ensureUserProfile(supabase);
+      const profileBootstrap =
+        await bootstrapAuthenticatedEstateAgentProfile(supabase);
 
-      if (!profileEnsure.ok) {
+      if (!profileBootstrap.ok) {
         setErrorMessage(
           "Your account is signed in but we could not finish profile setup. Try again or contact support."
         );

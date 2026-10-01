@@ -103,36 +103,44 @@ See dedicated section below and [COMMUNICATIONS.md](./COMMUNICATIONS.md).
 
 ---
 
-## Email events retention proposal
+## Email events retention (working product policy)
 
-**P0 issue:** Indefinite retention of `recipient_email` today.
+**Status:** **implemented** in migration `20260910210000_data_retention_and_activity_controls.sql`  
+**Automation:** Vercel cron `GET/POST /api/cron/data-retention` (`0 30 3 * *` → `30 3 * * *`) via `CRON_SECRET` + service_role RPCs.  
+**Separate from** property-lifecycle cron (`/api/cron/property-lifecycle`).
 
-### Field-level classification
+These periods are **Keynetic working product/business policy**, not claims that UK law mandates the exact numbers.
 
-| Field | PII? | Proposed operational retention | Proposed erasure treatment | Status |
-|-------|------|-------------------------------|----------------------------|--------|
-| `recipient_email` | **Yes** | **90 days** raw, then irreversible transform | Redact/hash on RTBF immediately | **proposed** |
-| `sent_by` | Indirect (UUID) | Same as row | Null on erasure | **proposed** |
-| `template` | No | **24 months** | Retain | **proposed** |
-| `status` | No | **24 months** | Retain | **proposed** |
-| `created_at`, `updated_at` | No | **24 months** | Retain | **proposed** |
-| `provider_message_id` | Indirect | **12 months** | Retain until Resend deletion confirmed | **proposed** |
-| `provider_events` jsonb | **May contain PII** | **90 days** full payload; aggregate counts only after | Scrub on RTBF; truncate per schedule | **proposed** |
-| `error_message` | **May contain PII** | **90 days** | Scrub | **proposed** |
-| `property_id`, `chain_id`, `invitation_id` | Indirect | **24 months** | Null when property/user erased | **proposed** |
+### Field-level behaviour
 
-### Rationale (proposed)
+| Field | PII? | Working retention | RTBF | Automation |
+|-------|------|-------------------|------|------------|
+| `recipient_email` | **Yes** | Raw **0–90 days**; then `redacted+<id>@erased.local` | Redact immediately | `retain_email_events_batch` |
+| `provider_message_id` | Indirect | Cleared on 90-day redact | Cleared | Same |
+| `error_message` | **May contain PII** | Cleared/set `[redacted]` on 90-day redact | Scrub | Same |
+| `provider_events` | **May contain PII** | Cleared to `[]` on 90-day redact | Scrub | Same |
+| `template`, `status`, timestamps, FKs | Operational | Kept through redaction; **row deleted after 24 months only if already redacted** | Metrics retained until delete | Same |
+| Email HTML/subject bodies | — | **Not stored in Keynetic DB** (Resend only) | Manual Resend request | N/A |
 
-- **90 days raw email:** Sufficient for delivery dispute resolution and rate-limit audit (`invitationSendSecurity.ts`)
-- **24 months non-identifying metrics:** Template performance, failure rates without recipient identity
-- **Transform after 90 days:** Replace `recipient_email` with `redacted+<event_id>@erased.local` or HMAC — **implementation Phase 3+**
+### Billing email dispatches
 
-### Not implemented in Phase 1
+| Field | Behaviour |
+|-------|-----------|
+| `recipient_email` | Redact after **24 months** (ledger row **retained** for idempotency/audit) |
+| Ledger identity / status / timestamps / FKs | Retained |
+| GDPR `REDACT_EMAIL_REFERENCE` | Also redacts matching `billing_customer_email_dispatches` via `_gdpr_redact_billing_customer_email_dispatches` |
 
-- Scheduled deletion job
-- Automatic redaction cron
+### Invitations
 
-**Legal review required** before publishing retention periods in Privacy Policy.
+Invite emails redacted **30 days after expiry** when no active invitation remains; token hashes retained (up to security/audit need, working target 24 months for hashes).
+
+### Observability
+
+`maintenance_job_runs` records non-personal run counts/status. Dry-run: `preview_retain_*_batch` (service_role only — not a public HTTP endpoint).
+
+**Provider-side (Resend) retention/deletion is not automated by Keynetic.**
+
+**Legal review still required** before publishing exact periods in the public Privacy Policy.
 
 ---
 

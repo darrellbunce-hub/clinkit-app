@@ -144,9 +144,11 @@ npx tsx scripts/verify-lifecycle-still-active-confirmation.ts
 | `LIFECYCLE_DORMANCY_CONFIRMATION_DAYS` | 30 | B2 confirmation window |
 | `LIFECYCLE_EVALUATION_BATCH_SIZE` | 100 | Worker batch size |
 | `LIFECYCLE_WORKER_LEASE_SECONDS` | 300 | Per-property worker lease |
-| `CRON_SECRET` | — | Secures `/api/cron/property-lifecycle` |
+| `CRON_SECRET` | — | Secures `/api/cron/property-lifecycle` and `/api/cron/data-retention` |
 
 Postgres mirrors via `app.lifecycle_*` settings (optional).
+
+**Related (separate):** data-retention cron `/api/cron/data-retention` (`30 3 * * *`) handles email/billing/invitation metadata retention — it does **not** run inside this property lifecycle worker.
 
 ## Worker architecture
 
@@ -165,7 +167,8 @@ Query & Cost Governance: durable signals calculated on write; worker evaluates s
 
 ## Remaining before Right to Erasure
 
-- Per-user GDPR erase workflow (not lifecycle automation) — architecture audit: [GDPR Right to Erasure Architecture](./GDPR_RIGHT_TO_ERASURE_ARCHITECTURE.md)
-- Activity text PII review/redaction policy
+- Per-user GDPR erase workflow operational readiness (mailbox, DPAs, drills) — architecture: [GDPR Right to Erasure Architecture](./GDPR_RIGHT_TO_ERASURE_ARCHITECTURE.md)
 - Analytics platform ingestion from snapshots
 - Optional chain-completion webhook for faster grace entry
+
+**Note:** Arbitrary `activities.update` free text is blocked at DB level (`is_allowed_structured_activity_update`). Historical activity scrub on lifecycle anonymise remains a separate hardening item.

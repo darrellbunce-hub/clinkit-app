@@ -339,6 +339,20 @@ export async function createEaBranchCheckoutSession(input: {
   const config = getStripeServerConfig();
   const stripe = getStripeClient();
 
+  // Defence in depth: smoke-test fixture branches must never enter Checkout / founding.
+  const { data: isSmokeBranch } = await admin.rpc("is_smoke_test_ea_branch", {
+    p_branch_id: context.branchId,
+  });
+  if (isSmokeBranch === true) {
+    return {
+      ok: false,
+      error: "smoke_test_fixture_checkout_forbidden",
+      status: 403,
+      message:
+        "This branch is a Production smoke-test fixture and cannot start Checkout.",
+    };
+  }
+
   const { data: openSub } = await admin
     .from("ea_branch_subscriptions")
     .select(

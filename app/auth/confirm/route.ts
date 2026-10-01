@@ -1,3 +1,4 @@
+import { createServerClient } from "@supabase/ssr";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
@@ -7,7 +8,6 @@ import {
   stripAuthConfirmQueryParams,
 } from "@/lib/auth/authConfirm";
 import { ROUTES } from "@/lib/auth/routes";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 function redirectToPasswordRecoveryError(
   request: NextRequest,
@@ -21,23 +21,39 @@ function redirectToPasswordRecoveryError(
   return NextResponse.redirect(redirectUrl);
 }
 
-function redirectToAuthConfirmDestination(
+/**
+ * Create a server client that writes the auth session onto the redirect
+ * response. Required so verifyOtp / exchangeCodeForSession cookies survive
+ * the 307 to /reset-password.
+ */
+function createConfirmRedirectClient(
   request: NextRequest,
-  destinationPath: string
+  redirectResponse: NextResponse
 ) {
-  const redirectUrl = request.nextUrl.clone();
-  redirectUrl.pathname = destinationPath;
-  stripAuthConfirmQueryParams(redirectUrl);
-
-  return NextResponse.redirect(redirectUrl);
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            redirectResponse.cookies.set(name, value, options);
+          });
+        },
+      },
+    }
+  );
 }
 
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
   const tokenHash = searchParams.get("token_hash");
   const type = searchParams.get("type");
-  const providerErrorCode =
-    searchParams.get("error_code");
+  const code = searchParams.get("code");
+  const providerErrorCode = searchParams.get("error_code");
   const destination = resolveAuthConfirmDestination(
     searchParams.get("next")
   );
@@ -51,6 +67,34 @@ export async function GET(request: NextRequest) {
         providerErrorCode,
       })
     );
+  }
+
+  const successUrl = request.nextUrl.clone();
+  successUrl.pathname = destination;
+  stripAuthConfirmQueryParams(successUrl);
+  const redirectResponse = NextResponse.redirect(successUrl);
+  const supabase = createConfirmRedirectClient(
+    request,
+    redirectResponse
+  );
+
+  // PKCE / default ConfirmationURL redirects land with ?code= (no token_hash).
+  if (code) {
+    const { error } =
+      await supabase.auth.exchangeCodeForSession(code);
+
+    if (error) {
+      return redirectToPasswordRecoveryError(
+        request,
+        resolveAuthConfirmFailureCode({
+          tokenHash,
+          type,
+          verifyError: error,
+        })
+      );
+    }
+
+    return redirectResponse;
   }
 
   if (!tokenHash || !type) {
@@ -73,14 +117,10 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const supabase =
-    await createServerSupabaseClient();
-
-  const { error } =
-    await supabase.auth.verifyOtp({
-      type: "recovery",
-      token_hash: tokenHash,
-    });
+  const { error } = await supabase.auth.verifyOtp({
+    type: "recovery",
+    token_hash: tokenHash,
+  });
 
   if (error) {
     return redirectToPasswordRecoveryError(
@@ -93,10 +133,5 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  await supabase.rpc("ensure_user_profile");
-
-  return redirectToAuthConfirmDestination(
-    request,
-    destination
-  );
+  return redirectResponse;
 }

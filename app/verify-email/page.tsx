@@ -15,6 +15,7 @@ import {
   EMAIL_VERIFICATION_TRANSACTION_MESSAGE,
 } from "@/lib/auth/emailVerificationGate";
 import { ROUTES } from "@/lib/auth/routes";
+import { bootstrapAuthenticatedEstateAgentProfile } from "@/lib/estateAgent/flushPendingEstateAgentProfile";
 import { flushPendingSignupLegalAcceptance } from "@/lib/legal/recordSignupLegalAcceptance";
 import {
   BTN_ACCENT_CLASS,
@@ -55,11 +56,21 @@ function VerifyEmailContent() {
   }, []);
 
   useEffect(() => {
-    async function flushPendingAcceptance() {
+    async function flushPendingSignupState() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      // If a session already exists (e.g. confirmation landed with cookies),
+      // bootstrap EA from Auth metadata before any homeowner default.
+      if (user) {
+        await bootstrapAuthenticatedEstateAgentProfile(supabase);
+      }
+
       await flushPendingSignupLegalAcceptance(supabase);
     }
 
-    void flushPendingAcceptance();
+    void flushPendingSignupState();
   }, []);
 
   async function handleResend(

@@ -223,7 +223,7 @@ function runStaticMigrationChecks(): void {
     chain_properties_participant:
       "supabase/migrations/20260725140000_chain_properties_participant_stage_entered_at.sql",
     ea_branch_directory:
-      "supabase/migrations/20260610170000_phase4_ea_property_assignments.sql",
+      "supabase/migrations/20260902120000_smoke_test_fixtures.sql",
     ea_operational_assignments:
       "supabase/migrations/20260612000000_phase7a_ea_originated_properties.sql",
   };
@@ -282,14 +282,18 @@ function runStaticMigrationChecks(): void {
   );
 
   const directorySql = readProjectFile(currentDefs.ea_branch_directory);
+  const directoryBody = directorySql.slice(
+    directorySql.indexOf("create or replace view public.ea_branch_directory"),
+    directorySql.indexOf("comment on view public.ea_branch_directory")
+  );
   record(
     "ea_branch_directory has no auth.uid() predicate (intentional authenticated directory)",
-    !/auth\.uid\(\)/.test(
-      directorySql.slice(
-        directorySql.indexOf("create or replace view public.ea_branch_directory"),
-        directorySql.indexOf("comment on view public.ea_branch_directory")
-      )
-    )
+    !/auth\.uid\(\)/.test(directoryBody)
+  );
+  record(
+    "ea_branch_directory excludes active smoke-test fixture branches",
+    directoryBody.includes("smoke_test_fixture_objects") &&
+      directoryBody.includes("'ea_branch'")
   );
 
   const summarySql = readProjectFile(currentDefs.agent_branch_property_summaries);

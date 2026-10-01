@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "verify:ea-prop-authz": "npx tsx scripts/verify-create-ea-operational-property-authz-development.ts",
+    "verify:cleanup-authz": "npx tsx scripts/verify-cleanup-abandoned-onboarding-chain-authz-development.ts",
+    "verify:data-retention": "npx tsx scripts/verify-data-retention-and-activity-controls-development.ts"
   },
   "dependencies": {
     "@react-email/components": "^1.0.12",

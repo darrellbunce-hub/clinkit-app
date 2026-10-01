@@ -211,15 +211,35 @@ export function isSearchingPlaceholder<
 }
 
 /**
- * Addressed properties and stage searching placeholders participate in walks.
+ * Peer property whose address was redacted by the participant privacy view
+ * (address null) but which still participates in linked_property_id topology.
+ * Distinct from searching placeholders (stage === searching).
+ *
+ * Does not restore or expose the redacted address — existence/position only.
  */
-export function isRenderableTopologyProperty<
-  T extends TopologyProperty
+export function isPrivacyRedactedPeerProperty<
+  T extends Pick<
+    TopologyProperty,
+    "stage" | "address" | "relationship_type"
+  >
 >(property: T): boolean {
   return (
-    !!property.address ||
-    isSearchingPlaceholder(property)
+    !property.address &&
+    property.stage !== "searching" &&
+    (property.relationship_type === "sale" ||
+      property.relationship_type === "purchase")
   );
+}
+
+/**
+ * Every property loaded for the chain participates in linked_property_id walks.
+ *
+ * Privacy may null address/postcode for non-owned peers; that must not remove
+ * the node from topology or change walk roots for other participants.
+ * Labelling stays privacy-safe via getHomeownerPropertyLabel / chain tiles.
+ */
+export function isRenderableTopologyProperty<T>(_property: T): boolean {
+  return true;
 }
 
 function getRenderableProperties<
