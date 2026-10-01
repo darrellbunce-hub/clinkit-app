@@ -444,7 +444,7 @@ function main() {
   {
     const updated = requireFunction(functions, "break_chain_connection");
     const original = requireFunction(
-      extractFunctions(read("supabase/migrations/20260930200000_reconcile_development_to_production_baseline.sql")),
+      extractFunctions(read("supabase/migrations/20260610300000_phase5a_ea_delegated_mutations.sql")),
       "break_chain_connection"
     );
 
@@ -464,7 +464,7 @@ function main() {
     assert(
       normalize(updated.body.replace(/\n\s+and chain_id = v_property\.chain_id/g, "")) ===
         normalize(original.body),
-      "rest of the body is identical to 20260930200000"
+      "rest of the body is identical to 20260610300000"
     );
     assert(
       normalize(updated.header) === normalize(original.header),
@@ -472,7 +472,7 @@ function main() {
     );
     assert(
       /revoke all on function public\.break_chain_connection\(bigint, text\) from public;\s*grant execute on function public\.break_chain_connection\(bigint, text\) to authenticated;/i.test(migration),
-      "ACL restated as in 20260930200000"
+      "ACL restated as in 20260610300000"
     );
   }
 
