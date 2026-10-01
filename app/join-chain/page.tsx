@@ -15,6 +15,8 @@ import {
   migrateSourceChainOnwardProperties,
   relinkJoinedPropertyToSearching,
   resolveSearchingFromJoinIntent,
+  SOURCE_CHAIN_MIGRATION_FAILED_MESSAGE,
+  SourceChainMigrationError,
 } from "@/lib/joinChainSearching";
 import {
   establishConnectedHopAfterSellerJoinsPurchase,
@@ -266,7 +268,9 @@ function JoinChainContent() {
 
       if (!joinCompleted) {
         alert(
-          "An error occurred while finishing the join. Your membership may have been created, but setting up your next-home search step did not complete."
+          error instanceof SourceChainMigrationError
+            ? SOURCE_CHAIN_MIGRATION_FAILED_MESSAGE
+            : "An error occurred while finishing the join. Your membership may have been created, but setting up your next-home search step did not complete."
         );
       }
     }
