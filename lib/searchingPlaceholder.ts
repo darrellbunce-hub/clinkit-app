@@ -305,6 +305,53 @@ export async function attachSearchingPlaceholderToSale(
   };
 }
 
+type CreateSearchingPlaceholderForSaleRpcResult = {
+  ok?: boolean;
+  error?: string;
+  property_id?: number;
+};
+
+/**
+ * Creates (or returns) the searching placeholder linked from a sale in one
+ * transaction. Authorised via the sale; only the sale's existing homeowner
+ * receives an operational identity — never an estate agent. Used by EA sale
+ * origination; Start Move keeps attachSearchingPlaceholderToSale.
+ */
+export async function createSearchingPlaceholderForSale(
+  supabase: SupabaseClient,
+  params: {
+    salePropertyId: number;
+  }
+): Promise<AttachSearchingPlaceholderResult> {
+  const { data, error } = await supabase.rpc(
+    "create_searching_placeholder_for_sale",
+    {
+      p_sale_property_id: params.salePropertyId,
+    }
+  );
+
+  if (error) {
+    return {
+      ok: false,
+      error: error.message,
+    };
+  }
+
+  const result = data as CreateSearchingPlaceholderForSaleRpcResult | null;
+
+  if (!result?.ok || result.property_id == null) {
+    return {
+      ok: false,
+      error: result?.error ?? "searching_placeholder_create_failed",
+    };
+  }
+
+  return {
+    ok: true,
+    placeholderId: Number(result.property_id),
+  };
+}
+
 export type ConvertSearchingPlaceholderResult =
   | { ok: true; propertyId: number }
   | {

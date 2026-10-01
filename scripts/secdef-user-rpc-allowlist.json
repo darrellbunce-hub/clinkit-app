@@ -18,6 +18,7 @@
     { "schema": "public", "name": "create_ea_branch_invitation", "args": "uuid, text, text, text", "reason": "user_facing_product_rpc" },
     { "schema": "public", "name": "create_ea_operational_chain", "args": "text, text", "reason": "user_facing_product_rpc" },
     { "schema": "public", "name": "create_ea_operational_property", "args": "bigint, text, text, text, uuid, boolean, text, text, boolean", "reason": "user_facing_product_rpc" },
+    { "schema": "public", "name": "create_searching_placeholder_for_sale", "args": "bigint", "reason": "user_facing_product_rpc" },
     { "schema": "public", "name": "current_user_property_role", "args": "bigint", "reason": "user_facing_product_rpc" },
     { "schema": "public", "name": "defer_property_claim_invitation", "args": "bigint", "reason": "user_facing_product_rpc" },
     { "schema": "public", "name": "delink_estate_agent_from_property", "args": "bigint, uuid, text", "reason": "user_facing_product_rpc" },
