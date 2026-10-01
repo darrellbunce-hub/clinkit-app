@@ -3,6 +3,11 @@
  * Requires migrations applied:
  *   20260713120000_convert_searching_placeholder_for_sale.sql
  *   20260714150000_operational_identity_enforcement.sql
+ *   20261001110000_create_searching_placeholder_for_sale.sql
+ *   20261001130000_searching_placeholder_ownership_enforcement.sql
+ *
+ * Ownership assertions (unowned EA tiles, claim convergence, repair) live in
+ * scripts/verify-searching-placeholder-ownership-development.ts.
  */
 import { createClient } from "@supabase/supabase-js";
 import { readFileSync } from "fs";
@@ -166,9 +171,8 @@ async function main() {
     })
     .select("id")
     .single();
-  await hoA.rpc("establish_operational_homeowner", {
+  await hoA.rpc("establish_operational_homeowner_for_created_property", {
     p_property_id: saleA!.id,
-    p_granted_via: "start_move",
   });
   const attachA = await attachSearchingPlaceholderToSale(hoA, {
     chainId: chainAId,
@@ -229,7 +233,7 @@ async function main() {
   console.log("Scenario B", convertB);
   assert(convertB.ok, "Scenario B convert failed");
 
-  // Scenario C: EA converts before claim
+  // Scenario C: EA converts before claim (purchase stays unowned until claim)
   const stampC = Date.now() + 2;
   const eaCEmail = `ea-c-${stampC}@keynetic-test.dev`;
   const hoCEmail = `ho-c-${stampC}@keynetic-test.dev`;

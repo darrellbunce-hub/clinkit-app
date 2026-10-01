@@ -16,6 +16,34 @@ export type SourceChainMigrationResult = {
   onwardSaleMigrated: boolean;
 };
 
+export type SourceChainMigrationStep =
+  | "lookup_onward_searching"
+  | "lookup_onward_sale"
+  | "move_onward_searching"
+  | "move_onward_sale";
+
+/**
+ * Thrown when onward properties could not be moved off the source chain.
+ * Callers must not run cleanup_abandoned_onboarding_chain afterwards: it deletes
+ * every property still on the source chain.
+ */
+export class SourceChainMigrationError extends Error {
+  readonly step: SourceChainMigrationStep;
+  readonly sourceError: unknown;
+
+  constructor(step: SourceChainMigrationStep, sourceError: unknown) {
+    super(`Source chain migration failed at ${step}`);
+    this.name = "SourceChainMigrationError";
+    this.step = step;
+    this.sourceError = sourceError;
+  }
+}
+
+export const SOURCE_CHAIN_MIGRATION_FAILED_MESSAGE =
+  "We could not finish joining this chain because your existing move details " +
+  "could not be moved across. Your original move details have been kept and " +
+  "nothing was removed. Please contact support before trying again.";
+
 export type TopologyRelinkResult =
   | { ok: true; linkedSearchingId: number }
   | {
@@ -57,6 +85,7 @@ export async function migrateSourceChainOnwardProperties(
 ): Promise<SourceChainMigrationResult> {
   const {
     data: onwardSearching,
+    error: onwardSearchingError,
   } = await supabase
     .from("properties")
     .select("id")
@@ -65,8 +94,16 @@ export async function migrateSourceChainOnwardProperties(
     .eq("created_by_user_id", params.userId)
     .maybeSingle();
 
+  if (onwardSearchingError) {
+    throw new SourceChainMigrationError(
+      "lookup_onward_searching",
+      onwardSearchingError
+    );
+  }
+
   const {
     data: onwardSale,
+    error: onwardSaleError,
   } = await supabase
     .from("properties")
     .select("id")
@@ -76,24 +113,54 @@ export async function migrateSourceChainOnwardProperties(
     .neq("id", params.excludePropertyId)
     .maybeSingle();
 
+  if (onwardSaleError) {
+    throw new SourceChainMigrationError(
+      "lookup_onward_sale",
+      onwardSaleError
+    );
+  }
+
+  // RLS-filtered updates succeed with zero rows, so require exactly one updated row.
   if (onwardSearching) {
-    await supabase
+    const {
+      data: movedSearching,
+      error: moveSearchingError,
+    } = await supabase
       .from("properties")
       .update({
         chain_id: params.joinedProperty.chain_id,
       })
-      .eq("id", onwardSearching.id);
+      .eq("id", onwardSearching.id)
+      .select("id");
+
+    if (moveSearchingError || movedSearching?.length !== 1) {
+      throw new SourceChainMigrationError(
+        "move_onward_searching",
+        moveSearchingError ?? "no_row_updated"
+      );
+    }
   }
 
   if (onwardSale) {
-    await supabase
+    const {
+      data: movedSale,
+      error: moveSaleError,
+    } = await supabase
       .from("properties")
       .update({
         linked_property_id:
           params.joinedProperty.id,
         chain_id: params.joinedProperty.chain_id,
       })
-      .eq("id", onwardSale.id);
+      .eq("id", onwardSale.id)
+      .select("id");
+
+    if (moveSaleError || movedSale?.length !== 1) {
+      throw new SourceChainMigrationError(
+        "move_onward_sale",
+        moveSaleError ?? "no_row_updated"
+      );
+    }
   }
 
   return {

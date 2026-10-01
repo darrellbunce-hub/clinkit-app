@@ -140,3 +140,17 @@ select
     'public.list_recent_email_events(text, integer)',
     'EXECUTE'
   ) as auth_can_execute_list_recent_email_events;
+
+-- =============================================================================
+-- 6. SECURITY DEFINER ACL remediation (authoritative scripts)
+-- =============================================================================
+-- After applying 20260903214500_sec_revoke_internal_secdef_execute_grants.sql:
+--   node scripts/verify-secdef-acl-remediation.mjs
+--   node scripts/verify-secdef-execute-grants.mjs
+-- Expect PASS on remediation targets and zero unallowlisted anon/authenticated
+-- SECURITY DEFINER EXECUTE grants.
+select
+  'see scripts/verify-secdef-acl-remediation.sql' as remediation_acl_check,
+  'see scripts/verify-secdef-execute-grants.mjs' as regression_grant_check,
+  'see scripts/secdef-user-rpc-allowlist.json' as user_rpc_allowlist,
+  'see scripts/secdef-service-role-only-targets.json' as service_role_only_targets;

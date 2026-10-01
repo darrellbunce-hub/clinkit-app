@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { attachSearchingPlaceholderToSale } from "@/lib/searchingPlaceholder";
+import { createSearchingPlaceholderForSale } from "@/lib/searchingPlaceholder";
 import { refreshOperationalSummary } from "@/lib/operationalSummary/refreshOperationalSummary";
 
 export type FinalizeOperationalSaleCreationParams = {
@@ -37,10 +37,8 @@ export async function finalizeOperationalSaleCreation(
   }
 
   const attachResult =
-    await attachSearchingPlaceholderToSale(supabase, {
-      chainId: params.chainId,
+    await createSearchingPlaceholderForSale(supabase, {
       salePropertyId: params.salePropertyId,
-      userId: params.userId,
     });
 
   if (!attachResult.ok) {
