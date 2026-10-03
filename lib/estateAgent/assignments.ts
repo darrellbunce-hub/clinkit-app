@@ -145,84 +145,96 @@ export type AssignPropertyToBranchInput = {
   propertyId: number;
   branchId: string;
   homeownerOnlyUpdates: boolean;
-  assignedByUserId: string;
 };
 
+type AssignmentRpcResult = {
+  ok?: boolean;
+  error?: string;
+  assignment_id?: string;
+};
+
+export function formatPropertyEaAssignmentError(
+  code: string | null | undefined
+): string {
+  switch (code) {
+    case "not_authorized":
+      return "Only the homeowner selling this property can appoint or change its estate agent.";
+    case "branch_acts_for_buyer":
+      return "This branch represents the buyer of this property, so it cannot also act for you as seller.";
+    case "branch_not_found":
+      return "That estate agent branch could not be found.";
+    case "no_active_assignment":
+      return "This property has no estate agent assigned.";
+    case "invalid_property":
+      return "An estate agent cannot be assigned to this property.";
+    default:
+      return "Could not update the estate agent for this property.";
+  }
+}
+
+async function callAssignmentRpc(
+  supabase: SupabaseClient,
+  name: string,
+  args: Record<string, unknown>
+): Promise<{ assignmentId: string | null; error: string | null }> {
+  const { data, error } = await supabase.rpc(name, args);
+
+  if (error) {
+    return {
+      assignmentId: null,
+      error: formatPropertyEaAssignmentError(null),
+    };
+  }
+
+  const result = data as AssignmentRpcResult | null;
+
+  if (!result?.ok) {
+    return {
+      assignmentId: null,
+      error: formatPropertyEaAssignmentError(result?.error),
+    };
+  }
+
+  return {
+    assignmentId: result.assignment_id ?? null,
+    error: null,
+  };
+}
+
+/** Seller-side homeowner appoints (or replaces) the property's EA branch. */
 export async function assignPropertyToBranch(
   supabase: SupabaseClient,
   input: AssignPropertyToBranchInput
-): Promise<{ error: string | null }> {
-  const existingAssignment =
-    await loadPropertyEaAssignment(
-      supabase,
-      input.propertyId
-    );
-
-  if (
-    existingAssignment &&
-    existingAssignment.branch_id ===
-      input.branchId &&
-    existingAssignment.homeowner_only_updates ===
-      input.homeownerOnlyUpdates
-  ) {
-    return { error: null };
-  }
-
-  if (existingAssignment) {
-    const { error: revokeError } =
-      await supabase
-        .from("property_ea_assignments")
-        .update({
-          status: "revoked",
-          revoked_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", existingAssignment.id);
-
-    if (revokeError) {
-      return { error: revokeError.message };
-    }
-  }
-
-  const { error: insertError } = await supabase
-    .from("property_ea_assignments")
-    .insert({
-      property_id: input.propertyId,
-      branch_id: input.branchId,
-      status: "active",
-      homeowner_only_updates:
+): Promise<{ assignmentId: string | null; error: string | null }> {
+  return callAssignmentRpc(
+    supabase,
+    "assign_property_ea_branch",
+    {
+      p_property_id: input.propertyId,
+      p_branch_id: input.branchId,
+      p_homeowner_only_updates:
         input.homeownerOnlyUpdates,
-      assigned_by_user_id:
-        input.assignedByUserId,
-    });
-
-  if (insertError) {
-    return { error: insertError.message };
-  }
-
-  return { error: null };
+    }
+  );
 }
 
+/** Seller-side homeowner sets whether their EA branch may post updates. */
 export async function updatePropertyEaDelegation(
   supabase: SupabaseClient,
-  assignmentId: string,
+  propertyId: number,
   homeownerOnlyUpdates: boolean
 ): Promise<{ error: string | null }> {
-  const { error } = await supabase
-    .from("property_ea_assignments")
-    .update({
-      homeowner_only_updates:
+  const { error } = await callAssignmentRpc(
+    supabase,
+    "set_property_ea_update_permission",
+    {
+      p_property_id: propertyId,
+      p_homeowner_only_updates:
         homeownerOnlyUpdates,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", assignmentId)
-    .eq("status", "active");
+    }
+  );
 
-  if (error) {
-    return { error: error.message };
-  }
-
-  return { error: null };
+  return { error };
 }
 
 export async function loadAgentBranchPropertySummaries(

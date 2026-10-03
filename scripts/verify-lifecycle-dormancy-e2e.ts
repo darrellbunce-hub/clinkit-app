@@ -1,9 +1,21 @@
 /**
- * Development-only end-to-end verification:
- * stale connected transaction → worker → dormancy_warning → notification → confirm → active
+ * Development-only end-to-end verification of the bounded placeholder
+ * lifecycle (20261005130000):
  *
- * Requires migrations through 20260714202000_harden_confirm_still_active_authority.sql
- * and Development Supabase (.env.local with service role + anon key).
+ *   managed homeowner sale + long inactivity → worker plans and applies
+ *     nothing; confirmation is a managed no-op
+ *   buyer-held placeholder in dormancy_warning → recipient is its buyer →
+ *     notification once → buyer confirms → active, last_still_active_confirmed_at
+ *     recorded, last_operational_activity_at unchanged (a confirmation is
+ *     audited, not operational activity) → idempotent → not re-warned
+ *
+ * The warning itself is a fixture: placeholder clocks are anchored no earlier
+ * than the rollout effective-from instant, so the worker cannot plan a warning
+ * for a fresh row. The full expire/dormant path is covered by
+ * verify-lifecycle-bounded-dormancy-development.ts (L14).
+ *
+ * Requires 20261005130000 and Development Supabase (.env.local with service
+ * role + anon key).
  *
  * Usage:
  *   npx tsx scripts/verify-lifecycle-dormancy-e2e.ts
@@ -107,8 +119,8 @@ function serviceClient() {
   });
 }
 
-async function signUpHomeowner(stamp: number) {
-  const email = `lifecycle-e2e-${stamp}@keynetic-test.dev`;
+async function signUpHomeowner(stamp: number, label = "ho") {
+  const email = `lifecycle-e2e-${label}-${stamp}@keynetic-test.dev`;
   const boot = createClient(url!, anonKey!, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
@@ -129,10 +141,10 @@ async function signUpHomeowner(stamp: number) {
   return { client, userId };
 }
 
-async function createChain(client: SupabaseClient, stamp: number) {
+async function createChain(client: SupabaseClient, stamp: number, label = "A") {
   const { data, error } = await client.rpc("create_chain_for_onboarding", {
-    p_name: `Lifecycle E2E ${stamp}`,
-    p_access_code: `LE2E${stamp}`,
+    p_name: `Lifecycle E2E ${label} ${stamp}`,
+    p_access_code: `LE2E${label}${stamp}`,
   });
   if (error || !data?.ok) {
     throw new Error(error?.message ?? data?.error ?? "chain_create_failed");
@@ -147,6 +159,7 @@ async function insertProperty(params: {
   userId: string;
   stamp: number;
   label: string;
+  relationship?: "sale" | "purchase";
 }) {
   const { data, error } = await params.client
     .from("properties")
@@ -157,7 +170,7 @@ async function insertProperty(params: {
       postcode: "E1 1E2",
       stage: "property_listed",
       status: "healthy",
-      relationship_type: "sale",
+      relationship_type: params.relationship ?? "sale",
       created_by_user_id: params.userId,
       buyer_connected: false,
       seller_connected: false,
@@ -166,6 +179,30 @@ async function insertProperty(params: {
     .single();
   if (error || !data) throw new Error(error?.message ?? "property_insert_failed");
   return data.id as number;
+}
+
+/** Fixture: a pending dormancy warning on a placeholder (deadline relative to now). */
+async function setPlaceholderWarning(
+  admin: SupabaseClient,
+  propertyId: number,
+  deadlineInDays: number
+): Promise<void> {
+  const now = Date.now();
+  const { error } = await admin.from("property_lifecycle_states").upsert(
+    {
+      property_id: propertyId,
+      operational_state: "dormancy_warning",
+      lifecycle_reason: "verify_lifecycle_dormancy_e2e",
+      entered_state_at: new Date(now).toISOString(),
+      seller_side_unrepresented_since: new Date(now - 200 * DAY_MS).toISOString(),
+      dormancy_warning_at: new Date(now - (30 - deadlineInDays) * DAY_MS).toISOString(),
+      dormancy_confirmation_deadline_at: new Date(now + deadlineInDays * DAY_MS).toISOString(),
+      dormancy_warning_notified_at: null,
+      dormancy_warning_notification_claimed_at: null,
+    },
+    { onConflict: "property_id" }
+  );
+  if (error) throw new Error(`warning fixture: ${error.message}`);
 }
 
 async function simulateConnectedInactivity(params: {
@@ -252,31 +289,25 @@ async function main() {
     `Simulated inactivity: ${inactiveDays} days (threshold ${config.connectedDormantDays})\n`
   );
 
-  const { client: homeownerClient, userId: homeownerId } =
-    await signUpHomeowner(stamp);
-  const chainId = await createChain(homeownerClient, stamp);
+  const service = new PropertyLifecycleService(admin);
 
-  const primaryPropertyId = await insertProperty({
+  // Managed homeowner sale: never warned through inactivity.
+  const { client: homeownerClient, userId: homeownerId } =
+    await signUpHomeowner(stamp, "ho");
+  const chainId = await createChain(homeownerClient, stamp, "A");
+
+  const managedPropertyId = await insertProperty({
     client: homeownerClient,
     chainId,
     chainPosition: 1,
     userId: homeownerId,
     stamp,
-    label: "E2E Primary",
-  });
-
-  const peerPropertyId = await insertProperty({
-    client: homeownerClient,
-    chainId,
-    chainPosition: 2,
-    userId: homeownerId,
-    stamp,
-    label: "E2E Peer",
+    label: "E2E Managed",
   });
 
   const { data: grant, error: grantError } = await homeownerClient.rpc(
-    "establish_operational_homeowner",
-    { p_property_id: primaryPropertyId, p_granted_via: "start_move" }
+    "establish_operational_homeowner_for_created_property",
+    { p_property_id: managedPropertyId }
   );
   record(
     "Fixture: operational homeowner established via RPC",
@@ -287,99 +318,96 @@ async function main() {
   await simulateConnectedInactivity({
     admin,
     chainId,
-    propertyIds: [primaryPropertyId, peerPropertyId],
+    propertyIds: [managedPropertyId],
     inactiveDays,
   });
 
-  const service = new PropertyLifecycleService(admin);
-  const contextBefore = await service.loadContext(primaryPropertyId);
-
-  if (!contextBefore) {
-    throw new Error("Could not load lifecycle context for test property.");
+  const managedContext = await service.loadContext(managedPropertyId);
+  if (!managedContext) {
+    throw new Error("Could not load lifecycle context for the managed property.");
   }
-
+  const managedEvaluation = service.evaluateContext(managedContext);
   record(
-    "Pre-worker: connected chain with stale operational activity",
-    Boolean(
-      contextBefore?.isChainConnected &&
-        (contextBefore.daysSinceChainOperationalActivity ?? 0) >=
-          config.connectedDormantDays
-    ),
+    "Managed: homeowner sale after long inactivity has no dormancy plan",
+    managedContext.sellerSide === "homeowner" &&
+      managedEvaluation.plannedActions.length === 0,
     JSON.stringify({
-      isChainConnected: contextBefore?.isChainConnected,
-      daysSinceChainOperationalActivity:
-        contextBefore?.daysSinceChainOperationalActivity,
-      hasMeaningfulParticipation: contextBefore?.hasMeaningfulParticipation,
+      sellerSide: managedContext.sellerSide,
+      planned: managedEvaluation.plannedActions,
     })
   );
 
-  const evaluation = service.evaluateContext(contextBefore);
-  record(
-    "Evaluator plans enter_dormancy_warning via real worker path",
-    evaluation.plannedActions.includes(
-      PROPERTY_LIFECYCLE_ACTION.enterDormancyWarning
-    ),
-    JSON.stringify(evaluation.plannedActions)
-  );
-
-  const lifecycleBeforeWorker = await loadLifecycleRow(admin, primaryPropertyId);
-  record(
-    "Pre-worker lifecycle state is active",
-    lifecycleBeforeWorker.operational_state ===
-      PROPERTY_OPERATIONAL_STATE.active
-  );
-
-  const workerRunId = randomUUID();
-  const applyResult = await applyLifecyclePlan({
+  const managedApply = await applyLifecyclePlan({
     supabase: admin,
-    evaluation,
-    workerRunId,
+    evaluation: managedEvaluation,
+    workerRunId: randomUUID(),
+  });
+  const managedLifecycle = await loadLifecycleRow(admin, managedPropertyId);
+  record(
+    "Managed: worker applies nothing; state stays active",
+    managedApply.appliedActions.length === 0 &&
+      managedLifecycle.operational_state === PROPERTY_OPERATIONAL_STATE.active,
+    JSON.stringify({ applied: managedApply.appliedActions, errors: managedApply.errors })
+  );
+
+  const { data: managedConfirm } = await homeownerClient.rpc(
+    "confirm_transaction_still_active",
+    { p_property_id: managedPropertyId }
+  );
+  const { count: managedConfirmations } = await admin
+    .from("property_lifecycle_still_active_confirmations")
+    .select("id", { count: "exact", head: true })
+    .eq("property_id", managedPropertyId);
+  record(
+    "Managed: confirmation is a no-op (no clock, no audit row)",
+    managedConfirm?.ok === true &&
+      managedConfirm?.managed === true &&
+      managedConfirmations === 0,
+    JSON.stringify(managedConfirm)
+  );
+
+  // Buyer-held purchase with no seller side: a placeholder whose dependent
+  // side is its buyer.
+  const { client: buyerClient, userId: buyerId } =
+    await signUpHomeowner(stamp, "buyer");
+  const buyerChainId = await createChain(buyerClient, stamp, "B");
+
+  const primaryPropertyId = await insertProperty({
+    client: buyerClient,
+    chainId: buyerChainId,
+    chainPosition: 1,
+    userId: buyerId,
+    stamp,
+    label: "E2E Placeholder",
+    relationship: "purchase",
   });
 
+  const { data: buyerGrant, error: buyerGrantError } = await buyerClient.rpc(
+    "establish_operational_homeowner_for_created_property",
+    { p_property_id: primaryPropertyId }
+  );
   record(
-    "Worker apply: active → dormancy_warning",
-    applyResult.appliedActions.includes(
-      PROPERTY_LIFECYCLE_ACTION.enterDormancyWarning
-    ),
+    "Fixture: buyer holds the purchase; seller side unrepresented",
+    !buyerGrantError && buyerGrant?.ok === true,
+    buyerGrantError?.message ?? buyerGrant?.error
+  );
+
+  await setPlaceholderWarning(admin, primaryPropertyId, 20);
+
+  const placeholderContext = await service.loadContext(primaryPropertyId);
+  if (!placeholderContext) {
+    throw new Error("Could not load lifecycle context for the placeholder.");
+  }
+  const placeholderEvaluation = service.evaluateContext(placeholderContext);
+  record(
+    "Placeholder: seller side none; warning pending inside its window plans nothing",
+    placeholderContext.sellerSide === "none" &&
+      placeholderContext.operationalState === PROPERTY_OPERATIONAL_STATE.dormancyWarning &&
+      placeholderEvaluation.plannedActions.length === 0,
     JSON.stringify({
-      applied: applyResult.appliedActions,
-      errors: applyResult.errors,
+      sellerSide: placeholderContext.sellerSide,
+      planned: placeholderEvaluation.plannedActions,
     })
-  );
-
-  const lifecycleWarning = await loadLifecycleRow(admin, primaryPropertyId);
-  record(
-    "Transition: operational_state is dormancy_warning",
-    lifecycleWarning.operational_state ===
-      PROPERTY_OPERATIONAL_STATE.dormancyWarning
-  );
-  record(
-    "Transition: dormancy_warning_at populated",
-    Boolean(lifecycleWarning.dormancy_warning_at)
-  );
-  record(
-    "Transition: dormancy_confirmation_deadline_at populated",
-    Boolean(lifecycleWarning.dormancy_confirmation_deadline_at)
-  );
-  record(
-    "Transition: notification not yet marked before delivery",
-    lifecycleWarning.dormancy_warning_notified_at === null
-  );
-
-  const { data: warningEvent } = await admin
-    .from("property_lifecycle_events")
-    .select("from_state, to_state, trigger, scenario")
-    .eq("property_id", primaryPropertyId)
-    .eq("to_state", "dormancy_warning")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  record(
-    "Audit: lifecycle event recorded for dormancy_warning",
-    warningEvent?.from_state === "active" &&
-      warningEvent?.to_state === "dormancy_warning" &&
-      warningEvent?.trigger === "worker"
   );
 
   const { data: recipientBeforeSend } = await admin.rpc(
@@ -387,12 +415,16 @@ async function main() {
     { p_property_id: primaryPropertyId }
   );
   const recipientRow = (
-    (recipientBeforeSend ?? []) as Array<{ homeowner_user_id?: string }>
+    (recipientBeforeSend ?? []) as Array<{
+      recipient_user_id?: string;
+      recipient_kind?: string;
+    }>
   )[0];
 
   record(
-    "Recipient: active operational homeowner resolved (no PII printed)",
-    recipientRow?.homeowner_user_id === homeownerId
+    "Recipient: the placeholder's buyer (dependent side) is resolved (no PII printed)",
+    recipientRow?.recipient_user_id === buyerId &&
+      recipientRow?.recipient_kind === "buyer"
   );
 
   let notificationSendCount = 0;
@@ -452,13 +484,23 @@ async function main() {
     .eq("id", primaryPropertyId)
     .single();
 
-  const confirmResult = await confirmTransactionStillActive({
+  const outsiderConfirm = await confirmTransactionStillActive({
     supabase: homeownerClient,
+    propertyId: primaryPropertyId,
+  });
+  record(
+    "Confirmation: a user who is not the placeholder's dependent side is refused",
+    !outsiderConfirm.ok && outsiderConfirm.error === "not_authorised",
+    JSON.stringify(outsiderConfirm)
+  );
+
+  const confirmResult = await confirmTransactionStillActive({
+    supabase: buyerClient,
     propertyId: primaryPropertyId,
   });
 
   record(
-    "Confirmation: authenticated homeowner returns lifecycle to active",
+    "Confirmation: the placeholder's buyer returns lifecycle to active",
     confirmResult.ok &&
       confirmResult.operationalState === PROPERTY_OPERATIONAL_STATE.active
   );
@@ -486,23 +528,26 @@ async function main() {
     .single();
 
   record(
-    "Confirmation: last_operational_activity_at updated",
-    Boolean(propertyActivityAfterConfirm?.last_operational_activity_at) &&
-      propertyActivityAfterConfirm?.last_operational_activity_at !==
-        propertyActivityBeforeConfirm?.last_operational_activity_at
+    "Confirmation: last_operational_activity_at unchanged (audited confirmation, not operational activity)",
+    propertyActivityAfterConfirm?.last_operational_activity_at ===
+      propertyActivityBeforeConfirm?.last_operational_activity_at,
+    JSON.stringify({
+      before: propertyActivityBeforeConfirm?.last_operational_activity_at,
+      after: propertyActivityAfterConfirm?.last_operational_activity_at,
+    })
   );
 
   const { count: confirmationCount } = await admin
     .from("property_lifecycle_still_active_confirmations")
     .select("id", { count: "exact", head: true })
     .eq("property_id", primaryPropertyId)
-    .eq("user_id", homeownerId);
+    .eq("user_id", buyerId);
 
   const { data: confirmationRows } = await admin
     .from("property_lifecycle_still_active_confirmations")
     .select("confirmation_code")
     .eq("property_id", primaryPropertyId)
-    .eq("user_id", homeownerId)
+    .eq("user_id", buyerId)
     .limit(1);
 
   record(
@@ -512,7 +557,7 @@ async function main() {
   );
 
   const repeatConfirm = await confirmTransactionStillActive({
-    supabase: homeownerClient,
+    supabase: buyerClient,
     propertyId: primaryPropertyId,
   });
 
@@ -557,35 +602,23 @@ async function main() {
 
   await simulateConnectedInactivity({
     admin,
-    chainId,
-    propertyIds: [primaryPropertyId, peerPropertyId],
+    chainId: buyerChainId,
+    propertyIds: [primaryPropertyId],
     inactiveDays,
   });
 
-  const futureContext = await service.loadContext(primaryPropertyId);
-  const futureEvaluation = service.evaluateContext(futureContext!);
+  const laterContext = await service.loadContext(primaryPropertyId);
+  const laterEvaluation = service.evaluateContext(laterContext!);
   record(
-    "Future cycle: evaluator plans dormancy_warning after renewed inactivity",
-    futureEvaluation.plannedActions.includes(
+    "Placeholder clock follows the confirmation, not operational activity: no warning planned after backdated activity",
+    !laterEvaluation.plannedActions.includes(
       PROPERTY_LIFECYCLE_ACTION.enterDormancyWarning
-    )
+    ),
+    JSON.stringify(laterEvaluation.plannedActions)
   );
 
-  const futureApply = await applyLifecyclePlan({
-    supabase: admin,
-    evaluation: futureEvaluation,
-    workerRunId: randomUUID(),
-  });
-
-  record(
-    "Future cycle: worker can enter dormancy_warning again",
-    futureApply.appliedActions.includes(
-      PROPERTY_LIFECYCLE_ACTION.enterDormancyWarning
-    )
-  );
-
-  console.log(`\nTest fixture property ID: ${primaryPropertyId}`);
-  console.log(`Chain ID: ${chainId}`);
+  console.log(`\nTest fixture property IDs: ${managedPropertyId}, ${primaryPropertyId}`);
+  console.log(`Chain IDs: ${chainId}, ${buyerChainId}`);
   console.log("No real Resend emails were sent.\n");
 
   summarize();

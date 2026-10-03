@@ -144,6 +144,10 @@ export function resolveOperationalSubject(
 /**
  * Applies the operational subject's membership lens so the existing
  * participant-centric resolver sees seller/buyer hops as the subject would.
+ *
+ * An EA branch always acts for the seller side of its assigned row (sale or
+ * purchase), so the assigned row is the subject's sale and the purchase it
+ * links to is the subject's onward purchase.
  */
 export function applyOperationalSubjectLens(
   chainProperties: OperationalProperty[],
@@ -166,24 +170,18 @@ export function applyOperationalSubjectLens(
     return chainProperties;
   }
 
-  const assignedRole =
-    assignedProperty.relationship_type === "purchase"
-      ? "buyer"
-      : "seller";
-
   return chainProperties.map((property) => {
     if (property.id === subject.assignedPropertyId) {
       return {
         ...property,
         isOwnProperty: true,
         is_own_property: true,
-        currentUserRole: assignedRole,
-        current_user_role: assignedRole,
+        currentUserRole: "seller",
+        current_user_role: "seller",
       };
     }
 
     if (
-      assignedRole === "seller" &&
       property.relationship_type === "purchase" &&
       (property.linked_property_id ===
         subject.assignedPropertyId ||
@@ -196,23 +194,6 @@ export function applyOperationalSubjectLens(
         is_own_property: true,
         currentUserRole: "buyer",
         current_user_role: "buyer",
-      };
-    }
-
-    if (
-      assignedRole === "buyer" &&
-      property.relationship_type === "sale" &&
-      (property.linked_property_id ===
-        subject.assignedPropertyId ||
-        assignedProperty.linked_property_id ===
-          property.id)
-    ) {
-      return {
-        ...property,
-        isOwnProperty: true,
-        is_own_property: true,
-        currentUserRole: "seller",
-        current_user_role: "seller",
       };
     }
 

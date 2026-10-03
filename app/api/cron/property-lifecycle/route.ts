@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { isAuthorizedLifecycleCronRequest } from "@/lib/lifecycle/cronAuth";
-import { runPropertyLifecycleWorkerBatch } from "@/lib/lifecycle/worker";
+import { runPropertyLifecycleWorker } from "@/lib/lifecycle/worker";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/serviceRole";
 
 export const runtime = "nodejs";
@@ -9,10 +9,11 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 /**
- * Scheduled property lifecycle worker.
+ * Property lifecycle worker.
  *
- * Secured via Authorization: Bearer ${CRON_SECRET}.
- * Configure in vercel.json and set CRON_SECRET in Vercel env.
+ * Secured via Authorization: Bearer ${CRON_SECRET}. Disabled unless
+ * LIFECYCLE_CRON_ENABLED is "true"; it has no vercel.json schedule until the
+ * bounded placeholder lifecycle is approved for the target environment.
  */
 export async function GET(request: Request) {
   const authorization = request.headers.get("authorization");
@@ -21,13 +22,19 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  if (process.env.LIFECYCLE_CRON_ENABLED !== "true") {
+    return NextResponse.json({ ok: true, disabled: true });
+  }
+
   try {
     const supabase = createServiceRoleSupabaseClient();
-    const result = await runPropertyLifecycleWorkerBatch(supabase);
+    const result = await runPropertyLifecycleWorker(supabase);
 
     return NextResponse.json({
       ok: true,
       workerRunId: result.workerRunId,
+      batchCount: result.batchCount,
+      timeBudgetExhausted: result.timeBudgetExhausted,
       candidateCount: result.candidateCount,
       processedCount: result.processedCount,
       appliedCount: result.appliedCount,

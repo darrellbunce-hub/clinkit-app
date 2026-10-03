@@ -1,16 +1,66 @@
 import { Heading, Link, Text } from "@react-email/components";
 
-import type { DormancyWarningEmailParams } from "@/lib/communications/types";
+import type {
+  DormancyWarningAudience,
+  DormancyWarningEmailParams,
+} from "@/lib/communications/types";
 import { EMAIL_BRAND } from "@/emails/brand";
 import ContentContainer from "@/emails/components/ContentContainer";
 import PrimaryButton from "@/emails/components/PrimaryButton";
 import EmailSection from "@/emails/components/Section";
 import EmailLayout from "@/emails/layout/EmailLayout";
 
+const COPY: Record<
+  DormancyWarningAudience,
+  {
+    preview: string;
+    footerReason: string;
+    heading: string;
+    paragraphs: string[];
+    button: string;
+  }
+> = {
+  buyer: {
+    preview: "Confirm whether your MoveLoop property transaction is still active",
+    footerReason:
+      "You received this email because a property linked to your transaction on MoveLoop has entered a dormancy warning period.",
+    heading: "Is your property transaction still active?",
+    paragraphs: [
+      "A property linked to your transaction on MoveLoop is still waiting for its seller to connect, and it has not had any recent activity.",
+      "If the transaction is still going ahead, please confirm that it is still active. This helps us keep property chains accurate and prevents properties nobody is acting for from remaining linked indefinitely.",
+      "If we don't receive confirmation, that property will be released after the confirmation period and removed from your chain. Confirming does not give you any control over the property.",
+      "No action is required if the transaction is no longer going ahead.",
+    ],
+    button: "Confirm my transaction is still active",
+  },
+  estate_agent: {
+    preview: "Confirm whether a transaction your branch is involved in on MoveLoop is still active",
+    footerReason:
+      "You received this email because a property linked to a sale your branch manages on MoveLoop has entered a dormancy warning period.",
+    heading: "Is this onward purchase still going ahead?",
+    paragraphs: [
+      "Your client's onward purchase on MoveLoop is still waiting for its seller to connect, and it has not had any recent activity.",
+      "If the purchase is still going ahead, please confirm that it is still active.",
+      "If we don't receive confirmation, the onward purchase will be released after the confirmation period and removed from the chain. Confirming does not give your branch any control over that property.",
+      "No action is required if the purchase is no longer going ahead.",
+    ],
+    button: "Confirm this purchase is still active",
+  },
+};
+
+const PARAGRAPH_STYLE = {
+  margin: "0 0 16px",
+  color: EMAIL_BRAND.charcoal,
+  fontSize: 16,
+  lineHeight: "26px",
+};
+
 export default function DormancyWarningEmail(props: DormancyWarningEmailParams) {
+  const copy = COPY[props.audience ?? "buyer"];
+
   return (
-    <EmailLayout preview="Confirm whether your MoveLoop property transaction is still active">
-      <ContentContainer footerReason="You received this email because your property transaction on MoveLoop has entered a dormancy warning period.">
+    <EmailLayout preview={copy.preview}>
+      <ContentContainer footerReason={copy.footerReason}>
         <EmailSection style={{ paddingTop: 32, paddingBottom: 8 }}>
           <Heading
             as="h1"
@@ -22,60 +72,19 @@ export default function DormancyWarningEmail(props: DormancyWarningEmailParams) 
               fontWeight: 700,
             }}
           >
-            Is your property transaction still active?
+            {copy.heading}
           </Heading>
 
-          <Text
-            style={{
-              margin: "0 0 16px",
-              color: EMAIL_BRAND.charcoal,
-              fontSize: 16,
-              lineHeight: "26px",
-            }}
-          >
-            Your property transaction on MoveLoop has not had any recent activity.
-          </Text>
-
-          <Text
-            style={{
-              margin: "0 0 16px",
-              color: EMAIL_BRAND.charcoal,
-              fontSize: 16,
-              lineHeight: "26px",
-            }}
-          >
-            If your move is still progressing, please confirm that your transaction
-            is still active. This helps us keep property chains accurate and prevents
-            inactive properties from remaining linked indefinitely.
-          </Text>
-
-          <Text
-            style={{
-              margin: "0 0 16px",
-              color: EMAIL_BRAND.charcoal,
-              fontSize: 16,
-              lineHeight: "26px",
-            }}
-          >
-            If we don&apos;t receive confirmation, your participation may eventually
-            be released from the transaction after the confirmation period.
-          </Text>
-
-          <Text
-            style={{
-              margin: "0 0 16px",
-              color: EMAIL_BRAND.charcoal,
-              fontSize: 16,
-              lineHeight: "26px",
-            }}
-          >
-            No action is required if you no longer wish to participate.
-          </Text>
+          {copy.paragraphs.map((paragraph) => (
+            <Text key={paragraph} style={PARAGRAPH_STYLE}>
+              {paragraph}
+            </Text>
+          ))}
         </EmailSection>
 
         <EmailSection style={{ paddingTop: 8, paddingBottom: 24 }}>
           <PrimaryButton href={props.confirmationLink}>
-            Confirm my transaction is still active
+            {copy.button}
           </PrimaryButton>
         </EmailSection>
 
@@ -113,6 +122,10 @@ export default function DormancyWarningEmail(props: DormancyWarningEmailParams) 
   );
 }
 
-export function getDormancyWarningSubject(): string {
-  return "Is your property transaction still active?";
+export function getDormancyWarningSubject(
+  audience: DormancyWarningAudience = "buyer"
+): string {
+  return audience === "estate_agent"
+    ? "Is this onward purchase still active on MoveLoop?"
+    : "Is your property transaction still active?";
 }

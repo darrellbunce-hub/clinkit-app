@@ -18,6 +18,7 @@ import {
   getCustomerFacingConfidenceScore,
   getHealthStatusClasses,
   getOperationalPriorityTier,
+  resolveDaysSinceLastUpdate,
 } from "@/lib/estateAgent/commandCentrePresentation";
 import {
   FONT_HEADING_CLASS,
@@ -33,6 +34,7 @@ import {
 import { getEstateAgentManagementModePresentationFromSummary } from "@/lib/estateAgent/managementModePresentation";
 import { acknowledgePropertyClaimInvitationDecline } from "@/lib/propertyClaim/propertyInvitations";
 import { shouldShowInvitationDeclinedActionDetails } from "@/lib/propertyClaim/invitationDeclinedPresentation";
+import { isInvitationEligibleSummary } from "@/lib/propertyClaim/invitationPresentation";
 import { WorkspaceIcon } from "@/lib/theme/workspaceIcons";
 import { supabase } from "@/lib/supabase";
 
@@ -169,7 +171,7 @@ export default function OperationalPropertyCard({
 
           <span className="text-sm text-text-muted">
             {formatDaysSinceLastUpdate(
-              summary.days_since_last_update
+              resolveDaysSinceLastUpdate(summary)
             )}
           </span>
         </div>
@@ -189,7 +191,7 @@ export default function OperationalPropertyCard({
           />
         ) : null}
 
-        {summary.origin_type === "estate_agent" ? (
+        {isInvitationEligibleSummary(summary) ? (
           <HomeownerInvitationPanel
             propertyId={summary.property_id}
             onChanged={onInvitationChanged}

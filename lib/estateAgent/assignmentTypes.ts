@@ -48,6 +48,7 @@ export type AgentBranchPropertySummary = {
   needs_attention?: boolean | null;
   stale_update?: boolean | null;
   days_since_last_update?: number | null;
+  last_update_at?: string | null;
   operational_alerts?:
     | {
         code: string;

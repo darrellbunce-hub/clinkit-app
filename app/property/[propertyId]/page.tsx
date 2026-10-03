@@ -1189,7 +1189,10 @@ async function handleReportDelay() {
         </>
         )}
 
-        {canEdit && (
+        {canEdit &&
+          !isEstateAgent({
+            account_type: accountType ?? "homeowner",
+          }) && (
           <div className="mt-8">
             <PropertyEstateAgentAssignment
               propertyId={currentProperty.id}

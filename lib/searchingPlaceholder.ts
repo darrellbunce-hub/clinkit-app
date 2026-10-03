@@ -511,7 +511,11 @@ export async function convertSearchingPlaceholder(
     logConvertRpcTransportError(request, error);
     return {
       ok: false,
-      reason: "update_failed",
+      reason:
+        error.code === "23505" &&
+        error.message === "property_address_reserved"
+          ? "duplicate_address"
+          : "update_failed",
       error: buildConvertFailureError(request, {
         transportError: error,
       }),

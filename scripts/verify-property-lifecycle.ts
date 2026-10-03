@@ -61,46 +61,103 @@ function main() {
     "Elapsed grace should plan archival"
   );
 
+  // Dormancy applies only to unrepresented placeholders, measured from the
+  // effective-from floor, so these cases use a fixed evaluation instant.
+  const evaluatedAt = new Date("2027-06-01T00:00:00.000Z");
+  const before = (days: number) =>
+    new Date(evaluatedAt.getTime() - days * 86_400_000).toISOString();
+  const noDormancy = (actions: string[]) =>
+    !actions.some((action) =>
+      [
+        PROPERTY_LIFECYCLE_ACTION.enterDormancyWarning,
+        PROPERTY_LIFECYCLE_ACTION.markDormant,
+        PROPERTY_LIFECYCLE_ACTION.releaseProperty,
+      ].includes(action as never)
+    );
+
+  const legacyInactive = evaluatePropertyLifecycleFromContext(
+    createDefaultLifecycleContext(201, {
+      operationalState: PROPERTY_OPERATIONAL_STATE.active,
+      memberCount: 1,
+      isChainConnected: false,
+      hasValidActiveInvitation: false,
+      hasAcceptedClaim: false,
+      claimStatus: "unclaimed",
+      lastOperationalActivityAt: before(100),
+      enteredStateAt: before(100),
+    }),
+    evaluatedAt
+  );
+  assert(
+    noDormancy(legacyInactive.plannedActions),
+    "Inactivity alone (no seller-side signals) never plans dormancy"
+  );
+
   const dormantContext = createDefaultLifecycleContext(202, {
     operationalState: PROPERTY_OPERATIONAL_STATE.active,
-    memberCount: 1,
-    isChainConnected: false,
-    hasValidActiveInvitation: false,
-    hasAcceptedClaim: false,
-    claimStatus: "unclaimed",
-    lastOperationalActivityAt: new Date(Date.now() - 100 * 86_400_000).toISOString(),
-    enteredStateAt: new Date(Date.now() - 100 * 86_400_000).toISOString(),
+    chainId: 1,
+    relationshipType: "purchase",
+    sellerSide: "none",
+    buyerSide: "homeowner",
+    isManaged: false,
+    sellerSideUnrepresentedSince: before(100),
+    hasPlaceholderDependants: false,
+    enteredStateAt: before(100),
   });
 
-  const dormantEval = evaluatePropertyLifecycleFromContext(dormantContext);
+  const dormantEval = evaluatePropertyLifecycleFromContext(
+    dormantContext,
+    evaluatedAt
+  );
   assert(
     dormantEval.plannedActions.includes(PROPERTY_LIFECYCLE_ACTION.markDormant),
-    "Inactive unconnected property should be marked dormant"
+    "Placeholder without dependants unrepresented 90+ days should be marked dormant"
   );
   assert(
     dormantEval.plannedActions.includes(
       PROPERTY_LIFECYCLE_ACTION.releaseProperty
     ),
-    "Dormant property should plan release for Scenario C"
+    "Dormant placeholder should plan release"
+  );
+
+  const managedStale = evaluatePropertyLifecycleFromContext(
+    createDefaultLifecycleContext(204, {
+      operationalState: PROPERTY_OPERATIONAL_STATE.active,
+      isChainConnected: true,
+      relationshipType: "sale",
+      sellerSide: "homeowner",
+      buyerSide: "none",
+      isManaged: true,
+      chainLastOperationalActivityAt: before(160),
+      lastOperationalActivityAt: before(160),
+    }),
+    evaluatedAt
+  );
+  assert(
+    noDormancy(managedStale.plannedActions),
+    "Managed transaction never enters dormancy warning, however stale"
   );
 
   const connectedWarningEval = evaluatePropertyLifecycleFromContext(
     createDefaultLifecycleContext(203, {
       operationalState: PROPERTY_OPERATIONAL_STATE.active,
+      chainId: 1,
       isChainConnected: true,
-      chainLastOperationalActivityAt: new Date(
-        Date.now() - 160 * 86_400_000
-      ).toISOString(),
-      lastOperationalActivityAt: new Date(
-        Date.now() - 160 * 86_400_000
-      ).toISOString(),
-    })
+      relationshipType: "purchase",
+      sellerSide: "none",
+      buyerSide: "homeowner",
+      isManaged: false,
+      sellerSideUnrepresentedSince: before(160),
+      hasPlaceholderDependants: true,
+      enteredStateAt: before(160),
+    }),
+    evaluatedAt
   );
   assert(
     connectedWarningEval.plannedActions.includes(
       PROPERTY_LIFECYCLE_ACTION.enterDormancyWarning
     ),
-    "Connected stale transaction should enter dormancy warning"
+    "Placeholder with dependants unrepresented 150+ days should enter dormancy warning"
   );
 
   assert(

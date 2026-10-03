@@ -381,16 +381,17 @@ async function main() {
     .update({ seller_connected: true, buyer_connected: true })
     .eq("id", saleProperty.id);
   const purchaseProperty = await insertProperty({
-    client: buyer.client,
+    client: admin,
     chainId: sharedChainId,
     chainPosition: 2,
     userId: buyer.userId,
     stamp,
     label: "SharedPurchase",
   });
-  await establishOperationalHomeowner(buyer.client, {
-    propertyId: purchaseProperty.id,
-    grantedVia: OPERATIONAL_IDENTITY_GRANT_VIA.startMove,
+  await admin.rpc("_establish_operational_homeowner_core", {
+    p_property_id: purchaseProperty.id,
+    p_homeowner_user_id: buyer.userId,
+    p_granted_via: OPERATIONAL_IDENTITY_GRANT_VIA.startMove,
   });
 
   const sellerRequestId = await advanceToApproved(admin, seller.userId);

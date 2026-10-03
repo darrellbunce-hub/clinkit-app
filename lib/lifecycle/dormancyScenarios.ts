@@ -1,8 +1,24 @@
 /**
- * Pure dormancy evaluation helpers — isolated (B1) vs connected (B2).
+ * Pure dormancy evaluation — bounded placeholder lifecycle.
+ *
+ * A row whose seller side is represented (homeowner or EA) is managed: it is
+ * never warned, made dormant, archived or released through inactivity. Only an
+ * unrepresented placeholder has a clock, measured from the latest of: the
+ * moment its seller side became unrepresented, dependent-side activity, an
+ * explicit still-active confirmation, and the rollout effective-from instant.
+ *
+ *   placeholder with dependants     warning after the connected window, then
+ *                                   the confirmation window → dormant →
+ *                                   snapshot → archive → release
+ *   placeholder without dependants  dormant after the inactivity window →
+ *                                   snapshot → archive → release
+ *
+ * Every database step re-checks representation, timing and dependants under a
+ * row lock, so a plan evaluated before a reset, a confirmation or a new
+ * representative is skipped.
  */
 
-import { addDays, daysBetween } from "@/lib/lifecycle/config";
+import { addDays } from "@/lib/lifecycle/config";
 import {
   PROPERTY_LIFECYCLE_ACTION,
   PROPERTY_LIFECYCLE_SCENARIO,
@@ -12,17 +28,9 @@ import {
   type PropertyLifecycleRecommendation,
 } from "@/lib/lifecycle/types";
 
-function nowIso(): string {
-  return new Date().toISOString();
-}
-
-function inactivityAnchor(context: PropertyLifecycleContext): string | null {
-  return (
-    context.lastOperationalActivityAt ??
-    context.enteredStateAt ??
-    null
-  );
-}
+type DormancyScenario =
+  | typeof PROPERTY_LIFECYCLE_SCENARIO.isolatedDormant
+  | typeof PROPERTY_LIFECYCLE_SCENARIO.connectedDormant;
 
 function isProtectedFromDormancy(context: PropertyLifecycleContext): boolean {
   return (
@@ -31,17 +39,82 @@ function isProtectedFromDormancy(context: PropertyLifecycleContext): boolean {
     context.operationalState === PROPERTY_OPERATIONAL_STATE.anonymised ||
     context.operationalState === PROPERTY_OPERATIONAL_STATE.completedGrace ||
     context.operationalState === PROPERTY_OPERATIONAL_STATE.archived ||
-    Boolean(context.chainCompletedAt) ||
-    context.hasMeaningfulParticipation ||
-    context.hasValidActiveInvitation
+    Boolean(context.chainCompletedAt)
   );
 }
 
+/**
+ * Seller side represented. Missing signals (pre-migration RPC) count as
+ * managed so incomplete data never plans a dormancy step.
+ */
+export function isManagedForDormancy(
+  context: PropertyLifecycleContext
+): boolean {
+  if (context.sellerSide !== undefined) {
+    return context.sellerSide !== "none";
+  }
+
+  return context.isManaged ?? true;
+}
+
+/** Unrepresented placeholder with a running clock. */
+export function isPlaceholderForDormancy(
+  context: PropertyLifecycleContext
+): boolean {
+  return (
+    !isManagedForDormancy(context) &&
+    Boolean(context.sellerSideUnrepresentedSince)
+  );
+}
+
+function latestInstant(values: Array<string | null | undefined>): string | null {
+  let latest: number | null = null;
+
+  for (const value of values) {
+    if (!value) {
+      continue;
+    }
+
+    const ms = new Date(value).getTime();
+
+    if (!Number.isNaN(ms) && (latest === null || ms > latest)) {
+      latest = ms;
+    }
+  }
+
+  return latest === null ? null : new Date(latest).toISOString();
+}
+
+/**
+ * Same anchor as the database (_property_placeholder_anchor). Null for a row
+ * that is not a placeholder.
+ */
+export function placeholderDormancyAnchor(
+  context: PropertyLifecycleContext,
+  config: LifecycleConfig
+): string | null {
+  if (!isPlaceholderForDormancy(context)) {
+    return null;
+  }
+
+  return latestInstant([
+    context.sellerSideUnrepresentedSince,
+    context.placeholderActivityAt,
+    context.lastStillActiveConfirmedAt,
+    context.dormancyEffectiveFrom ?? config.dormancyEffectiveFrom,
+  ]);
+}
+
+function placeholderScenario(
+  context: PropertyLifecycleContext
+): DormancyScenario {
+  return context.hasPlaceholderDependants
+    ? PROPERTY_LIFECYCLE_SCENARIO.connectedDormant
+    : PROPERTY_LIFECYCLE_SCENARIO.isolatedDormant;
+}
+
 function dormantContinuationPlan(
-  scenario:
-    | typeof PROPERTY_LIFECYCLE_SCENARIO.isolatedDormant
-    | typeof PROPERTY_LIFECYCLE_SCENARIO.connectedDormant,
-  reason: string,
+  scenario: DormancyScenario,
   eligibleAt: string
 ): PropertyLifecycleRecommendation[] {
   return [
@@ -55,216 +128,130 @@ function dormantContinuationPlan(
     {
       scenario,
       action: PROPERTY_LIFECYCLE_ACTION.archiveOperational,
-      reason: "Archive dormant operational participation.",
+      reason: "Archive dormant placeholder.",
       eligible: true,
       eligibleAt,
     },
     {
       scenario,
       action: PROPERTY_LIFECYCLE_ACTION.releaseProperty,
-      reason: "Release dormant address for reuse.",
+      reason: "Release dormant placeholder address for reuse.",
       eligible: true,
       eligibleAt,
     },
   ];
 }
 
-function isolatedReleasePlan(
-  scenario: typeof PROPERTY_LIFECYCLE_SCENARIO.isolatedDormant,
-  reason: string,
-  eligibleAt: string
+function expiredWarningPlan(
+  context: PropertyLifecycleContext,
+  config: LifecycleConfig,
+  evaluatedAt: Date
 ): PropertyLifecycleRecommendation[] {
+  const deadline = dormancyWarningDeadline(context, config);
+
+  if (deadline === null || evaluatedAt < new Date(deadline)) {
+    return [];
+  }
+
+  const scenario = PROPERTY_LIFECYCLE_SCENARIO.connectedDormant;
+
   return [
     {
       scenario,
-      action: PROPERTY_LIFECYCLE_ACTION.markDormant,
-      reason,
+      action: PROPERTY_LIFECYCLE_ACTION.expireDormancyWarning,
+      reason:
+        "Dormancy confirmation period expired without a still-active confirmation or dependent-side activity.",
       eligible: true,
-      eligibleAt,
+      eligibleAt: deadline,
     },
-    {
-      scenario,
-      action: PROPERTY_LIFECYCLE_ACTION.createAnalyticsSnapshot,
-      reason: "Capture analytics before isolated dormant archival.",
-      eligible: true,
-      eligibleAt,
-    },
-    {
-      scenario,
-      action: PROPERTY_LIFECYCLE_ACTION.archiveOperational,
-      reason: "Archive isolated dormant operational participation.",
-      eligible: true,
-      eligibleAt,
-    },
-    {
-      scenario,
-      action: PROPERTY_LIFECYCLE_ACTION.releaseProperty,
-      reason: "Release isolated dormant address for reuse.",
-      eligible: true,
-      eligibleAt,
-    },
+    ...dormantContinuationPlan(scenario, deadline),
   ];
 }
 
+export function dormancyWarningDeadline(
+  context: PropertyLifecycleContext,
+  config: LifecycleConfig
+): string | null {
+  return (
+    context.dormancyConfirmationDeadlineAt ??
+    (context.dormancyWarningAt
+      ? addDays(context.dormancyWarningAt, config.dormancyConfirmationDays)
+      : null)
+  );
+}
+
 /**
- * B1 — isolated / unconnected property with no meaningful transaction progress.
+ * Placeholder dormancy: the only path by which an uncompleted row is warned,
+ * made dormant, archived or released through inactivity.
  */
-export function evaluateIsolatedDormantScenario(
+export function evaluatePlaceholderDormancyScenario(
   context: PropertyLifecycleContext,
   config: LifecycleConfig,
   evaluatedAt: Date = new Date()
 ): PropertyLifecycleRecommendation[] {
-  if (isProtectedFromDormancy(context)) {
+  if (isProtectedFromDormancy(context) || !isPlaceholderForDormancy(context)) {
     return [];
   }
 
-  if (context.isChainConnected) {
-    return [];
-  }
-
-  const anchor = inactivityAnchor(context);
-  const inactiveDays = daysBetween(anchor, evaluatedAt);
-  const meetsThreshold =
-    inactiveDays !== null &&
-    inactiveDays >= config.dormantInactivityDays;
-
-  if (!meetsThreshold) {
-    return [];
-  }
-
-  const eligibleAt = anchor
-    ? addDays(anchor, config.dormantInactivityDays)
-    : nowIso();
-
-  if (context.operationalState === PROPERTY_OPERATIONAL_STATE.active) {
-    return isolatedReleasePlan(
-      PROPERTY_LIFECYCLE_SCENARIO.isolatedDormant,
-      "Isolated property with no meaningful operational activity within the inactivity window.",
-      eligibleAt
-    );
+  if (context.operationalState === PROPERTY_OPERATIONAL_STATE.dormancyWarning) {
+    return expiredWarningPlan(context, config, evaluatedAt);
   }
 
   if (context.operationalState === PROPERTY_OPERATIONAL_STATE.dormant) {
     return dormantContinuationPlan(
-      PROPERTY_LIFECYCLE_SCENARIO.isolatedDormant,
-      "Isolated property already marked dormant.",
-      context.enteredStateAt ?? eligibleAt
+      placeholderScenario(context),
+      context.enteredStateAt ?? evaluatedAt.toISOString()
     );
   }
 
-  return [];
-}
-
-/**
- * B2 — connected transaction abandoned after warning + confirmation period.
- */
-export function evaluateConnectedDormantScenario(
-  context: PropertyLifecycleContext,
-  config: LifecycleConfig,
-  evaluatedAt: Date = new Date()
-): PropertyLifecycleRecommendation[] {
-  if (isProtectedFromDormancy(context)) {
+  if (context.operationalState !== PROPERTY_OPERATIONAL_STATE.active) {
     return [];
   }
 
-  if (!context.isChainConnected) {
+  const anchor = placeholderDormancyAnchor(context, config);
+
+  if (!anchor) {
     return [];
   }
 
-  const chainAnchor =
-    context.chainLastOperationalActivityAt ?? inactivityAnchor(context);
-  const inactiveDays = daysBetween(chainAnchor, evaluatedAt);
-  const meetsConnectedThreshold =
-    inactiveDays !== null &&
-    inactiveDays >= config.connectedDormantDays;
+  if (context.hasPlaceholderDependants) {
+    const warningAt = addDays(anchor, config.connectedDormantDays);
 
-  if (
-    context.operationalState === PROPERTY_OPERATIONAL_STATE.active &&
-    meetsConnectedThreshold
-  ) {
-    const eligibleAt = chainAnchor
-      ? addDays(chainAnchor, config.connectedDormantDays)
-      : nowIso();
+    if (evaluatedAt < new Date(warningAt)) {
+      return [];
+    }
 
     return [
       {
         scenario: PROPERTY_LIFECYCLE_SCENARIO.connectedDormant,
         action: PROPERTY_LIFECYCLE_ACTION.enterDormancyWarning,
         reason:
-          "Connected transaction has no meaningful operational activity within the connected dormancy threshold.",
+          "Placeholder with dependants has had no seller side and no dependent-side activity within the connected window.",
         eligible: true,
-        eligibleAt,
+        eligibleAt: warningAt,
       },
     ];
   }
 
-  if (
-    context.operationalState ===
-    PROPERTY_OPERATIONAL_STATE.dormancyWarning
-  ) {
-    const deadline =
-      context.dormancyConfirmationDeadlineAt ??
-      (context.dormancyWarningAt
-        ? addDays(
-            context.dormancyWarningAt,
-            config.dormancyConfirmationDays
-          )
-        : null);
+  const dormantAt = addDays(anchor, config.dormantInactivityDays);
 
-    const confirmationExpired =
-      deadline !== null && evaluatedAt >= new Date(deadline);
-
-    if (!confirmationExpired) {
-      return [];
-    }
-
-    const eligibleAt = deadline ?? nowIso();
-
-    return [
-      {
-        scenario: PROPERTY_LIFECYCLE_SCENARIO.connectedDormant,
-        action: PROPERTY_LIFECYCLE_ACTION.markDormant,
-        reason:
-          "Connected dormancy confirmation period expired without a still-active confirmation.",
-        eligible: true,
-        eligibleAt,
-      },
-      {
-        scenario: PROPERTY_LIFECYCLE_SCENARIO.connectedDormant,
-        action: PROPERTY_LIFECYCLE_ACTION.createAnalyticsSnapshot,
-        reason: "Capture analytics before connected dormant archival.",
-        eligible: true,
-        eligibleAt,
-      },
-      {
-        scenario: PROPERTY_LIFECYCLE_SCENARIO.connectedDormant,
-        action: PROPERTY_LIFECYCLE_ACTION.archiveOperational,
-        reason: "Archive connected abandoned operational participation.",
-        eligible: true,
-        eligibleAt,
-      },
-      {
-        scenario: PROPERTY_LIFECYCLE_SCENARIO.connectedDormant,
-        action: PROPERTY_LIFECYCLE_ACTION.releaseProperty,
-        reason: "Release connected abandoned address for reuse.",
-        eligible: true,
-        eligibleAt,
-      },
-    ];
+  if (evaluatedAt < new Date(dormantAt)) {
+    return [];
   }
 
-  if (
-    context.operationalState === PROPERTY_OPERATIONAL_STATE.dormant &&
-    context.isChainConnected
-  ) {
-    return dormantContinuationPlan(
-      PROPERTY_LIFECYCLE_SCENARIO.connectedDormant,
-      "Connected property marked dormant after confirmation expiry.",
-      context.enteredStateAt ?? nowIso()
-    );
-  }
+  const scenario = PROPERTY_LIFECYCLE_SCENARIO.isolatedDormant;
 
-  return [];
+  return [
+    {
+      scenario,
+      action: PROPERTY_LIFECYCLE_ACTION.markDormant,
+      reason:
+        "Placeholder without dependants has had no seller side within the inactivity window.",
+      eligible: true,
+      eligibleAt: dormantAt,
+    },
+    ...dormantContinuationPlan(scenario, dormantAt),
+  ];
 }
 
 export function evaluateDormantReleaseFromArchived(
@@ -280,7 +267,7 @@ export function evaluateDormantReleaseFromArchived(
 
   return [
     {
-      scenario: context.isChainConnected
+      scenario: context.hasPlaceholderDependants
         ? PROPERTY_LIFECYCLE_SCENARIO.connectedDormant
         : PROPERTY_LIFECYCLE_SCENARIO.isolatedDormant,
       action: PROPERTY_LIFECYCLE_ACTION.releaseProperty,

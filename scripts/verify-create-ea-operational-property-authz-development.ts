@@ -419,6 +419,28 @@ async function runExecuteChecks(): Promise<void> {
     );
 
     // CASE 2 — already associated: second property on same chain
+    const { data: secondSaleA, error: secondSaleAError } = await eaA.client.rpc(
+      "create_ea_operational_property",
+      {
+        p_chain_id: chainAId,
+        p_relationship_type: "sale",
+        p_address: `2 Authz Second Sale ${stamp}`,
+        p_postcode: "PO16 7AB",
+        p_branch_id: eaA.branchId,
+        p_homeowner_only_updates: false,
+        p_awaiting_buyer: false,
+      }
+    );
+
+    record(
+      "CASE2 EA-associated chain property creation succeeds",
+      !secondSaleAError &&
+        secondSaleA?.ok === true &&
+        typeof secondSaleA.property_id === "number",
+      secondSaleAError?.message ?? secondSaleA?.error ?? JSON.stringify(secondSaleA)
+    );
+
+    // CASE 2b — agents originate sales only; a purchase row's EA acts for its seller
     const { data: purchaseA, error: purchaseAError } = await eaA.client.rpc(
       "create_ea_operational_property",
       {
@@ -433,11 +455,11 @@ async function runExecuteChecks(): Promise<void> {
     );
 
     record(
-      "CASE2 EA-associated chain property creation succeeds",
+      "CASE2b EA purchase origination refused (invalid_relationship_type)",
       !purchaseAError &&
-        purchaseA?.ok === true &&
-        typeof purchaseA.property_id === "number",
-      purchaseAError?.message ?? purchaseA?.error ?? JSON.stringify(purchaseA)
+        purchaseA?.ok === false &&
+        purchaseA?.error === "invalid_relationship_type",
+      purchaseAError?.message ?? JSON.stringify(purchaseA)
     );
 
     // Victim chain owned/operated by EA B
@@ -547,8 +569,8 @@ async function runExecuteChecks(): Promise<void> {
       "join_ea_operational_chain",
       {
         p_access_code: accessCodeB,
-        p_relationship_type: "purchase",
-        p_address: `Joined Purchase ${stamp}`,
+        p_relationship_type: "sale",
+        p_address: `Joined Sale ${stamp}`,
         p_postcode: "PO16 7JN",
         p_branch_id: eaA.branchId,
         p_homeowner_only_updates: false,
@@ -560,6 +582,27 @@ async function runExecuteChecks(): Promise<void> {
       "Access-code join still succeeds",
       !joinError && joinRpc?.ok === true && typeof joinRpc.property_id === "number",
       joinError?.message ?? joinRpc?.error ?? JSON.stringify(joinRpc)
+    );
+
+    const { data: joinPurchase, error: joinPurchaseError } = await eaA.client.rpc(
+      "join_ea_operational_chain",
+      {
+        p_access_code: accessCodeB,
+        p_relationship_type: "purchase",
+        p_address: `Joined Purchase ${stamp}`,
+        p_postcode: "PO16 7JP",
+        p_branch_id: eaA.branchId,
+        p_homeowner_only_updates: false,
+        p_awaiting_buyer: false,
+      }
+    );
+
+    record(
+      "Access-code join refuses a purchase row (invalid_relationship_type)",
+      !joinPurchaseError &&
+        joinPurchase?.ok === false &&
+        joinPurchase?.error === "invalid_relationship_type",
+      joinPurchaseError?.message ?? JSON.stringify(joinPurchase)
     );
 
     // Core must not be callable by authenticated clients

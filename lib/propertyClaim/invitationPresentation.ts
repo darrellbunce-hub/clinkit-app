@@ -1,6 +1,20 @@
 import type { AgentBranchPropertySummary } from "@/lib/estateAgent/assignmentTypes";
 import type { InvitationLifecycleStatus } from "@/lib/propertyClaim/invitationTypes";
 
+/**
+ * The homeowner invitation applies to EA-originated rows and to rows whose
+ * homeowner left while the EA kept managing them (claim reset to unclaimed).
+ */
+export function isInvitationEligibleSummary(
+  summary: Pick<AgentBranchPropertySummary, "origin_type" | "claim_status">
+): boolean {
+  return (
+    summary.origin_type === "estate_agent" ||
+    summary.claim_status === "unclaimed" ||
+    summary.claim_status === "claim_invited"
+  );
+}
+
 export type InvitationStatusBadgeVariant =
   | "claimed"
   | "awaiting_claim"
@@ -17,7 +31,7 @@ export function getInvitationLifecycleStatus(
     | "invitation_lifecycle_status"
   >
 ): InvitationLifecycleStatus | null {
-  if (summary.origin_type !== "estate_agent") {
+  if (!isInvitationEligibleSummary(summary)) {
     return null;
   }
 
@@ -124,7 +138,7 @@ export function isInvitationExpiredPriority(
   >
 ): boolean {
   return (
-    summary.origin_type === "estate_agent" &&
+    isInvitationEligibleSummary(summary) &&
     summary.claim_status !== "claimed" &&
     summary.invitation_lifecycle_status ===
       "invitation_expired"
@@ -138,7 +152,7 @@ export function isInvitationActivePriority(
   >
 ): boolean {
   return (
-    summary.origin_type === "estate_agent" &&
+    isInvitationEligibleSummary(summary) &&
     summary.claim_status !== "claimed" &&
     summary.invitation_lifecycle_status ===
       "invitation_active"
@@ -152,7 +166,7 @@ export function isInvitationDeclinedPriority(
   >
 ): boolean {
   return (
-    summary.origin_type === "estate_agent" &&
+    isInvitationEligibleSummary(summary) &&
     summary.claim_status !== "claimed" &&
     summary.invitation_lifecycle_status ===
       "invitation_declined"
@@ -181,7 +195,7 @@ export function isReadyToInvitePriority(
   >
 ): boolean {
   return (
-    summary.origin_type === "estate_agent" &&
+    isInvitationEligibleSummary(summary) &&
     summary.claim_status !== "claimed" &&
     summary.invitation_lifecycle_status !==
       "invitation_active" &&
@@ -204,7 +218,7 @@ export function isInvitationDeferred(
   >
 ): boolean {
   return (
-    summary.origin_type === "estate_agent" &&
+    isInvitationEligibleSummary(summary) &&
     summary.claim_status !== "claimed" &&
     summary.invitation_lifecycle_status ===
       "invitation_deferred"

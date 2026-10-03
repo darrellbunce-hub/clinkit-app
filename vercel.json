@@ -1,16 +1,16 @@
 {
   "crons": [
     {
-      "path": "/api/cron/property-lifecycle",
-      "schedule": "0 3 * * *"
-    },
-    {
       "path": "/api/cron/billing-health",
       "schedule": "0 4 * * *"
     },
     {
       "path": "/api/cron/data-retention",
       "schedule": "30 3 * * *"
+    },
+    {
+      "path": "/api/cron/chain-intelligence",
+      "schedule": "30 5 * * *"
     }
   ]
 }

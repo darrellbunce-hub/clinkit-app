@@ -48,6 +48,12 @@ export type ParticipationDelinkExecuteResult =
       branchId?: string;
       lifecycleState?: string;
       invitationReset?: boolean;
+      /** homeowner_self on a sale: the EA branch continues to manage the row. */
+      eaRetained?: boolean;
+      /** The row stays in the chain as an unrepresented placeholder. */
+      placeholder?: boolean;
+      /** Buyer leaving a purchase: their sales that linked to it. */
+      unlinkedSaleIds?: number[];
     }
   | { ok: false; error: string };
 
@@ -64,7 +70,8 @@ export const PARTICIPATION_DELINK_PERMISSION_MATRIX: Record<
   [PARTICIPATION_DELINK_OPERATION.homeownerSelf]: {
     actor: "homeowner",
     summary: "Operational homeowner releases their property participation.",
-    lifecycleImpact: "Transitions property lifecycle to released.",
+    lifecycleImpact:
+      "Released only for a mistake reason with no dependants (or a buyer leaving an unconnected purchase); otherwise the EA keeps managing it or it stays as a placeholder.",
     retainsHistory: true,
   },
   [PARTICIPATION_DELINK_OPERATION.homeownerRemoveEa]: {
@@ -76,13 +83,14 @@ export const PARTICIPATION_DELINK_PERMISSION_MATRIX: Record<
   [PARTICIPATION_DELINK_OPERATION.estateAgentRemoveBranch]: {
     actor: "estate_agent",
     summary: "Assigned branch releases operational management.",
-    lifecycleImpact: "No lifecycle change unless no homeowner remains.",
+    lifecycleImpact:
+      "No lifecycle change while a homeowner remains; otherwise released only for a mistake reason with no dependants, else a placeholder.",
     retainsHistory: true,
   },
   [PARTICIPATION_DELINK_OPERATION.estateAgentRemoveHomeowner]: {
     actor: "estate_agent",
     summary:
-      "Withdraw homeowner association when invitation is pending or participation is not yet meaningful.",
+      "Withdraw a homeowner your branch invited, while the invitation is pending or before participation is meaningful.",
     lifecycleImpact: "Resets claim to re-invitable; does not release property lifecycle.",
     retainsHistory: true,
   },
@@ -92,12 +100,15 @@ export const PARTICIPATION_DELINK_ERROR_MESSAGES: Record<string, string> = {
   not_authenticated: "You must be signed in.",
   property_not_found: "Property not found.",
   invalid_operation: "This de-link operation is not supported.",
-  not_operational_homeowner: "Only the operational homeowner can perform this action.",
+  not_operational_homeowner: "Only the homeowner selling this property can perform this action.",
   no_active_ea_assignment: "No active estate agent is assigned to this property.",
   branch_mismatch: "The selected branch does not match the active assignment.",
   not_assigned_ea: "Your branch is not assigned to this property.",
   branch_required: "A branch assignment is required.",
   not_ea_originated: "This action only applies to estate-agent-originated properties.",
+  not_seller_side_row: "This action only applies to the property your branch is selling.",
+  homeowner_not_invited:
+    "This homeowner added the property themselves, so your branch cannot remove them.",
   homeowner_actively_participating:
     "This homeowner has meaningfully participated and cannot be removed from an established transaction.",
   no_homeowner_to_remove: "There is no homeowner association to remove.",

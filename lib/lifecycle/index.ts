@@ -33,9 +33,15 @@ export {
 } from "@/lib/lifecycle/scenarios";
 
 export {
-  evaluateConnectedDormantScenario,
-  evaluateIsolatedDormantScenario,
+  dormancyWarningDeadline,
+  evaluateDormantReleaseFromArchived,
+  evaluatePlaceholderDormancyScenario,
+  isManagedForDormancy,
+  isPlaceholderForDormancy,
+  placeholderDormancyAnchor,
 } from "@/lib/lifecycle/dormancyScenarios";
+
+export { computeNextLifecycleEvaluationAt } from "@/lib/lifecycle/schedule";
 
 export {
   confirmTransactionStillActive,
@@ -61,9 +67,11 @@ export {
 export {
   applyLifecyclePlan,
   executeLifecycleAction,
+  runPropertyLifecycleWorker,
   runPropertyLifecycleWorkerBatch,
   type ApplyLifecyclePlanResult,
   type LifecycleWorkerBatchResult,
+  type LifecycleWorkerRunResult,
 } from "@/lib/lifecycle/worker";
 
 export {

@@ -36,6 +36,8 @@ export const PROPERTY_LIFECYCLE_ACTION = {
   none: "none",
   enterCompletedGrace: "enter_completed_grace",
   enterDormancyWarning: "enter_dormancy_warning",
+  /** dormancy_warning past its deadline → dormant; skipped if the warning was reset. */
+  expireDormancyWarning: "expire_dormancy_warning",
   markDormant: "mark_dormant",
   createAnalyticsSnapshot: "create_analytics_snapshot",
   archiveOperational: "archive_operational",
@@ -56,6 +58,10 @@ export type PropertyLifecycleTransitionTrigger =
   | "manual"
   | "system"
   | "still_active_confirmation";
+
+/** Seller / buyer side representation (`_property_side_representation`). */
+export type PropertySellerSide = "homeowner" | "ea" | "none";
+export type PropertyBuyerSide = "homeowner" | "via_sale" | "none";
 
 /** Operational signals gathered for lifecycle evaluation. */
 export type PropertyLifecycleContext = {
@@ -89,10 +95,30 @@ export type PropertyLifecycleContext = {
   hasActiveOperationalIdentity: boolean;
   /** Durable transaction progress — identity age alone does NOT qualify. */
   hasMeaningfulParticipation: boolean;
+  hasActiveCounterparty?: boolean;
+  hasActiveEaAssignment?: boolean;
   hasAnalyticsSnapshot: boolean;
   manuallyReleased: boolean;
   addressReserved: boolean;
   chainReleaseSafe: boolean;
+  /*
+   * Representation and placeholder clock (20261005130000). Absent when the
+   * signals RPC predates it; evaluation then treats the row as managed, so no
+   * dormancy step is ever planned from incomplete signals.
+   */
+  sellerSide?: PropertySellerSide;
+  buyerSide?: PropertyBuyerSide;
+  /** Seller side represented: homeowner or EA. Never dormant. */
+  isManaged?: boolean;
+  /** Set while the seller side is unrepresented; null on managed rows. */
+  sellerSideUnrepresentedSince?: string | null;
+  /** Latest dependent-side activity on the placeholder. */
+  placeholderActivityAt?: string | null;
+  lastStillActiveConfirmedAt?: string | null;
+  /** A buyer, linked sale or Buyer Ready node still depends on the placeholder. */
+  hasPlaceholderDependants?: boolean;
+  nextEvaluationAt?: string | null;
+  dormancyEffectiveFrom?: string | null;
 };
 
 export type PropertyLifecycleRecommendation = {
@@ -152,6 +178,9 @@ export type PropertyLifecycleStateRow = {
   dormancy_confirmation_deadline_at: string | null;
   dormancy_warning_notified_at: string | null;
   last_still_active_confirmed_at: string | null;
+  seller_side_unrepresented_since: string | null;
+  placeholder_activity_at: string | null;
+  next_evaluation_at: string | null;
   metadata: Record<string, unknown>;
   created_at: string;
   updated_at: string;
@@ -172,11 +201,21 @@ export type PropertyLifecycleEvaluationRpcResult = {
 /** Configuration shape for lifecycle retention policy. */
 export type LifecycleConfig = {
   completedGraceDays: number;
+  /** Placeholder without dependants: days before it is made dormant. */
   dormantInactivityDays: number;
+  /** Placeholder with dependants: days before the dormancy warning. */
   connectedDormantDays: number;
   dormancyConfirmationDays: number;
   evaluationBatchSize: number;
   workerLeaseSeconds: number;
+  workerTimeBudgetMs: number;
+  /** Retry delay after a failed evaluation. */
+  workerRetryDelayMs: number;
+  /**
+   * No placeholder clock starts before this instant; history before the
+   * rollout is never inferred.
+   */
+  dormancyEffectiveFrom: string;
   completedGraceMs: number;
   dormantInactivityMs: number;
   connectedDormantMs: number;

@@ -51,6 +51,16 @@ const MIGRATIONS_DIR = join(ROOT, "supabase", "migrations");
 const M1 = "20261001110000_create_searching_placeholder_for_sale.sql";
 const M2 = "20261001120000_properties_chain_integrity_guard.sql";
 const M3 = "20261001130000_searching_placeholder_ownership_enforcement.sql";
+// Sequenced after this change set; every other migration must precede M1.
+const LATER_MIGRATIONS = [
+  "20261005100000_address_reservation_classifier.sql",
+  "20261005110000_seller_side_authority_and_awaiting_connection.sql",
+  "20261005120000_operational_authority_enforcement.sql",
+  "20261005130000_lifecycle_bounded_dormancy.sql",
+  "20261005140000_reservation_placeholders_awaiting_seller.sql",
+  "20261005150000_dashboard_last_update_at.sql",
+  "20261005160000_drop_properties_address_match_key_idx.sql",
+];
 
 type TestResult = { name: string; pass: boolean; detail?: string };
 const results: TestResult[] = [];
@@ -136,13 +146,18 @@ function runStaticChecks(): void {
   // Ordering / sequencing
   {
     const others = readdirSync(MIGRATIONS_DIR)
-      .filter((file) => file.endsWith(".sql") && ![M1, M2, M3].includes(file))
+      .filter(
+        (file) => file.endsWith(".sql") && ![M1, M2, M3].includes(file) && !LATER_MIGRATIONS.includes(file)
+      )
       .map((file) => file.split("_")[0]);
     const [v1, v2, v3] = [M1, M2, M3].map((file) => file.split("_")[0]);
 
     record(
       "ordering: 110000 < 120000 < 130000, all later than existing migrations",
-      v1 < v2 && v2 < v3 && others.every((version) => version < v1)
+      v1 < v2 &&
+        v2 < v3 &&
+        others.every((version) => version < v1) &&
+        LATER_MIGRATIONS.every((file) => file.split("_")[0] > v3)
     );
     record(
       "ordering: helper _is_estate_agent_account defined in 110000 before 120000/130000 use it",
@@ -274,7 +289,7 @@ function runStaticChecks(): void {
   {
     const link = fn(f3, "link_sale_to_searching_placeholder").body;
     record(
-      "P6 link: delegated EA editor, no view-only assigned arm",
+      "P6 link (historical M3, superseded by can_operate_property): delegated EA editor, no view-only assigned arm",
       link.includes("public.is_ea_delegated_editor_on_property(p_sale_property_id)") &&
         !link.includes("is_ea_assigned_to_property")
     );
@@ -311,7 +326,7 @@ function runStaticChecks(): void {
       /begin\s+update public\.properties[\s\S]*_establish_operational_homeowner_core[\s\S]*insert into public\.activities[\s\S]*exception\s+when sqlstate 'SP001' then\s+return jsonb_build_object\('ok', false, 'error', sqlerrm\);/i.test(convert)
     );
     record(
-      "P4 convert: view-only EA still denied (delegated editor or homeowner only)",
+      "P4 convert (historical M3, superseded by can_operate_property): delegated editor or homeowner only",
       convert.includes("public.is_property_operational_homeowner(p_sale_property_id)") &&
         convert.includes("public.is_ea_delegated_editor_on_property(p_sale_property_id)") &&
         !convert.includes("is_ea_assigned_to_property")
@@ -320,6 +335,37 @@ function runStaticChecks(): void {
       "P4 convert ACL",
       publicRpcAcl(m3, "public.convert_searching_placeholder_for_sale(bigint, text, text)")
     );
+  }
+
+  // Effective definitions: an EA-only sale follows can_operate_property
+  {
+    const latest = new Map<string, SqlFunction>();
+    for (const file of readdirSync(MIGRATIONS_DIR).filter((f) => f.endsWith(".sql")).sort()) {
+      for (const [name, def] of extractFunctions(read(`supabase/migrations/${file}`))) {
+        latest.set(name, def);
+      }
+    }
+    const operate = fn(latest, "can_operate_property").body;
+    record(
+      "Effective can_operate_property: assigned EA operates when updates are allowed or no seller homeowner (EA-only)",
+      /pea\.homeowner_only_updates = false\s+or t\.seller_user_id is null/i.test(operate) &&
+        /pea\.status = 'active'/i.test(operate) &&
+        /stage is distinct from 'searching'/i.test(operate)
+    );
+    for (const name of ["convert_searching_placeholder_for_sale", "link_sale_to_searching_placeholder"]) {
+      const body = fn(latest, name).body;
+      record(
+        `Effective ${name}: authorised by can_operate_property on the anchor only (no stricter delegated-editor rule)`,
+        body.includes("public.can_operate_property(p_sale_property_id)") &&
+          !body.includes("is_ea_delegated_editor_on_property") &&
+          !body.includes("is_ea_assigned_to_property")
+      );
+      record(
+        `Effective ${name}: onward owner is the anchor's seller-side homeowner, never the caller`,
+        body.includes("public._property_seller_side_user_id(p_sale_property_id)") &&
+          !/:=\s*auth\.uid\(\)/i.test(body)
+      );
+    }
   }
 
   // Phase 5 — claim convergence + reverse
@@ -807,7 +853,8 @@ async function runScenarios(ctx: Ctx): Promise<void> {
     cTileId != null && (await identity(ctx, cTileId)) == null && noEaOwnerClass(await members(ctx, cTileId), eaA.userId)
   );
 
-  // D — EA view-only origination → unowned; conversion denied
+  // D — EA-only sale with homeowner-only updates: no homeowner is connected, so the
+  // assigned EA is the operational authority and converts; the purchase stays unowned.
   const d = await eaSale(ctx, eaA, { inviteEmail: hoM.email, homeownerOnlyUpdates: true, onward: true });
   const dTileId = await linkedTile(ctx, d.saleId);
   record(
@@ -820,9 +867,20 @@ async function runScenarios(ctx: Ctx): Promise<void> {
   );
   const dConvert = await convertRpc(eaA, d.saleId, `D ${s}`);
   const dTile = dTileId ? await property(ctx, dTileId) : null;
+  const { count: dAssignments } = dTileId
+    ? await ctx.admin
+        .from("property_ea_assignments")
+        .select("id", { count: "exact", head: true })
+        .eq("property_id", dTileId)
+    : { count: null };
   record(
-    "D view-only EA conversion denied; tile unchanged",
-    dConvert?.ok === false && dConvert.error === "not_authorized" && dTile?.stage === "searching" && dTile.address == null,
+    "D EA-only sale (homeowner-only updates, unclaimed): EA converts → unowned purchase, no EA identity, membership or assignment",
+    dConvert?.ok === true &&
+      dTile?.stage === "offer_accepted" &&
+      dTileId != null &&
+      (await identity(ctx, dTileId)) == null &&
+      noEaOwnerClass(await members(ctx, dTileId), eaA.userId) &&
+      dAssignments === 0,
     JSON.stringify(dConvert)
   );
 
@@ -1072,7 +1130,11 @@ async function runScenarios(ctx: Ctx): Promise<void> {
     actor_user_id: eaA.userId,
     actor_role: "operational_participant",
   });
-  record("L view-only EA cannot insert a completion event", !!lViewOnlyInsert.error);
+  record(
+    "L homeowner-only EA on a still-unclaimed (EA-only) sale operates it until a homeowner claims",
+    !lViewOnlyInsert.error,
+    lViewOnlyInsert.error?.message
+  );
   await ctx.admin.from("chain_completion_events").insert({
     chain_id: d.chainId,
     event_type: "completion_date_update_acknowledged",
@@ -1142,13 +1204,15 @@ async function runScenarios(ctx: Ctx): Promise<void> {
     p_invite_email: hoP.email,
     p_awaiting_buyer: false,
   });
-  const paId = (pa as Rpc)?.property_id as number | undefined;
-  const paClaim = paId ? await claim(hoP, paId) : null;
-  const paIdentity = paId ? await identity(ctx, paId) : null;
+  const { count: paRows } = await ctx.admin
+    .from("properties")
+    .select("id", { count: "exact", head: true })
+    .eq("chain_id", h.chainId)
+    .eq("address", `PA ${s} Agreed Purchase`);
   record(
-    "M purchase_agreed purchase: claim still grants the homeowner (onward_claimed false)",
-    paClaim?.ok === true && paClaim.onward_claimed === false && paIdentity?.homeowner_user_id === hoP.userId,
-    JSON.stringify(paClaim)
+    "M EA cannot originate a purchase row (invalid_relationship_type, nothing created)",
+    (pa as Rpc)?.ok === false && (pa as Rpc)?.error === "invalid_relationship_type" && paRows === 0,
+    JSON.stringify(pa)
   );
 
   const { data: selfGrant } = await eaA.client.rpc("establish_operational_homeowner_for_created_property", {
@@ -1158,6 +1222,161 @@ async function runScenarios(ctx: Ctx): Promise<void> {
     "M EA cannot self-grant an EA-created tile via for_created_property",
     (selfGrant as Rpc)?.ok === false && (selfGrant as Rpc)?.error === "estate_agent_cannot_be_homeowner",
     JSON.stringify(selfGrant)
+  );
+
+  // N — EA-only unclaimed sale (homeowner-only updates, no homeowner): the assigned
+  // EA links/converts its onward placeholder; nobody else can; the EA gains nothing
+  // on the resulting purchase. eaB is first unassigned, then assigned to its own
+  // sale elsewhere, then assigned to the buyer-side sale linking into N's sale.
+  const n = await eaSale(ctx, eaA, { homeownerOnlyUpdates: true, onward: false });
+  const { data: nCreate } = await eaA.client.rpc("create_searching_placeholder_for_sale", {
+    p_sale_property_id: n.saleId,
+  });
+  const nTileId = (nCreate as Rpc)?.property_id as number | undefined;
+  await ctx.admin.from("properties").update({ linked_property_id: null }).eq("id", n.saleId);
+  record(
+    "N fixture: EA-only sale with an unlinked, unowned searching placeholder",
+    (nCreate as Rpc)?.ok === true &&
+      nTileId != null &&
+      (await linkedTile(ctx, n.saleId)) === null &&
+      (await identity(ctx, nTileId)) == null,
+    JSON.stringify(nCreate)
+  );
+
+  const nLink = async (actor: Actor): Promise<Rpc> => {
+    const { data, error } = await actor.client.rpc("link_sale_to_searching_placeholder", {
+      p_sale_property_id: n.saleId,
+      p_searching_property_id: nTileId,
+    });
+    return error ? { ok: false, error: error.message } : (data as Rpc);
+  };
+  const refusedBoth = async (actor: Actor, label: string) => {
+    const link = await nLink(actor);
+    const convert = await convertRpc(actor, n.saleId, `N ${label} ${s}`);
+    return {
+      pass:
+        link?.ok === false &&
+        link.error === "forbidden" &&
+        convert?.ok === false &&
+        convert.error === "not_authorized",
+      detail: JSON.stringify({ link, convert }),
+    };
+  };
+
+  const { count: eaBAssignmentsBefore } = await ctx.admin
+    .from("property_ea_assignments")
+    .select("id", { count: "exact", head: true })
+    .eq("branch_id", eaB.branchId);
+  const nUnassigned = await refusedBoth(eaB, "unassigned");
+  record(
+    "N2 unassigned EA (no assignment anywhere) cannot link or convert",
+    eaBAssignmentsBefore === 0 && nUnassigned.pass,
+    nUnassigned.detail
+  );
+
+  const nOther = await eaSale(ctx, eaB, { onward: false });
+  const nOtherProperty = await refusedBoth(eaB, "other");
+  record(
+    "N4 EA assigned to another property cannot link or convert",
+    nOther.finalize.ok && nOtherProperty.pass,
+    nOtherProperty.detail
+  );
+
+  const { data: nChainRows } = await ctx.admin
+    .from("properties")
+    .select("chain_position")
+    .eq("chain_id", n.chainId);
+  const nNextPosition = Math.max(0, ...(nChainRows ?? []).map((r) => Number(r.chain_position ?? 0))) + 1;
+  const { data: nBuyerSale, error: nBuyerSaleError } = await ctx.admin
+    .from("properties")
+    .insert({
+      chain_id: n.chainId,
+      chain_position: nNextPosition,
+      address: `N ${s} Buyer-side Sale`,
+      postcode: "PO16 7NB",
+      stage: "property_listed",
+      status: "pending_connection",
+      relationship_type: "sale",
+      created_by_user_id: eaB.userId,
+      awaiting_buyer: false,
+      buyer_connected: true,
+      seller_connected: true,
+      is_searching: false,
+      linked_property_id: n.saleId,
+    })
+    .select("id")
+    .single();
+  const { error: nBuyerAssignError } = nBuyerSale
+    ? await ctx.admin.from("property_ea_assignments").insert({
+        property_id: nBuyerSale.id,
+        branch_id: eaB.branchId,
+        status: "active",
+        homeowner_only_updates: false,
+        assigned_by_user_id: eaB.userId,
+      })
+    : { error: nBuyerSaleError };
+  const nBuyerSide = await refusedBoth(eaB, "buyer-side");
+  record(
+    "N3 buyer-side EA (operates the sale buying into this one) cannot link or convert",
+    !nBuyerAssignError && nBuyerSide.pass,
+    nBuyerAssignError?.message ?? nBuyerSide.detail
+  );
+
+  const { error: nCounterpartyError } = await ctx.admin.from("property_counterparty_participants").insert({
+    property_id: n.saleId,
+    user_id: hoA.userId,
+    counterparty_role: "buyer",
+    granted_via: "join_chain_property",
+    status: "active",
+  });
+  const nConnected = await refusedBoth(hoA, "connected");
+  record(
+    "N5 connected participant (buyer counterparty) cannot link or convert",
+    !nCounterpartyError && nConnected.pass,
+    nCounterpartyError?.message ?? nConnected.detail
+  );
+
+  const nLinked = await nLink(eaA);
+  record(
+    "N1 assigned EA on the EA-only unclaimed sale links its searching placeholder",
+    nLinked?.ok === true && (await linkedTile(ctx, n.saleId)) === nTileId,
+    JSON.stringify(nLinked)
+  );
+  const nConverted = await convertRpc(eaA, n.saleId, `N ${s}`);
+  const nPurchase = nTileId ? await property(ctx, nTileId) : null;
+  record(
+    "N1 assigned EA on the EA-only unclaimed sale converts the onward placeholder",
+    nConverted?.ok === true &&
+      nConverted.property_id === nTileId &&
+      nPurchase?.stage === "offer_accepted" &&
+      nPurchase.relationship_type === "purchase",
+    JSON.stringify(nConverted)
+  );
+
+  const { data: nOperate } = await eaA.client.rpc("can_operate_property", { p_property_id: nTileId });
+  const { data: nOnward } = await eaA.client.rpc("create_searching_placeholder_for_sale", {
+    p_sale_property_id: nTileId,
+  });
+  const { error: nActivityError } = await eaA.client.from("activities").insert({
+    property_id: nTileId,
+    update: "Solicitors Instructed",
+    updated_by: "estate_agent",
+  });
+  const { count: nPurchaseAssignments } = await ctx.admin
+    .from("property_ea_assignments")
+    .select("id", { count: "exact", head: true })
+    .eq("property_id", nTileId ?? -1);
+  record(
+    "N6 the original EA gains no authority over the resulting onward purchase (not operable, no onward from it, no write, no identity/membership/assignment)",
+    nOperate === false &&
+      (nOnward as Rpc)?.ok === false &&
+      (nOnward as Rpc)?.error === "not_authorized" &&
+      nActivityError?.code === "42501" &&
+      nTileId != null &&
+      (await identity(ctx, nTileId)) == null &&
+      noEaOwnerClass(await members(ctx, nTileId), eaA.userId) &&
+      nPurchaseAssignments === 0,
+    JSON.stringify({ nOperate, nOnward, activity: nActivityError?.code ?? null, nPurchaseAssignments })
   );
 
   const { count: eaIdentityCount } = await ctx.admin
@@ -1201,8 +1420,9 @@ async function cleanupFixtures(ctx: Ctx): Promise<void> {
     warn("chains", (await ctx.admin.from("chains").delete().eq("id", chainId)).error);
   }
 
+  // Deleting the branch cascades its members; deleting members first would leave a
+  // populated branch with no owner and trip the deferred owner invariant.
   for (const branchId of ctx.branchIds) {
-    warn("ea_branch_members", (await ctx.admin.from("ea_branch_members").delete().eq("branch_id", branchId)).error);
     warn("ea_branches", (await ctx.admin.from("ea_branches").delete().eq("id", branchId)).error);
   }
   for (const companyId of ctx.companyIds) {
@@ -1216,7 +1436,7 @@ async function cleanupFixtures(ctx: Ctx): Promise<void> {
 }
 
 async function runExecute(): Promise<void> {
-  console.log("\n--- Live Development scenarios A–M ---\n");
+  console.log("\n--- Live Development scenarios A–N ---\n");
   loadEnvLocal();
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();

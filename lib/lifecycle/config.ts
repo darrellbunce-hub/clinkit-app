@@ -2,6 +2,18 @@ import type { LifecycleConfig } from "@/lib/lifecycle/types";
 
 const DAY_MS = 86_400_000;
 
+export const DEFAULT_LIFECYCLE_DORMANCY_EFFECTIVE_FROM = "2026-10-05T00:00:00.000Z";
+
+function readIsoInstant(envValue: string | undefined, fallback: string): string {
+  if (!envValue) {
+    return fallback;
+  }
+
+  const parsed = new Date(envValue.trim());
+
+  return Number.isNaN(parsed.getTime()) ? fallback : parsed.toISOString();
+}
+
 function readPositiveInt(
   envValue: string | undefined,
   fallback: number
@@ -56,6 +68,22 @@ export function getLifecycleConfig(): LifecycleConfig {
     300
   );
 
+  const workerTimeBudgetSeconds = readPositiveInt(
+    process.env.LIFECYCLE_WORKER_TIME_BUDGET_SECONDS,
+    240
+  );
+
+  const workerRetryDelaySeconds = readPositiveInt(
+    process.env.LIFECYCLE_WORKER_RETRY_DELAY_SECONDS,
+    3600
+  );
+
+  // Must match the database setting app.lifecycle_dormancy_effective_from.
+  const dormancyEffectiveFrom = readIsoInstant(
+    process.env.LIFECYCLE_DORMANCY_EFFECTIVE_FROM,
+    DEFAULT_LIFECYCLE_DORMANCY_EFFECTIVE_FROM
+  );
+
   return {
     completedGraceDays,
     dormantInactivityDays,
@@ -63,6 +91,9 @@ export function getLifecycleConfig(): LifecycleConfig {
     dormancyConfirmationDays,
     evaluationBatchSize,
     workerLeaseSeconds,
+    workerTimeBudgetMs: workerTimeBudgetSeconds * 1000,
+    workerRetryDelayMs: workerRetryDelaySeconds * 1000,
+    dormancyEffectiveFrom,
     completedGraceMs: completedGraceDays * DAY_MS,
     dormantInactivityMs: dormantInactivityDays * DAY_MS,
     connectedDormantMs: connectedDormantDays * DAY_MS,

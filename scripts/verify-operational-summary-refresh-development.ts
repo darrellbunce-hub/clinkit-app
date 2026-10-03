@@ -323,6 +323,27 @@ async function verifyExecuteFlow(): Promise<void> {
       return;
     }
 
+    // Membership alone never authorises operational writes; the owner holds
+    // the seller-side operational identity.
+    const { error: identityError } = await service
+      .from("property_operational_identities")
+      .insert({
+        property_id: propertyId,
+        homeowner_user_id: ownerUserId,
+        operational_role: "seller",
+        granted_via: "backfill",
+        status: "active",
+      });
+
+    if (identityError) {
+      record(
+        "--execute fixture operational identity",
+        false,
+        identityError.message
+      );
+      return;
+    }
+
     const ownerClient = await signIn(ownerEmail, PASSWORD);
 
     const { data: participantRows, error: participantError } =
@@ -375,15 +396,16 @@ async function verifyExecuteFlow(): Promise<void> {
 
     const newStage = "contracts_exchanged";
     const stageEnteredAt = new Date().toISOString();
-    const { error: updateError } = await ownerClient
+    const { data: updatedRows, error: updateError } = await ownerClient
       .from("properties")
       .update({ stage: newStage, stage_entered_at: stageEnteredAt })
-      .eq("id", propertyId);
+      .eq("id", propertyId)
+      .select("id");
 
     record(
-      "Stage mutation succeeds for operational owner",
-      !updateError,
-      updateError ? formatPostgrestError(updateError) : undefined
+      "Stage mutation succeeds for operational owner (exactly one row updated)",
+      !updateError && (updatedRows ?? []).length === 1,
+      updateError ? formatPostgrestError(updateError) : `rows=${(updatedRows ?? []).length}`
     );
 
     const refreshResult = await refreshOperationalSummary(ownerClient, {
@@ -480,6 +502,7 @@ async function verifyExecuteFlow(): Promise<void> {
       await service.from("property_operational_summary").delete().eq("property_id", propertyId);
       await service.from("activities").delete().eq("property_id", propertyId);
       await service.from("property_members").delete().eq("property_id", propertyId);
+      await service.from("property_operational_identities").delete().eq("property_id", propertyId);
       await service.from("properties").delete().eq("id", propertyId);
     }
 

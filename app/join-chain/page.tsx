@@ -11,7 +11,9 @@ import {
 } from "@/components/mobileStandards";
 import { supabase } from "@/lib/supabase";
 import {
+  formatJoinedPropertyRelinkFailure,
   formatTopologyConflictMessage,
+  JOINED_PROPERTY_RELINK_NOT_APPLIED_MESSAGE,
   migrateSourceChainOnwardProperties,
   relinkJoinedPropertyToSearching,
   resolveSearchingFromJoinIntent,
@@ -187,8 +189,8 @@ function JoinChainContent() {
 
           if (!migrationRelinkResult.ok) {
             alert(
-              formatTopologyConflictMessage(
-                migrationRelinkResult.existingLinkedPropertyId
+              formatJoinedPropertyRelinkFailure(
+                migrationRelinkResult
               )
             );
             return;
@@ -227,6 +229,13 @@ function JoinChainContent() {
               intentResult.existingLinkedPropertyId!
             )
           );
+        } else if (
+          intentResult.reason ===
+          "relink_not_applied"
+        ) {
+          alert(
+            JOINED_PROPERTY_RELINK_NOT_APPLIED_MESSAGE
+          );
         } else {
           alert(
             "Join completed, but we could not set up your next-home search step. Please try again from the chain page or contact support."
@@ -246,6 +255,7 @@ function JoinChainContent() {
             "cleanup_abandoned_onboarding_chain",
             {
               p_chain_id: Number(sourceChainId),
+              p_require_empty: true,
             }
           );
 

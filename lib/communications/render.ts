@@ -127,7 +127,7 @@ export async function renderDormancyWarning(
 ): Promise<RenderedEmail> {
   return renderEmailTemplate(
     DormancyWarningEmail(props),
-    getDormancyWarningSubject()
+    getDormancyWarningSubject(props.audience)
   );
 }
 

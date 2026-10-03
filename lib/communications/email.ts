@@ -21,6 +21,7 @@ import {
 import { createResendProvider } from "@/lib/communications/resend";
 import type {
   ClaimSuccessfulEmailParams,
+  DormancyWarningAudience,
   DormancyWarningEmailParams,
   EaGraceFinalWarningEmailParams,
   EaGraceReminderEmailParams,
@@ -225,10 +226,12 @@ export async function sendClaimSuccessful(
 export function buildDormancyWarningEmailParams(params: {
   to: string;
   propertyId: number;
+  audience?: DormancyWarningAudience;
 }): DormancyWarningEmailParams {
   return {
     to: params.to,
     confirmationLink: buildDormancyWarningPropertyUrl(params.propertyId),
+    audience: params.audience ?? "buyer",
   };
 }
 

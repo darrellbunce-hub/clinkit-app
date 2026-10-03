@@ -170,11 +170,7 @@ export async function migrateSourceChainOnwardProperties(
   };
 }
 
-export async function relinkJoinedPropertyToSearching(
-  supabase: SupabaseClient,
-  joinedProperty: JoinedPropertyRef,
-  searchingId: number
-): Promise<
+export type JoinedPropertyRelinkResult =
   | { ok: true; linkedSearchingId: number }
   | { ok: true; alreadyLinked: true }
   | {
@@ -182,7 +178,13 @@ export async function relinkJoinedPropertyToSearching(
       reason: "downstream_link_exists";
       existingLinkedPropertyId: number;
     }
-> {
+  | { ok: false; reason: "relink_not_applied" };
+
+export async function relinkJoinedPropertyToSearching(
+  supabase: SupabaseClient,
+  joinedProperty: JoinedPropertyRef,
+  searchingId: number
+): Promise<JoinedPropertyRelinkResult> {
   const relinkDecision =
     evaluateJoinedPropertyRelink(
       joinedProperty.linked_property_id,
@@ -197,15 +199,21 @@ export async function relinkJoinedPropertyToSearching(
     return relinkDecision;
   }
 
-  const { error } = await supabase
+  // RLS-filtered updates succeed with zero rows, so require exactly one updated row.
+  const { data: relinked, error } = await supabase
     .from("properties")
     .update({
       linked_property_id: searchingId,
     })
-    .eq("id", joinedProperty.id);
+    .eq("id", joinedProperty.id)
+    .select("id");
 
   if (error) {
     throw error;
+  }
+
+  if (relinked?.length !== 1) {
+    return { ok: false, reason: "relink_not_applied" };
   }
 
   return relinkDecision;
@@ -221,6 +229,7 @@ export type IntentSearchingResult =
       ok: false;
       reason:
         | "downstream_link_exists"
+        | "relink_not_applied"
         | "insert_failed";
       existingLinkedPropertyId?: number;
       error?: unknown;
@@ -299,6 +308,10 @@ export async function resolveSearchingFromJoinIntent(
     );
 
   if (!relinkResult.ok) {
+    if (relinkResult.reason === "relink_not_applied") {
+      return { ok: false, reason: "relink_not_applied" };
+    }
+
     return {
       ok: false,
       reason: "downstream_link_exists",
@@ -312,6 +325,19 @@ export async function resolveSearchingFromJoinIntent(
     searchingId: searchingId!,
     created,
   };
+}
+
+/** Customer-safe message when the joined property could not be linked to the next-home search step. */
+export const JOINED_PROPERTY_RELINK_NOT_APPLIED_MESSAGE =
+  "Join completed, but we could not link your next-home search step to this property. " +
+  "Nothing was removed. Please try again from the chain page or contact support.";
+
+export function formatJoinedPropertyRelinkFailure(
+  result: Extract<JoinedPropertyRelinkResult, { ok: false }>
+): string {
+  return result.reason === "relink_not_applied"
+    ? JOINED_PROPERTY_RELINK_NOT_APPLIED_MESSAGE
+    : formatTopologyConflictMessage(result.existingLinkedPropertyId);
 }
 
 /** Customer-safe message when join-chain searching setup conflicts with an existing downstream link. */

@@ -18,6 +18,8 @@ export type EstateAgentManagementModeInput = {
   claimStatus?: string | null;
   homeowner_only_updates?: boolean;
   homeownerOnlyUpdates?: boolean;
+  /** Seller-side homeowner connected; when known it takes precedence over claim status. */
+  hasConnectedHomeowner?: boolean;
 };
 
 export type EstateAgentManagementModePresentation = {
@@ -87,9 +89,10 @@ export function resolveEstateAgentManagementMode(
   const claimStatus = resolveClaimStatus(input);
   const homeownerOnlyUpdates =
     resolveHomeownerOnlyUpdates(input);
-  const isClaimed = claimStatus === "claimed";
+  const hasHomeowner =
+    input.hasConnectedHomeowner ?? claimStatus === "claimed";
 
-  if (!isClaimed) {
+  if (!hasHomeowner) {
     return "awaiting_homeowner";
   }
 
@@ -114,11 +117,13 @@ export function getEstateAgentManagementModePresentation(
     colour: config.colour,
     title: config.title,
     description: config.description,
-    editable: canAgentMutateAssignedProperty({
-      status: "active",
-      homeowner_only_updates: homeownerOnlyUpdates,
-      homeownerOnlyUpdates,
-    }),
+    editable:
+      mode === "awaiting_homeowner" ||
+      canAgentMutateAssignedProperty({
+        status: "active",
+        homeowner_only_updates: homeownerOnlyUpdates,
+        homeownerOnlyUpdates,
+      }),
   };
 }
 
@@ -140,10 +145,13 @@ export function getEstateAgentManagementModePresentationFromSummary(
 
 export function getEstateAgentManagementModeForOperationalAssignment(
   assignment:
-    | Pick<
+    | (Pick<
         EstateAgentOperationalAssignment,
         "claimStatus" | "homeownerOnlyUpdates"
-      >
+      > &
+        Partial<
+          Pick<EstateAgentOperationalAssignment, "subjectUserId">
+        >)
     | null
     | undefined
 ): EstateAgentManagementModePresentation | null {
@@ -155,6 +163,10 @@ export function getEstateAgentManagementModeForOperationalAssignment(
     claimStatus: assignment.claimStatus,
     homeownerOnlyUpdates:
       assignment.homeownerOnlyUpdates,
+    hasConnectedHomeowner:
+      assignment.subjectUserId === undefined
+        ? undefined
+        : assignment.subjectUserId != null,
   });
 }
 

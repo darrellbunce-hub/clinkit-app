@@ -178,15 +178,62 @@ function testResolveModeFromAssignmentFields() {
   );
 }
 
+function testWorkspaceModeFollowsSellerSideSubject() {
+  // A purchase the branch connected to reports claim_status "claimed" with no
+  // seller yet: the seller-side subject, not claim status, decides the mode.
+  const awaitingSeller =
+    getEstateAgentManagementModeForOperationalAssignment({
+      homeownerOnlyUpdates: true,
+      claimStatus: "claimed",
+      subjectUserId: null,
+    })!;
+
+  assert(
+    awaitingSeller.mode === "awaiting_homeowner",
+    "no seller-side homeowner is awaiting homeowner despite claimed status"
+  );
+  assert(
+    awaitingSeller.editable === true,
+    "EA-only property is editable even with homeowner-only updates set"
+  );
+
+  const sellerConnectedHomeownerOnly =
+    getEstateAgentManagementModeForOperationalAssignment({
+      homeownerOnlyUpdates: true,
+      claimStatus: "claimed",
+      subjectUserId: "seller-user",
+    })!;
+
+  assert(
+    sellerConnectedHomeownerOnly.mode === "homeowner_managing" &&
+      sellerConnectedHomeownerOnly.editable === false,
+    "connected seller with homeowner-only updates is homeowner managing, read-only"
+  );
+
+  const sellerConnectedShared =
+    getEstateAgentManagementModeForOperationalAssignment({
+      homeownerOnlyUpdates: false,
+      claimStatus: "unclaimed",
+      subjectUserId: "seller-user",
+    })!;
+
+  assert(
+    sellerConnectedShared.mode === "shared_management" &&
+      sellerConnectedShared.editable === true,
+    "connected seller with EA updates allowed is shared management"
+  );
+}
+
 function main() {
   testAwaitingHomeownerBeforeClaim();
   testSharedManagementAfterClaim();
   testHomeownerManagingReadOnly();
   testDashboardAndWorkspaceParity();
   testResolveModeFromAssignmentFields();
+  testWorkspaceModeFollowsSellerSideSubject();
 
   console.log(
-    "verify-management-mode-presentation: 5/5 passed"
+    "verify-management-mode-presentation: 6/6 passed"
   );
 }
 

@@ -6,11 +6,15 @@ import {
 } from "@/lib/communications/email";
 import type { SendEmailResult } from "@/lib/communications/types";
 
+/** get_dormancy_warning_email_recipient.recipient_kind */
+type DormancyWarningRecipientKind = "buyer" | "estate_agent";
+
 type DormancyWarningRecipient = {
   property_id: number;
   chain_id: number | null;
-  homeowner_user_id: string;
+  recipient_user_id: string;
   recipient_email: string;
+  recipient_kind?: DormancyWarningRecipientKind;
 };
 
 type NotificationTarget = {
@@ -21,6 +25,7 @@ type NotificationTarget = {
 export type DormancyWarningNotificationResult = {
   propertyId: number;
   recipientEmail: string | null;
+  recipientKind?: DormancyWarningRecipientKind;
   claimed: boolean;
   sent: boolean;
   skipped: boolean;
@@ -179,6 +184,8 @@ export async function processDormancyWarningNotificationForProperty(params: {
       buildDormancyWarningEmailParams({
         to: recipient.recipient_email,
         propertyId: params.propertyId,
+        audience:
+          recipient.recipient_kind === "estate_agent" ? "estate_agent" : "buyer",
       }),
       {
         propertyId: params.propertyId,
@@ -221,6 +228,7 @@ export async function processDormancyWarningNotificationForProperty(params: {
     return {
       propertyId: params.propertyId,
       recipientEmail: recipient.recipient_email,
+      recipientKind: recipient.recipient_kind,
       claimed: true,
       sent: true,
       skipped: false,
@@ -247,7 +255,8 @@ export async function processDormancyWarningNotificationForProperty(params: {
 }
 
 /**
- * Sends dormancy warning emails for all pending chain notification targets.
+ * Sends the dormancy warning email for the placeholder itself when its
+ * notification is pending. No other row in the chain is notified.
  */
 export async function processDormancyWarningNotifications(params: {
   supabase: SupabaseClient;

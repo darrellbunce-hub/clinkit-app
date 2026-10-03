@@ -99,7 +99,7 @@ export default function ParticipationDelinkPanel({
     }
 
     setSuccessMessage(
-      getParticipationDelinkSuccessMessage(pendingOperation)
+      getParticipationDelinkSuccessMessage(pendingOperation, data)
     );
 
     await onCompleted?.();

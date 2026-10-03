@@ -8,9 +8,9 @@ import DormancyWarningPanel from "@/components/lifecycle/DormancyWarningPanel";
 import { MobileAlert } from "@/components/mobile/MobileLayout";
 import { confirmTransactionStillActive } from "@/lib/lifecycle/confirmStillActive";
 import {
-  isActiveOperationalHomeowner,
-  loadPropertyLifecycleState,
-  resolveEffectiveOperationalState,
+  loadPropertyLifecycleStatus,
+  NO_LIFECYCLE_WARNING,
+  type PropertyLifecycleStatus,
 } from "@/lib/lifecycle/loadPropertyLifecycleState";
 import {
   isLifecycleDormancyWarningHint,
@@ -40,13 +40,8 @@ export default function PropertyLifecycleDormancySection({
 
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
-  const [isActiveHomeowner, setIsActiveHomeowner] = useState(false);
-  const [operationalState, setOperationalState] = useState(
-    resolveEffectiveOperationalState(null)
-  );
-  const [confirmationDeadlineAt, setConfirmationDeadlineAt] = useState<
-    string | null
-  >(null);
+  const [status, setStatus] =
+    useState<PropertyLifecycleStatus>(NO_LIFECYCLE_WARNING);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isConfirming, setIsConfirming] = useState(false);
   const [infoMessage, setInfoMessage] = useState("");
@@ -59,10 +54,10 @@ export default function PropertyLifecycleDormancySection({
     router.replace(`/property/${propertyId}`, { scroll: false });
   }, [lifecycleHint, propertyId, router]);
 
-  const reloadLifecycleState = useCallback(async () => {
+  const reloadLifecycleStatus = useCallback(async () => {
     if (!currentUserId) {
       setIsLoading(false);
-      setIsActiveHomeowner(false);
+      setStatus(NO_LIFECYCLE_WARNING);
       return;
     }
 
@@ -70,19 +65,8 @@ export default function PropertyLifecycleDormancySection({
     setLoadError("");
 
     try {
-      const [snapshot, homeowner] = await Promise.all([
-        loadPropertyLifecycleState({ supabase, propertyId }),
-        isActiveOperationalHomeowner({
-          supabase,
-          propertyId,
-          userId: currentUserId,
-        }),
-      ]);
-
-      setIsActiveHomeowner(homeowner);
-      setOperationalState(resolveEffectiveOperationalState(snapshot));
-      setConfirmationDeadlineAt(
-        snapshot?.dormancy_confirmation_deadline_at ?? null
+      setStatus(
+        await loadPropertyLifecycleStatus({ supabase, propertyId })
       );
     } catch (error) {
       setLoadError(
@@ -96,13 +80,13 @@ export default function PropertyLifecycleDormancySection({
   }, [currentUserId, propertyId]);
 
   useEffect(() => {
-    void reloadLifecycleState();
-  }, [reloadLifecycleState]);
+    void reloadLifecycleStatus();
+  }, [reloadLifecycleStatus]);
 
   const view = resolveStillActiveConfirmationView({
     lifecycleHint,
-    operationalState,
-    isActiveOperationalHomeowner: isActiveHomeowner,
+    inWarning: status.inWarning,
+    canConfirmStillActive: status.canConfirm,
   });
 
   useEffect(() => {
@@ -136,7 +120,7 @@ export default function PropertyLifecycleDormancySection({
       return { ok: false, message: result.error };
     }
 
-    await reloadLifecycleState();
+    await reloadLifecycleStatus();
     await onConfirmed?.();
 
     if (!result.idempotent) {
@@ -163,7 +147,7 @@ export default function PropertyLifecycleDormancySection({
 
       {view.showDormancyPanel ? (
         <DormancyWarningPanel
-          confirmationDeadlineAt={confirmationDeadlineAt}
+          confirmationDeadlineAt={status.confirmationDeadlineAt}
           onConfirmClick={() => setIsModalOpen(true)}
           isConfirmDisabled={isConfirming}
         />

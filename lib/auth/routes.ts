@@ -25,6 +25,7 @@ export const ROUTES = {
   estateAgentJoin: "/estate-agents/join",
   agentHome: "/agent",
   agentOriginate: "/agent/originate",
+  agentReconnect: "/agent/reconnect",
   claimProperty: "/claim",
   privacyAdmin: "/admin/privacy",
   platformAdminMfaEnroll: "/admin/mfa/enroll",

@@ -41,6 +41,9 @@ type ExecuteRpcRow = {
   branch_id?: string;
   lifecycle_state?: string;
   invitation_reset?: boolean;
+  ea_retained?: boolean;
+  placeholder?: boolean;
+  unlinked_sale_ids?: number[] | null;
 };
 
 function mapReasonCodes(
@@ -103,6 +106,9 @@ function mapExecute(row: ExecuteRpcRow): ParticipationDelinkExecuteResult {
     branchId: row.branch_id,
     lifecycleState: row.lifecycle_state,
     invitationReset: row.invitation_reset,
+    eaRetained: row.ea_retained,
+    placeholder: row.placeholder,
+    unlinkedSaleIds: row.unlinked_sale_ids ?? undefined,
   };
 }
 

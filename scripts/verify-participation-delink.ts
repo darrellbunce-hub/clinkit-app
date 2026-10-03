@@ -1,7 +1,9 @@
 /**
  * Participation de-link regression tests (Phase 2).
  *
- * Requires migrations through 20260714160000_participation_delink.sql
+ * Requires migrations through 20261005120000_operational_authority_enforcement.sql
+ * (W1-W7: estate_agent_remove_homeowner follows current seller-side
+ * assignment and the claim / invitation flow, not property origin).
  */
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { readFileSync } from "fs";
@@ -14,6 +16,7 @@ for (const line of readFileSync(".env.local", "utf8").split("\n")) {
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const password = "TraceBuyerReady123!";
 
 type Result = { name: string; pass: boolean; detail?: string };
@@ -150,16 +153,14 @@ async function main() {
 
   const saleId = sale!.id as number;
 
-  await ho.rpc("establish_operational_homeowner", {
+  await ho.rpc("establish_operational_homeowner_for_created_property", {
     p_property_id: saleId,
-    p_granted_via: "start_move",
   });
 
   const assignResult = await assignPropertyToBranch(ho, {
     propertyId: saleId,
     branchId,
     homeownerOnlyUpdates: true,
-    assignedByUserId: hoId,
   });
   if (assignResult.error) {
     throw new Error(assignResult.error);
@@ -198,7 +199,6 @@ async function main() {
     propertyId: saleId,
     branchId,
     homeownerOnlyUpdates: true,
-    assignedByUserId: hoId,
   });
   if (assignAgain.error) {
     throw new Error(assignAgain.error);
@@ -228,6 +228,12 @@ async function main() {
   record(
     "estate_agent_remove_branch succeeds",
     eaRemove?.ok === true,
+    JSON.stringify(eaRemove)
+  );
+
+  record(
+    "estate_agent_remove_branch with homeowner remaining changes nothing else",
+    eaRemove?.lifecycle_state === "active" && eaRemove?.placeholder === false,
     JSON.stringify(eaRemove)
   );
 
@@ -304,62 +310,282 @@ async function main() {
     JSON.stringify(blocked)
   );
 
-  const stamp3 = stamp + 3;
-  const ho3Email = `delink-ho3-${stamp3}@keynetic-test.dev`;
-  const { client: ho3, userId: ho3Id } = await signUp(ho3Email);
-  await setupHomeowner(ho3, ho3Id);
-
-  const { data: chain3 } = await ho3.rpc("create_chain_for_onboarding", {
-    p_name: `Delink3-${stamp3}`,
-    p_access_code: `KN-D3-${stamp3}`,
+  const admin = createClient(url, serviceRoleKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  const { data: sale3 } = await ho3
+  async function selfDelinkIsolatedSale(suffix: number, reasonCode: string) {
+    const ownerEmail = `delink-ho${suffix}-${stamp + suffix}@keynetic-test.dev`;
+    const { client: owner, userId: ownerId } = await signUp(ownerEmail);
+    await setupHomeowner(owner, ownerId);
+
+    const { data: chain } = await owner.rpc("create_chain_for_onboarding", {
+      p_name: `Delink${suffix}-${stamp + suffix}`,
+      p_access_code: `KN-D${suffix}-${stamp + suffix}`,
+    });
+
+    const { data: row } = await owner
+      .from("properties")
+      .insert({
+        chain_id: chain.chain_id,
+        chain_position: 1,
+        address: `Self Delink ${suffix} ${stamp}`,
+        postcode: "D3 3DL",
+        stage: "property_listed",
+        status: "pending_connection",
+        relationship_type: "sale",
+        created_by_user_id: ownerId,
+        buyer_connected: false,
+        seller_connected: true,
+        is_searching: false,
+      })
+      .select("id")
+      .single();
+
+    await owner.rpc("establish_operational_homeowner_for_created_property", {
+      p_property_id: row!.id,
+    });
+
+    const { data: result } = await owner.rpc("execute_participation_delink", {
+      p_property_id: row!.id,
+      p_operation: "homeowner_self",
+      p_branch_id: null,
+      p_reason_code: reasonCode,
+    });
+
+    const { data: lifecycle } = await admin
+      .from("property_lifecycle_states")
+      .select("operational_state")
+      .eq("property_id", row!.id)
+      .maybeSingle();
+
+    return { result, lifecycle };
+  }
+
+  // Intentional change (M3): only a mistake reason releases immediately.
+  const leaving = await selfDelinkIsolatedSale(3, "no_longer_moving");
+  record(
+    "homeowner_self (no_longer_moving) leaves an unrepresented placeholder",
+    leaving.result?.ok === true &&
+      leaving.result?.lifecycle_state === "active" &&
+      leaving.result?.placeholder === true,
+    JSON.stringify(leaving.result)
+  );
+  record(
+    "placeholder is not released",
+    leaving.lifecycle?.operational_state !== "released",
+    JSON.stringify(leaving.lifecycle)
+  );
+
+  const mistake = await selfDelinkIsolatedSale(4, "wrong_property");
+  record(
+    "homeowner_self (wrong_property, no dependants) releases property",
+    mistake.result?.ok === true && mistake.result?.lifecycle_state === "released",
+    JSON.stringify(mistake.result)
+  );
+  record(
+    "lifecycle state persisted as released",
+    mistake.lifecycle?.operational_state === "released",
+    JSON.stringify(mistake.lifecycle)
+  );
+
+  // estate_agent_remove_homeowner: EA-originated != EA-authorised. Each case
+  // checks the RPC and that the options RPC (what the UI renders) agrees.
+  async function withdraw(client: SupabaseClient, propertyId: number, branch: string | null) {
+    const { data } = await client.rpc("execute_participation_delink", {
+      p_property_id: propertyId,
+      p_operation: "estate_agent_remove_homeowner",
+      p_branch_id: branch,
+      p_reason_code: "wrong_homeowner_invited",
+    });
+    return data;
+  }
+  async function offersWithdraw(client: SupabaseClient, propertyId: number) {
+    const { data } = await client.rpc("get_participation_delink_options", {
+      p_property_id: propertyId,
+    });
+    return (
+      data?.options?.some(
+        (o: { operation: string }) => o.operation === "estate_agent_remove_homeowner"
+      ) === true
+    );
+  }
+
+  // W1: seller-side EA, invited homeowner who has claimed but not participated.
+  const stampW = stamp + 20;
+  const hoWEmail = `delink-how-${stampW}@keynetic-test.dev`;
+  const { client: hoW } = await signUp(hoWEmail);
+  await setupHomeowner(hoW, (await hoW.auth.getUser()).data.user!.id);
+  const invitedPropertyId = await createEaPendingProperty(ea, branchId, hoWEmail, stampW);
+  await hoW.rpc("claim_operational_property", {
+    p_property_id: invitedPropertyId,
+    p_invitation_token: null,
+  });
+  const w1Offered = await offersWithdraw(ea, invitedPropertyId);
+  const w1 = await withdraw(ea, invitedPropertyId, branchId);
+  record(
+    "W1: seller-side EA can withdraw a homeowner its branch invited (options agree)",
+    w1Offered && w1?.ok === true,
+    JSON.stringify({ w1Offered, w1 })
+  );
+
+  // W7: seller-side EA cannot withdraw a homeowner who created the sale.
+  const { data: selfChain } = await hoW.rpc("create_chain_for_onboarding", {
+    p_name: `DelinkSelf-${stampW}`,
+    p_access_code: `KN-DSF-${stampW}`,
+  });
+  const hoWId = (await hoW.auth.getUser()).data.user!.id;
+  const { data: selfSale } = await hoW
     .from("properties")
     .insert({
-      chain_id: chain3.chain_id,
+      chain_id: selfChain.chain_id,
       chain_position: 1,
-      address: `Self Delink ${stamp3}`,
-      postcode: "D3 3DL",
+      address: `Delink Self Sale ${stampW}`,
+      postcode: "D4 4DL",
       stage: "property_listed",
       status: "pending_connection",
       relationship_type: "sale",
-      created_by_user_id: ho3Id,
+      created_by_user_id: hoWId,
       buyer_connected: false,
       seller_connected: true,
       is_searching: false,
     })
     .select("id")
     .single();
-
-  await ho3.rpc("establish_operational_homeowner", {
-    p_property_id: sale3!.id,
-    p_granted_via: "start_move",
+  const selfSaleId = selfSale!.id as number;
+  await hoW.rpc("establish_operational_homeowner_for_created_property", {
+    p_property_id: selfSaleId,
   });
-
-  const { data: selfDelink } = await ho3.rpc("execute_participation_delink", {
-    p_property_id: sale3!.id,
-    p_operation: "homeowner_self",
-    p_branch_id: null,
-    p_reason_code: "no_longer_moving",
+  const selfAssign = await assignPropertyToBranch(hoW, {
+    propertyId: selfSaleId,
+    branchId,
+    homeownerOnlyUpdates: false,
   });
-
+  const w7Offered = await offersWithdraw(ea, selfSaleId);
+  const w7 = await withdraw(ea, selfSaleId, branchId);
   record(
-    "homeowner_self releases property",
-    selfDelink?.ok === true && selfDelink?.lifecycle_state === "released",
-    JSON.stringify(selfDelink)
+    "W7: assigned EA cannot withdraw a homeowner who created the sale (homeowner_not_invited; not offered)",
+    !selfAssign.error && !w7Offered && w7?.ok === false && w7?.error === "homeowner_not_invited",
+    JSON.stringify({ assignError: selfAssign.error, w7Offered, w7 })
   );
 
-  const { data: lifecycle } = await ho3
-    .from("property_lifecycle_states")
-    .select("operational_state")
-    .eq("property_id", sale3!.id)
-    .maybeSingle();
-
+  // W2: an EA assigned to a buyer-side (purchase) row cannot withdraw the buyer.
+  const { data: purchase } = await hoW
+    .from("properties")
+    .insert({
+      chain_id: selfChain.chain_id,
+      chain_position: 2,
+      address: `Delink Onward Purchase ${stampW}`,
+      postcode: "D5 5DL",
+      stage: "property_listed",
+      status: "pending_connection",
+      relationship_type: "purchase",
+      created_by_user_id: hoWId,
+      buyer_connected: true,
+      seller_connected: false,
+      is_searching: false,
+    })
+    .select("id")
+    .single();
+  const purchaseId = purchase?.id as number | undefined;
+  let w2Detail: unknown = "purchase fixture not created";
+  let w2Pass = false;
+  if (purchaseId) {
+    await hoW.rpc("establish_operational_homeowner_for_created_property", {
+      p_property_id: purchaseId,
+    });
+    const { error: buyerAssignError } = await admin.from("property_ea_assignments").insert({
+      property_id: purchaseId,
+      branch_id: branchId,
+      status: "active",
+      homeowner_only_updates: false,
+      assigned_by_user_id: hoWId,
+    });
+    const w2Offered = await offersWithdraw(ea, purchaseId);
+    const w2 = await withdraw(ea, purchaseId, branchId);
+    w2Pass = !buyerAssignError && !w2Offered && w2?.ok === false && w2?.error === "not_seller_side_row";
+    w2Detail = { buyerAssignError: buyerAssignError?.message, w2Offered, w2 };
+  }
   record(
-    "lifecycle state persisted as released",
-    lifecycle?.operational_state === "released",
-    JSON.stringify(lifecycle)
+    "W2: EA on the buyer side cannot withdraw the buyer (not_seller_side_row; not offered)",
+    w2Pass,
+    JSON.stringify(w2Detail)
+  );
+
+  // W3: an EA assigned to another property (different company) cannot act here.
+  const { client: otherEa, branchId: otherBranchId } = await setupEa(
+    `delink-ea-other-${stampW}@keynetic-test.dev`,
+    stampW + 1
+  );
+  await createEaPendingProperty(otherEa, otherBranchId, `invite-other-${stampW}@keynetic-test.dev`, stampW + 2);
+  const targetPropertyId = await createEaPendingProperty(
+    ea,
+    branchId,
+    `invite-target-${stampW}@keynetic-test.dev`,
+    stampW + 3
+  );
+  const w3Offered = await offersWithdraw(otherEa, targetPropertyId);
+  const w3 = await withdraw(otherEa, targetPropertyId, otherBranchId);
+  const w3Spoofed = await withdraw(otherEa, targetPropertyId, branchId);
+  record(
+    "W3: EA representing another property cannot withdraw (not_assigned_ea, even naming the assigned branch)",
+    !w3Offered &&
+      w3?.ok === false &&
+      w3?.error === "not_assigned_ea" &&
+      w3Spoofed?.ok === false &&
+      w3Spoofed?.error === "not_assigned_ea",
+    JSON.stringify({ w3Offered, w3, w3Spoofed })
+  );
+
+  // W4: a connected participant (the homeowner on the row) cannot use the EA action.
+  const w4 = await withdraw(ho2, activePropertyId, branchId);
+  record(
+    "W4: connected participant cannot withdraw (not_assigned_ea)",
+    w4?.ok === false && w4?.error === "not_assigned_ea",
+    JSON.stringify(w4)
+  );
+
+  // W5: a member of an unassigned branch in the same company cannot act.
+  const { client: sameCoMember, userId: sameCoMemberId } = await signUp(
+    `delink-ea-samecompany-${stampW}@keynetic-test.dev`
+  );
+  const { data: assignedBranch } = await admin
+    .from("ea_branches")
+    .select("company_id")
+    .eq("id", branchId)
+    .single();
+  const { data: unassignedBranch } = await admin
+    .from("ea_branches")
+    .insert({
+      company_id: assignedBranch!.company_id,
+      name: "Unassigned",
+      town_or_city: "London",
+      postcode: "E3 3DL",
+      region_code: "UK-LONDON",
+      is_head_office: false,
+    })
+    .select("id")
+    .single();
+  await admin.from("ea_branch_members").insert({
+    branch_id: unassignedBranch!.id,
+    user_id: sameCoMemberId,
+    role: "agent",
+  });
+  const w5Offered = await offersWithdraw(sameCoMember, targetPropertyId);
+  const w5 = await withdraw(sameCoMember, targetPropertyId, branchId);
+  record(
+    "W5: unassigned branch member (same company) cannot withdraw (not_assigned_ea; not offered)",
+    !w5Offered && w5?.ok === false && w5?.error === "not_assigned_ea",
+    JSON.stringify({ w5Offered, w5 })
+  );
+
+  // W6: the assigned EA's options and RPC agree on the pending-invite target.
+  const w6Offered = await offersWithdraw(ea, targetPropertyId);
+  const w6 = await withdraw(ea, targetPropertyId, branchId);
+  record(
+    "W6: options RPC and execute RPC agree for the assigned EA",
+    w6Offered && w6?.ok === true,
+    JSON.stringify({ w6Offered, w6 })
   );
 
   const failed = results.filter((r) => !r.pass);

@@ -9,11 +9,9 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 /**
- * Daily Chain Intelligence time-only refresh worker.
+ * Daily Chain Intelligence time-only refresh worker (vercel.json, 05:30 UTC).
  *
  * Secured via Authorization: Bearer ${CRON_SECRET}.
- * Add to vercel.json when enabling scheduled refresh:
- *   { "path": "/api/cron/chain-intelligence", "schedule": "30 3 * * *" }
  */
 export async function GET(request: Request) {
   const authorization = request.headers.get("authorization");

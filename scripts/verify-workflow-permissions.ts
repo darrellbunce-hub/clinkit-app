@@ -258,26 +258,81 @@ const eaDelegatedAccess = resolveWorkflowAccess(
   }
 );
 
+// An EA on a purchase row acts for that row's seller, never the buyer:
+// Buyer Ready stays with its owner even with delegated updates on.
 assertEqual(
-  "Estate agent delegated — canEdit buyer ready",
+  "Estate agent on purchase row — cannot edit buyer ready",
   eaDelegatedAccess.canEdit,
-  true
+  false
 );
 assertEqual(
-  "Estate agent delegated — viewerRole stays estate_agent",
+  "Estate agent on purchase row — viewerRole stays estate_agent",
   eaDelegatedAccess.viewerRole,
   "estate_agent"
 );
 assertEqual(
-  "Estate agent delegated — editable mode",
+  "Estate agent on purchase row — read_only buyer ready",
   eaDelegatedAccess.mode,
-  "editable"
+  "read_only"
 );
-assertEqual(
-  "Estate agent delegated — banner message",
-  eaDelegatedAccess.bannerMessage,
-  WORKFLOW_EA_DELEGATED_BANNER_MESSAGE
-);
+
+const eaPurchaseSellerView: OperationalProperty[] = [
+  participantProperty({
+    id: 30,
+    relationship_type: "purchase",
+    stage: "offer_accepted",
+    address: "Buyer flat",
+  }),
+];
+
+for (const [label, assignment, expectedEdit] of [
+  [
+    "seller connected, delegated updates",
+    { subjectUserId: SELLER_ID, homeownerOnlyUpdates: false },
+    true,
+  ],
+  [
+    "seller connected, homeowner-only updates",
+    { subjectUserId: SELLER_ID, homeownerOnlyUpdates: true },
+    false,
+  ],
+  [
+    "awaiting seller (EA-only)",
+    { subjectUserId: null, homeownerOnlyUpdates: true },
+    true,
+  ],
+] as const) {
+  const purchaseSellerAccess = resolveWorkflowAccess(
+    {
+      kind: "property",
+      chainId: CHAIN_ID,
+      propertyId: 30,
+    },
+    {
+      userId: "ea-user",
+      chainProperties: eaPurchaseSellerView,
+      chainNodes: [buyerReadyNode],
+      accountType: "estate_agent",
+      estateAgentAssignments: [
+        { propertyId: 30, chainId: CHAIN_ID, ...assignment },
+      ],
+    }
+  );
+
+  assertEqual(
+    `Estate agent on purchase row (${label}) — canEdit the row as its seller`,
+    purchaseSellerAccess.canEdit,
+    expectedEdit
+  );
+
+  if (expectedEdit) {
+    assertEqual(
+      `Estate agent on purchase row (${label}) — delegated banner`,
+      purchaseSellerAccess.bannerMessage,
+      WORKFLOW_EA_DELEGATED_BANNER_MESSAGE
+    );
+  }
+}
 
 const eaSaleParticipantView: OperationalProperty[] = [
   participantProperty({

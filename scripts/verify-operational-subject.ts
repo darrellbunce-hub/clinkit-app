@@ -243,56 +243,94 @@ assertEqual(
   CHAIN_TILE_LABEL.yourSale
 );
 
+// An EA assignment on a purchase row is the seller's agent: the row is the
+// subject's sale and the buyer's Buyer Ready node is never the EA's position.
+const PURCHASE_SELLER_ID = "purchase-seller-subject-test";
+const PURCHASE_BUYER_ID = "purchase-buyer-subject-test";
+
 const buyerReadyNode: OperationalBuyerReadyNode = {
   id: 901,
   chain_id: CHAIN_ID,
-  user_id: HOMEOWNER_ID,
+  user_id: PURCHASE_BUYER_ID,
   node_type: "buyer_ready",
 };
 
-const buyerReadyOnlyEaView: OperationalProperty[] = [
+const purchaseRowEaView: OperationalProperty[] = [
   participantProperty({
     id: 801,
     relationship_type: "purchase",
     chainPosition: 1,
     address: "Buyer flat",
+    linked_property_id: 802,
+  }),
+  participantProperty({
+    id: 802,
+    relationship_type: "purchase",
+    chainPosition: 2,
+    address: "Seller onward house",
   }),
 ];
 
-const buyerReadyEaSubject = resolveOperationalSubject({
-  viewerUserId: ESTATE_AGENT_ID,
-  accountType: "estate_agent",
-  chainId: CHAIN_ID,
-  chainProperties: buyerReadyOnlyEaView,
-  estateAgentAssignments: [
-    {
-      propertyId: 801,
-      chainId: CHAIN_ID,
-      subjectUserId: HOMEOWNER_ID,
-      homeownerOnlyUpdates: true,
-    },
-  ],
-});
+for (const [label, subjectUserId] of [
+  ["seller connected", PURCHASE_SELLER_ID],
+  ["awaiting seller", null],
+] as const) {
+  const purchaseRowEaSubject = resolveOperationalSubject({
+    viewerUserId: ESTATE_AGENT_ID,
+    accountType: "estate_agent",
+    chainId: CHAIN_ID,
+    chainProperties: purchaseRowEaView,
+    estateAgentAssignments: [
+      {
+        propertyId: 801,
+        chainId: CHAIN_ID,
+        subjectUserId,
+        homeownerOnlyUpdates: true,
+      },
+    ],
+  });
 
-const buyerReadyEaPosition = resolveSubjectOperationalPosition({
-  subject: buyerReadyEaSubject,
-  chainId: CHAIN_ID,
-  chainProperties: buyerReadyOnlyEaView,
-  chainNodes: [buyerReadyNode],
-});
+  const purchaseRowScoped = applyOperationalSubjectLens(
+    purchaseRowEaView,
+    purchaseRowEaSubject
+  );
 
-assertEqual(
-  "EA delegated topology — buyer ready owner position",
-  buyerReadyEaPosition.position?.kind,
-  "buyer_ready"
-);
-assertEqual(
-  "EA delegated topology — buyer ready node id",
-  buyerReadyEaPosition.position?.kind === "buyer_ready"
-    ? buyerReadyEaPosition.position.nodeId
-    : null,
-  901
-);
+  assertEqual(
+    `EA on purchase row (${label}) — assigned row is seller hop`,
+    purchaseRowScoped.find((property) => property.id === 801)
+      ?.currentUserRole,
+    "seller"
+  );
+  assertEqual(
+    `EA on purchase row (${label}) — onward purchase is buyer hop`,
+    purchaseRowScoped.find((property) => property.id === 802)
+      ?.currentUserRole,
+    "buyer"
+  );
+
+  const purchaseRowPosition = resolveSubjectOperationalPosition({
+    subject: purchaseRowEaSubject,
+    chainId: CHAIN_ID,
+    chainProperties: purchaseRowEaView,
+    chainNodes: [buyerReadyNode],
+  });
+
+  assertEqual(
+    `EA on purchase row (${label}) — position is the sale, not Buyer Ready`,
+    purchaseRowPosition.position?.kind === "sale"
+      ? purchaseRowPosition.position.propertyId
+      : purchaseRowPosition.position?.kind ?? null,
+    801
+  );
+  assertEqual(
+    `EA on purchase row (${label}) — tile headline`,
+    getChainTileDisplayTitle(
+      purchaseRowScoped.find((property) => property.id === 801)!,
+      true
+    ),
+    CHAIN_TILE_LABEL.yourSale
+  );
+}
 
 if (process.exitCode && process.exitCode !== 0) {
   process.exit(process.exitCode);

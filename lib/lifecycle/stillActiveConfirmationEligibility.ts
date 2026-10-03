@@ -1,8 +1,3 @@
-import {
-  PROPERTY_OPERATIONAL_STATE,
-  type PropertyOperationalState,
-} from "@/lib/lifecycle/types";
-
 export const LIFECYCLE_DORMANCY_WARNING_QUERY = "dormancy-warning";
 
 export const STILL_ACTIVE_ALREADY_ACTIVE_MESSAGE =
@@ -24,22 +19,22 @@ export function isLifecycleDormancyWarningHint(
   return lifecycleQuery === LIFECYCLE_DORMANCY_WARNING_QUERY;
 }
 
+/**
+ * inWarning / canConfirm come from get_property_lifecycle_status, which only
+ * reports a warning to a user who can confirm it. Following a warning link
+ * when the row is no longer in warning (already confirmed, activity resumed,
+ * or a seller connected) shows the "currently active" notice.
+ */
 export function resolveStillActiveConfirmationView(params: {
   lifecycleHint: boolean;
-  operationalState: PropertyOperationalState;
-  isActiveOperationalHomeowner: boolean;
+  inWarning: boolean;
+  canConfirmStillActive: boolean;
 }): StillActiveConfirmationView {
-  const { lifecycleHint, operationalState, isActiveOperationalHomeowner } =
-    params;
+  const { lifecycleHint, inWarning, canConfirmStillActive } = params;
 
-  const showDormancyPanel =
-    isActiveOperationalHomeowner &&
-    operationalState === PROPERTY_OPERATIONAL_STATE.dormancyWarning;
+  const showDormancyPanel = inWarning && canConfirmStillActive;
 
-  const showAlreadyActiveInfo =
-    lifecycleHint &&
-    isActiveOperationalHomeowner &&
-    operationalState === PROPERTY_OPERATIONAL_STATE.active;
+  const showAlreadyActiveInfo = lifecycleHint && !inWarning;
 
   return {
     showDormancyPanel,

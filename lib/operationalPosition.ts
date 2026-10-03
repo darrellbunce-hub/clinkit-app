@@ -605,7 +605,10 @@ export function getPropertyPageSubtitle(
       return OPERATIONAL_SALE_BANNER_MESSAGE;
     }
 
-    if (property.relationship_type === "sale") {
+    if (
+      property.relationship_type === "sale" ||
+      property.currentUserRole === "seller"
+    ) {
       return "This is your sale in the chain.";
     }
 

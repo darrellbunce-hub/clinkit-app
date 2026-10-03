@@ -1,4 +1,5 @@
 import {
+  getLatestActivity,
   hasActiveDelayReport,
   type OperationalActivity,
 } from "@/lib/activityIntelligence";
@@ -29,6 +30,8 @@ import {
 } from "@/lib/chainIntelligence/presentation";
 import {
   computeNextRecalculationAt,
+  computeStalenessRecalculationCandidates,
+  selectNextRecalculationAt,
 } from "@/lib/chainIntelligence/timingHealth";
 import {
   resolveBuyerReadyStageClock,
@@ -263,7 +266,7 @@ export function computeTimingChainIntelligence(params: {
         coverage.status
       );
 
-  let nextRecalculationAt: string | null = null;
+  const recalculationCandidates: string[] = [];
 
   for (const result of dependencyResults) {
     if (
@@ -281,20 +284,30 @@ export function computeTimingChainIntelligence(params: {
       continue;
     }
 
-    const candidate = computeNextRecalculationAt({
-      stageEnteredAt: dependency.stageEnteredAt,
-      expectedMaxDays: result.expectedMaxDays,
-      referenceDate,
-    });
-
-    if (
-      !nextRecalculationAt ||
-      new Date(candidate).getTime() <
-        new Date(nextRecalculationAt).getTime()
-    ) {
-      nextRecalculationAt = candidate;
-    }
+    recalculationCandidates.push(
+      computeNextRecalculationAt({
+        stageEnteredAt: dependency.stageEnteredAt,
+        expectedMaxDays: result.expectedMaxDays,
+        referenceDate,
+      })
+    );
   }
+
+  for (const activities of [
+    ...params.properties.map((property) => property.activities),
+    params.buyerReadyNode?.activities ?? [],
+  ]) {
+    recalculationCandidates.push(
+      ...computeStalenessRecalculationCandidates(
+        getLatestActivity(activities)?.timestamp
+      )
+    );
+  }
+
+  const nextRecalculationAt = selectNextRecalculationAt(
+    recalculationCandidates,
+    referenceDate
+  );
 
   return {
     score,

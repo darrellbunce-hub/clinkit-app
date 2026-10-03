@@ -153,7 +153,6 @@ export default function PropertyEstateAgentAssignment({
             propertyId,
             branchId: selectedBranch.branch_id,
             homeownerOnlyUpdates,
-            assignedByUserId: user.id,
           }
         );
 
@@ -198,7 +197,7 @@ export default function PropertyEstateAgentAssignment({
       const result =
         await updatePropertyEaDelegation(
           supabase,
-          currentAssignmentId,
+          propertyId,
           checked
         );
 

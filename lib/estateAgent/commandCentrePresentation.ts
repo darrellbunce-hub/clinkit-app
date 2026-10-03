@@ -6,6 +6,7 @@ import { mapChainHealthSlugToLabel } from "@/lib/operationalSummary/mapHealthSta
 import {
   getInvitationLifecycleStatus,
   isInvitationActivePriority,
+  isInvitationEligibleSummary,
   isInvitationExpiredPriority,
   isReadyToInvitePriority,
   isUnacknowledgedInvitationDeclinedPriority,
@@ -221,8 +222,8 @@ export function sortActionRequiredSummaries(
     }
 
     return (
-      (right.days_since_last_update ?? 0) -
-      (left.days_since_last_update ?? 0)
+      (resolveDaysSinceLastUpdate(right) ?? 0) -
+      (resolveDaysSinceLastUpdate(left) ?? 0)
     );
   });
 }
@@ -258,9 +259,9 @@ export function sortManagedPropertySummaries(
     }
 
     const leftDays =
-      left.days_since_last_update ?? 0;
+      resolveDaysSinceLastUpdate(left) ?? 0;
     const rightDays =
-      right.days_since_last_update ?? 0;
+      resolveDaysSinceLastUpdate(right) ?? 0;
 
     if (leftDays !== rightDays) {
       return rightDays - leftDays;
@@ -331,10 +332,7 @@ export function computeClaimOverviewKpis(
 ): ClaimOverviewKpis {
   const eaSummaries = filterActiveSummaries(
     summaries
-  ).filter(
-    (summary) =>
-      summary.origin_type === "estate_agent"
-  );
+  ).filter(isInvitationEligibleSummary);
 
   const counts = {
     awaitingClaim: 0,
@@ -493,6 +491,39 @@ export function formatHealthLabel(
   return mapChainHealthSlugToLabel(
     healthStatus
   );
+}
+
+const MS_PER_DAY = 1000 * 60 * 60 * 24;
+
+/**
+ * Whole days since the latest genuine property activity. Derived from
+ * last_update_at at read time so a summary recalculation never moves it;
+ * falls back to the stored count when the timestamp is absent.
+ */
+export function resolveDaysSinceLastUpdate(
+  summary: Pick<
+    AgentBranchPropertySummary,
+    "last_update_at" | "days_since_last_update"
+  >,
+  referenceDate: Date = new Date()
+): number | null {
+  if (summary.last_update_at) {
+    const updatedAt = new Date(
+      summary.last_update_at
+    ).getTime();
+
+    if (!Number.isNaN(updatedAt)) {
+      return Math.max(
+        0,
+        Math.floor(
+          (referenceDate.getTime() - updatedAt) /
+            MS_PER_DAY
+        )
+      );
+    }
+  }
+
+  return summary.days_since_last_update ?? null;
 }
 
 export function formatDaysSinceLastUpdate(

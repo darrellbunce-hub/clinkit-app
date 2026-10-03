@@ -7,6 +7,7 @@ import {
   filterActionRequiredSummaries,
   filterUpcomingCompletionSummaries,
   getHighestPriorityAlert,
+  resolveDaysSinceLastUpdate,
 } from "@/lib/estateAgent/commandCentrePresentation";
 import type { InvitationLifecycleStatus } from "@/lib/propertyClaim/invitationTypes";
 import { INVITATION_DECLINED_ACTION_REASON } from "@/lib/propertyClaim/invitationDeclinedPresentation";
@@ -15,6 +16,7 @@ import {
   isInvitationActivePriority,
   isInvitationDeclinedPriority,
   isInvitationDeferred,
+  isInvitationEligibleSummary,
   isInvitationExpiredPriority,
   isReadyToInvitePriority,
   isUnacknowledgedInvitationDeclinedPriority,
@@ -329,7 +331,7 @@ function buildReasonCandidates(
     reasons.push(
       getWorkspaceAlertReason(
         alert.code,
-        summary.days_since_last_update
+        resolveDaysSinceLastUpdate(summary)
       )
     );
   }
@@ -622,19 +624,19 @@ export function getManagedPropertyOperationalState(
   summary: AgentBranchPropertySummary
 ): string {
   if (
-    summary.origin_type === "estate_agent" &&
+    isInvitationEligibleSummary(summary) &&
     isInvitationDeclinedPriority(summary)
   ) {
     return "Homeowner declined invitation";
   }
 
-  if (summary.origin_type === "estate_agent") {
+  if (isInvitationEligibleSummary(summary)) {
     const topAlert = getHighestPriorityAlert(summary);
 
     if (topAlert) {
       return getWorkspaceAlertReason(
         topAlert.code,
-        summary.days_since_last_update
+        resolveDaysSinceLastUpdate(summary)
       );
     }
 
@@ -650,7 +652,7 @@ export function getManagedPropertyOperationalState(
   if (topAlert) {
     return getWorkspaceAlertReason(
       topAlert.code,
-      summary.days_since_last_update
+      resolveDaysSinceLastUpdate(summary)
     );
   }
 

@@ -14,6 +14,7 @@ import { completeEaManagedPropertyOrigination } from "@/lib/estateAgent/complete
 import type { AgentHomeContext } from "@/lib/estateAgent/loadAgentHomeContext";
 import { loadAgentHomeContext } from "@/lib/estateAgent/loadAgentHomeContext";
 import {
+  connectEaToAwaitingProperty,
   createEaOperationalChain,
   createEaOperationalProperty,
   generateOperationalAccessCode,
@@ -180,17 +181,41 @@ export default function AgentOriginatePage() {
         }
       );
 
-      if (result.error || result.propertyId == null) {
+      if (result.error === "property_already_exists") {
+        // The address may be a buyer's purchase awaiting its seller: the
+        // seller's agent connects to it instead of creating a second row.
+        const connectResult =
+          await connectEaToAwaitingProperty(supabase, {
+            accessCode,
+            address: saleAddress,
+            postcode: salePostcodeStored,
+            branchId: context.branch.id,
+          });
+
+        if (
+          connectResult.error ||
+          connectResult.propertyId == null
+        ) {
+          setIsSubmitting(false);
+          setErrorMessage(
+            "This property is already part of MoveLoop. Check the chain access code and address, or contact support."
+          );
+          return;
+        }
+
+        chainId = connectResult.chainId;
+        propertyId = connectResult.propertyId;
+      } else if (result.error || result.propertyId == null) {
         setIsSubmitting(false);
         setErrorMessage(
           result.error ??
             "Could not join the chain."
         );
         return;
+      } else {
+        chainId = result.chainId;
+        propertyId = result.propertyId;
       }
-
-      chainId = result.chainId;
-      propertyId = result.propertyId;
     } else {
       let chainAccessCode =
         generateOperationalAccessCode();
@@ -254,10 +279,27 @@ export default function AgentOriginatePage() {
         propertyResult.error ||
         propertyResult.propertyId == null
       ) {
+        const { error: cleanupError } = await supabase.rpc(
+          "cleanup_abandoned_onboarding_chain",
+          {
+            p_chain_id: chainId,
+            p_require_empty: true,
+          }
+        );
+
+        if (cleanupError) {
+          console.error(
+            "[agent-originate] empty chain cleanup failed:",
+            cleanupError.message
+          );
+        }
+
         setIsSubmitting(false);
         setErrorMessage(
-          propertyResult.error ??
-            "Could not create the property."
+          propertyResult.error === "property_already_exists"
+            ? "This property is already part of MoveLoop. If it is a buyer's purchase awaiting its seller, use Join with the chain access code."
+            : propertyResult.error ??
+                "Could not create the property."
         );
         return;
       }
@@ -414,10 +456,12 @@ export default function AgentOriginatePage() {
                   </span>
 
                   <span className="mt-1 block text-sm text-slate-600">
-                    Enabled by default so your branch can
-                    manage this transaction immediately.
-                    Uncheck only if you want view-only
-                    access until the homeowner connects.
+                    Your branch manages this transaction
+                    until the homeowner connects. Leave this
+                    enabled to keep making updates afterwards;
+                    uncheck it if the homeowner should make
+                    updates once they connect. The homeowner
+                    can change this later.
                   </span>
                 </span>
               </label>

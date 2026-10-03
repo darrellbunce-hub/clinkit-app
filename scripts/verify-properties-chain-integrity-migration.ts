@@ -16,6 +16,13 @@ const MIGRATION_FILE = "20261001120000_properties_chain_integrity_guard.sql";
 // Sequenced after this migration in the same change set (searching placeholder ownership).
 const DEPENDENT_FOLLOW_UP_MIGRATIONS = [
   "20261001130000_searching_placeholder_ownership_enforcement.sql",
+  "20261005100000_address_reservation_classifier.sql",
+  "20261005110000_seller_side_authority_and_awaiting_connection.sql",
+  "20261005120000_operational_authority_enforcement.sql",
+  "20261005130000_lifecycle_bounded_dormancy.sql",
+  "20261005140000_reservation_placeholders_awaiting_seller.sql",
+  "20261005150000_dashboard_last_update_at.sql",
+  "20261005160000_drop_properties_address_match_key_idx.sql",
 ];
 
 const HELPERS = [
@@ -557,8 +564,12 @@ function main() {
       "join migration: application fix intact (rejected or zero-row updates throw)"
     );
     assert(
-      /\.update\(\{\s*linked_property_id:\s*searchingId,\s*\}\)\s*\.eq\("id",\s*joinedProperty\.id\);\s*if \(error\) \{\s*throw error;/.test(joinSearching),
-      "join relink: joined property linked_property_id update throws on error"
+      /\.update\(\{\s*linked_property_id:\s*searchingId,\s*\}\)\s*\.eq\("id",\s*joinedProperty\.id\)\s*\.select\("id"\);\s*if \(error\) \{\s*throw error;\s*\}\s*if \(relinked\?\.length !== 1\) \{\s*return \{ ok: false, reason: "relink_not_applied" \};/.test(joinSearching),
+      "join relink: joined property linked_property_id update throws on error and fails on zero rows"
+    );
+    assert(
+      /if \(relinkResult\.reason === "relink_not_applied"\) \{\s*return \{ ok: false, reason: "relink_not_applied" \};/.test(joinSearching),
+      "join relink: resolveSearchingFromJoinIntent propagates relink_not_applied"
     );
 
     const joinPage = read("app/join-chain/page.tsx");
@@ -574,6 +585,11 @@ function main() {
     assert(
       order.every((index, i) => index >= 0 && (i === 0 || index > order[i - 1])),
       "join page: join → migrate → relink → placeholder → cleanup → catch order intact"
+    );
+    assert(
+      joinPage.includes("formatJoinedPropertyRelinkFailure(") &&
+        /intentResult\.reason ===\s*"relink_not_applied"[\s\S]*?JOINED_PROPERTY_RELINK_NOT_APPLIED_MESSAGE[\s\S]*?return;[\s\S]*?"cleanup_abandoned_onboarding_chain"/.test(joinPage),
+      "join page: a relink that updates no row stops before source-chain cleanup with a safe message"
     );
 
     const finalize = read("lib/estateAgent/finalizeOperationalSaleCreation.ts");

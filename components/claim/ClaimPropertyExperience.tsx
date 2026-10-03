@@ -209,7 +209,10 @@ export default function ClaimPropertyExperience({
 function mapClaimError(error: string): string {
   switch (error) {
     case "not_claimable":
+    case "property_released":
       return "This property is no longer available to connect.";
+    case "address_reserved":
+      return "This address is now part of another MoveLoop chain. Contact your estate agent.";
     case "already_member":
       return "You are already linked to this property.";
     case "homeowner_only":
@@ -218,6 +221,14 @@ function mapClaimError(error: string): string {
       return "Your account must have a verified email address to connect a property.";
     case "invitation_declined":
       return "This invitation has already been declined.";
+    case "invalid_token":
+      return "This invitation is no longer valid. Ask your estate agent to send a new one.";
+    case "already_used":
+      return "This invitation has already been used.";
+    case "expired":
+      return "This invitation has expired. Contact your estate agent if you need a new one.";
+    case "already_claimed":
+      return "This property has already been connected.";
     default:
       return "Could not connect this property. Please try again.";
   }

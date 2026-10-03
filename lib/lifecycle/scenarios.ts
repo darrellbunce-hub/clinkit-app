@@ -1,8 +1,7 @@
 import { addDays } from "@/lib/lifecycle/config";
 import {
-  evaluateConnectedDormantScenario,
   evaluateDormantReleaseFromArchived,
-  evaluateIsolatedDormantScenario,
+  evaluatePlaceholderDormancyScenario,
 } from "@/lib/lifecycle/dormancyScenarios";
 import {
   PROPERTY_LIFECYCLE_ACTION,
@@ -139,16 +138,13 @@ export function evaluateCompletedGraceScenario(
   return recommendations;
 }
 
-/** @deprecated Use evaluateIsolatedDormantScenario or evaluateConnectedDormantScenario */
+/** @deprecated Use evaluatePlaceholderDormancyScenario */
 export function evaluateDormantScenario(
   context: PropertyLifecycleContext,
   config: LifecycleConfig,
   evaluatedAt: Date = new Date()
 ): PropertyLifecycleRecommendation[] {
-  return [
-    ...evaluateIsolatedDormantScenario(context, config, evaluatedAt),
-    ...evaluateConnectedDormantScenario(context, config, evaluatedAt),
-  ];
+  return evaluatePlaceholderDormancyScenario(context, config, evaluatedAt);
 }
 
 /**
@@ -198,8 +194,7 @@ export function evaluateAllLifecycleScenarios(
 ): PropertyLifecycleRecommendation[] {
   return [
     ...evaluateCompletedGraceScenario(context, config, evaluatedAt),
-    ...evaluateIsolatedDormantScenario(context, config, evaluatedAt),
-    ...evaluateConnectedDormantScenario(context, config, evaluatedAt),
+    ...evaluatePlaceholderDormancyScenario(context, config, evaluatedAt),
     ...evaluateAnalyticsScenario(context),
   ];
 }
@@ -223,6 +218,7 @@ export function buildLifecyclePlan(
   const actionOrder: PropertyLifecycleRecommendation["action"][] = [
     PROPERTY_LIFECYCLE_ACTION.enterCompletedGrace,
     PROPERTY_LIFECYCLE_ACTION.enterDormancyWarning,
+    PROPERTY_LIFECYCLE_ACTION.expireDormancyWarning,
     PROPERTY_LIFECYCLE_ACTION.markDormant,
     PROPERTY_LIFECYCLE_ACTION.createAnalyticsSnapshot,
     PROPERTY_LIFECYCLE_ACTION.archiveOperational,

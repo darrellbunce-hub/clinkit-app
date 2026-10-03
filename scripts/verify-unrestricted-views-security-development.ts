@@ -959,13 +959,25 @@ async function runExecuteProbes(fixture: FixtureContext): Promise<void> {
     !strangerDirectory.permissionDenied && strangerDirectory.rowCount >= 1,
     `rows=${strangerDirectory.rowCount}`
   );
+  // Look the fixture branches up by id: an unfiltered page depends on how many
+  // other branches the shared Development directory holds.
+  const strangerFixtureRows = (
+    await Promise.all(
+      [fixture.branchAId, fixture.branchBId].map((branchId) =>
+        selectView(stranger, "ea_branch_directory", {
+          columns: "branch_id, branch_name, town_or_city, postcode, company_id, company_name",
+          filters: [{ column: "branch_id", value: branchId }],
+        })
+      )
+    )
+  ).flatMap((probe) => probe.rows);
   const seesFixtureBranches =
-    strangerDirectory.rows.some((r) => r.branch_id === fixture.branchAId) &&
-    strangerDirectory.rows.some((r) => r.branch_id === fixture.branchBId);
+    strangerFixtureRows.some((r) => r.branch_id === fixture.branchAId) &&
+    strangerFixtureRows.some((r) => r.branch_id === fixture.branchBId);
   record(
     "Directory exposes fixture branch/company identity fields only (no member emails)",
     seesFixtureBranches &&
-      strangerDirectory.rows.every(
+      [...strangerDirectory.rows, ...strangerFixtureRows].every(
         (r) =>
           !("invite_email" in r) &&
           !("email" in r) &&

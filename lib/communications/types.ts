@@ -109,9 +109,14 @@ export type ClaimSuccessfulEmailParams = {
   dashboardLink: string;
 };
 
+/** The placeholder's dependent side: a buyer, or the EA operating a linking sale. */
+export type DormancyWarningAudience = "buyer" | "estate_agent";
+
 export type DormancyWarningEmailParams = {
   to: string;
   confirmationLink: string;
+  /** Defaults to buyer. */
+  audience?: DormancyWarningAudience;
 };
 
 export type EaBillingEmailCommonParams = {

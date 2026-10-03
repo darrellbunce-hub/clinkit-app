@@ -13,6 +13,7 @@ for (const line of readFileSync(".env.local", "utf8").split("\n")) {
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const password = "TraceBuyerReady123!";
 
 function assert(condition: boolean, message: string) {
@@ -108,7 +109,7 @@ async function signIn(email: string) {
 async function scenario(
   name: string,
   setup: (
-    client: ReturnType<typeof createClient>,
+    client: Awaited<ReturnType<typeof signIn>>,
     chainId: number,
     userId: string,
     stamp: number
@@ -195,9 +196,8 @@ async function main() {
       })
       .select("id")
       .single();
-    await c.rpc("establish_operational_homeowner", {
+    await c.rpc("establish_operational_homeowner_for_created_property", {
       p_property_id: sale!.id,
-      p_granted_via: "start_move",
     });
     const { data: search } = await c
       .from("properties")
@@ -216,9 +216,8 @@ async function main() {
       })
       .select("id")
       .single();
-    await c.rpc("establish_operational_homeowner", {
+    await c.rpc("establish_operational_homeowner_for_created_property", {
       p_property_id: search!.id,
-      p_granted_via: "start_move",
     });
     await c
       .from("properties")
@@ -250,9 +249,8 @@ async function main() {
         })
         .select("id")
         .single();
-      await c.rpc("establish_operational_homeowner", {
+      await c.rpc("establish_operational_homeowner_for_created_property", {
         p_property_id: sale!.id,
-        p_granted_via: "start_move",
       });
       const { data: purchase } = await c
         .from("properties")
@@ -271,9 +269,8 @@ async function main() {
         })
         .select("id")
         .single();
-      await c.rpc("establish_operational_homeowner", {
+      await c.rpc("establish_operational_homeowner_for_created_property", {
         p_property_id: purchase!.id,
-        p_granted_via: "start_move",
       });
       const { data: search } = await c
         .from("properties")
@@ -292,18 +289,21 @@ async function main() {
         })
         .select("id")
         .single();
-      await c.rpc("establish_operational_homeowner", {
+      await c.rpc("establish_operational_homeowner_for_created_property", {
         p_property_id: search!.id,
-        p_granted_via: "start_move",
       });
       await c
         .from("properties")
         .update({ linked_property_id: purchase!.id })
         .eq("id", sale!.id);
-      await c
+      // Graph fixture only: the buyer cannot operate their purchase row (no
+      // seller side), so the purchase → searching link is written by the service role.
+      const admin = createClient(url, serviceRoleKey, { auth: { persistSession: false } });
+      const { error: hopError } = await admin
         .from("properties")
         .update({ linked_property_id: search!.id })
         .eq("id", purchase!.id);
+      assert(!hopError, `multi-hop fixture link: ${hopError?.message}`);
       return {
         saleId: sale!.id,
         expectedPlaceholderId: search!.id,
@@ -330,9 +330,8 @@ async function main() {
       })
       .select("id")
       .single();
-    await c.rpc("establish_operational_homeowner", {
+    await c.rpc("establish_operational_homeowner_for_created_property", {
       p_property_id: sale!.id,
-      p_granted_via: "start_move",
     });
     await c
       .from("properties")
@@ -390,9 +389,8 @@ async function main() {
     })
     .select("id")
     .single();
-  await convertClient.rpc("establish_operational_homeowner", {
+  await convertClient.rpc("establish_operational_homeowner_for_created_property", {
     p_property_id: convertSale!.id,
-    p_granted_via: "start_move",
   });
   const { data: convertPurchase } = await convertClient
     .from("properties")
@@ -411,56 +409,83 @@ async function main() {
     })
     .select("id")
     .single();
-  await convertClient.rpc("establish_operational_homeowner", {
+  await convertClient.rpc("establish_operational_homeowner_for_created_property", {
     p_property_id: convertPurchase!.id,
-    p_granted_via: "start_move",
-  });
-  const { data: convertSearch } = await convertClient
-    .from("properties")
-    .insert({
-      chain_id: convertChainId,
-      chain_position: 3,
-      stage: "searching",
-      address: null,
-      postcode: null,
-      relationship_type: "purchase",
-      status: "pending_connection",
-      created_by_user_id: convertUserId,
-      is_searching: true,
-      buyer_connected: false,
-      seller_connected: true,
-    })
-    .select("id")
-    .single();
-  await convertClient.rpc("establish_operational_homeowner", {
-    p_property_id: convertSearch!.id,
-    p_granted_via: "start_move",
   });
   await convertClient
     .from("properties")
     .update({ linked_property_id: convertPurchase!.id })
     .eq("id", convertSale!.id);
-  await convertClient
-    .from("properties")
-    .update({ linked_property_id: convertSearch!.id })
-    .eq("id", convertPurchase!.id);
 
-  const convertResult = await convertSearchingPlaceholder(
-    convertClient,
-    {
-      chainId: convertChainId,
-      salePropertyId: convertSale!.id,
-      address: `Converted ${convertStamp}`,
-      postcode: "V9 9VV",
-    }
+  // Multi-hop onward purchase: the onward move beyond a purchase belongs to that
+  // purchase's seller. The buyer is refused; the connected seller converts.
+  const { data: buyerCreate } = await convertClient.rpc(
+    "create_searching_placeholder_for_sale",
+    { p_sale_property_id: convertPurchase!.id }
   );
-  assert(convertResult.ok, "multi-hop convert should succeed");
+  assert(
+    buyerCreate?.ok === false && buyerCreate?.error === "not_authorized",
+    `multi-hop: buyer must not add an onward purchase beyond their purchase (${JSON.stringify(buyerCreate)})`
+  );
+
+  const sellerEmail = `spr-convert-seller-${convertStamp}@keynetic-test.dev`;
+  const sellerBoot = createClient(url, anonKey);
+  await sellerBoot.auth.signUp({ email: sellerEmail, password });
+  const sellerClient = await signIn(sellerEmail);
+  const { data: sellerJoin } = await sellerClient.rpc("join_chain_property", {
+    p_access_code: convertCode,
+    p_address: `convert purchase ${convertStamp}`,
+    p_postcode: "v22vv",
+  });
+  assert(
+    sellerJoin?.ok === true && sellerJoin?.joining_role === "seller",
+    `multi-hop: purchase seller joins by access code (${JSON.stringify(sellerJoin)})`
+  );
+
+  const { data: sellerCreate } = await sellerClient.rpc(
+    "create_searching_placeholder_for_sale",
+    { p_sale_property_id: convertPurchase!.id }
+  );
+  assert(
+    sellerCreate?.ok === true && sellerCreate?.created === true && sellerCreate?.owned === true,
+    `multi-hop: seller adds the onward placeholder from the purchase row (${JSON.stringify(sellerCreate)})`
+  );
+
+  const buyerConvert = await convertSearchingPlaceholder(convertClient, {
+    chainId: convertChainId,
+    salePropertyId: convertPurchase!.id,
+    address: `Buyer Converted ${convertStamp}`,
+    postcode: "V8 8VV",
+  });
+  assert(
+    !buyerConvert.ok && buyerConvert.reason === "not_authorized",
+    "multi-hop: buyer must not convert the seller's onward placeholder"
+  );
+
+  const convertResult = await convertSearchingPlaceholder(sellerClient, {
+    chainId: convertChainId,
+    salePropertyId: convertPurchase!.id,
+    address: `Converted ${convertStamp}`,
+    postcode: "V9 9VV",
+  });
+  assert(convertResult.ok, "multi-hop convert by the purchase's seller should succeed");
+  const convertedId = convertResult.ok ? convertResult.propertyId : null;
+  const { data: sellerOwns } = await sellerClient.rpc("is_property_operational_homeowner", {
+    p_property_id: convertedId,
+  });
+  const { data: buyerOwns } = await convertClient.rpc("is_property_operational_homeowner", {
+    p_property_id: convertedId,
+  });
+  assert(
+    sellerOwns === true && buyerOwns === false,
+    "multi-hop: the converted onward purchase belongs to the purchase's seller, not its buyer"
+  );
   const afterConvert =
     await resolveConvertibleSearchingPlaceholderForChain(
-      convertClient,
+      sellerClient,
       {
         chainId: convertChainId,
-        salePropertyId: convertSale!.id,
+        salePropertyId: convertPurchase!.id,
       }
     );
   assert(
@@ -471,9 +496,7 @@ async function main() {
   console.log(
     JSON.stringify(
       {
-        convertedPropertyId: convertResult.ok
-          ? convertResult.propertyId
-          : null,
+        convertedPropertyId: convertedId,
         afterConvert,
       },
       null,

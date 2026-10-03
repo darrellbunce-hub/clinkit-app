@@ -194,7 +194,7 @@ async function runExecute() {
   console.log("\n--- Execute email-lookup privacy checks ---\n");
   const admin = serviceClient();
   const suffix = randomUUID().slice(0, 8);
-  const ownerEmail = `email-priv-owner-${suffix}@email-priv.test`;
+  const ownerEmail = `email-priv-owner-${suffix}@emailpriv${suffix}.test`;
   const staffEmail = `email-priv-staff-${suffix}@email-priv.test`;
   const outsiderEmail = `email-priv-out-${suffix}@email-priv.test`;
 
@@ -288,7 +288,7 @@ async function runExecute() {
       townOrCity: "London",
       postcode: "E1 6AN",
       isHeadOffice: true,
-      emailDomain: `emailpriv${suffix}.co.uk`,
+      emailDomain: `emailpriv${suffix}.test`,
     });
     if (!onboarding.success) {
       record(

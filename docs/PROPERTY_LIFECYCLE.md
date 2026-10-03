@@ -86,8 +86,8 @@ Operational lifecycle (`property_lifecycle_states.operational_state`):
 |-------|---------|
 | `active` | Normal operational relationship; users may act on the property |
 | `completed_grace` | Chain completion confirmed; grace period before operational cleanup (Scenario A) |
-| `dormancy_warning` | Connected transaction stale; awaiting structured still-active confirmation (Scenario B2) |
-| `dormant` | Inactivity criteria met; pending archival (Scenario B1 or B2 after confirmation) |
+| `dormancy_warning` | Unrepresented placeholder with dependants past its window; awaiting its dependent side's still-active confirmation (Scenario B) |
+| `dormant` | Placeholder window elapsed (or confirmation window expired); pending archival (Scenario B) |
 | `archived` | Operational links removed; property prepared for release |
 | `released` | Address available for a future claim without support (Scenario C) |
 | `anonymised` | **Property-level** operational PII cleared; analytics snapshot retained. **Not** full GDPR RTBF (Scenario D) |
@@ -97,18 +97,38 @@ Operational lifecycle (`property_lifecycle_states.operational_state`):
 ```
 active ──completion confirmed──► completed_grace ──grace elapsed──► archived ──release──► released
   │
-  ├── B1 isolated inactivity ──► dormant ──archive──► archived ──release──► released
+  ├── placeholder, no dependants ──► dormant ──archive──► archived ──release──► released
   │
-  └── B2 connected inactivity ──► dormancy_warning ──confirm OR expire──► dormant ──► archived ──release
-                                                                                              │
-                                                                                              └──analytics──► anonymised
+  └── placeholder with dependants ──► dormancy_warning ──expire──► dormant ──► archived ──release
+                                        │                                                    │
+                                        ├──dependent-side confirm──► active                  └──analytics──► anonymised
+                                        ├──dependent-side activity──► active
+                                        └──seller side represented again──► active (managed)
+
+managed (seller side represented) ── no dormancy path; exits are completion grace or explicit user action
 ```
 
-**B1 (isolated):** no chain connection, no meaningful progress, no valid invitation → release after 90 days (default).
+Each worker step re-checks the state it needs under a row lock (`execute_property_lifecycle_action`): `expire_dormancy_warning` only moves a `dormancy_warning` row past its deadline to `dormant`; `mark_dormant` only moves an `active` row that is still inactive; `archive_operational` needs `dormant` or `completed_grace`; `release_property` needs `archived`; snapshots need `dormant`, `completed_grace`, `archived` or `released`. The worker stops a row's plan when the dormancy gate (`expireDormancyWarning` / `markDormant`) is skipped or fails, so a warning reset between evaluation and execution can never be archived or released.
 
-**B2 (connected):** chain connected but abandoned → warning at 150 days (default) → 30-day confirmation window → release if unconfirmed.
+Bounded dormancy (`20261005130000`) separates **managed** rows from **unrepresented placeholders**:
 
-Identity age alone does **not** count as meaningful activity.
+- **Managed** — the seller side is represented (`_property_side_representation`: a homeowner, or an EA assignment). A managed row never enters dormancy and is never made dormant, archived or released through inactivity, however stale. It keeps the 14/21-day staleness signals (page alert, confidence). Its only lifecycle exits are completion grace and explicit user action. Buyers, counterparties, viewers, creators and plain `property_members` never make a row managed.
+- **Placeholder** — not managed and not a searching row. Its clock starts when the seller side becomes unrepresented (`seller_side_unrepresented_since`).
+
+| Placeholder | Path | Default |
+|-----|------|---------|
+| No dependants | Quiet: dormant → snapshot → archive → release, no warning | 90 days |
+| With dependants (`_property_placeholder_has_dependants`) | Warning → 30-day confirmation → dormant → snapshot → archive → release | 150 days |
+
+**Dependants:** `buyer_connected` on a sale; an active identity or counterparty; a Buyer Ready node linked to the row; a represented row linking to it; a represented onward row. Rows that merely share the chain do not count.
+
+**Anchor** (`_property_placeholder_anchor`, mirrored by `placeholderDormancyAnchor`): the latest of `seller_side_unrepresented_since`, `placeholder_activity_at`, `last_still_active_confirmed_at` and the effective-from floor. History is never inferred from `stage_entered_at` or old activity.
+
+**Dependent-side activity only** (`_record_placeholder_dependent_activity`) restarts a placeholder's clock and returns its pending warning to `active`: non-system activity or a stage change on the placeholder itself; non-system activity or a stage change on the same-chain sale that links to it; a buyer counterparty joining; activity or progress on a Buyer Ready node linked to it. System notices never count, and nothing fans out across the chain — activity on one row never resets another unrelated row.
+
+**Representation changes:** when the seller side becomes represented again (a claim, an EA assignment, a seller counterparty) the row becomes managed immediately: the clock clears and a `dormancy_warning` / `dormant` row returns to `active` (logged). When the last seller-side representative leaves, the clock starts at that moment.
+
+**Rollout floor:** every clock starts no earlier than `LIFECYCLE_DORMANCY_EFFECTIVE_FROM` (default `2026-10-05T00:00:00Z`; database `lifecycle_dormancy_effective_from()` reads `app.lifecycle_dormancy_effective_from` with the same default). Rollout returns legacy `dormancy_warning` / `dormant` rows to `active` (logged) and releases nothing.
 
 Transitions are **explicit**, **audited** (`property_lifecycle_events`), and **configurable**. No silent deletion.
 
@@ -127,21 +147,31 @@ Transitions are **explicit**, **audited** (`property_lifecycle_events`), and **c
 - Release property for future claims
 - Create anonymised analytics snapshot first
 
-### Scenario B — Dormant transaction (B1 isolated / B2 connected)
+### Scenario B — Unrepresented placeholder
 
-**B1 — Isolated:** No chain connection, no meaningful operational activity, no valid active invitation for **`LIFECYCLE_DORMANT_INACTIVITY_DAYS`** (default 90).
+Only placeholders (see above) take this path. Managed rows never do.
 
-**B2 — Connected:** Chain connected but no chain-level operational activity for **`LIFECYCLE_CONNECTED_DORMANT_DAYS`** (default 150) → `dormancy_warning` → **`LIFECYCLE_DORMANCY_CONFIRMATION_DAYS`** (default 30) confirmation window → release if unconfirmed.
+**No dependants:** dormant → snapshot → archive → release after **`LIFECYCLE_DORMANT_INACTIVITY_DAYS`** (default 90) from the anchor, without a warning.
 
-Structured confirmation: `confirm_transaction_still_active()` — "My transaction is still active" (no free text).
+**With dependants:** `dormancy_warning` after **`LIFECYCLE_CONNECTED_DORMANT_DAYS`** (default 150) from the anchor — this row only, never its chain peers — then a **`LIFECYCLE_DORMANCY_CONFIRMATION_DAYS`** (default 30) confirmation window, then dormant → snapshot → archive → release if nobody on its dependent side confirms or acts.
 
-**Does NOT qualify as protection:** identity age alone, login recency alone, expired invitations, page views.
+**Dependent side** (`_is_placeholder_dependent_side_user`): the purchase's buyer identity holder; a buyer counterparty on the row; the seller side of the same-chain sale linking to the row (its homeowner, or a verified member of its EA branch when that sale is EA-operated); the owner of a Buyer Ready node linked to the row.
+
+**Warning recipient** (`get_dormancy_warning_email_recipient`, verified unbanned accounts only, first match): the purchase's buyer; a buyer counterparty; the seller homeowner of the linking sale; the linked Buyer Ready owner; then a member of the EA branch assigned to the linking sale (branch admins first) **only when that EA may update the sale** (`homeowner_only_updates = false`, or the sale has no seller homeowner). Every recipient must pass the same dependent-side check as confirmation, so whoever is emailed can confirm; an EA on a homeowner-only sale is never the actionable recipient. People receive the `buyer` variant; the EA receives the `estate_agent` variant, which says the property is an onward purchase and that confirming gives the branch no control over it. A row with no reachable recipient is still warned and released after the window, without an email.
+
+Structured confirmation: `confirm_transaction_still_active()` — "My transaction is still active" (no free text). Dependent side only (`can_confirm_property_still_active`, service role only; the UI reads `get_property_lifecycle_status`). Locks the property row then the lifecycle row; restarts this row's clock only; idempotent within 24 hours; unlimited; every confirmation is audited (`property_lifecycle_still_active_confirmations`). On a managed row it is a no-op (`managed: true`). On a dormant, archived, released or anonymised row it returns `invalid_state_for_confirmation`. **Confirming grants no authority** and changes no ownership or representation — delegates, viewers, EAs connected only through the chain and outsiders get `not_authorised`.
+
+**Does NOT restart a placeholder's clock:** identity age, login recency, page views, system notices, operational or chain-level activity elsewhere in the chain, issuing invitations.
 
 ### Scenario C — Future owner
 
-When lifecycle reaches `released`, a new homeowner claims via normal flows (`claim_operational_property` or Start Move) **without support intervention**.
+When lifecycle reaches `released`, the address is free and a new homeowner starts a new transaction at it (Start Move, or a new EA-created row) **without support intervention**.
 
-Requires: reset `property_claim_metadata`, clear stale memberships, global address not blocked by orphaned operational rows.
+The released row itself is historical: claims, identity grants and joins on an archived, released or anonymised row are refused (`property_released`, M3 `20261005120000`). Such rows are not listed by `discover_claimable_properties()` (so they neither appear in the homeowner's properties-to-claim list nor drive the post-login claim redirect), and their invitation links resolve to `property_released`.
+
+**Seller side leaving** (M3 `_execute_participation_delink`, see [Participation De-link](./PARTICIPATION_DELINK.md)): a row is released immediately only when it was added by mistake (`wrong_property`, `added_by_mistake`, `duplicate_property`) and nothing depends on it. Otherwise the departing authority is removed and the row stays in its chain as an unrepresented placeholder (counterparties, links, flags and valid invitations kept); the lifecycle above decides what happens next. Nobody gains authority over the row; the invited homeowner can still claim it.
+
+Requires: global address not blocked by orphaned operational rows (address reservation, M1/M3).
 
 ### Scenario D — Analytics
 
@@ -172,10 +202,14 @@ Environment variables (see `lib/lifecycle/config.ts`):
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `LIFECYCLE_COMPLETED_GRACE_DAYS` | `30` | Scenario A grace before archive |
-| `LIFECYCLE_DORMANT_INACTIVITY_DAYS` | `90` | B1 isolated inactivity threshold |
-| `LIFECYCLE_CONNECTED_DORMANT_DAYS` | `150` | B2 connected inactivity before warning |
-| `LIFECYCLE_DORMANCY_CONFIRMATION_DAYS` | `30` | B2 confirmation window after warning |
-| `LIFECYCLE_EVALUATION_BATCH_SIZE` | `100` | Worker batch size |
+| `LIFECYCLE_DORMANT_INACTIVITY_DAYS` | `90` | Placeholder without dependants: dormant after this many days from its anchor |
+| `LIFECYCLE_CONNECTED_DORMANT_DAYS` | `150` | Placeholder with dependants: warning after this many days from its anchor |
+| `LIFECYCLE_DORMANCY_CONFIRMATION_DAYS` | `30` | Confirmation window after warning |
+| `LIFECYCLE_DORMANCY_EFFECTIVE_FROM` | `2026-10-05T00:00:00Z` | Floor for every placeholder clock (must match `app.lifecycle_dormancy_effective_from`) |
+| `LIFECYCLE_EVALUATION_BATCH_SIZE` | `100` | Worker batch size (`p_limit` of the candidate query) |
+| `LIFECYCLE_WORKER_TIME_BUDGET_SECONDS` | `240` | Worker run budget; batches repeat until a batch is empty or repeats |
+| `LIFECYCLE_WORKER_RETRY_DELAY_SECONDS` | `3600` | Next evaluation after a failed row |
+| `LIFECYCLE_CRON_ENABLED` | unset | The worker route does nothing unless `true` |
 
 All periods are configurable — **never hardcode** in cleanup jobs.
 
@@ -196,8 +230,8 @@ All periods are configurable — **never hardcode** in cleanup jobs.
 
 ### Phase 2 — Automated production (implemented)
 
-- Scheduled worker: `GET /api/cron/property-lifecycle` (Vercel Cron, daily 03:00 UTC)
-- TypeScript evaluation + SQL execution via `runPropertyLifecycleWorkerBatch()`
+- Worker route: `GET /api/cron/property-lifecycle`. **Not scheduled** — it has no `vercel.json` cron and returns `{ disabled: true }` (after `CRON_SECRET` auth) unless `LIFECYCLE_CRON_ENABLED=true`. Scheduling it is a separate, explicit release decision.
+- TypeScript evaluation + SQL execution via `runPropertyLifecycleWorker()` (time-budgeted) over `runPropertyLifecycleWorkerBatch()`. Candidates come from the indexed `next_evaluation_at <= now()` query (`list_property_lifecycle_worker_candidates`); after each row the worker writes its next evaluation instant (`schedule_property_lifecycle_evaluation`, always in the future, or a retry delay on failure), so the run needs no exclude list and stops on an empty or repeated batch.
 - Service-role RPCs: candidate selection, leases, snapshot persistence, archive/release/anonymise
 - Address reusability: `property_address_is_reserved()` + updated `property_exists_for_onboarding()`
 - Idempotent analytics snapshots (`source_property_id`, `snapshot_kind` unique)
@@ -210,23 +244,29 @@ All periods are configurable — **never hardcode** in cleanup jobs.
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `LIFECYCLE_COMPLETED_GRACE_DAYS` | 30 | Post-completion grace before archival |
-| `LIFECYCLE_DORMANT_INACTIVITY_DAYS` | 90 | B1 isolated dormancy threshold |
-| `LIFECYCLE_CONNECTED_DORMANT_DAYS` | 150 | B2 connected dormancy before warning |
-| `LIFECYCLE_DORMANCY_CONFIRMATION_DAYS` | 30 | B2 confirmation window |
+| `LIFECYCLE_DORMANT_INACTIVITY_DAYS` | 90 | Placeholder without dependants |
+| `LIFECYCLE_CONNECTED_DORMANT_DAYS` | 150 | Placeholder with dependants, before warning |
+| `LIFECYCLE_DORMANCY_CONFIRMATION_DAYS` | 30 | Confirmation window |
+| `LIFECYCLE_DORMANCY_EFFECTIVE_FROM` | 2026-10-05T00:00:00Z | Rollout floor for previously exempt rows |
 | `LIFECYCLE_EVALUATION_BATCH_SIZE` | 100 | Worker batch size |
 | `LIFECYCLE_WORKER_LEASE_SECONDS` | 300 | Per-property processing lease |
+| `LIFECYCLE_WORKER_TIME_BUDGET_SECONDS` | 240 | Cron run time budget (route `maxDuration` is 300) |
 | `CRON_SECRET` | — | **Required** for cron route auth |
 
 **Manual configuration:**
 
 1. Apply migration `20260714190000_property_lifecycle_automation.sql`
 2. Set `CRON_SECRET` in Vercel (must match Authorization bearer token)
-3. Deploy with `vercel.json` cron schedule
+3. Leave the worker unscheduled until the release decision (see above)
 4. Optionally mirror retention in Postgres: `app.lifecycle_*` settings
 
 ```bash
-npx tsx scripts/verify-property-lifecycle-automation.ts
+npx tsx --conditions react-server scripts/verify-property-lifecycle-automation.ts
+npx tsx scripts/verify-lifecycle-bounded-dormancy-migration.ts
+npx tsx --conditions react-server scripts/verify-lifecycle-bounded-dormancy-development.ts --execute   # Development only
 ```
+
+Bounded dormancy deploy order: apply `20261005120000` → `20261005130000` → `20261005140000` → `20261005150000` **before** the application. An application running against the older signals RPC sees no seller-side signals and treats every row as managed, so it plans no dormancy step; the database dispatcher independently refuses every dormancy step on a managed row.
 
 ### Phase 3 — Analytics platform
 

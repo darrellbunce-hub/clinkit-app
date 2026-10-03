@@ -168,7 +168,10 @@ function testScenarioA_preClaimDelegatedEditing() {
   );
 }
 
-function testScenarioA_viewOnlyBlocked() {
+// With no homeowner connected there is no EA-update permission to restrict
+// the branch, so homeowner_only_updates only takes effect once one connects
+// (mirrors can_operate_property).
+function testScenarioA_eaOnlyOperatesBeforeHomeowner() {
   const mutationContext = {
     accountType: "estate_agent" as const,
     estateAgentAssignments: viewOnlyPreClaimAssignment,
@@ -182,13 +185,16 @@ function testScenarioA_viewOnlyBlocked() {
     mutationContext,
   });
 
-  assertFalsy(
-    "Scenario E — view-only EA has no position",
-    position.position
+  assertEqual(
+    "Scenario E — EA-only (homeowner-only flag set) has the sale position",
+    position.position?.kind === "sale"
+      ? position.position.propertyId
+      : null,
+    SALE_PROPERTY_ID
   );
 
-  assertFalsy(
-    "Scenario E — view-only EA cannot mutate",
+  assertTruthy(
+    "Scenario E — EA-only (homeowner-only flag set) can mutate",
     canMutatePropertyTarget(
       unclaimedEaSaleView[0],
       ESTATE_AGENT_ID,
@@ -369,7 +375,7 @@ function testOriginationDefaults() {
 const tests = [
   ["EA origination defaults", testOriginationDefaults],
   ["Scenario A pre-claim delegated editing", testScenarioA_preClaimDelegatedEditing],
-  ["Scenario A view-only blocked (Scenario E pre-claim)", testScenarioA_viewOnlyBlocked],
+  ["Scenario A EA-only operates before homeowner (Scenario E pre-claim)", testScenarioA_eaOnlyOperatesBeforeHomeowner],
   ["Scenario B post-claim delegated editing", testScenarioB_postClaimDelegatedEditing],
   ["Scenario C revoked delegation", testScenarioC_revokedDelegation],
   ["Scenario D re-enabled delegation helpers", testScenarioD_reenabledDelegation],

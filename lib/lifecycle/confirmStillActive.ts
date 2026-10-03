@@ -7,8 +7,9 @@ type ConfirmStillActiveResult =
   | { ok: false; error: string };
 
 /**
- * Structured "My transaction is still active" confirmation.
- * Resets connected dormancy clock and counts as meaningful operational activity.
+ * Structured "My transaction is still active" confirmation by a placeholder's
+ * dependent side. Restarts that row's dormancy clock only; it is not
+ * operational activity and grants no authority.
  */
 export async function confirmTransactionStillActive(params: {
   supabase: SupabaseClient;

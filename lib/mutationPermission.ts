@@ -26,6 +26,27 @@ export function isEstateAgentDelegationEnabled(
   return assignment?.homeownerOnlyUpdates === false;
 }
 
+/**
+ * Mirrors can_operate_property for the assigned branch: with no seller-side
+ * homeowner connected the EA is the operator; otherwise the homeowner's
+ * EA-update permission decides.
+ */
+export function canEstateAgentOperateAssignment(
+  assignment: Pick<
+    EstateAgentOperationalAssignment,
+    "homeownerOnlyUpdates" | "subjectUserId"
+  > | null | undefined
+): boolean {
+  if (!assignment) {
+    return false;
+  }
+
+  return (
+    assignment.subjectUserId == null ||
+    isEstateAgentDelegationEnabled(assignment)
+  );
+}
+
 function findActiveAssignmentInChain(
   chainId: number,
   chainProperties: OperationalProperty[],
@@ -42,10 +63,10 @@ function findActiveAssignmentInChain(
  * Resolves operational position for mutation checks.
  *
  * Homeowners: viewer membership (unchanged).
- * Estate agents: subject position only when delegation is enabled.
- * Pre-claim EA-originated properties use the assigned-property lens even when
- * subject_user_id is null; seller-hop topology still resolves via
- * applyOperationalSubjectLens.
+ * Estate agents: subject position when the branch may operate the assigned row
+ * (EA-only, or the seller-side homeowner allows EA updates). EA-only rows use
+ * the assigned-property lens with subject_user_id null; seller-hop topology
+ * still resolves via applyOperationalSubjectLens.
  */
 export function resolveMutationOperationalPosition(params: {
   viewerUserId: string | null | undefined;
@@ -96,7 +117,7 @@ export function resolveMutationOperationalPosition(params: {
     assignments
   );
 
-  if (!isEstateAgentDelegationEnabled(assignment)) {
+  if (!canEstateAgentOperateAssignment(assignment)) {
     return { position: null };
   }
 

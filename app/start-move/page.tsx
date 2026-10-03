@@ -15,13 +15,40 @@ import {
 import { generateAccessCode } from "@/lib/accessCode";
 import { attachSearchingPlaceholderToSale } from "@/lib/searchingPlaceholder";
 import CollectionPointNotice from "@/components/legal/CollectionPointNotice";
-import DuplicatePropertyDialog from "@/components/onboarding/DuplicatePropertyDialog";
+import DuplicatePropertyDialog, {
+  type DuplicatePropertyDialogVariant,
+} from "@/components/onboarding/DuplicatePropertyDialog";
 import PropertyAddressLookup from "@/components/address/PropertyAddressLookup";
 import { formatUkPostcodeForStorage } from "@/lib/address/normalize";
+import { checkStartMoveAddress } from "@/lib/onboarding/addressReservation";
 
-type PendingDuplicateJoin = {
-  chainId: number;
-};
+type PendingDuplicateAction =
+  /** The caller's own chain already holds the address. */
+  | { kind: "open_chain"; chainId: number | null }
+  /** Join without a source chain (nothing created yet). */
+  | { kind: "join" }
+  /** Create the caller's sale first, then join carrying it across. */
+  | { kind: "join_after_sale" }
+  /** A source chain was already created; Join Chain migrates and removes it. */
+  | { kind: "join_source_chain"; chainId: number }
+  | { kind: "none" };
+
+const START_MOVE_FAILED_MESSAGE =
+  "We could not create your chain. Please try again.";
+
+const START_MOVE_ADDRESS_RESERVED_MESSAGE =
+  "One of these addresses has just been added to MoveLoop by someone else. Please try again and we will show you how to join it.";
+
+function isAddressReservedFailure(
+  insertError: { code?: string; message?: string } | null,
+  grantError: string | null | undefined
+) {
+  return (
+    (insertError?.code === "23505" &&
+      insertError.message === "property_address_reserved") ||
+    grantError === "address_reserved"
+  );
+}
 
 export default function StartMovePage() {
  
@@ -36,8 +63,14 @@ export default function StartMovePage() {
     ] = useState(false);
   const [duplicateDialogOpen, setDuplicateDialogOpen] =
     useState(false);
-  const [pendingDuplicateJoin, setPendingDuplicateJoin] =
-    useState<PendingDuplicateJoin | null>(null);
+  const [duplicateDialogVariant, setDuplicateDialogVariant] =
+    useState<DuplicatePropertyDialogVariant>("existing");
+  const [pendingDuplicateAction, setPendingDuplicateAction] =
+    useState<PendingDuplicateAction>({ kind: "none" });
+  const [isSubmitting, setIsSubmitting] =
+    useState(false);
+  const [errorMessage, setErrorMessage] =
+    useState("");
   const [sellingAddress, setSellingAddress] =
     useState("");
 
@@ -51,26 +84,161 @@ export default function StartMovePage() {
     useState("");
 
     function redirectToJoinExistingChain(
-      chainId: number
+      chainId: number | null
     ) {
-      const joinParams = new URLSearchParams({
-        sourceChain: String(chainId),
-      });
+      const joinParams = new URLSearchParams();
+
+      if (chainId != null) {
+        joinParams.set("sourceChain", String(chainId));
+      }
 
       if (searchingForProperty) {
         joinParams.set("searching", "1");
       }
 
-      window.location.href =
-        `/join-chain?${joinParams.toString()}`;
+      const query = joinParams.toString();
+
+      window.location.href = query
+        ? `/join-chain?${query}`
+        : "/join-chain";
     }
 
-    function promptJoinExistingChain(chainId: number) {
-      setPendingDuplicateJoin({ chainId });
+    function openDuplicateDialog(
+      variant: DuplicatePropertyDialogVariant,
+      action: PendingDuplicateAction
+    ) {
+      setDuplicateDialogVariant(variant);
+      setPendingDuplicateAction(action);
       setDuplicateDialogOpen(true);
     }
 
-    async function handleStartMove() {
+    function promptJoinExistingChain(chainId: number) {
+      openDuplicateDialog("existing", {
+        kind: "join_source_chain",
+        chainId,
+      });
+    }
+
+    async function cleanupOnboardingChain(chainId: number) {
+      const { error } = await supabase.rpc(
+        "cleanup_abandoned_onboarding_chain",
+        { p_chain_id: chainId }
+      );
+
+      if (error) {
+        console.error(
+          "[start-move] onboarding cleanup failed:",
+          error.message
+        );
+      }
+    }
+
+    function hasSellingAddress() {
+      return !notSelling && Boolean(sellingAddress);
+    }
+
+    function hasBuyingAddress() {
+      return !notBuying && Boolean(buyingAddress);
+    }
+
+    /** Returns true when routing took over and nothing should be created. */
+    async function routeExistingAddresses(): Promise<boolean> {
+      if (hasSellingAddress()) {
+        const selling = await checkStartMoveAddress(supabase, {
+          address: sellingAddress,
+          postcode: formatUkPostcodeForStorage(sellingPostcode),
+          side: "selling",
+        });
+
+        if (!selling.ok) {
+          setErrorMessage(selling.message);
+          return true;
+        }
+
+        if (selling.state === "yours") {
+          openDuplicateDialog("yours", {
+            kind: "open_chain",
+            chainId: selling.chainId,
+          });
+          return true;
+        }
+
+        if (selling.state === "awaiting_connection") {
+          openDuplicateDialog("awaiting_seller", { kind: "join" });
+          return true;
+        }
+
+        if (selling.state === "already_represented") {
+          openDuplicateDialog("represented", { kind: "none" });
+          return true;
+        }
+      }
+
+      if (hasBuyingAddress()) {
+        const buying = await checkStartMoveAddress(supabase, {
+          address: buyingAddress,
+          postcode: formatUkPostcodeForStorage(buyingPostcode),
+          side: "buying",
+        });
+
+        if (!buying.ok) {
+          setErrorMessage(buying.message);
+          return true;
+        }
+
+        if (buying.state === "yours") {
+          openDuplicateDialog("yours", {
+            kind: "open_chain",
+            chainId: buying.chainId,
+          });
+          return true;
+        }
+
+        if (buying.state === "awaiting_connection") {
+          openDuplicateDialog(
+            "awaiting_buyer",
+            hasSellingAddress()
+              ? { kind: "join_after_sale" }
+              : { kind: "join" }
+          );
+          return true;
+        }
+
+        if (buying.state === "already_represented") {
+          openDuplicateDialog("represented", { kind: "none" });
+          return true;
+        }
+      }
+
+      return false;
+    }
+
+    async function handleStartMove(
+      options: { joinBuyingAfterSale?: boolean } = {}
+    ) {
+      if (isSubmitting) {
+        return;
+      }
+
+      setIsSubmitting(true);
+      setErrorMessage("");
+
+      let chainId: number | null = null;
+      let redirected = false;
+
+      async function fail(
+        logMessage: string,
+        detail?: unknown,
+        userMessage: string = START_MOVE_FAILED_MESSAGE
+      ) {
+        console.error(logMessage, detail ?? "");
+
+        if (chainId != null) {
+          await cleanupOnboardingChain(chainId);
+        }
+
+        setErrorMessage(userMessage);
+      }
 
       try {
     
@@ -89,11 +257,16 @@ export default function StartMovePage() {
           return;
     
         }
+
+        if (
+          !options.joinBuyingAfterSale &&
+          (await routeExistingAddresses())
+        ) {
+          return;
+        }
     
         let accessCode =
           generateAccessCode();
-    
-        let chainId: number | null = null;
 
         for (let attempt = 0; attempt < 5; attempt++) {
           const chainResult =
@@ -116,7 +289,7 @@ export default function StartMovePage() {
           }
 
           if (chainResult.error) {
-            console.error(
+            await fail(
               "[start-move] chain create failed:",
               chainResult.error
             );
@@ -129,7 +302,7 @@ export default function StartMovePage() {
         }
 
         if (chainId == null) {
-          console.error(
+          await fail(
             "[start-move] chain create failed after retries"
           );
           return;
@@ -197,15 +370,14 @@ export default function StartMovePage() {
             .single();
     
           if (sellingError) {
-    
-            console.error(
+            await fail(
               "[start-move] selling property insert failed:",
-              sellingError.message
+              sellingError.message,
+              isAddressReservedFailure(sellingError, null)
+                ? START_MOVE_ADDRESS_RESERVED_MESSAGE
+                : START_MOVE_FAILED_MESSAGE
             );
-    
-    
             return;
-    
           }
     
           if (sellingProperty) {
@@ -220,10 +392,17 @@ export default function StartMovePage() {
               });
 
             if (sellerMemberError || !sellerGrant.ok) {
-              console.error(
+              const grantError = !sellerGrant.ok
+                ? sellerGrant.error
+                : null;
+              await fail(
                 "[start-move] operational homeowner grant failed:",
                 sellerMemberError?.message ??
-                  (!sellerGrant.ok ? sellerGrant.error : "unknown_error")
+                  grantError ??
+                  "unknown_error",
+                isAddressReservedFailure(null, grantError)
+                  ? START_MOVE_ADDRESS_RESERVED_MESSAGE
+                  : START_MOVE_FAILED_MESSAGE
               );
               return;
             }
@@ -233,6 +412,12 @@ export default function StartMovePage() {
         let buyerReadyPropertyId = null;
         // BUYING PROPERTY
         if (!notBuying && buyingAddress) {
+          if (options.joinBuyingAfterSale) {
+            redirected = true;
+            redirectToJoinExistingChain(chainId);
+            return;
+          }
+
           const buyingPostcodeStored =
             formatUkPostcodeForStorage(buyingPostcode);
           const { data: buyingCheck } = await supabase.rpc(
@@ -290,15 +475,14 @@ export default function StartMovePage() {
             .single();
     
           if (buyingError) {
-    
-            console.error(
+            await fail(
               "[start-move] buying property insert failed:",
-              buyingError.message
+              buyingError.message,
+              isAddressReservedFailure(buyingError, null)
+                ? START_MOVE_ADDRESS_RESERVED_MESSAGE
+                : START_MOVE_FAILED_MESSAGE
             );
-  
-    
             return;
-    
           }
     
           if (buyingProperty) {
@@ -311,10 +495,17 @@ export default function StartMovePage() {
               });
 
             if (buyerMemberError || !buyerGrant.ok) {
-              console.error(
+              const grantError = !buyerGrant.ok
+                ? buyerGrant.error
+                : null;
+              await fail(
                 "[start-move] operational homeowner grant failed:",
                 buyerMemberError?.message ??
-                  (!buyerGrant.ok ? buyerGrant.error : "unknown_error")
+                  grantError ??
+                  "unknown_error",
+                isAddressReservedFailure(null, grantError)
+                  ? START_MOVE_ADDRESS_RESERVED_MESSAGE
+                  : START_MOVE_FAILED_MESSAGE
               );
               return;
             }
@@ -339,7 +530,7 @@ export default function StartMovePage() {
             );
 
           if (!attachResult.ok) {
-            console.error(
+            await fail(
               "[start-move] searching placeholder attach failed:",
               attachResult.error
             );
@@ -375,17 +566,19 @@ export default function StartMovePage() {
   });
         
         }
+        redirected = true;
         window.location.href =
           `/chain/${chainId}?refresh=${Date.now()}`;
     
       } catch (error) {
-    
-        console.error(
+        await fail(
           "[start-move] unexpected error:",
           error instanceof Error ? error.message : "unknown_error"
         );
-    
-    
+      } finally {
+        if (!redirected) {
+          setIsSubmitting(false);
+        }
       }
     
     }
@@ -556,11 +749,20 @@ export default function StartMovePage() {
 
 </div>
 <div className="mt-10">
+{errorMessage ? (
+  <p
+    role="alert"
+    className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+  >
+    {errorMessage}
+  </p>
+) : null}
 <button
   type="submit"
-  className="mt-10 w-full bg-slate-900 text-white rounded-2xl py-5 text-lg font-semibold"
+  disabled={isSubmitting}
+  className="mt-10 w-full bg-slate-900 text-white rounded-2xl py-5 text-lg font-semibold disabled:cursor-not-allowed disabled:opacity-60"
 >
-  Create Chain
+  {isSubmitting ? "Creating..." : "Create Chain"}
 </button>
 </div>
 
@@ -568,16 +770,35 @@ export default function StartMovePage() {
 
       <DuplicatePropertyDialog
         isOpen={duplicateDialogOpen}
+        isPending={isSubmitting}
+        variant={duplicateDialogVariant}
         onJoinExisting={() => {
-          if (pendingDuplicateJoin) {
-            redirectToJoinExistingChain(
-              pendingDuplicateJoin.chainId
-            );
+          const action = pendingDuplicateAction;
+
+          if (action.kind === "open_chain") {
+            window.location.href =
+              action.chainId != null
+                ? `/chain/${action.chainId}`
+                : "/my-chains";
+          } else if (action.kind === "join") {
+            redirectToJoinExistingChain(null);
+          } else if (action.kind === "join_source_chain") {
+            redirectToJoinExistingChain(action.chainId);
+          } else if (action.kind === "join_after_sale") {
+            setDuplicateDialogOpen(false);
+            setPendingDuplicateAction({ kind: "none" });
+            void handleStartMove({ joinBuyingAfterSale: true });
           }
         }}
         onCancel={() => {
+          const action = pendingDuplicateAction;
+
           setDuplicateDialogOpen(false);
-          setPendingDuplicateJoin(null);
+          setPendingDuplicateAction({ kind: "none" });
+
+          if (action.kind === "join_source_chain") {
+            void cleanupOnboardingChain(action.chainId);
+          }
         }}
       />
 

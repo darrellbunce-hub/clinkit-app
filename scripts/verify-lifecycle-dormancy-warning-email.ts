@@ -1,8 +1,13 @@
 /**
  * Dormancy warning email notification verification.
  *
- * Requires migrations through 20260714201000_fix_dormancy_warning_recipient_banned_check.sql
+ * Requires migrations through 20261005130000_lifecycle_bounded_dormancy.sql
  * and SUPABASE_SERVICE_ROLE_KEY + NEXT_PUBLIC_SUPABASE_ANON_KEY in .env.local.
+ *
+ * Model: only unrepresented placeholders are warned; a managed row (seller side
+ * represented) is returned to active and never emailed. The recipient is the
+ * placeholder's dependent side (here a buyer counterparty), the warning is per
+ * row (no chain-wide fan-out), and only the dependent side may confirm.
  *
  * Auth pattern:
  * - Homeowner onboarding RPCs (create_chain_for_onboarding, confirm_transaction_still_active)
@@ -16,11 +21,23 @@ import { randomUUID } from "crypto";
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { readFileSync } from "fs";
+import Module from "module";
 import { join } from "path";
 
-import { renderDormancyWarning } from "../lib/communications/render";
-import { buildDormancyWarningPropertyUrl } from "../lib/communications/dormancyWarningLinks";
-import { processDormancyWarningNotifications } from "../lib/lifecycle/dormancyWarningNotifications";
+// Allow importing server-only modules from this Node script.
+const moduleWithLoad = Module as typeof Module & {
+  _load: (request: string, parent: unknown, isMain: boolean) => unknown;
+};
+const originalLoad = moduleWithLoad._load.bind(Module);
+moduleWithLoad._load = function patchedLoad(
+  request: string,
+  parent: unknown,
+  isMain: boolean
+) {
+  if (request === "server-only") return {};
+  return originalLoad(request, parent, isMain);
+};
+
 import type { SendEmailResult } from "../lib/communications/types";
 
 const PLACEHOLDER_SERVICE_ROLE_KEYS = new Set([
@@ -219,6 +236,7 @@ async function insertProperty(params: {
   address: string;
   postcode: string;
   userId: string;
+  relationshipType?: "sale" | "purchase";
 }) {
   const { data, error } = await params.admin
     .from("properties")
@@ -229,7 +247,7 @@ async function insertProperty(params: {
       postcode: params.postcode,
       stage: "property_listed",
       status: "healthy",
-      relationship_type: "sale",
+      relationship_type: params.relationshipType ?? "sale",
       created_by_user_id: params.userId,
       buyer_connected: false,
       seller_connected: false,
@@ -249,15 +267,34 @@ async function upsertOperationalIdentity(params: {
   propertyId: number;
   userId: string;
   status?: "active" | "delinked" | "released";
+  role?: "seller" | "buyer";
 }) {
   await params.admin.from("property_operational_identities").upsert({
     property_id: params.propertyId,
     homeowner_user_id: params.userId,
-    operational_role: "seller",
+    operational_role: params.role ?? "seller",
     granted_via: "start_move",
     status: params.status ?? "active",
     granted_at: new Date().toISOString(),
   });
+}
+
+async function addBuyerCounterparty(
+  admin: SupabaseClient,
+  propertyId: number,
+  userId: string
+) {
+  const { error } = await admin.from("property_counterparty_participants").insert({
+    property_id: propertyId,
+    user_id: userId,
+    counterparty_role: "buyer",
+    granted_via: "join_chain_property",
+    status: "active",
+  });
+
+  if (error) {
+    throw new Error(`counterparty fixture: ${error.message}`);
+  }
 }
 
 async function setDormancyWarning(admin: SupabaseClient, propertyId: number) {
@@ -307,6 +344,11 @@ function mockSendFailure(): () => Promise<SendEmailResult> {
 }
 
 async function main() {
+  // Dynamic imports so the server-only patch above is in place first.
+  const { renderDormancyWarning } = await import("../lib/communications/render");
+  const { buildDormancyWarningPropertyUrl } = await import("../lib/communications/dormancyWarningLinks");
+  const { processDormancyWarningNotifications } = await import("../lib/lifecycle/dormancyWarningNotifications");
+
   console.log("=== Template / privacy checks ===\n");
 
   const rendered = await renderDormancyWarning({
@@ -355,9 +397,12 @@ async function main() {
   const unverifiedEmail = `dormancy-unverified-${stamp}@example.com`;
   const delinkedEmail = `dormancy-delinked-${stamp}@example.com`;
 
+  // The homeowner created the chain and owns a separate managed sale; they are
+  // not on the placeholder's dependent side.
   const { client: homeownerClient, userId: homeownerId } =
     await signUpHomeowner(homeownerEmail);
-  const counterpartyId = await signUpUserIdOnly(counterpartyEmail);
+  const { client: counterpartyClient, userId: counterpartyId } =
+    await signUpHomeowner(counterpartyEmail);
   const delegateId = await signUpUserIdOnly(delegateEmail);
   const eaId = await signUpUserIdOnly(eaEmail);
   const unverifiedId = await createUnverifiedUserId(admin, unverifiedEmail);
@@ -365,6 +410,8 @@ async function main() {
 
   const chainId = await createChain(homeownerClient, stamp);
 
+  // Unrepresented sale placeholder (no seller identity, no EA assignment);
+  // its dependent side is the buyer counterparty.
   const propertyId = await insertProperty({
     admin,
     chainId,
@@ -374,20 +421,7 @@ async function main() {
     userId: homeownerId,
   });
 
-  await upsertOperationalIdentity({
-    admin,
-    propertyId,
-    userId: homeownerId,
-    status: "active",
-  });
-
-  await admin.from("property_counterparty_participants").insert({
-    property_id: propertyId,
-    user_id: counterpartyId,
-    counterparty_role: "buyer",
-    granted_via: "join_chain_property",
-    status: "active",
-  });
+  await addBuyerCounterparty(admin, propertyId, counterpartyId);
 
   await admin.from("property_delegates").insert({
     property_id: propertyId,
@@ -399,7 +433,6 @@ async function main() {
   });
 
   await admin.from("property_members").insert([
-    { property_id: propertyId, user_id: homeownerId, role: "seller" },
     { property_id: propertyId, user_id: eaId, role: "estate_agent" },
   ]);
 
@@ -407,12 +440,56 @@ async function main() {
 
   const resolvedRecipient = await getRecipientEmail(admin, propertyId);
   record(
-    "1. Dormancy warning resolves active operational homeowner",
-    resolvedRecipient === homeownerEmail.toLowerCase()
+    "1. Dormancy warning on an unrepresented sale placeholder resolves its dependent side (buyer counterparty)",
+    resolvedRecipient === counterpartyEmail.toLowerCase(),
+    `recipient matches counterparty: ${resolvedRecipient === counterpartyEmail.toLowerCase()}`
   );
+
+  const managedPropertyId = await insertProperty({
+    admin,
+    chainId,
+    chainPosition: 4,
+    address: `${stamp} Managed Lane`,
+    postcode: "E1 1MG",
+    userId: homeownerId,
+  });
+  await addBuyerCounterparty(admin, managedPropertyId, counterpartyId);
+  await setDormancyWarning(admin, managedPropertyId);
+  await upsertOperationalIdentity({
+    admin,
+    propertyId: managedPropertyId,
+    userId: homeownerId,
+    status: "active",
+  });
+  const { data: managedState } = await admin
+    .from("property_lifecycle_states")
+    .select("operational_state, seller_side_unrepresented_since, dormancy_warning_at")
+    .eq("property_id", managedPropertyId)
+    .single();
+  const managedRecipient = await getRecipientEmail(admin, managedPropertyId);
+  let managedSends = 0;
+  await processDormancyWarningNotifications({
+    supabase: admin,
+    sourcePropertyId: managedPropertyId,
+    workerRunId: randomUUID(),
+    sendEmail: async () => {
+      managedSends += 1;
+      return mockSendSuccess()();
+    },
+  });
   record(
-    "2. Counterparty is not treated as homeowner recipient",
-    resolvedRecipient !== counterpartyEmail.toLowerCase()
+    "2. Managed homeowner sale is never warned: representing the seller side returns it to active, with no recipient and no email",
+    managedState?.operational_state === "active" &&
+      managedState?.seller_side_unrepresented_since === null &&
+      managedState?.dormancy_warning_at === null &&
+      managedRecipient === null &&
+      managedSends === 0,
+    JSON.stringify({
+      state: managedState?.operational_state,
+      clock: managedState?.seller_side_unrepresented_since !== null,
+      hasRecipient: managedRecipient !== null,
+      managedSends,
+    })
   );
   record(
     "3. Delegate is not emailed",
@@ -429,17 +506,12 @@ async function main() {
     chainPosition: 2,
     address: `${stamp} Unverified Lane`,
     postcode: "E1 1UV",
-    userId: unverifiedId,
+    userId: homeownerId,
   });
-  await upsertOperationalIdentity({
-    admin,
-    propertyId: unverifiedPropertyId,
-    userId: unverifiedId,
-    status: "active",
-  });
+  await addBuyerCounterparty(admin, unverifiedPropertyId, unverifiedId);
   await setDormancyWarning(admin, unverifiedPropertyId);
   record(
-    "5. Unverified user is not emailed",
+    "5. Unverified dependent-side user is not emailed",
     (await getRecipientEmail(admin, unverifiedPropertyId)) === null
   );
 
@@ -450,12 +522,14 @@ async function main() {
     address: `${stamp} Delinked Lane`,
     postcode: "E1 1DL",
     userId: delinkedId,
+    relationshipType: "purchase",
   });
   await upsertOperationalIdentity({
     admin,
     propertyId: delinkedPropertyId,
     userId: delinkedId,
     status: "delinked",
+    role: "buyer",
   });
   await admin
     .from("property_operational_identities")
@@ -463,7 +537,7 @@ async function main() {
     .eq("property_id", delinkedPropertyId);
   await setDormancyWarning(admin, delinkedPropertyId);
   record(
-    "6. Released/delinked identity is not emailed",
+    "6. Delinked purchase buyer identity is not emailed",
     (await getRecipientEmail(admin, delinkedPropertyId)) === null
   );
 
@@ -562,9 +636,8 @@ async function main() {
   );
 
   const chainStamp = stamp + 1;
-  const { client: ownerAClient, userId: ownerA } = await signUpHomeowner(
-    `dormancy-a-${chainStamp}@example.com`
-  );
+  const buyerAEmail = `dormancy-a-${chainStamp}@example.com`;
+  const { client: ownerAClient, userId: ownerA } = await signUpHomeowner(buyerAEmail);
   const ownerB = await signUpUserIdOnly(`dormancy-b-${chainStamp}@example.com`);
   const ownerC = await signUpUserIdOnly(`dormancy-c-${chainStamp}@example.com`);
   const chainIdWide = await createChain(ownerAClient, chainStamp);
@@ -594,16 +667,14 @@ async function main() {
     userId: ownerC,
   });
 
-  for (const [property, owner] of [
+  // Three unrepresented placeholders in one chain, each with its own buyer
+  // counterparty as dependent side.
+  for (const [property, buyer] of [
     [propertyA, ownerA],
     [propertyB, ownerB],
     [propertyC, ownerC],
   ] as const) {
-    await upsertOperationalIdentity({
-      admin,
-      propertyId: property,
-      userId: owner,
-    });
+    await addBuyerCounterparty(admin, property, buyer);
     await setDormancyWarning(admin, property);
   }
 
@@ -624,11 +695,24 @@ async function main() {
     },
   });
 
+  const { data: peerStates } = await admin
+    .from("property_lifecycle_states")
+    .select("property_id, dormancy_warning_notified_at")
+    .in("property_id", [propertyB, propertyC]);
+
   record(
-    "11. Chain-wide warning resolves each operational homeowner independently",
+    "11. Warning is per row: each placeholder resolves its own dependent side, and processing one row emails only that row's recipient",
     chainRecipients.every(Boolean) &&
-      chainSent.length === 3 &&
-      new Set(chainSent).size === 3
+      new Set(chainRecipients).size === 3 &&
+      chainSent.length === 1 &&
+      chainSent[0]?.toLowerCase() === buyerAEmail.toLowerCase() &&
+      (peerStates ?? []).length === 2 &&
+      (peerStates ?? []).every((row) => row.dormancy_warning_notified_at === null),
+    JSON.stringify({
+      distinctRecipients: new Set(chainRecipients).size,
+      sent: chainSent.length,
+      peersNotified: (peerStates ?? []).filter((row) => row.dormancy_warning_notified_at !== null).length,
+    })
   );
 
   {
@@ -640,7 +724,14 @@ async function main() {
       })
       .eq("property_id", propertyId);
 
-    const { data: confirmResult, error: confirmError } = await homeownerClient.rpc(
+    const { data: outsiderConfirm } = await homeownerClient.rpc(
+      "confirm_transaction_still_active",
+      {
+        p_property_id: propertyId,
+      }
+    );
+
+    const { data: confirmResult, error: confirmError } = await counterpartyClient.rpc(
       "confirm_transaction_still_active",
       {
         p_property_id: propertyId,
@@ -654,11 +745,18 @@ async function main() {
       .single();
 
     record(
-      "13. Confirmation resets notification cycle",
-      !confirmError &&
+      "13. Confirmation by the dependent side resets the notification cycle (a caller outside it is refused)",
+      outsiderConfirm?.ok === false &&
+        outsiderConfirm?.error === "not_authorised" &&
+        !confirmError &&
         confirmResult?.ok === true &&
         afterConfirm?.operational_state === "active" &&
-        afterConfirm?.dormancy_warning_notified_at === null
+        afterConfirm?.dormancy_warning_notified_at === null,
+      JSON.stringify({
+        outsider: outsiderConfirm?.error ?? outsiderConfirm?.ok,
+        confirm: confirmError?.message ?? confirmResult?.error ?? confirmResult?.ok,
+        state: afterConfirm?.operational_state,
+      })
     );
 
     await setDormancyWarning(admin, propertyId);

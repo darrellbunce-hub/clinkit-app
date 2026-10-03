@@ -33,6 +33,7 @@ function getTitle(error: string): string {
     case "already_claimed":
       return "Invitation already used";
     case "email_mismatch":
+    case "property_released":
       return "Invitation not available";
     default:
       return "Invitation invalid";
@@ -51,6 +52,8 @@ function getMessage(error: string): string {
       return "This property has already been connected.";
     case "email_mismatch":
       return "Sign in with the email address your estate agent used for this invitation.";
+    case "property_released":
+      return "This property is no longer available to connect.";
     case "not_authenticated":
       return "Sign in to continue connecting your property.";
     case "homeowner_only":

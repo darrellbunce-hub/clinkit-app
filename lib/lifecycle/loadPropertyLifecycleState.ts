@@ -1,65 +1,50 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import {
-  PROPERTY_OPERATIONAL_STATE,
-  type PropertyLifecycleStateRow,
-  type PropertyOperationalState,
-} from "@/lib/lifecycle/types";
+/**
+ * Dormancy warning status for one property, as the signed-in user may see it
+ * (get_property_lifecycle_status). A warning is only ever reported to a user
+ * on the placeholder's dependent side, who can also confirm it; everyone else
+ * (and every managed row) gets inWarning = false.
+ */
+export type PropertyLifecycleStatus = {
+  inWarning: boolean;
+  canConfirm: boolean;
+  confirmationDeadlineAt: string | null;
+};
 
-export type PropertyLifecycleStateSnapshot = Pick<
-  PropertyLifecycleStateRow,
-  | "operational_state"
-  | "dormancy_warning_at"
-  | "dormancy_confirmation_deadline_at"
-  | "dormancy_warning_notified_at"
-  | "last_still_active_confirmed_at"
->;
+export const NO_LIFECYCLE_WARNING: PropertyLifecycleStatus = {
+  inWarning: false,
+  canConfirm: false,
+  confirmationDeadlineAt: null,
+};
 
-export async function loadPropertyLifecycleState(params: {
+export async function loadPropertyLifecycleStatus(params: {
   supabase: SupabaseClient;
   propertyId: number;
-}): Promise<PropertyLifecycleStateSnapshot | null> {
-  const { data, error } = await params.supabase
-    .from("property_lifecycle_states")
-    .select(
-      "operational_state, dormancy_warning_at, dormancy_confirmation_deadline_at, dormancy_warning_notified_at, last_still_active_confirmed_at"
-    )
-    .eq("property_id", params.propertyId)
-    .maybeSingle();
+}): Promise<PropertyLifecycleStatus> {
+  const { data, error } = await params.supabase.rpc(
+    "get_property_lifecycle_status",
+    { p_property_id: params.propertyId }
+  );
 
   if (error) {
     throw new Error(error.message);
   }
 
-  if (!data) {
-    return null;
+  const payload = data as {
+    ok?: boolean;
+    in_warning?: boolean;
+    can_confirm?: boolean;
+    confirmation_deadline_at?: string | null;
+  } | null;
+
+  if (!payload?.ok || !payload.in_warning) {
+    return NO_LIFECYCLE_WARNING;
   }
 
-  return data as PropertyLifecycleStateSnapshot;
-}
-
-export function resolveEffectiveOperationalState(
-  snapshot: PropertyLifecycleStateSnapshot | null
-): PropertyOperationalState {
-  return snapshot?.operational_state ?? PROPERTY_OPERATIONAL_STATE.active;
-}
-
-export async function isActiveOperationalHomeowner(params: {
-  supabase: SupabaseClient;
-  propertyId: number;
-  userId: string;
-}): Promise<boolean> {
-  const { data, error } = await params.supabase
-    .from("property_operational_identities")
-    .select("property_id")
-    .eq("property_id", params.propertyId)
-    .eq("homeowner_user_id", params.userId)
-    .eq("status", "active")
-    .maybeSingle();
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  return Boolean(data);
+  return {
+    inWarning: true,
+    canConfirm: payload.can_confirm === true,
+    confirmationDeadlineAt: payload.confirmation_deadline_at ?? null,
+  };
 }

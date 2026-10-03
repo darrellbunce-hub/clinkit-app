@@ -387,16 +387,17 @@ async function main() {
     .eq("id", salePropertyId);
 
   const purchasePropertyId = await insertProperty({
-    client: buyer.client,
+    client: admin,
     chainId: sharedChainId,
     chainPosition: 2,
     userId: buyer.userId,
     stamp,
     label: "Shared Purchase",
   });
-  await establishOperationalHomeowner(buyer.client, {
-    propertyId: purchasePropertyId,
-    grantedVia: OPERATIONAL_IDENTITY_GRANT_VIA.startMove,
+  await admin.rpc("_establish_operational_homeowner_core", {
+    p_property_id: purchasePropertyId,
+    p_homeowner_user_id: buyer.userId,
+    p_granted_via: OPERATIONAL_IDENTITY_GRANT_VIA.startMove,
   });
 
   const sharedReport = (await generateErasureImpactReport({

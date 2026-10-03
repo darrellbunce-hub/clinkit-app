@@ -23,6 +23,7 @@ import {
   sortActionRequiredSummaries,
   sortManagedPropertySummaries,
 } from "@/lib/estateAgent/commandCentrePresentation";
+import { listReconnectableProperties } from "@/lib/estateAgent/reconnectReturningBranch";
 import { buildOperationalBriefModel } from "@/lib/estateAgent/workspacePresentation";
 import { BTN_PRIMARY_SM_CLASS } from "@/lib/theme/themeTokens";
 import { supabase } from "@/lib/supabase";
@@ -36,6 +37,8 @@ export default function AgentCommandCentre({
     useState<AgentBranchPropertySummary[]>([]);
   const [isLoading, setIsLoading] =
     useState(true);
+  const [reconnectableCount, setReconnectableCount] =
+    useState(0);
 
   async function reloadSummaries() {
     const rows =
@@ -49,6 +52,14 @@ export default function AgentCommandCentre({
 
   useEffect(() => {
     void reloadSummaries();
+
+    void listReconnectableProperties(supabase).then(
+      (result) => {
+        setReconnectableCount(
+          result.ok ? result.properties.length : 0
+        );
+      }
+    );
   }, []);
 
   const activeSummaries = useMemo(
@@ -127,6 +138,23 @@ export default function AgentCommandCentre({
           Add Managed Property
         </Link>
       </header>
+
+      {reconnectableCount > 0 ? (
+        <div className="flex flex-col gap-3 rounded-2xl bg-surface-card px-5 py-4 shadow-sm ring-1 ring-surface-card-border sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-text-charcoal">
+            {reconnectableCount === 1
+              ? "A property your branch represented is no longer represented after the homeowner left MoveLoop."
+              : `${reconnectableCount} properties your branch represented are no longer represented after the homeowner left MoveLoop.`}
+          </p>
+
+          <Link
+            href={ROUTES.agentReconnect}
+            className="shrink-0 text-sm font-semibold text-brand-primary underline"
+          >
+            Review and reconnect
+          </Link>
+        </div>
+      ) : null}
 
       <OperationalBriefSection
         brief={operationalBrief}

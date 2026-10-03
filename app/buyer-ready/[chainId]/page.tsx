@@ -6,6 +6,7 @@ import Navbar from "@/components/Navbar";
 import OperationalContextStrip from "@/components/operational/OperationalContextStrip";
 import OperationalManagerBanner from "@/components/operational/OperationalManagerBanner";
 import WorkflowReadOnlyBanner from "@/components/WorkflowReadOnlyBanner";
+import ChainLifecycleDormancySection from "@/components/lifecycle/ChainLifecycleDormancySection";
 import { useOperationalWorkspaceLabels } from "@/hooks/useOperationalWorkspaceLabels";
 import {
   CARD_PADDING_CLASS,
@@ -91,6 +92,7 @@ type BuyerReadyActivity = {
 type BuyerReadyChainNode = {
   id: number;
   chain_id: number;
+  user_id?: string | null;
   linked_property_id?: number | null;
   stage?: string;
   status?: string;
@@ -144,7 +146,7 @@ function activityUpdaterBadgeClass(
 
 export default function BuyerReadyPage() {
   type SectionFeedback = {
-    section: "status" | "update";
+    section: "status" | "update" | "lifecycle";
     variant: "success" | "warning";
     message: string;
   };
@@ -805,6 +807,25 @@ export default function BuyerReadyPage() {
             message={access.bannerMessage}
           />
         )}
+
+        {renderSectionAlert("lifecycle")}
+
+        <ChainLifecycleDormancySection
+          linkedPropertyId={
+            currentUserId &&
+            workflowNode.user_id === currentUserId
+              ? workflowNode.linked_property_id ?? null
+              : null
+          }
+          onConfirmed={refreshParticipantData}
+          onSuccessMessage={(message) =>
+            showSectionFeedback({
+              section: "lifecycle",
+              variant: "success",
+              message,
+            })
+          }
+        />
 
         {!isCompletedCompletionMode && (
           <div

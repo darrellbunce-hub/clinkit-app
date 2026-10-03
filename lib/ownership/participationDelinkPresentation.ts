@@ -18,9 +18,10 @@ export function getParticipationDelinkConfirmationCopy(
       return {
         title: "Leave this transaction?",
         body:
-          "You will be removed as the operational homeowner on this property. " +
-          "Delegates will be revoked, the property will be released for future use, " +
-          "and chain participants will be notified. Transaction history and analytics are retained.",
+          "You will be removed from this property and your delegates will be revoked. " +
+          "If an estate agent manages it, they continue to manage it. Otherwise it stays in the chain " +
+          "waiting for its seller, unless you choose \"wrong property\" and nobody else depends on it: " +
+          "then it is released. Chain participants will be notified. Transaction history and analytics are retained.",
         confirmLabel: "Leave transaction",
         destructive: true,
       };
@@ -40,7 +41,10 @@ export function getParticipationDelinkConfirmationCopy(
         title: "Release branch management?",
         body:
           "Your branch will no longer manage this property operationally. " +
-          "The homeowner (if present) retains their participation.",
+          "The homeowner (if present) retains their participation. " +
+          "With no homeowner connected, the property stays in the chain waiting for its seller; " +
+          "it is released straight away only if you choose \"added by mistake\" or " +
+          "\"duplicate property\" and nobody else depends on it.",
         confirmLabel: "Release management",
         destructive: true,
       };
@@ -65,15 +69,40 @@ export function getParticipationDelinkConfirmationCopy(
   }
 }
 
+export type ParticipationDelinkOutcome = {
+  lifecycleState?: string;
+  eaRetained?: boolean;
+  placeholder?: boolean;
+};
+
 export function getParticipationDelinkSuccessMessage(
-  operation: ParticipationDelinkOperation
+  operation: ParticipationDelinkOperation,
+  outcome: ParticipationDelinkOutcome = {}
 ): string {
+  const released = outcome.lifecycleState === "released";
+
   switch (operation) {
     case PARTICIPATION_DELINK_OPERATION.homeownerSelf:
-      return "You have left this transaction. The property has been released.";
+      if (released) {
+        return "You have left this transaction. The property has been released.";
+      }
+
+      if (outcome.eaRetained) {
+        return "You have left this transaction. The estate agent continues to manage the property.";
+      }
+
+      return "You have left this transaction. The property stays in the chain for the other participants.";
     case PARTICIPATION_DELINK_OPERATION.homeownerRemoveEa:
       return "Estate agent removed from this property.";
     case PARTICIPATION_DELINK_OPERATION.estateAgentRemoveBranch:
+      if (released) {
+        return "Branch management released. The property has been released.";
+      }
+
+      if (outcome.placeholder) {
+        return "Branch management released. The property stays in the chain until its seller connects.";
+      }
+
       return "Branch management released.";
     case PARTICIPATION_DELINK_OPERATION.estateAgentRemoveHomeowner:
       return "Homeowner association withdrawn. You can send a new invitation.";

@@ -1,3 +1,7 @@
+import {
+  STALE_DAYS_CONFIDENCE,
+  STALE_DAYS_PAGE_ALERT,
+} from "@/lib/activityIntelligence";
 import { CHAIN_INTELLIGENCE_CONFIG } from "@/lib/chainIntelligence/config";
 
 export type TimingZone =
@@ -112,4 +116,63 @@ export function computeNextRecalculationAt(params: {
     (params.expectedMaxDays + graceDays) * 24 * 60 * 60 * 1000;
 
   return new Date(boundaryMs).toISOString();
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Days after the latest activity at which staleness flips (both thresholds
+ * are strict "greater than" on whole days).
+ */
+export const STALENESS_RECALCULATION_OFFSETS_DAYS = [
+  STALE_DAYS_PAGE_ALERT + 1,
+  STALE_DAYS_CONFIDENCE + 1,
+] as const;
+
+export function computeStalenessRecalculationCandidates(
+  latestActivityAt: string | null | undefined
+): string[] {
+  if (!latestActivityAt) {
+    return [];
+  }
+
+  const latestMs = new Date(latestActivityAt).getTime();
+
+  if (Number.isNaN(latestMs)) {
+    return [];
+  }
+
+  return STALENESS_RECALCULATION_OFFSETS_DAYS.map((days) =>
+    new Date(latestMs + days * DAY_MS).toISOString()
+  );
+}
+
+/**
+ * Earliest candidate strictly after the reference date; one day after it when
+ * every candidate has passed, so a due chain is never left permanently due.
+ */
+export function selectNextRecalculationAt(
+  candidates: Array<string | null | undefined>,
+  referenceDate: Date = new Date()
+): string {
+  const referenceMs = referenceDate.getTime();
+  let earliest: number | null = null;
+
+  for (const candidate of candidates) {
+    if (!candidate) {
+      continue;
+    }
+
+    const ms = new Date(candidate).getTime();
+
+    if (
+      !Number.isNaN(ms) &&
+      ms > referenceMs &&
+      (earliest === null || ms < earliest)
+    ) {
+      earliest = ms;
+    }
+  }
+
+  return new Date(earliest ?? referenceMs + DAY_MS).toISOString();
 }

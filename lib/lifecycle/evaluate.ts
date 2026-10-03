@@ -69,6 +69,8 @@ export function createDefaultLifecycleContext(
     daysSinceChainCompleted: null,
     hasActiveOperationalIdentity: false,
     hasMeaningfulParticipation: false,
+    hasActiveCounterparty: false,
+    hasActiveEaAssignment: false,
     hasAnalyticsSnapshot: false,
     manuallyReleased: false,
     addressReserved: true,

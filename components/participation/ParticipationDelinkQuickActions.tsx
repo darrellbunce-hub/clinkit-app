@@ -91,7 +91,7 @@ export default function ParticipationDelinkQuickActions({
 
     return {
       ok: true,
-      message: getParticipationDelinkSuccessMessage(pendingOperation),
+      message: getParticipationDelinkSuccessMessage(pendingOperation, data),
     };
   }
 
