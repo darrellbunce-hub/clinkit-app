@@ -14,6 +14,7 @@ import { join } from "path";
 const ROOT = join(import.meta.dirname, "..");
 const MIGRATIONS = join(ROOT, "supabase", "migrations");
 const FILE = "20261005160000_drop_properties_address_match_key_idx.sql";
+const LATER_MIGRATIONS = ["20261005170000_dashboard_genuine_last_update.sql"];
 
 type TestResult = { name: string; pass: boolean; detail?: string };
 const results: TestResult[] = [];
@@ -38,9 +39,11 @@ function main() {
   );
 
   record(
-    "Ordered after 20261005150000 and the last migration",
+    "Ordered after 20261005150000; followed only by known later migrations",
     files.indexOf(FILE) > files.indexOf("20261005150000_dashboard_last_update_at.sql") &&
-      files[files.length - 1] === FILE
+      files
+        .slice(files.indexOf(FILE) + 1)
+        .every((file) => LATER_MIGRATIONS.includes(file))
   );
   record(
     "The index it drops is the one 20261005120000 creates on the service_role-only helpers",

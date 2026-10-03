@@ -16,6 +16,16 @@ function assert(condition: boolean, message: string) {
   }
 }
 
+function londonNoonDaysAgo(days: number): string {
+  const [year, month, day] = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/London",
+  })
+    .format(new Date())
+    .split("-")
+    .map(Number);
+  return new Date(Date.UTC(year, month - 1, day - days, 12)).toISOString();
+}
+
 function summary(
   overrides: Partial<AgentBranchPropertySummary> &
     Pick<
@@ -113,7 +123,7 @@ function testPrimaryActionReason() {
       claim_status: "unclaimed",
       invitation_lifecycle_status:
         "awaiting_claim",
-      days_since_last_update: 18,
+      last_update_at: londonNoonDaysAgo(18),
       operational_alerts: [
         { code: "stale_update", severity: "warning" },
       ],
@@ -134,7 +144,7 @@ function testPrimaryActionReason() {
       claim_status: "unclaimed",
       invitation_lifecycle_status:
         "invitation_deferred",
-      days_since_last_update: 18,
+      last_update_at: londonNoonDaysAgo(18),
       operational_alerts: [
         { code: "stale_update", severity: "warning" },
       ],

@@ -157,10 +157,13 @@ function main() {
     }) && read("lib/lifecycle/dormancyScenarios.ts").includes("placeholderActivityAt")
   );
   record(
-    "Dashboard Last updated comes from activity rows (summary last_update_at), not the touch",
-    read("lib/operationalSummary/derivePropertySummary.ts").includes("last_update_at: getLatestActivityTimestamp([") &&
+    "Dashboard Last updated comes from genuine activity rows (view, 20261005170000), not the touch",
+    read("supabase/migrations/20261005170000_dashboard_genuine_last_update.sql").includes(
+      "public.is_genuine_property_activity(a.update, a.updated_by)"
+    ) &&
       !read("lib/operationalSummary/derivePropertySummary.ts").includes("last_operational_activity_at") &&
-      !read("supabase/migrations/20261005150000_dashboard_last_update_at.sql").includes("last_operational_activity_at")
+      !read("supabase/migrations/20261005150000_dashboard_last_update_at.sql").includes("last_operational_activity_at") &&
+      !read("supabase/migrations/20261005170000_dashboard_genuine_last_update.sql").includes("last_operational_activity_at")
   );
   record(
     "Chain-level reads prefer the chains row (peer timestamps were never needed for them)",

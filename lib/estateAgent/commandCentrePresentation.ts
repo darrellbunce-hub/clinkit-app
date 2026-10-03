@@ -221,10 +221,7 @@ export function sortActionRequiredSummaries(
       return rightWarning - leftWarning;
     }
 
-    return (
-      (resolveDaysSinceLastUpdate(right) ?? 0) -
-      (resolveDaysSinceLastUpdate(left) ?? 0)
-    );
+    return compareLeastRecentlyUpdatedFirst(left, right);
   });
 }
 
@@ -258,16 +255,7 @@ export function sortManagedPropertySummaries(
       return left.needs_attention ? -1 : 1;
     }
 
-    const leftDays =
-      resolveDaysSinceLastUpdate(left) ?? 0;
-    const rightDays =
-      resolveDaysSinceLastUpdate(right) ?? 0;
-
-    if (leftDays !== rightDays) {
-      return rightDays - leftDays;
-    }
-
-    return 0;
+    return compareLeastRecentlyUpdatedFirst(left, right);
   });
 }
 
@@ -495,35 +483,70 @@ export function formatHealthLabel(
 
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
+const LONDON_CALENDAR_DATE = new Intl.DateTimeFormat(
+  "en-GB",
+  {
+    timeZone: "Europe/London",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }
+);
+
+function londonCalendarDayNumber(date: Date): number {
+  const parts = LONDON_CALENDAR_DATE.formatToParts(date);
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((entry) => entry.type === type)?.value);
+
+  return (
+    Date.UTC(part("year"), part("month") - 1, part("day")) /
+    MS_PER_DAY
+  );
+}
+
 /**
- * Whole days since the latest genuine property activity. Derived from
- * last_update_at at read time so a summary recalculation never moves it;
- * falls back to the stored count when the timestamp is absent.
+ * Europe/London calendar days since the latest genuine property activity
+ * (last_update_at, derived from activity history by the dashboard view).
+ * Null when the property has no genuine activity.
  */
 export function resolveDaysSinceLastUpdate(
-  summary: Pick<
-    AgentBranchPropertySummary,
-    "last_update_at" | "days_since_last_update"
-  >,
+  summary: Pick<AgentBranchPropertySummary, "last_update_at">,
   referenceDate: Date = new Date()
 ): number | null {
-  if (summary.last_update_at) {
-    const updatedAt = new Date(
-      summary.last_update_at
-    ).getTime();
-
-    if (!Number.isNaN(updatedAt)) {
-      return Math.max(
-        0,
-        Math.floor(
-          (referenceDate.getTime() - updatedAt) /
-            MS_PER_DAY
-        )
-      );
-    }
+  if (!summary.last_update_at) {
+    return null;
   }
 
-  return summary.days_since_last_update ?? null;
+  const updatedAt = new Date(summary.last_update_at);
+
+  if (Number.isNaN(updatedAt.getTime())) {
+    return null;
+  }
+
+  return Math.max(
+    0,
+    londonCalendarDayNumber(referenceDate) -
+      londonCalendarDayNumber(updatedAt)
+  );
+}
+
+/** Sort comparator: least recently updated first; no genuine activity sorts oldest. */
+export function compareLeastRecentlyUpdatedFirst(
+  left: Pick<AgentBranchPropertySummary, "last_update_at">,
+  right: Pick<AgentBranchPropertySummary, "last_update_at">
+): number {
+  const leftDays =
+    resolveDaysSinceLastUpdate(left) ??
+    Number.POSITIVE_INFINITY;
+  const rightDays =
+    resolveDaysSinceLastUpdate(right) ??
+    Number.POSITIVE_INFINITY;
+
+  if (leftDays === rightDays) {
+    return 0;
+  }
+
+  return leftDays > rightDays ? -1 : 1;
 }
 
 export function formatDaysSinceLastUpdate(

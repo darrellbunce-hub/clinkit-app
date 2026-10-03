@@ -60,6 +60,7 @@ const LATER_MIGRATIONS = [
   "20261005140000_reservation_placeholders_awaiting_seller.sql",
   "20261005150000_dashboard_last_update_at.sql",
   "20261005160000_drop_properties_address_match_key_idx.sql",
+  "20261005170000_dashboard_genuine_last_update.sql",
 ];
 
 type TestResult = { name: string; pass: boolean; detail?: string };
