@@ -21,12 +21,16 @@ import DuplicatePropertyDialog, {
 import PropertyAddressLookup from "@/components/address/PropertyAddressLookup";
 import { formatUkPostcodeForStorage } from "@/lib/address/normalize";
 import { checkStartMoveAddress } from "@/lib/onboarding/addressReservation";
+import {
+  buildJoinExistingChainHref,
+  resolveBuyingAwaitingConnectionAction,
+} from "@/lib/onboarding/joinChainIntent";
 
 type PendingDuplicateAction =
   /** The caller's own chain already holds the address. */
   | { kind: "open_chain"; chainId: number | null }
   /** Join without a source chain (nothing created yet). */
-  | { kind: "join" }
+  | { kind: "join"; notSelling: boolean }
   /** Create the caller's sale first, then join carrying it across. */
   | { kind: "join_after_sale" }
   /** A source chain was already created; Join Chain migrates and removes it. */
@@ -84,23 +88,14 @@ export default function StartMovePage() {
     useState("");
 
     function redirectToJoinExistingChain(
-      chainId: number | null
+      chainId: number | null,
+      options: { notSelling?: boolean } = {}
     ) {
-      const joinParams = new URLSearchParams();
-
-      if (chainId != null) {
-        joinParams.set("sourceChain", String(chainId));
-      }
-
-      if (searchingForProperty) {
-        joinParams.set("searching", "1");
-      }
-
-      const query = joinParams.toString();
-
-      window.location.href = query
-        ? `/join-chain?${query}`
-        : "/join-chain";
+      window.location.href = buildJoinExistingChainHref({
+        sourceChainId: chainId,
+        searching: searchingForProperty,
+        notSelling: options.notSelling === true,
+      });
     }
 
     function openDuplicateDialog(
@@ -164,7 +159,10 @@ export default function StartMovePage() {
         }
 
         if (selling.state === "awaiting_connection") {
-          openDuplicateDialog("awaiting_seller", { kind: "join" });
+          openDuplicateDialog("awaiting_seller", {
+            kind: "join",
+            notSelling: false,
+          });
           return true;
         }
 
@@ -197,9 +195,9 @@ export default function StartMovePage() {
         if (buying.state === "awaiting_connection") {
           openDuplicateDialog(
             "awaiting_buyer",
-            hasSellingAddress()
-              ? { kind: "join_after_sale" }
-              : { kind: "join" }
+            resolveBuyingAwaitingConnectionAction({
+              hasSellingAddress: hasSellingAddress(),
+            })
           );
           return true;
         }
@@ -781,7 +779,9 @@ export default function StartMovePage() {
                 ? `/chain/${action.chainId}`
                 : "/my-chains";
           } else if (action.kind === "join") {
-            redirectToJoinExistingChain(null);
+            redirectToJoinExistingChain(null, {
+              notSelling: action.notSelling,
+            });
           } else if (action.kind === "join_source_chain") {
             redirectToJoinExistingChain(action.chainId);
           } else if (action.kind === "join_after_sale") {

@@ -259,8 +259,8 @@ assert(
   )
 );
 
-assert(
-  "If host sale buyer_connected were true, Awaiting Buyer would disappear",
+assertEqual(
+  "If host sale buyer_connected were true, Awaiting Buyer gives way to Connected Buyer (no buyer row links in)",
   resolveUpstreamPurchaserState({
     operationalSalePropertyId: 31,
     chainProperties: [
@@ -268,7 +268,8 @@ assert(
       { id: 32, buyer_connected: true },
     ],
     buyerReadyForAnchor: null,
-  }) === null
+  }),
+  { kind: "connected_buyer", anchorPropertyId: 31 }
 );
 
 // ---------------------------------------------------------------------------
@@ -395,7 +396,7 @@ assert(
 );
 
 assertEqual(
-  "User A labels: Awaiting Buyer / Your Sale / Connected Purchase / Next Home Search",
+  "User A labels: Awaiting Buyer / Your Sale / Your Purchase / Seller's Next Home Search (36 is B's search)",
   [
     CHAIN_TILE_LABEL.awaitingBuyer,
     getChainTileDisplayTitle(userACuckoo2, true),
@@ -405,8 +406,8 @@ assertEqual(
   [
     CHAIN_TILE_LABEL.awaitingBuyer,
     CHAIN_TILE_LABEL.yourSale,
-    CHAIN_TILE_LABEL.connectedPurchase,
-    CHAIN_TILE_LABEL.nextHomeSearch,
+    CHAIN_TILE_LABEL.yourPurchase,
+    CHAIN_TILE_LABEL.sellerNextHomeSearch,
   ]
 );
 

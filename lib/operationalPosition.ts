@@ -350,9 +350,12 @@ export const CHAIN_TILE_LABEL = {
   awaitingBuyer: "Awaiting Buyer",
   buyerReady: "Buyer Ready",
   yourSale: "Your Sale",
+  yourPurchase: "Your Purchase",
   connectedBuyer: "Connected Buyer",
   connectedPurchase: "Connected Purchase",
   nextHomeSearch: "Next Home Search",
+  /** Another participant's onward search, seen by everyone in the chain. */
+  sellerNextHomeSearch: "Seller's Next Home Search",
   /** @deprecated Use connectedBuyer */
   connectedSale: "Connected Buyer",
 } as const;
@@ -401,6 +404,51 @@ export function isPrimaryHomeownerProperty(
   }
 
   return false;
+}
+
+function isHomeownerLabelOwnProperty(
+  property: HomeownerPropertyLabelInput
+): boolean {
+  return (
+    property.isOwnProperty ??
+    property.is_own_property ??
+    false
+  );
+}
+
+/**
+ * The viewer is buying this row: buyer on someone's sale, or buyer of their
+ * own purchase. Relative label only — membership never grants authority.
+ */
+export function isViewerPurchaseProperty(
+  property: HomeownerPropertyLabelInput
+): boolean {
+  return (
+    !isSearchingPlaceholder(property) &&
+    property.currentUserRole === "buyer"
+  );
+}
+
+/**
+ * The viewer's own onward search. Every participant sees every placeholder;
+ * ownership only changes the label.
+ */
+export function isViewerSearchingPlaceholder(
+  property: HomeownerPropertyLabelInput
+): boolean {
+  return (
+    isSearchingPlaceholder(property) &&
+    (property.currentUserRole === "buyer" ||
+      isHomeownerLabelOwnProperty(property))
+  );
+}
+
+export function getSearchingPlaceholderLabel(
+  property: HomeownerPropertyLabelInput
+): string {
+  return isViewerSearchingPlaceholder(property)
+    ? CHAIN_TILE_LABEL.nextHomeSearch
+    : CHAIN_TILE_LABEL.sellerNextHomeSearch;
 }
 
 export function shouldShowHomeownerAddress(
@@ -533,7 +581,7 @@ export function getHomeownerPropertyLabel(
   context: HomeownerPropertyLabelContext
 ): string {
   if (isSearchingPlaceholder(property)) {
-    return CHAIN_TILE_LABEL.nextHomeSearch;
+    return getSearchingPlaceholderLabel(property);
   }
 
   if (
@@ -541,6 +589,12 @@ export function getHomeownerPropertyLabel(
     context.isOperationalPosition
   ) {
     return CHAIN_TILE_LABEL.yourSale;
+  }
+
+  if (isViewerPurchaseProperty(property)) {
+    return context.surface !== "chain" && property.address
+      ? `${CHAIN_TILE_LABEL.yourPurchase} — ${property.address}`
+      : CHAIN_TILE_LABEL.yourPurchase;
   }
 
   if (shouldShowHomeownerAddress(property, context)) {
@@ -587,7 +641,7 @@ export function getPropertyPageHeadline(
   }
 
   if (isSearchingPlaceholder(property)) {
-    return CHAIN_TILE_LABEL.nextHomeSearch;
+    return getSearchingPlaceholderLabel(property);
   }
 
   return getHomeownerPropertyLabel(property, {
@@ -618,7 +672,13 @@ export function getPropertyPageSubtitle(
   }
 
   if (isSearchingPlaceholder(property)) {
-    return "Your onward home has not been chosen yet.";
+    return isViewerSearchingPlaceholder(property)
+      ? "Your onward home has not been chosen yet."
+      : "The seller's onward home has not been chosen yet.";
+  }
+
+  if (isViewerPurchaseProperty(property)) {
+    return "This is your purchase in the chain.";
   }
 
   if (isPrimaryHomeownerProperty(property)) {
@@ -678,6 +738,8 @@ export function getDashboardChainTitle(
       chainPosition?: number;
       chain_position?: number;
       currentUserRole?: string | null;
+      isOwnProperty?: boolean;
+      is_own_property?: boolean;
     }
   >,
   operationalPropertyId?: number | null
@@ -688,14 +750,37 @@ export function getDashboardChainTitle(
       Number(chainId)
   );
 
-  if (operationalPropertyId != null) {
+  const resolvedOperationalPropertyId =
+    operationalPropertyId !== undefined
+      ? operationalPropertyId
+      : resolveOperationalSalePropertyId(
+          chainId,
+          chainProperties.map((property) => ({
+            ...property,
+            id: property.id ?? -1,
+            chainId: Number(chainId),
+            linked_property_id: null,
+            members: [],
+          })) as OperationalProperty[]
+        );
+
+  if (resolvedOperationalPropertyId != null) {
     const operationalProperty = chainProperties.find(
-      (property) => property.id === operationalPropertyId
+      (property) => property.id === resolvedOperationalPropertyId
     );
 
     if (operationalProperty?.address) {
       return operationalProperty.address;
     }
+  }
+
+  const viewerPurchase = chainProperties.find(
+    (property) =>
+      isViewerPurchaseProperty(property) && property.address
+  );
+
+  if (viewerPurchase?.address) {
+    return viewerPurchase.address;
   }
 
   return `Property chain`;
@@ -709,6 +794,33 @@ export function getChainTileDisplayTitle(
     surface: "chain",
     isOperationalPosition,
   });
+}
+
+/**
+ * Chain page / composed tile title for a property row. The viewer's own Buyer
+ * Ready step points at the property they are buying.
+ */
+export function resolveChainPropertyTileTitle(
+  property: HomeownerPropertyLabelInput,
+  context: {
+    isOperationalPosition: boolean;
+    ownerBuyerReadyLinkedPropertyId?: number | null;
+  }
+): string {
+  if (
+    context.ownerBuyerReadyLinkedPropertyId != null &&
+    property.id != null &&
+    Number(property.id) ===
+      Number(context.ownerBuyerReadyLinkedPropertyId) &&
+    !isSearchingPlaceholder(property)
+  ) {
+    return CHAIN_TILE_LABEL.yourPurchase;
+  }
+
+  return getChainTileDisplayTitle(
+    property,
+    context.isOperationalPosition
+  );
 }
 
 export function isOperationalSaleProperty(

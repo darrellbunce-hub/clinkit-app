@@ -361,13 +361,13 @@ const tilesB = composeChainTiles({
 });
 
 assertEqual(
-  "A/B — User A rendered tiles",
+  "A/B — User A rendered tiles (own purchase + B's search, relative labels)",
   composedTileLabels(tilesA),
   [
     CHAIN_TILE_LABEL.awaitingBuyer,
     CHAIN_TILE_LABEL.yourSale,
-    CHAIN_TILE_LABEL.connectedPurchase,
-    CHAIN_TILE_LABEL.nextHomeSearch,
+    CHAIN_TILE_LABEL.yourPurchase,
+    CHAIN_TILE_LABEL.sellerNextHomeSearch,
   ]
 );
 
@@ -501,14 +501,22 @@ for (const spec of viewerSpecs) {
     yourSaleCount === 1
   );
 
+  const expectedSearchLabel = membership.owned.some(
+    (owned) => owned.id === LENGTH
+  )
+    ? CHAIN_TILE_LABEL.nextHomeSearch
+    : CHAIN_TILE_LABEL.sellerNextHomeSearch;
+  const searchTiles = tiles.filter(
+    (tile) =>
+      tile.label === CHAIN_TILE_LABEL.nextHomeSearch ||
+      tile.label === CHAIN_TILE_LABEL.sellerNextHomeSearch
+  );
   assert(
-    `${spec.name} — Next Home Search present at end`,
-    tiles.some(
-      (tile) =>
-        tile.kind === "property" &&
-        tile.anchorPropertyId === LENGTH &&
-        tile.label === CHAIN_TILE_LABEL.nextHomeSearch
-    )
+    `${spec.name} — searching placeholder shown once at end, labelled relative to viewer`,
+    searchTiles.length === 1 &&
+      searchTiles[0].kind === "property" &&
+      searchTiles[0].anchorPropertyId === LENGTH &&
+      searchTiles[0].label === expectedSearchLabel
   );
 
   const foreignAddresses = longChain

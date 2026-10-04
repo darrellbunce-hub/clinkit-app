@@ -126,16 +126,22 @@ const eaAssignments: EstateAgentOperationalAssignment[] = [
 
 const eaParticipantView: OperationalProperty[] = [
   participantProperty({
+    id: 700,
+    relationship_type: "purchase",
+    chainPosition: 1,
+    linked_property_id: 701,
+  }),
+  participantProperty({
     id: 701,
     relationship_type: "sale",
     chainPosition: 2,
     address: "10 Seller Street",
+    linked_property_id: 702,
   }),
   participantProperty({
     id: 702,
     relationship_type: "purchase",
     chainPosition: 3,
-    linked_property_id: 701,
   }),
 ];
 
@@ -179,6 +185,12 @@ assertEqual(
   eaScopedProperties.find((property) => property.id === 702)
     ?.currentUserRole,
   "buyer"
+);
+assertEqual(
+  "applyOperationalSubjectLens — upstream purchase linking into the sale is not the subject's",
+  eaScopedProperties.find((property) => property.id === 700)
+    ?.currentUserRole,
+  null
 );
 
 const eaPosition = resolveSubjectOperationalPosition({

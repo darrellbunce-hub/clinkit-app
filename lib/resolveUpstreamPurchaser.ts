@@ -9,7 +9,8 @@ import type { ChainNodesChainSummary } from "@/lib/chainNodesSummary";
  *
  * Phase 1: Awaiting Buyer (render-time).
  * Phase 2: Buyer Ready (chain_nodes summary anchored to that property).
- * Phase 3: Connected Buyer (future).
+ * Phase 3: Connected Buyer — a joined buyer with neither a Buyer Ready step nor
+ * an onward sale of their own linked into this property.
  */
 
 export type UpstreamPurchaserAwaitingBuyer = {
@@ -23,9 +24,15 @@ export type UpstreamPurchaserBuyerReady = {
   summary: ChainNodesChainSummary;
 };
 
+export type UpstreamPurchaserConnectedBuyer = {
+  kind: "connected_buyer";
+  anchorPropertyId: number;
+};
+
 export type UpstreamPurchaserState =
   | UpstreamPurchaserAwaitingBuyer
   | UpstreamPurchaserBuyerReady
+  | UpstreamPurchaserConnectedBuyer
   | null;
 
 export type UpstreamPurchaserAnchorProperty = {
@@ -34,6 +41,7 @@ export type UpstreamPurchaserAnchorProperty = {
   relationship_type?: string | null;
   stage?: string | null;
   address?: string | null;
+  linked_property_id?: number | null;
 };
 
 export type ResolvePurchaserStateForPropertyParams = {
@@ -48,9 +56,10 @@ export type ResolvePurchaserStateForPropertyParams = {
  * Precedence:
  * 1. eligible sale with buyer_connected === false → Awaiting Buyer
  * 2. buyer_connected === true + buyer_ready summary for this property → Buyer Ready
- * 3. else → null
+ * 3. buyer_connected === true + no property linked into it → Connected Buyer
+ * 4. else → null (the buyer's own sale renders upstream)
  *
- * Searching placeholders never receive Awaiting Buyer / Buyer Ready tiles.
+ * Searching placeholders never receive purchaser tiles.
  */
 export function resolvePurchaserStateForProperty(
   params: ResolvePurchaserStateForPropertyParams
@@ -90,6 +99,17 @@ export function resolvePurchaserStateForProperty(
       kind: "buyer_ready",
       anchorPropertyId: propertyId,
       summary: buyerReadyForAnchor,
+    };
+  }
+
+  const buyerSaleLinksIn = chainProperties.some(
+    (property) => property.linked_property_id === propertyId
+  );
+
+  if (!buyerSaleLinksIn) {
+    return {
+      kind: "connected_buyer",
+      anchorPropertyId: propertyId,
     };
   }
 
@@ -189,14 +209,57 @@ export function shouldRenderUpstreamPurchaserBeforeProperty(
     return false;
   }
 
+  return upstreamPurchaser.anchorPropertyId === propertyId;
+}
+
+export type ResolveRenderedUpstreamPurchaserParams = {
+  upstreamPurchaser: UpstreamPurchaserState;
+  propertyId: number;
+  /** Viewer's own Buyer Ready node, already rendered as the operational prefix. */
+  ownerBuyerReadyNodeId?: number | null;
+  /** Viewer holds the buyer role on this property ("Your Purchase"). */
+  viewerIsAnchorBuyer?: boolean;
+};
+
+/**
+ * Purchaser synthetic to draw before a property for this viewer. Labels and
+ * de-duplication only — the underlying purchaser state is the same for all.
+ */
+export function resolveRenderedUpstreamPurchaser(
+  params: ResolveRenderedUpstreamPurchaserParams
+): UpstreamPurchaserState {
+  const {
+    upstreamPurchaser,
+    propertyId,
+    ownerBuyerReadyNodeId = null,
+    viewerIsAnchorBuyer = false,
+  } = params;
+
   if (
-    upstreamPurchaser.kind === "awaiting_buyer" ||
-    upstreamPurchaser.kind === "buyer_ready"
+    !shouldRenderUpstreamPurchaserBeforeProperty(
+      upstreamPurchaser,
+      propertyId
+    )
   ) {
-    return upstreamPurchaser.anchorPropertyId === propertyId;
+    return null;
   }
 
-  return false;
+  if (
+    upstreamPurchaser?.kind === "buyer_ready" &&
+    ownerBuyerReadyNodeId != null &&
+    upstreamPurchaser.summary.id === ownerBuyerReadyNodeId
+  ) {
+    return null;
+  }
+
+  if (
+    upstreamPurchaser?.kind === "connected_buyer" &&
+    viewerIsAnchorBuyer
+  ) {
+    return null;
+  }
+
+  return upstreamPurchaser;
 }
 
 /** @deprecated Use shouldRenderUpstreamPurchaserBeforeProperty */

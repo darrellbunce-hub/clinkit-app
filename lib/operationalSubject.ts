@@ -183,10 +183,7 @@ export function applyOperationalSubjectLens(
 
     if (
       property.relationship_type === "purchase" &&
-      (property.linked_property_id ===
-        subject.assignedPropertyId ||
-        assignedProperty.linked_property_id ===
-          property.id)
+      assignedProperty.linked_property_id === property.id
     ) {
       return {
         ...property,

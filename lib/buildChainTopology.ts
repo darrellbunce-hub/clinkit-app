@@ -51,16 +51,6 @@ export type ChainTopologyBuyerReadyPrefix = {
   stageLabel: string;
 };
 
-export type SyntheticTerminusKind =
-  | "searching"
-  | "end_of_chain";
-
-export type ChainTopologySyntheticTerminus = {
-  kind: "synthetic";
-  terminus: SyntheticTerminusKind;
-  propertyNumber: number;
-};
-
 /**
  * One property segment: a root and its linked_property_id walk.
  * gapBefore is null for the first segment; otherwise classifies the
@@ -71,10 +61,13 @@ export type ChainTopologySegment = {
   gapBefore: SegmentGapState | null;
 };
 
+/**
+ * Chain ends are never synthesised: a searching placeholder row is the only
+ * Searching state, and the absence of one ends the chain in that direction.
+ */
 export type ChainTopology = {
   buyerReadyPrefix: ChainTopologyBuyerReadyPrefix | null;
   segments: ChainTopologySegment[];
-  syntheticTerminus: ChainTopologySyntheticTerminus | null;
   /** Flat property list across all segments (formerly flatNodes). */
   flatPropertyNodes: TopologyProperty[];
   /** Addressed properties participating in segment walks. */
@@ -320,53 +313,6 @@ function buildPropertySegment<
 }
 
 /**
- * Synthetic Searching / End Of Chain suffix rules (unchanged from pre-refactor):
- * - Shown when the chain has renderable properties but no purchase property.
- * - End Of Chain when a sale has awaiting_buyer; otherwise Searching.
- */
-function resolveSyntheticTerminus<
-  T extends TopologyProperty
->(
-  renderableProperties: T[],
-  flatPropertyNodes: T[]
-): ChainTopologySyntheticTerminus | null {
-  const hasPurchaseProperty =
-    renderableProperties.some(
-      (property) =>
-        property.relationship_type ===
-        "purchase"
-    );
-
-  if (
-    hasPurchaseProperty ||
-    renderableProperties.length === 0
-  ) {
-    return null;
-  }
-
-  const sellerConfirmedEndOfChain =
-    renderableProperties
-      .filter(
-        (property) =>
-          property.relationship_type ===
-          "sale"
-      )
-      .some(
-        (property) =>
-          property.awaiting_buyer
-      );
-
-  return {
-    kind: "synthetic",
-    terminus: sellerConfirmedEndOfChain
-      ? "end_of_chain"
-      : "searching",
-    propertyNumber:
-      flatPropertyNodes.length + 1,
-  };
-}
-
-/**
  * Builds the canonical chain topology from persisted chain data.
  *
  * Input:
@@ -377,7 +323,6 @@ function resolveSyntheticTerminus<
  * Output:
  * - buyerReadyPrefix: upstream Buyer Ready tile when node is present.
  * - segments: property segments with inter-segment gap classification.
- * - syntheticTerminus: downstream Searching / End Of Chain when rules match.
  * - flatPropertyNodes / renderableProperties: helpers for rendering overlays
  *   and intelligence calculations.
  */
@@ -450,16 +395,9 @@ export function buildChainTopology<
         }
       : null;
 
-  const syntheticTerminus =
-    resolveSyntheticTerminus(
-      renderableProperties,
-      flatPropertyNodes
-    );
-
   return {
     buyerReadyPrefix,
     segments,
-    syntheticTerminus,
     flatPropertyNodes,
     renderableProperties,
   };

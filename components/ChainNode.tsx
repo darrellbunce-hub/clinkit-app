@@ -27,7 +27,11 @@ type ChainNodeProps = {
 
   isOperationalPosition?: boolean;
 
-  positionKind?: "awaiting_buyer" | "buyer_ready" | "sale";
+  positionKind?:
+    | "awaiting_buyer"
+    | "buyer_ready"
+    | "connected_buyer"
+    | "sale";
 };
 
 export default function ChainNode({
@@ -62,6 +66,9 @@ export default function ChainNode({
 
   const isAwaitingBuyer =
     positionKind === "awaiting_buyer";
+
+  const isConnectedBuyer =
+    positionKind === "connected_buyer";
 
   const headlineTitle = isOperationalSale
     ? getOperationalSaleChainHeadline()
@@ -108,10 +115,12 @@ export default function ChainNode({
   isAwaitingBuyer
     ? "❓"
 
-    : displayTitle === CHAIN_TILE_LABEL.buyerReady
+    : displayTitle === CHAIN_TILE_LABEL.buyerReady ||
+      isConnectedBuyer
     ? "🧍"
 
-    : displayTitle === CHAIN_TILE_LABEL.nextHomeSearch
+    : displayTitle === CHAIN_TILE_LABEL.nextHomeSearch ||
+      displayTitle === CHAIN_TILE_LABEL.sellerNextHomeSearch
     ? "🔎"
 
     : status === "pending_connection" &&
@@ -146,7 +155,7 @@ export default function ChainNode({
         {stageLabel}
       </p>
 
-      {isAwaitingBuyer ? null : (
+      {isAwaitingBuyer || isConnectedBuyer ? null : (
         <>
           <div className="mt-3 w-full h-2 rounded-full bg-chain-progress-track overflow-hidden">
 

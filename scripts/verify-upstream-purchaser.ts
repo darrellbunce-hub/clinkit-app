@@ -94,12 +94,30 @@ assertEqual(
 );
 
 assertEqual(
-  "No upstream tile when buyer_connected without buyer_ready",
+  "Connected Buyer when buyer_connected without buyer_ready and no buyer sale links in",
   resolveUpstreamPurchaserState({
     operationalSalePropertyId: operationalSaleId,
     chainProperties: [
       { id: 10, buyer_connected: true, relationship_type: "sale" },
       { id: 11, buyer_connected: true, relationship_type: "purchase" },
+    ],
+    buyerReadyForAnchor: null,
+  }),
+  { kind: "connected_buyer", anchorPropertyId: 10 }
+);
+
+assertEqual(
+  "No upstream tile when the buyer's own sale links into the property",
+  resolveUpstreamPurchaserState({
+    operationalSalePropertyId: operationalSaleId,
+    chainProperties: [
+      {
+        id: 9,
+        buyer_connected: false,
+        relationship_type: "sale",
+        linked_property_id: 10,
+      },
+      { id: 10, buyer_connected: true, relationship_type: "sale" },
     ],
     buyerReadyForAnchor: null,
   }),
@@ -222,7 +240,7 @@ assert(
 );
 
 assert(
-  "Only one anchor match — other-property summary does not resolve for sale 10",
+  "Only one anchor match — other-property summary does not resolve Buyer Ready for sale 10",
   resolveUpstreamPurchaserState({
     operationalSalePropertyId: operationalSaleId,
     chainProperties: [
@@ -232,7 +250,7 @@ assert(
       [buyerReadySummaryOtherAnchor],
       operationalSaleId
     ),
-  }) === null
+  })?.kind !== "buyer_ready"
 );
 
 assertEqual(
@@ -256,10 +274,30 @@ assertEqual(
 );
 
 const multiHopChain = [
-  { id: 1, buyer_connected: false, relationship_type: "sale" as const },
-  { id: 2, buyer_connected: true, relationship_type: "purchase" as const },
-  { id: 3, buyer_connected: true, relationship_type: "sale" as const },
-  { id: 4, buyer_connected: true, relationship_type: "purchase" as const },
+  {
+    id: 1,
+    buyer_connected: false,
+    relationship_type: "sale" as const,
+    linked_property_id: 2,
+  },
+  {
+    id: 2,
+    buyer_connected: true,
+    relationship_type: "purchase" as const,
+    linked_property_id: 3,
+  },
+  {
+    id: 3,
+    buyer_connected: true,
+    relationship_type: "sale" as const,
+    linked_property_id: 4,
+  },
+  {
+    id: 4,
+    buyer_connected: true,
+    relationship_type: "purchase" as const,
+    linked_property_id: 5,
+  },
   {
     id: 5,
     buyer_connected: false,
@@ -292,8 +330,18 @@ const summaryAnchoredToP1: ChainNodesChainSummary = {
 
 const connectedWithReady = resolvePurchaserStatesByPropertyId({
   chainProperties: [
-    { id: 1, buyer_connected: true, relationship_type: "sale" },
-    { id: 2, buyer_connected: true, relationship_type: "purchase" },
+    {
+      id: 1,
+      buyer_connected: true,
+      relationship_type: "sale",
+      linked_property_id: 2,
+    },
+    {
+      id: 2,
+      buyer_connected: true,
+      relationship_type: "purchase",
+      linked_property_id: 3,
+    },
     { id: 3, buyer_connected: true, relationship_type: "sale" },
   ],
   buyerReadySummaries: [summaryAnchoredToP1],

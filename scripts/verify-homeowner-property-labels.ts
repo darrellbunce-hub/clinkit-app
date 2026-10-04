@@ -147,7 +147,7 @@ assertChainLabels(
   sellerPlusPurchaseRows,
   [
     "357 Jenni Place",
-    CHAIN_TILE_LABEL.connectedBuyer,
+    `${CHAIN_TILE_LABEL.yourPurchase} — 888 Jo Lane`,
     CHAIN_TILE_LABEL.nextHomeSearch,
   ]
 );
@@ -199,17 +199,17 @@ assertNotAddress(
   "999 Hidden Purchase"
 );
 
-assertNotAddress(
-  "Seller + purchase — no upstream sale address",
+assert(
+  "Seller + purchase — viewer's own purchase shows its address",
   getParticipantPropertyLabel(
     sellerPlusPurchaseRows[1],
     resolveDashboardOperationalPropertyId(sellerPlusPurchaseRows)
   ),
-  "888 Jo Lane"
+  `${CHAIN_TILE_LABEL.yourPurchase} — 888 Jo Lane`
 );
 
 assert(
-  "Chain tile — connected sale",
+  "Chain tile — sale the viewer is buying is Your Purchase",
   getChainTileDisplayTitle(
     {
       relationship_type: "sale",
@@ -220,7 +220,7 @@ assert(
     },
     false
   ),
-  CHAIN_TILE_LABEL.connectedBuyer
+  CHAIN_TILE_LABEL.yourPurchase
 );
 
 assertNotAddress(

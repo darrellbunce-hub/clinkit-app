@@ -24,6 +24,10 @@ import {
   establishConnectedHopAfterSellerJoinsPurchase,
 } from "@/lib/chainConnection";
 import { ensureBuyerReadyOnJoin } from "@/lib/ensureBuyerReadyOnJoin";
+import {
+  readJoinChainIntent,
+  shouldCreateBuyerReadyOnJoin,
+} from "@/lib/onboarding/joinChainIntent";
 import PropertyAddressLookup from "@/components/address/PropertyAddressLookup";
 import { formatUkPostcodeForStorage } from "@/lib/address/normalize";
 
@@ -31,11 +35,11 @@ function JoinChainContent() {
   const searchParams =
     useSearchParams();
 
-  const sourceChainId =
-    searchParams.get("sourceChain");
-
-  const searchingIntent =
-    searchParams.get("searching") === "1";
+  const {
+    sourceChainId,
+    searchingIntent,
+    notSellingIntent,
+  } = readJoinChainIntent(searchParams);
 
   const [accessCode, setAccessCode] =
     useState("");
@@ -47,7 +51,7 @@ function JoinChainContent() {
     useState("");
 
   const [nothingToSell, setNothingToSell] =
-    useState(false);
+    useState(notSellingIntent);
 
   async function handleJoinChain() {
 
@@ -102,10 +106,8 @@ function JoinChainContent() {
 
     const joiningRole =
       joinResult.joining_role as string;
-    const shouldCreateBuyerReady =
-      joiningRole === "buyer" && nothingToSell;
 
-    if (joinResult.joining_role === "seller") {
+    if (joiningRole === "seller") {
       await establishConnectedHopAfterSellerJoinsPurchase(
         supabase,
         property.id
@@ -113,8 +115,10 @@ function JoinChainContent() {
     }
 
     if (
-      joinResult.joining_role === "buyer" &&
-      nothingToSell
+      shouldCreateBuyerReadyOnJoin({
+        joiningRole,
+        nothingToSell,
+      })
     ) {
       let buyerReadyResult;
 

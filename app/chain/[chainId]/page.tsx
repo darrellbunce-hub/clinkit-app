@@ -34,9 +34,9 @@ import { EstimatedCompletionWindowPanel } from "@/components/chainIntelligence/E
 import { resolveBuyerReadyStageLabel } from "@/lib/chainIntelligence/buyerReadyLabels";
 import {
   CHAIN_TILE_LABEL,
-  getChainTileDisplayTitle,
   getDashboardChainTitle,
   mapToOperationalProperties,
+  resolveChainPropertyTileTitle,
 } from "@/lib/operationalPosition";
 import {
   applyOperationalSubjectLens,
@@ -83,7 +83,7 @@ import {
 import {
   findBuyerReadySummaryForAnchor,
   resolvePurchaserStatesByPropertyId,
-  shouldRenderUpstreamPurchaserBeforeProperty,
+  resolveRenderedUpstreamPurchaser,
 } from "@/lib/resolveUpstreamPurchaser";
 import type {
   OperationalBuyerReadyNode,
@@ -350,6 +350,7 @@ export default function ChainPage() {
           relationship_type: property.relationship_type,
           stage: property.stage,
           address: property.address,
+          linked_property_id: property.linked_property_id,
         })
       ),
       buyerReadySummaries,
@@ -665,7 +666,7 @@ export default function ChainPage() {
           <h1 className={PAGE_TITLE_CLASS}>
             {getDashboardChainTitle(
               chainId,
-              chainProperties
+              subjectChainProperties
             )}
           </h1>
 
@@ -1141,31 +1142,29 @@ export default function ChainPage() {
       operationalPosition.propertyId ===
         property.id;
 
-    const upstreamPurchaser =
-      purchaserStatesByPropertyId.get(property.id) ??
-      null;
-
-    const showUpstreamPurchaserBeforeSale =
-      shouldRenderUpstreamPurchaserBeforeProperty(
-        upstreamPurchaser,
-        property.id
-      );
-
     const subjectProperty =
       subjectChainProperties.find(
         (row) => row.id === property.id
       ) ?? property;
 
+    const upstreamPurchaser =
+      resolveRenderedUpstreamPurchaser({
+        upstreamPurchaser:
+          purchaserStatesByPropertyId.get(property.id) ??
+          null,
+        propertyId: property.id,
+        ownerBuyerReadyNodeId: showOwnerOperationalBuyerReady
+          ? ownerOperationalBuyerReadyNode?.id ?? null
+          : null,
+        viewerIsAnchorBuyer:
+          subjectProperty.currentUserRole === "buyer",
+      });
+
     const displayTitle =
-      ownerBuyerReadyLinkedPropertyId !=
-        null &&
-      Number(property.id) ===
-        Number(ownerBuyerReadyLinkedPropertyId)
-        ? CHAIN_TILE_LABEL.connectedPurchase
-        : getChainTileDisplayTitle(
-            subjectProperty,
-            isOperationalPosition
-          );
+      resolveChainPropertyTileTitle(subjectProperty, {
+        isOperationalPosition,
+        ownerBuyerReadyLinkedPropertyId,
+      });
 
     let displayStage = "In Progress";
 
@@ -1173,10 +1172,6 @@ export default function ChainPage() {
 
       displayStage =
         "Onward purchase not yet identified";
-
-    } else if (property.awaiting_buyer) {
-
-      displayStage = "Awaiting buyer";
 
     } else if (
       property.status === "pending_connection" &&
@@ -1199,8 +1194,7 @@ export default function ChainPage() {
         className="flex items-center"
       >
 
-        {showUpstreamPurchaserBeforeSale &&
-          upstreamPurchaser?.kind ===
+        {upstreamPurchaser?.kind ===
             "awaiting_buyer" && (
 
           <div
@@ -1235,8 +1229,7 @@ export default function ChainPage() {
 
         )}
 
-        {showUpstreamPurchaserBeforeSale &&
-          upstreamPurchaser?.kind ===
+        {upstreamPurchaser?.kind ===
             "buyer_ready" && (
 
           <div
@@ -1281,6 +1274,43 @@ export default function ChainPage() {
             />
 
             </Link>
+
+            <div className="flex items-center mx-5">
+
+              <div
+                className={chainConnectorClasses(
+                  "connected"
+                )}
+              />
+
+            </div>
+
+          </div>
+
+        )}
+
+        {upstreamPurchaser?.kind ===
+            "connected_buyer" && (
+
+          <div
+            className="flex items-center"
+            aria-label="Connected buyer"
+          >
+
+            <ChainNode
+              propertyNumber={0}
+              displayTitle={
+                CHAIN_TILE_LABEL.connectedBuyer
+              }
+              stageLabel="Buyer connected"
+              progress={0}
+              updatedDaysAgo={0}
+              currentUserRole={null}
+              status="healthy"
+              buyer_connected={true}
+              seller_connected={true}
+              positionKind="connected_buyer"
+            />
 
             <div className="flex items-center mx-5">
 
@@ -1414,59 +1444,6 @@ export default function ChainPage() {
 
     );
   })}
-
-  {topology.syntheticTerminus && (
-  <div className="flex items-center">
-
-    <div className="flex items-center mx-5">
-
-      <div
-        className="
-          w-24
-          border-t-4
-          border-dashed
-          border-slate-300
-        "
-      ></div>
-
-    </div>
-
-    <ChainNode
-      propertyNumber={
-        topology.syntheticTerminus.propertyNumber
-      }
-      displayTitle={
-        topology.syntheticTerminus.terminus ===
-        "end_of_chain"
-          ? "End Of Chain"
-          : CHAIN_TILE_LABEL.nextHomeSearch
-      }
-      stageLabel={
-        topology.syntheticTerminus.terminus ===
-        "end_of_chain"
-          ? "No onward purchase"
-          : "Searching for forever home"
-      }
-      progress={
-        topology.syntheticTerminus.terminus ===
-        "end_of_chain"
-          ? 100
-          : 0
-      }
-      updatedDaysAgo={0}
-      currentUserRole={null}
-      status={
-        topology.syntheticTerminus.terminus ===
-        "end_of_chain"
-          ? "healthy"
-          : "pending_connection"
-      }
-      buyer_connected={false}
-      seller_connected={false}
-    />
-
-  </div>
-  )}
 
             </div>
           </MobileChainScrollRegion>
