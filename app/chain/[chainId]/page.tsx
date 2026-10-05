@@ -21,6 +21,7 @@ import {
   getLinkedPropertyGapState,
   isSearchingPlaceholder,
 } from "@/lib/buildChainTopology";
+import { buildChainActivityTimeline } from "@/lib/chainActivityTimeline";
 import { computeChainIntelligence } from "@/lib/chainIntelligence";
 import {
   CHAIN_CONFIDENCE_TOOLTIP,
@@ -69,6 +70,7 @@ import CompletionScheduledBanner from "@/components/CompletionScheduledBanner";
 import ChainCompletedBanner from "@/components/ChainCompletedBanner";
 import ParticipantDataLoadingState from "@/components/loading/ParticipantDataLoadingState";
 import PropertyEstateAgentAssignment from "@/components/estate-agents/PropertyEstateAgentAssignment";
+import ActivityActorBadge from "@/components/operational/ActivityActorBadge";
 import RecordCompletionDateForm from "@/components/RecordCompletionDateForm";
 import { canShowCompletionSchedulingForm } from "@/lib/recordChainCompletionDate";
 import { canEditProperty } from "@/lib/propertyPermissions";
@@ -303,27 +305,14 @@ export default function ChainPage() {
   const buyerReadyActivities =
     buyerReadyNode?.activities ?? [];
 
-  const recentActivities = [
-    ...chainProperties.flatMap((property) =>
-      property.activities.map((activity) => ({
-        ...activity,
-      }))
-    ),
-    ...buyerReadyActivities.map(
-      (activity: {
-        id?: number;
-        timestamp: string;
-        update: string;
-        updated_by?: string;
-      }) => ({
-        ...activity,
-      })
-    ),
-  ].sort(
-    (a, b) =>
-      new Date(b.timestamp || 0).getTime() -
-      new Date(a.timestamp || 0).getTime()
-  );
+  const recentActivities = buildChainActivityTimeline({
+    chainId,
+    chainProperties,
+    labelProperties: subjectChainProperties,
+    operationalPosition,
+    ownerBuyerReadyLinkedPropertyId,
+    chainNodes,
+  });
 
   const saleOperationalPropertyId =
     operationalPosition?.kind === "sale"
@@ -1465,10 +1454,10 @@ export default function ChainPage() {
 
     )}
 
-    {recentActivities.map((activity, index) => (
+    {recentActivities.map((activity) => (
 
       <div
-        key={`${activity.id}-${index}`}
+        key={activity.key}
         className="border border-slate-200 rounded-2xl p-5"
       >
 
@@ -1480,9 +1469,15 @@ export default function ChainPage() {
               {activity.update}
             </p>
 
-            <p className="text-xs text-slate-400 mt-2">
-            Updated by {activity.updated_by || "homeowner"}
+            <p className="text-sm text-slate-600 mt-1">
+              {activity.positionLabel}
             </p>
+
+            <div className="mt-3">
+              <ActivityActorBadge
+                updatedBy={activity.updated_by}
+              />
+            </div>
 
           </div>
 

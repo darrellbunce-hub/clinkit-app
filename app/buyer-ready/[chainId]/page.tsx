@@ -3,6 +3,7 @@
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import Navbar from "@/components/Navbar";
+import ActivityActorBadge from "@/components/operational/ActivityActorBadge";
 import OperationalContextStrip from "@/components/operational/OperationalContextStrip";
 import OperationalManagerBanner from "@/components/operational/OperationalManagerBanner";
 import WorkflowReadOnlyBanner from "@/components/WorkflowReadOnlyBanner";
@@ -24,7 +25,6 @@ import { BUYER_READY_STAGES } from "@/data/buyerReadyStages";
 import { supabase } from "@/lib/supabase";
 import {
   findBuyerReadyNodeForChain,
-  formatActivityUpdaterLabel,
   getBuyerReadyActionMessage,
   getBuyerReadyStatusDescription,
   resolveWorkflowAccess,
@@ -126,22 +126,6 @@ function formatTimeAgo(timestamp: string) {
   }
 
   return `${days} days ago`;
-}
-
-function activityUpdaterBadgeClass(
-  updatedBy: string | null | undefined
-) {
-  switch (updatedBy) {
-    case "estate_agent":
-      return "bg-purple-100 text-purple-700";
-    case "solicitor":
-    case "conveyancer":
-      return "bg-emerald-100 text-emerald-700";
-    case "system":
-      return "bg-slate-200 text-slate-700";
-    default:
-      return "bg-blue-100 text-blue-700";
-  }
 }
 
 export default function BuyerReadyPage() {
@@ -1129,13 +1113,9 @@ export default function BuyerReadyPage() {
                   </p>
 
                   <div className="mt-3">
-                    <span
-                      className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${activityUpdaterBadgeClass(activity.updated_by)}`}
-                    >
-                      {formatActivityUpdaterLabel(
-                        activity.updated_by
-                      )}
-                    </span>
+                    <ActivityActorBadge
+                      updatedBy={activity.updated_by}
+                    />
                   </div>
 
                   <p className="text-sm text-slate-400 mt-3">

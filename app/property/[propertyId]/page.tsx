@@ -18,6 +18,7 @@ import {
   MobilePanelHeader,
 } from "@/components/mobile/MobileLayout";
 import Navbar from "@/components/Navbar";
+import ActivityActorBadge from "@/components/operational/ActivityActorBadge";
 import OperationalContextStrip from "@/components/operational/OperationalContextStrip";
 import OperationalManagerBanner from "@/components/operational/OperationalManagerBanner";
 import WorkflowReadOnlyBanner from "@/components/WorkflowReadOnlyBanner";
@@ -1265,39 +1266,9 @@ async function handleReportDelay() {
 
         <div className="mt-3">
 
-          <span
-            className={`
-              inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold
-
-              ${
-                activity.updated_by === "estate_agent"
-                  ? "bg-purple-100 text-purple-700"
-
-                : activity.updated_by === "solicitor"
-                  ? "bg-emerald-100 text-emerald-700"
-
-                : activity.updated_by === "system"
-                  ? "bg-slate-200 text-slate-700"
-
-                : "bg-blue-100 text-blue-700"
-              }
-            `}
-          >
-
-            {
-              activity.updated_by === "estate_agent"
-                ? "Estate Agent"
-
-              : activity.updated_by === "solicitor"
-                ? "Solicitor"
-
-              : activity.updated_by === "system"
-                ? "System"
-
-              : "Homeowner"
-            }
-
-          </span>
+          <ActivityActorBadge
+            updatedBy={activity.updated_by}
+          />
 
         </div>
 

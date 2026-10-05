@@ -64,6 +64,7 @@
     { "schema": "public", "name": "is_ea_company_member", "args": "uuid", "reason": "user_facing_product_rpc" },
     { "schema": "public", "name": "is_ea_delegated_editor_on_chain", "args": "bigint", "reason": "user_facing_product_rpc" },
     { "schema": "public", "name": "is_ea_delegated_editor_on_property", "args": "bigint", "reason": "user_facing_product_rpc" },
+    { "schema": "public", "name": "is_property_chain_operational_viewer", "args": "bigint", "reason": "authenticated_readonly_predicate_helper" },
     { "schema": "public", "name": "is_property_member", "args": "bigint", "reason": "user_facing_product_rpc" },
     { "schema": "public", "name": "is_property_operational_homeowner", "args": "bigint", "reason": "user_facing_product_rpc" },
     { "schema": "public", "name": "is_property_operational_participant", "args": "bigint", "reason": "user_facing_product_rpc" },

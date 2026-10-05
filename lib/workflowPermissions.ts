@@ -422,3 +422,19 @@ export function formatActivityUpdaterLabel(
       return "Homeowner";
   }
 }
+
+export function getActivityUpdaterBadgeClass(
+  updatedBy: string | null | undefined
+): string {
+  switch (updatedBy) {
+    case "estate_agent":
+      return "bg-purple-100 text-purple-700";
+    case "solicitor":
+    case "conveyancer":
+      return "bg-emerald-100 text-emerald-700";
+    case "system":
+      return "bg-slate-200 text-slate-700";
+    default:
+      return "bg-blue-100 text-blue-700";
+  }
+}
