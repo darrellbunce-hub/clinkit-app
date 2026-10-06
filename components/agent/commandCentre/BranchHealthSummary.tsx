@@ -10,12 +10,22 @@ export default function BranchHealthSummary({
 }) {
   return (
     <div className={`${WORKSPACE_CARD_CLASS} px-6 py-5`}>
-      <dl className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4">
+      <dl
+        className={`grid grid-cols-2 gap-x-6 gap-y-4 ${overview.pending > 0 ? "sm:grid-cols-5" : "sm:grid-cols-4"}`}
+      >
         <StatItem
           label="Healthy"
           value={String(overview.healthy)}
           tone="success"
         />
+
+        {overview.pending > 0 ? (
+          <StatItem
+            label="Not yet calculated"
+            value={String(overview.pending)}
+            tone="neutral"
+          />
+        ) : null}
 
         <StatItem
           label="Attention"

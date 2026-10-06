@@ -228,10 +228,12 @@ function main() {
   const card = read("components/agent/commandCentre/OperationalPropertyCard.tsx");
   const workspace = read("lib/estateAgent/workspacePresentation.ts");
   record(
-    "Card, sorters and workspace alerts use last_update_at only (no stored-count fallback, no '?? 0')",
+    "Card and sorters use last_update_at; workspace staleness wording uses the activity clock (no stored-count fallback, no '?? 0')",
     card.includes("resolveDaysSinceLastUpdate(summary)") &&
       !/summary\.days_since_last_update/.test(card) &&
-      (workspace.match(/resolveDaysSinceLastUpdate\(summary\)/g) ?? []).length === 3 &&
+      !workspace.includes("days_since_last_update") &&
+      (workspace.match(/resolveDaysOnActivityClock\(summary\)/g) ?? []).length === 4 &&
+      /summary\.activity_clock_at \?\? summary\.last_update_at \?\? null/.test(presentation) &&
       (presentation.match(/compareLeastRecentlyUpdatedFirst\(left, right\)/g) ?? []).length === 2 &&
       !presentation.includes("days_since_last_update") &&
       !/resolveDaysSinceLastUpdate\([a-z]+\)\s*\?\?\s*0/.test(presentation) &&

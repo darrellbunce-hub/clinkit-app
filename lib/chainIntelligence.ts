@@ -1,7 +1,7 @@
 import { isSearchingPlaceholder } from "@/lib/buildChainTopology";
 import {
   countActiveDelayReports,
-  daysSinceLastActivity,
+  daysSinceOperationalClock,
   DELAY_REPORTED_PREFIX,
   hasActiveDelayReport,
   type OperationalActivity,
@@ -88,11 +88,12 @@ export function getStaleProperties<
   T extends IntelligenceProperty
 >(
   properties: T[],
-  staleAfterDays = STALE_DAYS_CONFIDENCE
+  staleAfterDays = STALE_DAYS_CONFIDENCE,
+  referenceDate: Date = new Date()
 ): T[] {
   return getConfidenceScopeProperties(properties).filter(
     (property) =>
-      daysSinceLastActivity(property.activities) >
+      daysSinceOperationalClock(property, referenceDate) >
       staleAfterDays
   );
 }
@@ -115,15 +116,28 @@ export function isBuyerReadyOperationallyStale(params: {
     | null
     | undefined;
   buyerReadyActivities?: OperationalActivity[] | null;
+  /** Server node clock; authoritative when defined. */
+  buyerReadyActivityClockAt?: string | null;
   staleAfterDays?: number;
+  referenceDate?: Date;
 }): boolean {
   const staleAfterDays =
     params.staleAfterDays ?? STALE_DAYS_CONFIDENCE;
 
+  if (params.buyerReadyActivityClockAt !== undefined) {
+    return (
+      daysSinceOperationalClock(
+        { activityClockAt: params.buyerReadyActivityClockAt },
+        params.referenceDate
+      ) > staleAfterDays
+    );
+  }
+
   if (params.buyerReadyActivities?.length) {
     return (
-      daysSinceLastActivity(
-        params.buyerReadyActivities
+      daysSinceOperationalClock(
+        { activities: params.buyerReadyActivities },
+        params.referenceDate
       ) > staleAfterDays
     );
   }
@@ -284,6 +298,63 @@ function progressToRepresentativeStage(
   return "offer_accepted";
 }
 
+export function describeChainHealth(
+  status: ChainHealthStatus,
+  scheduledCompletionMode = false
+): string {
+  if (status === "Replacement Buyer Required") {
+    return "A chain connection has been broken. A replacement buyer may be required before the chain can progress.";
+  }
+
+  if (scheduledCompletionMode) {
+    switch (status) {
+      case "At Risk":
+        return "Multiple delays have been reported while awaiting the agreed completion date.";
+      case "Active":
+        return "A delay has been reported while awaiting the agreed completion date.";
+      default:
+        return COMPLETION_SCHEDULED_CHAIN_HEALTH_MESSAGE;
+    }
+  }
+
+  switch (status) {
+    case "At Risk":
+      return "Multiple delays or stale properties may impact chain progression.";
+    case "Active":
+      return "Some delays or stale updates detected within the chain.";
+    default:
+      return "Most properties updated recently with no major delays reported.";
+  }
+}
+
+function resolveChainHealthStatus(params: {
+  staleCount: number;
+  delayReportedCount: number;
+  requiresReplacementBuyer: boolean;
+  scheduledCompletionMode?: boolean;
+}): ChainHealthStatus {
+  if (params.requiresReplacementBuyer) {
+    return "Replacement Buyer Required";
+  }
+
+  const pressure = params.scheduledCompletionMode
+    ? params.delayReportedCount
+    : Math.max(params.staleCount, params.delayReportedCount);
+
+  if (pressure >= 2) {
+    return "At Risk";
+  }
+
+  if (
+    params.delayReportedCount >= 1 ||
+    (!params.scheduledCompletionMode && params.staleCount >= 1)
+  ) {
+    return "Active";
+  }
+
+  return "Stable";
+}
+
 export function computeChainHealth(params: {
   staleCount: number;
   delayReportedCount: number;
@@ -293,69 +364,23 @@ export function computeChainHealth(params: {
   status: ChainHealthStatus;
   message: string;
 } {
-  if (params.requiresReplacementBuyer) {
-    return {
-      status: "Replacement Buyer Required",
-      message:
-        "A chain connection has been broken. A replacement buyer may be required before the chain can progress.",
-    };
-  }
-
-  if (params.scheduledCompletionMode) {
-    if (params.delayReportedCount >= 2) {
-      return {
-        status: "At Risk",
-        message:
-          "Multiple delays have been reported while awaiting the agreed completion date.",
-      };
-    }
-
-    if (params.delayReportedCount >= 1) {
-      return {
-        status: "Active",
-        message:
-          "A delay has been reported while awaiting the agreed completion date.",
-      };
-    }
-
-    return {
-      status: "Stable",
-      message: COMPLETION_SCHEDULED_CHAIN_HEALTH_MESSAGE,
-    };
-  }
-
-  if (
-    params.staleCount >= 2 ||
-    params.delayReportedCount >= 2
-  ) {
-    return {
-      status: "At Risk",
-      message:
-        "Multiple delays or stale properties may impact chain progression.",
-    };
-  }
-
-  if (
-    params.staleCount >= 1 ||
-    params.delayReportedCount >= 1
-  ) {
-    return {
-      status: "Active",
-      message:
-        "Some delays or stale updates detected within the chain.",
-    };
-  }
+  const status = resolveChainHealthStatus(params);
 
   return {
-    status: "Stable",
-    message:
-      "Most properties updated recently with no major delays reported.",
+    status,
+    message: describeChainHealth(
+      status,
+      params.scheduledCompletionMode ?? false
+    ),
   };
 }
 
 export function selectBottleneckProperty<
   T extends IntelligenceProperty
->(inScopeProperties: T[]): T | null {
+>(
+  inScopeProperties: T[],
+  referenceDate: Date = new Date()
+): T | null {
   const blockedProperty = inScopeProperties.find(
     (property) => property.status === "blocked"
   );
@@ -378,7 +403,7 @@ export function selectBottleneckProperty<
 
   const staleProperty = inScopeProperties.find(
     (property) =>
-      daysSinceLastActivity(property.activities) >
+      daysSinceOperationalClock(property, referenceDate) >
       STALE_DAYS_BOTTLENECK
   );
 
@@ -394,6 +419,8 @@ export type BuyerReadyIntelligenceNode = {
   /** Only when product provides an authoritative lost-buyer signal. */
   authoritativeLost?: boolean;
   hasActiveOperationalDelay?: boolean | null;
+  /** Server node clock (chain_node_operational_clock). */
+  activityClockAt?: string | null;
 };
 
 export function computeChainIntelligence<
@@ -410,12 +437,16 @@ export function computeChainIntelligence<
   const scheduledCompletionMode =
     params.scheduledCompletionMode ?? false;
 
+  const referenceDate = params.referenceDate ?? new Date();
+
   const inScopeProperties = getConfidenceScopeProperties(
     params.chainProperties
   );
 
   const stalePropertiesRaw = getStaleProperties(
-    params.chainProperties
+    params.chainProperties,
+    STALE_DAYS_CONFIDENCE,
+    referenceDate
   );
 
   const staleProperties = scheduledCompletionMode
@@ -458,10 +489,16 @@ export function computeChainIntelligence<
     (property) => property.status === "blocked"
   ).length;
 
-  const buyerReadyStaleRaw = isBuyerReadyOperationallyStale({
-    buyerReadySummary: params.buyerReadySummary,
-    buyerReadyActivities: params.buyerReadyActivities,
-  });
+  // A chain without Buyer Ready has nothing to stall.
+  const buyerReadyStaleRaw =
+    !!params.buyerReadySummary &&
+    isBuyerReadyOperationallyStale({
+      buyerReadySummary: params.buyerReadySummary,
+      buyerReadyActivities: params.buyerReadyActivities,
+      buyerReadyActivityClockAt:
+        params.buyerReadyNode?.activityClockAt,
+      referenceDate,
+    });
 
   const buyerReadyStale = scheduledCompletionMode
     ? false
@@ -504,16 +541,19 @@ export function computeChainIntelligence<
             resolvedBuyerReadyNode.authoritativeLost,
           hasActiveOperationalDelay:
             resolvedBuyerReadyNode.hasActiveOperationalDelay,
+          activityClockAt:
+            resolvedBuyerReadyNode.activityClockAt,
         }
       : null,
     buyerReadySummary: params.buyerReadySummary,
-    referenceDate: params.referenceDate,
+    referenceDate,
   });
 
+  // A stalled Buyer Ready node counts as a stale chain dependency.
   const chainHealth = computeChainHealth({
     staleCount: scheduledCompletionMode
       ? 0
-      : stalePropertiesRaw.length,
+      : stalePropertiesRaw.length + (buyerReadyStaleRaw ? 1 : 0),
     delayReportedCount: activeDelayCount,
     requiresReplacementBuyer,
     scheduledCompletionMode,
@@ -525,7 +565,7 @@ export function computeChainIntelligence<
 
   const bottleneckProperty = scheduledCompletionMode
     ? null
-    : selectBottleneckProperty(inScopeProperties);
+    : selectBottleneckProperty(inScopeProperties, referenceDate);
 
   return {
     inScopeProperties,

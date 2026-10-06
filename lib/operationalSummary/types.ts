@@ -27,6 +27,8 @@ export type ChainOperationalSummaryRecord = {
   requires_replacement_buyer: boolean;
   computed_at: string;
   summary_version: number;
+  bottleneck_property_id: number | null;
+  stale_property_ids: number[];
 };
 
 export type PropertyOperationalSummaryRecord = {
@@ -51,9 +53,22 @@ export type PropertyOperationalSummaryRecord = {
   computed_at: string;
   summary_version: number;
   derived_from_activity_at: string | null;
+  activity_clock_at: string | null;
+  activity_clock_source: string | null;
 };
 
-export type OperationalRefreshProperty = {
+/**
+ * Server clocks (property_operational_clock / chain_node_operational_clock).
+ * Present on worker datasets; absent on legacy datasets, where staleness
+ * falls back to the latest loaded activity.
+ */
+export type OperationalActivityClock = {
+  genuineLastActivityAt?: string | null;
+  activityClockAt?: string | null;
+  activityClockSource?: string | null;
+};
+
+export type OperationalRefreshProperty = OperationalActivityClock & {
   id: number;
   chainId: number;
   chainPosition: number;
@@ -71,7 +86,7 @@ export type OperationalRefreshProperty = {
   hasActiveOperationalDelay?: boolean;
 };
 
-export type OperationalRefreshChainNode = {
+export type OperationalRefreshChainNode = OperationalActivityClock & {
   id: number;
   chain_id: number;
   node_type: string;

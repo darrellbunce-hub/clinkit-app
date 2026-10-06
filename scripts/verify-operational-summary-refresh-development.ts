@@ -16,8 +16,8 @@ import { join } from "path";
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-import { loadOperationalRefreshDataset } from "../lib/operationalSummary/loadOperationalRefreshDataset";
-import { refreshOperationalSummary } from "../lib/operationalSummary/refreshOperationalSummary";
+import { loadOperationalRefreshDatasets } from "../lib/operationalSummary/processOperationalRefresh";
+import { refreshOperationalSummaryForWorker } from "../lib/operationalSummary/refreshOperationalSummary";
 
 const DEVELOPMENT_SUPABASE_PROJECT_REF = "bbbsxzxcjkmpqsfvmhbo";
 const TEST_EMAIL_PREFIX = "ops-refresh-dev";
@@ -173,29 +173,28 @@ async function verifyViewColumnProbe(): Promise<void> {
 
 async function verifyStructuredFailureShape(): Promise<void> {
   const anon = anonClient();
-  const loadResult = await loadOperationalRefreshDataset(anon, 999_999_999);
+  let anonLoadError: string | null = null;
 
-  record(
-    "Structured dataset load failure (no throw)",
-    !loadResult.ok,
-    loadResult.ok ? "unexpected success" : loadResult.step
-  );
-
-  if (!loadResult.ok) {
-    record(
-      "Structured failure includes step/code/message",
-      Boolean(loadResult.step && loadResult.message),
-      `${loadResult.step}:${loadResult.code ?? "null"}`
-    );
+  try {
+    await loadOperationalRefreshDatasets(anon, [999_999_999]);
+  } catch (error) {
+    anonLoadError = error instanceof Error ? error.message : String(error);
   }
 
-  const refreshResult = await refreshOperationalSummary(anon, {
-    chainId: 999_999_999,
-  });
+  record(
+    "Anon cannot load operational refresh datasets (service role only)",
+    anonLoadError != null,
+    anonLoadError ?? "unexpected success"
+  );
+
+  const refreshResult = await refreshOperationalSummaryForWorker(
+    anon,
+    999_999_999
+  );
 
   record(
-    "Structured refresh failure (no throw)",
-    !refreshResult.ok,
+    "Structured refresh failure without the service role (no throw)",
+    !refreshResult.ok && Boolean(refreshResult.error),
     refreshResult.ok ? "unexpected success" : refreshResult.step ?? "unknown"
   );
 }
@@ -360,26 +359,33 @@ async function verifyExecuteFlow(): Promise<void> {
       participantError?.code ?? `rows=${participantRows?.length ?? 0}`
     );
 
-    const loadResult = await loadOperationalRefreshDataset(
-      ownerClient,
-      chainId
-    );
+    let ownerLoadError: string | null = null;
+    try {
+      await loadOperationalRefreshDatasets(ownerClient, [chainId!]);
+    } catch (error) {
+      ownerLoadError = error instanceof Error ? error.message : String(error);
+    }
 
     record(
-      "loadOperationalRefreshDataset succeeds for authorised chain",
-      loadResult.ok,
-      loadResult.ok ? undefined : `${loadResult.step}:${loadResult.code}`
+      "An authenticated participant cannot load worker datasets (service role only)",
+      ownerLoadError != null,
+      ownerLoadError ?? "unexpected success"
     );
 
-    if (loadResult.ok) {
-      record(
-        "Dataset includes stageEnteredAt for Chain Intelligence",
-        loadResult.dataset.properties.some(
-          (property) => property.stageEnteredAt != null
-        ),
-        "stageEnteredAt present"
-      );
-    }
+    const loaded = await loadOperationalRefreshDatasets(service, [chainId!]);
+    const loadedProperty = loaded.datasets[0]?.properties[0];
+
+    record(
+      "Service dataset includes stageEnteredAt and the activity clock",
+      loadedProperty?.stageEnteredAt != null &&
+        loadedProperty.activityClockAt != null &&
+        loadedProperty.activityClockSource === "stage_entered_at" &&
+        loadedProperty.genuineLastActivityAt === null,
+      JSON.stringify({
+        source: loadedProperty?.activityClockSource,
+        genuine: loadedProperty?.genuineLastActivityAt,
+      })
+    );
 
     const strangerClient = await signIn(strangerEmail, PASSWORD);
     const { data: strangerRows, error: strangerError } =
@@ -408,9 +414,29 @@ async function verifyExecuteFlow(): Promise<void> {
       updateError ? formatPostgrestError(updateError) : `rows=${(updatedRows ?? []).length}`
     );
 
-    const refreshResult = await refreshOperationalSummary(ownerClient, {
-      chainId,
-    });
+    const { data: queuedAfterStage } = await service
+      .from("chain_operational_refresh_queue")
+      .select("chain_id, reason")
+      .eq("chain_id", chainId)
+      .maybeSingle();
+    const { data: missingState } = await ownerClient.rpc(
+      "get_chain_operational_intelligence",
+      { p_chain_id: chainId }
+    );
+
+    record(
+      "Stage update queues the chain; the cached view reports missing before the worker runs",
+      queuedAfterStage != null && missingState?.summary_state === "missing",
+      JSON.stringify({
+        reason: queuedAfterStage?.reason,
+        state: missingState?.summary_state,
+      })
+    );
+
+    const refreshResult = await refreshOperationalSummaryForWorker(
+      service,
+      chainId!
+    );
 
     record(
       "Operational-summary refresh succeeds after stage update",
@@ -483,19 +509,42 @@ async function verifyExecuteFlow(): Promise<void> {
         : `expected=${newStage}; actual=${propertySummary?.current_stage ?? "null"}`
     );
 
-    const invisibleChainResult = await refreshOperationalSummary(
+    const { data: freshState } = await ownerClient.rpc(
+      "get_chain_operational_intelligence",
+      { p_chain_id: chainId }
+    );
+    const { data: strangerState, error: strangerStateError } =
+      await strangerClient.rpc("get_chain_operational_intelligence", {
+        p_chain_id: chainId,
+      });
+    const { data: queuedAfterRefresh } = await service
+      .from("chain_operational_refresh_queue")
+      .select("chain_id")
+      .eq("chain_id", chainId)
+      .maybeSingle();
+
+    record(
+      "After the worker: owner sees a fresh cached summary; the chain left the queue",
+      freshState?.summary_state === "fresh" &&
+        freshState?.summary_version === 3 &&
+        queuedAfterRefresh == null,
+      JSON.stringify({ state: freshState?.summary_state, queued: queuedAfterRefresh != null })
+    );
+    record(
+      "A stranger gets nothing from the cached chain intelligence RPC",
+      !strangerStateError && strangerState == null,
+      strangerStateError ? formatPostgrestError(strangerStateError) : JSON.stringify(strangerState)
+    );
+
+    const invisibleChainResult = await refreshOperationalSummaryForWorker(
       strangerClient,
-      { chainId }
+      chainId!
     );
 
     record(
-      "Secondary refresh failure is structured (stranger on foreign chain)",
-      !invisibleChainResult.ok &&
-        Boolean(invisibleChainResult.step) &&
-        Boolean(invisibleChainResult.error),
-      invisibleChainResult.ok
-        ? "unexpected success"
-        : `${invisibleChainResult.step}:${invisibleChainResult.errorCode}`
+      "A stranger cannot calculate or cache a foreign chain (structured failure)",
+      !invisibleChainResult.ok && Boolean(invisibleChainResult.error),
+      invisibleChainResult.ok ? "unexpected success" : invisibleChainResult.step ?? "unknown"
     );
   } finally {
     if (propertyId != null) {
@@ -509,6 +558,7 @@ async function verifyExecuteFlow(): Promise<void> {
     if (chainId != null) {
       await service.from("chain_operational_summary").delete().eq("chain_id", chainId);
       await service.from("chains").delete().eq("id", chainId);
+      await service.from("chain_operational_refresh_queue").delete().eq("chain_id", chainId);
     }
 
     if (ownerUserId) {

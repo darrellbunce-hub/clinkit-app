@@ -9,7 +9,7 @@ import type {
   UpdateInviteEmailResult,
 } from "@/lib/propertyClaim/invitationTypes";
 import type { ClaimablePropertySummary } from "@/lib/propertyClaim/types";
-import { refreshOperationalSummaryForProperty } from "@/lib/operationalSummary/refreshOperationalSummary";
+import { requestOperationalSummaryRefresh } from "@/lib/operationalSummary/requestOperationalSummaryRefresh";
 
 type InvitationStatusRpc = {
   ok?: boolean;
@@ -203,19 +203,7 @@ async function refreshSummaryAfterInvitationMutation(
     return;
   }
 
-  const refreshResult =
-    await refreshOperationalSummaryForProperty(
-      supabase,
-      propertyId,
-      property.chain_id
-    );
-
-  if (!refreshResult.ok) {
-    console.error(
-      "Operational summary refresh after invitation mutation failed:",
-      refreshResult.error
-    );
-  }
+  await requestOperationalSummaryRefresh(property.chain_id);
 }
 
 export async function rotatePropertyClaimInvitationForDelivery(

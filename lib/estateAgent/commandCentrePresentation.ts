@@ -1,7 +1,16 @@
 import { BUYER_READY_STAGES } from "@/data/buyerReadyStages";
 import { STAGES } from "@/data/stages";
-import type { AgentBranchPropertySummary } from "@/lib/estateAgent/assignmentTypes";
+import {
+  STALE_DAYS_CONFIDENCE,
+  STALE_DAYS_PAGE_ALERT,
+  wholeDaysSinceTimestamp,
+} from "@/lib/activityIntelligence";
+import type {
+  AgentBranchPropertySummary,
+  OperationalSummaryState,
+} from "@/lib/estateAgent/assignmentTypes";
 import { classifyAgentDashboardTab } from "@/lib/estateAgent/classifyAgentDashboard";
+import { isChainInScheduledCompletionMode } from "@/lib/completionLifecycle";
 import { mapChainHealthSlugToLabel } from "@/lib/operationalSummary/mapHealthStatus";
 import {
   getInvitationLifecycleStatus,
@@ -15,6 +24,7 @@ import { toCustomerFacingConfidenceScore } from "@/lib/chainIntelligence/present
 
 export type OperationalPriorityTier =
   | "healthy"
+  | "pending"
   | "attention"
   | "critical";
 
@@ -34,10 +44,13 @@ export type TodaysOperationsKpis = {
 export function getCustomerFacingConfidenceScore(
   summary: Pick<
     AgentBranchPropertySummary,
-    "confidence_score" | "confidence_unavailable"
+    "confidence_score" | "confidence_unavailable" | "summary_state"
   >
 ): number | null {
-  if (summary.confidence_unavailable) {
+  if (
+    summary.confidence_unavailable ||
+    summary.summary_state === "missing"
+  ) {
     return null;
   }
 
@@ -56,6 +69,7 @@ export type ClaimOverviewKpis = {
 
 export type BranchHealthOverview = {
   healthy: number;
+  pending: number;
   attention: number;
   critical: number;
   confidenceHealthy: number;
@@ -87,6 +101,95 @@ export function countAlertsBySeverity(
   ).length;
 }
 
+export function getSummaryState(
+  summary: Pick<
+    AgentBranchPropertySummary,
+    "summary_state" | "health_status" | "confidence_score"
+  >
+): OperationalSummaryState {
+  if (summary.summary_state) {
+    return summary.summary_state;
+  }
+
+  return summary.health_status == null &&
+    summary.confidence_score == null
+    ? "missing"
+    : "fresh";
+}
+
+export function isSummaryMissing(
+  summary: AgentBranchPropertySummary
+): boolean {
+  return getSummaryState(summary) === "missing";
+}
+
+/** Whole days on the live activity clock; null without a clock. */
+export function resolveActivityClockDays(
+  summary: Pick<
+    AgentBranchPropertySummary,
+    "activity_clock_at" | "last_update_at"
+  >,
+  referenceDate: Date = new Date()
+): number | null {
+  return wholeDaysSinceTimestamp(
+    summary.activity_clock_at ?? summary.last_update_at,
+    referenceDate
+  );
+}
+
+/**
+ * Live safety net, independent of the cached summary: the activity clock has
+ * passed the 14-day alert threshold outside scheduled completion.
+ */
+export function hasLiveStaleActivityClock(
+  summary: AgentBranchPropertySummary,
+  referenceDate: Date = new Date()
+): boolean {
+  if (
+    isChainInScheduledCompletionMode({
+      completionLifecycleStatus:
+        summary.completion_lifecycle_status,
+      completionScheduledDate:
+        summary.completion_scheduled_date,
+    })
+  ) {
+    return false;
+  }
+
+  const days = resolveActivityClockDays(
+    summary,
+    referenceDate
+  );
+
+  return days != null && days > STALE_DAYS_PAGE_ALERT;
+}
+
+function hasLiveCriticalActivityClock(
+  summary: AgentBranchPropertySummary,
+  referenceDate: Date = new Date()
+): boolean {
+  if (!hasLiveStaleActivityClock(summary, referenceDate)) {
+    return false;
+  }
+
+  const days = resolveActivityClockDays(
+    summary,
+    referenceDate
+  );
+
+  return days != null && days > STALE_DAYS_CONFIDENCE;
+}
+
+/** Cached needs_attention, or the live 14-day activity clock. */
+export function summaryRequiresOperationalAction(
+  summary: AgentBranchPropertySummary
+): boolean {
+  return (
+    summary.needs_attention === true ||
+    hasLiveStaleActivityClock(summary)
+  );
+}
+
 export function getOperationalPriorityTier(
   summary: AgentBranchPropertySummary
 ): OperationalPriorityTier {
@@ -95,18 +198,23 @@ export function getOperationalPriorityTier(
   if (
     alerts.some(
       (alert) => alert.severity === "critical"
-    )
+    ) ||
+    hasLiveCriticalActivityClock(summary)
   ) {
     return "critical";
   }
 
   if (
-    summary.needs_attention ||
+    summaryRequiresOperationalAction(summary) ||
     alerts.some(
       (alert) => alert.severity === "warning"
     )
   ) {
     return "attention";
+  }
+
+  if (isSummaryMissing(summary)) {
+    return "pending";
   }
 
   return "healthy";
@@ -147,7 +255,7 @@ export function filterActionRequiredSummaries(
 ): AgentBranchPropertySummary[] {
   return filterActiveSummaries(summaries).filter(
     (summary) =>
-      summary.needs_attention === true ||
+      summaryRequiresOperationalAction(summary) ||
       isInvitationExpiredPriority(summary) ||
       isInvitationActivePriority(summary) ||
       isReadyToInvitePriority(summary) ||
@@ -233,8 +341,9 @@ export function sortManagedPropertySummaries(
       OperationalPriorityTier,
       number
     > = {
-      critical: 3,
-      attention: 2,
+      critical: 4,
+      attention: 3,
+      pending: 2,
       healthy: 1,
     };
 
@@ -251,8 +360,11 @@ export function sortManagedPropertySummaries(
       );
     }
 
-    if (left.needs_attention !== right.needs_attention) {
-      return left.needs_attention ? -1 : 1;
+    const leftAction = summaryRequiresOperationalAction(left);
+    const rightAction = summaryRequiresOperationalAction(right);
+
+    if (leftAction !== rightAction) {
+      return leftAction ? -1 : 1;
     }
 
     return compareLeastRecentlyUpdatedFirst(left, right);
@@ -271,10 +383,9 @@ export function computeTodaysOperationsKpis(
     )
   );
 
-  const needsAttention =
-    activeSummaries.filter(
-      (summary) => summary.needs_attention
-    ).length;
+  const needsAttention = activeSummaries.filter(
+    summaryRequiresOperationalAction
+  ).length;
 
   const critical = activeSummaries.filter(
     (summary) =>
@@ -385,6 +496,11 @@ export function computeBranchHealthOverview(
         getOperationalPriorityTier(summary) ===
         "healthy"
     ).length,
+    pending: activeSummaries.filter(
+      (summary) =>
+        getOperationalPriorityTier(summary) ===
+        "pending"
+    ).length,
     attention: activeSummaries.filter(
       (summary) =>
         getOperationalPriorityTier(summary) ===
@@ -481,6 +597,38 @@ export function formatHealthLabel(
   );
 }
 
+export const SUMMARY_NOT_YET_CALCULATED_LABEL =
+  "Not yet calculated";
+
+export const SUMMARY_UPDATING_LABEL = "Updating";
+
+/** A missing summary never presents a health status. */
+export function formatSummaryHealthLabel(
+  summary: AgentBranchPropertySummary
+): string {
+  if (isSummaryMissing(summary)) {
+    return SUMMARY_NOT_YET_CALCULATED_LABEL;
+  }
+
+  return formatHealthLabel(summary.health_status);
+}
+
+export function getSummaryHealthStatusClasses(
+  summary: AgentBranchPropertySummary
+): string {
+  return getHealthStatusClasses(
+    isSummaryMissing(summary)
+      ? null
+      : summary.health_status
+  );
+}
+
+export function isSummaryUpdating(
+  summary: AgentBranchPropertySummary
+): boolean {
+  return getSummaryState(summary) === "stale";
+}
+
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
 const LONDON_CALENDAR_DATE = new Intl.DateTimeFormat(
@@ -527,6 +675,27 @@ export function resolveDaysSinceLastUpdate(
     0,
     londonCalendarDayNumber(referenceDate) -
       londonCalendarDayNumber(updatedAt)
+  );
+}
+
+/**
+ * Europe/London calendar days on the live activity clock (genuine activity,
+ * else stage entry / creation). Used for staleness wording only; "Last
+ * updated" stays on genuine activity.
+ */
+export function resolveDaysOnActivityClock(
+  summary: Pick<
+    AgentBranchPropertySummary,
+    "activity_clock_at" | "last_update_at"
+  >,
+  referenceDate: Date = new Date()
+): number | null {
+  return resolveDaysSinceLastUpdate(
+    {
+      last_update_at:
+        summary.activity_clock_at ?? summary.last_update_at ?? null,
+    },
+    referenceDate
   );
 }
 
@@ -603,6 +772,8 @@ export function getPriorityTierCardClasses(
       return "border-red-200 bg-red-50/40";
     case "attention":
       return "border-amber-200 bg-amber-50/40";
+    case "pending":
+      return "border-slate-200 bg-slate-50/60";
     default:
       return "border-slate-200 bg-white";
   }

@@ -9,7 +9,8 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 /**
- * Daily Chain Intelligence time-only refresh worker (vercel.json, 05:30 UTC).
+ * Chain Intelligence worker (vercel.json): missing, queued and time-due
+ * operational summaries.
  *
  * Secured via Authorization: Bearer ${CRON_SECRET}.
  */
@@ -22,7 +23,10 @@ export async function GET(request: Request) {
 
   try {
     const supabase = createServiceRoleSupabaseClient();
-    const result = await runChainIntelligenceWorkerBatch(supabase);
+    const result = await runChainIntelligenceWorkerBatch(supabase, {
+      maxBatches: 10,
+      timeBudgetMs: 240_000,
+    });
 
     return NextResponse.json({
       ok: true,

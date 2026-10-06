@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { finalizeOperationalSaleCreation } from "@/lib/estateAgent/finalizeOperationalSaleCreation";
 import type { SellerOnwardPlan } from "@/lib/estateAgent/sellerOnwardPlan";
-import { refreshOperationalSummary } from "@/lib/operationalSummary/refreshOperationalSummary";
+import { requestOperationalSummaryRefresh } from "@/lib/operationalSummary/requestOperationalSummaryRefresh";
 import {
   convertSearchingPlaceholder,
   createSearchingPlaceholderForSale,
@@ -58,19 +58,7 @@ export async function completeEaManagedPropertyOrigination(
       };
     }
 
-    const refreshResult =
-      await refreshOperationalSummary(supabase, {
-        chainId: input.chainId,
-      });
-
-    if (!refreshResult.ok) {
-      return {
-        ok: false,
-        error:
-          refreshResult.error ??
-          "summary_refresh_failed",
-      };
-    }
+    await requestOperationalSummaryRefresh(input.chainId);
 
     return { ok: true };
   }

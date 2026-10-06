@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { createSearchingPlaceholderForSale } from "@/lib/searchingPlaceholder";
-import { refreshOperationalSummary } from "@/lib/operationalSummary/refreshOperationalSummary";
+import { requestOperationalSummaryRefresh } from "@/lib/operationalSummary/requestOperationalSummaryRefresh";
 
 export type FinalizeOperationalSaleCreationParams = {
   chainId: number;
@@ -16,49 +16,20 @@ export async function finalizeOperationalSaleCreation(
   supabase: SupabaseClient,
   params: FinalizeOperationalSaleCreationParams
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  if (params.endOfChain) {
-    if (params.refreshSummaries) {
-      const refreshResult =
-        await refreshOperationalSummary(supabase, {
-          chainId: params.chainId,
-        });
+  if (!params.endOfChain) {
+    const attachResult =
+      await createSearchingPlaceholderForSale(supabase, {
+        salePropertyId: params.salePropertyId,
+      });
 
-      if (!refreshResult.ok) {
-        return {
-          ok: false,
-          error:
-            refreshResult.error ??
-            "summary_refresh_failed",
-        };
-      }
+    if (!attachResult.ok) {
+      return attachResult;
     }
-
-    return { ok: true };
-  }
-
-  const attachResult =
-    await createSearchingPlaceholderForSale(supabase, {
-      salePropertyId: params.salePropertyId,
-    });
-
-  if (!attachResult.ok) {
-    return attachResult;
   }
 
   if (params.refreshSummaries) {
-    const refreshResult =
-      await refreshOperationalSummary(supabase, {
-        chainId: params.chainId,
-      });
-
-    if (!refreshResult.ok) {
-      return {
-        ok: false,
-        error:
-          refreshResult.error ??
-          "summary_refresh_failed",
-      };
-    }
+    // The property insert already queued the chain; this only speeds it up.
+    await requestOperationalSummaryRefresh(params.chainId);
   }
 
   return { ok: true };

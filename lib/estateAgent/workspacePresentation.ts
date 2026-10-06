@@ -7,7 +7,9 @@ import {
   filterActionRequiredSummaries,
   filterUpcomingCompletionSummaries,
   getHighestPriorityAlert,
-  resolveDaysSinceLastUpdate,
+  hasLiveStaleActivityClock,
+  isSummaryMissing,
+  resolveDaysOnActivityClock,
 } from "@/lib/estateAgent/commandCentrePresentation";
 import type { InvitationLifecycleStatus } from "@/lib/propertyClaim/invitationTypes";
 import { INVITATION_DECLINED_ACTION_REASON } from "@/lib/propertyClaim/invitationDeclinedPresentation";
@@ -24,6 +26,7 @@ import {
 
 export type OperationalHealthLevel =
   | "normal"
+  | "pending"
   | "attention"
   | "critical";
 
@@ -57,6 +60,8 @@ export function getOperationalHealthStatusLabel(
       return "IMMEDIATE ACTION REQUIRED";
     case "attention":
       return "ATTENTION REQUIRED";
+    case "pending":
+      return "CALCULATING";
     default:
       return "OPERATING NORMALLY";
   }
@@ -70,6 +75,8 @@ export function getOperationalHealthHeadline(
       return "Immediate operational action required";
     case "attention":
       return "Attention required";
+    case "pending":
+      return "Operational status is being calculated";
     default:
       return "Branch operating normally";
   }
@@ -82,13 +89,16 @@ function formatTransactionCount(count: number): string {
 export function getOperationalHealthSummarySentence(
   level: OperationalHealthLevel,
   actionRequiredCount: number,
-  activeTransactions: number
+  activeTransactions: number,
+  pendingCount = 0
 ): string {
   switch (level) {
     case "critical":
       return `${formatTransactionCount(actionRequiredCount)} need immediate review`;
     case "attention":
       return `${formatTransactionCount(actionRequiredCount)} require${actionRequiredCount === 1 ? "s" : ""} attention`;
+    case "pending":
+      return `${formatTransactionCount(pendingCount)} not yet calculated`;
     default:
       return `${formatTransactionCount(activeTransactions)} progressing normally`;
   }
@@ -144,6 +154,10 @@ export function resolveOperationalHealthLevel(
     return "attention";
   }
 
+  if (branchHealth.pending > 0) {
+    return "pending";
+  }
+
   return "normal";
 }
 
@@ -165,6 +179,8 @@ export function buildOperationalBriefModel(
 
   const healthLevel =
     resolveOperationalHealthLevel(summaries);
+  const pendingCount =
+    computeBranchHealthOverview(summaries).pending;
 
   const requiresActionTone: BriefKpiTone =
     actionRequired.length > 0
@@ -183,7 +199,8 @@ export function buildOperationalBriefModel(
       getOperationalHealthSummarySentence(
         healthLevel,
         actionRequired.length,
-        operationsKpis.activeChains
+        operationsKpis.activeChains,
+        pendingCount
       ),
     reassuranceSentence:
       getOperationalHealthReassuranceSentence(
@@ -326,12 +343,25 @@ function buildReasonCandidates(
     reasons.push("Invite homeowner");
   }
 
-  for (const alert of summary.operational_alerts ??
-    []) {
+  const alerts = summary.operational_alerts ?? [];
+
+  for (const alert of alerts) {
     reasons.push(
       getWorkspaceAlertReason(
         alert.code,
-        resolveDaysSinceLastUpdate(summary)
+        resolveDaysOnActivityClock(summary)
+      )
+    );
+  }
+
+  if (
+    hasLiveStaleActivityClock(summary) &&
+    !alerts.some((alert) => alert.code === "stale_update")
+  ) {
+    reasons.push(
+      getWorkspaceAlertReason(
+        "stale_update",
+        resolveDaysOnActivityClock(summary)
       )
     );
   }
@@ -490,6 +520,8 @@ export function getBriefHealthIndicatorClasses(
       return "bg-status-critical";
     case "attention":
       return "bg-status-warning";
+    case "pending":
+      return "bg-status-unknown";
     default:
       return "bg-status-success";
   }
@@ -520,6 +552,14 @@ export function getBriefHealthHeroClasses(
         icon: "text-status-warning",
         headline: "text-status-warning-text",
         indicator: "bg-status-warning",
+      };
+    case "pending":
+      return {
+        panel: "bg-status-unknown-soft",
+        accent: "border-surface-card-border",
+        icon: "text-text-muted",
+        headline: "text-text-charcoal",
+        indicator: "bg-status-unknown",
       };
     default:
       return {
@@ -630,29 +670,19 @@ export function getManagedPropertyOperationalState(
     return "Homeowner declined invitation";
   }
 
-  if (isInvitationEligibleSummary(summary)) {
-    const topAlert = getHighestPriorityAlert(summary);
-
-    if (topAlert) {
-      return getWorkspaceAlertReason(
-        topAlert.code,
-        resolveDaysSinceLastUpdate(summary)
-      );
-    }
-
-    if (summary.needs_attention) {
-      return "Needs attention";
-    }
-
-    return "Progressing normally";
-  }
-
   const topAlert = getHighestPriorityAlert(summary);
 
   if (topAlert) {
     return getWorkspaceAlertReason(
       topAlert.code,
-      resolveDaysSinceLastUpdate(summary)
+      resolveDaysOnActivityClock(summary)
+    );
+  }
+
+  if (hasLiveStaleActivityClock(summary)) {
+    return getWorkspaceAlertReason(
+      "stale_update",
+      resolveDaysOnActivityClock(summary)
     );
   }
 
@@ -660,8 +690,15 @@ export function getManagedPropertyOperationalState(
     return "Needs attention";
   }
 
+  if (isSummaryMissing(summary)) {
+    return MANAGED_PROPERTY_CALCULATING_STATE;
+  }
+
   return "Progressing normally";
 }
+
+export const MANAGED_PROPERTY_CALCULATING_STATE =
+  "Calculating operational status";
 
 export function isDeferredInvitationSummary(
   summary: Pick<

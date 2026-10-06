@@ -11,14 +11,16 @@ import EstateAgentManagementModeBadge from "@/components/estate-agents/EstateAge
 import type { AgentBranchPropertySummary } from "@/lib/estateAgent/assignmentTypes";
 import {
   formatDaysSinceLastUpdate,
-  formatHealthLabel,
   formatManagedStageLabel,
   formatPropertyAddress,
   formatPropertyLocationLine,
+  formatSummaryHealthLabel,
   getCustomerFacingConfidenceScore,
-  getHealthStatusClasses,
   getOperationalPriorityTier,
+  getSummaryHealthStatusClasses,
+  isSummaryUpdating,
   resolveDaysSinceLastUpdate,
+  SUMMARY_UPDATING_LABEL,
 } from "@/lib/estateAgent/commandCentrePresentation";
 import {
   FONT_HEADING_CLASS,
@@ -154,12 +156,16 @@ export default function OperationalPropertyCard({
 
         <div className="flex flex-wrap items-center gap-2">
           <span
-            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${getHealthStatusClasses(summary.health_status)}`}
+            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${getSummaryHealthStatusClasses(summary)}`}
           >
-            {formatHealthLabel(
-              summary.health_status
-            )}
+            {formatSummaryHealthLabel(summary)}
           </span>
+
+          {isSummaryUpdating(summary) ? (
+            <span className="inline-flex rounded-full bg-status-unknown-soft px-2.5 py-1 text-xs font-medium text-text-muted">
+              {SUMMARY_UPDATING_LABEL}
+            </span>
+          ) : null}
 
           <span className="text-sm text-text-muted">
             {formatManagedStageLabel(

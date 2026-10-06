@@ -16,6 +16,12 @@ export type IntelligenceProperty = {
    * When undefined/null, falls back to legacy latest-activity delay detection.
    */
   hasActiveOperationalDelay?: boolean | null;
+  /**
+   * Server activity clock (property_operational_clock): latest genuine
+   * activity, else the documented fallback. When undefined, staleness falls
+   * back to the latest of `activities`.
+   */
+  activityClockAt?: string | null;
 };
 
 export type StageDefinition = {

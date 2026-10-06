@@ -1,8 +1,4 @@
-import type { OperationalRefreshDatasetLoadStep } from "@/lib/operationalSummary/loadOperationalRefreshDatasetResult";
-
-export type RefreshOperationalSummaryStep =
-  | OperationalRefreshDatasetLoadStep
-  | "persist";
+export type RefreshOperationalSummaryStep = "load" | "derive" | "persist";
 
 export type RefreshOperationalSummaryResult = {
   ok: boolean;

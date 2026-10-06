@@ -144,6 +144,53 @@ export function daysSinceLastActivity(
   );
 }
 
+/** Whole 24-hour periods since a timestamp; null when absent or invalid. */
+export function wholeDaysSinceTimestamp(
+  timestamp: string | null | undefined,
+  referenceDate: Date = new Date()
+): number | null {
+  if (!timestamp) {
+    return null;
+  }
+
+  const ms = new Date(timestamp).getTime();
+
+  if (Number.isNaN(ms)) {
+    return null;
+  }
+
+  return Math.floor(
+    (referenceDate.getTime() - ms) / (1000 * 60 * 60 * 24)
+  );
+}
+
+/**
+ * Days on the staleness clock. A defined `activityClockAt` (server clock:
+ * genuine activity, else stage entry / creation) is authoritative; otherwise
+ * the latest of `activities` is used.
+ */
+export function daysSinceOperationalClock(
+  params: {
+    activityClockAt?: string | null;
+    activities?: OperationalActivity[] | null;
+  },
+  referenceDate: Date = new Date()
+): number {
+  if (params.activityClockAt !== undefined) {
+    return (
+      wholeDaysSinceTimestamp(
+        params.activityClockAt,
+        referenceDate
+      ) ?? 0
+    );
+  }
+
+  return daysSinceLastActivity(
+    params.activities,
+    referenceDate
+  );
+}
+
 export function countActiveDelayReports(params: {
   propertyActivitiesList: OperationalActivity[][];
   buyerReadyActivities?:

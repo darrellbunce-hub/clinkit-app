@@ -14,9 +14,10 @@
  *   E   system notice newer than genuine -> the genuine activity
  *   E2  system notices only              -> NULL
  *   M   genuine activity with no summary row is shown
- *   F   summary recalculation (homeowner client) changes nothing
- *   G   chain-intelligence refresh (service role) changes nothing
- *   K   a client-written summary last_update_at changes nothing
+ *   F   a homeowner summary request only queues the chain
+ *   G   chain-intelligence refresh (service role) changes nothing; the
+ *       cache agrees with the dashboard and the chain leaves the queue
+ *   K   a client-written summary last_update_at is ignored
  *   H   lifecycle transition + archive changes nothing; a revoked branch
  *       does not see activity after its revocation
  *   I   repeated dashboard loads change nothing and write nothing
@@ -43,10 +44,7 @@ import {
   formatDaysSinceLastUpdate,
   resolveDaysSinceLastUpdate,
 } from "../lib/estateAgent/commandCentrePresentation";
-import {
-  refreshOperationalSummary,
-  refreshOperationalSummaryForWorker,
-} from "../lib/operationalSummary/refreshOperationalSummary";
+import { refreshOperationalSummaryForWorker } from "../lib/operationalSummary/refreshOperationalSummary";
 
 const DEVELOPMENT_SUPABASE_PROJECT_REF = "bbbsxzxcjkmpqsfvmhbo";
 const PASSWORD = "DashLastUpdateVerify123!";
@@ -456,32 +454,33 @@ async function run(ctx: Ctx) {
   );
 
   // -------------------------------------------------------------------------
-  // F: summary recalculation by the homeowner client
+  // F: a homeowner-client summary request only queues the chain
   // -------------------------------------------------------------------------
   const refreshErrors: string[] = [];
   for (const f of all) {
-    const result = await refreshOperationalSummary(f.client, { chainId: f.chainId });
-    if (!result.ok) refreshErrors.push(`${f.propertyId}:${result.error}`);
+    const { error } = await f.client.rpc("upsert_operational_summaries", {
+      p_chain_summary: { chain_id: f.chainId },
+      p_property_summaries: [],
+    });
+    if (error) refreshErrors.push(`${f.propertyId}:${error.message}`);
   }
-  const { data: cache } = await admin
+  const { data: cacheAfterClient } = await admin
     .from("property_operational_summary")
-    .select("property_id, last_update_at, days_since_last_update")
+    .select("property_id")
     .in("property_id", ids);
-  const cacheOf = (id: number) => (cache ?? []).find((c) => c.property_id === id);
+  const { data: queuedAfterClient } = await admin
+    .from("chain_operational_refresh_queue")
+    .select("chain_id")
+    .in("chain_id", all.map((f) => f.chainId));
   const v1 = await dashboard();
   record(
-    "F: summary recalculation does not change Last updated for any fixture",
-    refreshErrors.length === 0 && snapshot(v1) === snapshot(v0),
-    refreshErrors.join("; ") || undefined
-  );
-  record(
-    "F: the cached summary still has the old defects (0 days without activity; system notice as latest) and the dashboard ignores them",
-    cacheOf(pNone.propertyId)?.days_since_last_update === 0 &&
-      cacheOf(pNone.propertyId)?.last_update_at == null &&
-      sameInstant(cacheOf(pSystemNewer.propertyId)?.last_update_at, systemNewerNotice.timestamp) &&
-      label(v1.get(pNone.propertyId)) === "No updates recorded" &&
-      label(v1.get(pSystemNewer.propertyId)) === `${calendarDaysAgo(5)} days since last update`,
-    JSON.stringify({ none: cacheOf(pNone.propertyId), sysNewer: cacheOf(pSystemNewer.propertyId) })
+    "F: a homeowner summary request queues the chain, writes no summary and changes no Last updated",
+    refreshErrors.length === 0 &&
+      (cacheAfterClient ?? []).length === 0 &&
+      (queuedAfterClient ?? []).length === all.length &&
+      snapshot(v1) === snapshot(v0),
+    refreshErrors.join("; ") ||
+      JSON.stringify({ cache: (cacheAfterClient ?? []).length, queued: (queuedAfterClient ?? []).length })
   );
 
   // -------------------------------------------------------------------------
@@ -497,6 +496,30 @@ async function run(ctx: Ctx) {
     "G: chain-intelligence refresh does not change Last updated for any fixture",
     workerErrors.length === 0 && snapshot(v2) === snapshot(v0),
     workerErrors.join("; ") || undefined
+  );
+  const { data: cache } = await admin
+    .from("property_operational_summary")
+    .select("property_id, last_update_at, activity_clock_source, summary_version")
+    .in("property_id", ids);
+  const cacheOf = (id: number) => (cache ?? []).find((c) => c.property_id === id);
+  record(
+    "G: the cached summary agrees with the dashboard (no activity → null; system notice ignored)",
+    cacheOf(pNone.propertyId)?.last_update_at == null &&
+      cacheOf(pNone.propertyId)?.activity_clock_source !== "genuine_activity" &&
+      sameInstant(cacheOf(pSystemNewer.propertyId)?.last_update_at, systemNewerGenuine.timestamp) &&
+      cacheOf(pSystemOnly.propertyId)?.last_update_at == null &&
+      sameInstant(cacheOf(pOlder.propertyId)?.last_update_at, olderActivity.timestamp) &&
+      (cache ?? []).every((c) => c.summary_version === 3),
+    JSON.stringify({ none: cacheOf(pNone.propertyId), sysNewer: cacheOf(pSystemNewer.propertyId) })
+  );
+  const { data: v2Queue } = await admin
+    .from("chain_operational_refresh_queue")
+    .select("chain_id")
+    .in("chain_id", all.map((f) => f.chainId));
+  record(
+    "G: a processed chain leaves the refresh queue",
+    (v2Queue ?? []).length === 0,
+    `queued=${(v2Queue ?? []).length}`
   );
 
   // -------------------------------------------------------------------------
@@ -527,9 +550,10 @@ async function run(ctx: Ctx) {
     .maybeSingle();
   const v3 = await dashboard();
   record(
-    "K: a client-written summary last_update_at (now, 0 days) does not reach the dashboard",
+    "K: a client-written summary last_update_at is ignored (not cached) and does not reach the dashboard",
     !forgeError &&
-      sameInstant(forgedCache?.last_update_at as string | undefined, forged) &&
+      !sameInstant(forgedCache?.last_update_at as string | undefined, forged) &&
+      sameInstant(forgedCache?.last_update_at as string | undefined, olderActivity.timestamp) &&
       label(v3.get(pOlder.propertyId)) === `${olderExpectedDays} days since last update` &&
       snapshot(v3) === snapshot(v0),
     JSON.stringify({ forgeError: forgeError?.message, cache: forgedCache?.last_update_at })
@@ -667,6 +691,10 @@ async function cleanup(ctx: Ctx): Promise<void> {
     warn("chain_nodes", (await admin.from("chain_nodes").delete().eq("chain_id", chainId)).error);
     warn("chain_operational_summary", (await admin.from("chain_operational_summary").delete().eq("chain_id", chainId)).error);
     warn("chains", (await admin.from("chains").delete().eq("id", chainId)).error);
+    warn(
+      "chain_operational_refresh_queue",
+      (await admin.from("chain_operational_refresh_queue").delete().eq("chain_id", chainId)).error
+    );
   }
 
   // Deleting the branch cascades its members (the owner invariant forbids removing them first).

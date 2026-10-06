@@ -4,7 +4,7 @@ import type { ClaimOperationalPropertyResult } from "@/lib/propertyClaim/types";
 import {
   mapTransactionParticipationError,
 } from "@/lib/auth/emailVerificationGate";
-import { refreshOperationalSummary } from "@/lib/operationalSummary/refreshOperationalSummary";
+import { requestOperationalSummaryRefresh } from "@/lib/operationalSummary/requestOperationalSummaryRefresh";
 
 type ClaimRpcResult = {
   ok?: boolean;
@@ -53,17 +53,7 @@ export async function claimOperationalProperty(
     };
   }
 
-  const refreshResult =
-    await refreshOperationalSummary(supabase, {
-      chainId: result.chain_id,
-    });
-
-  if (!refreshResult.ok) {
-    console.error(
-      "Operational summary refresh after claim failed:",
-      refreshResult.error
-    );
-  }
+  await requestOperationalSummaryRefresh(result.chain_id);
 
   return {
     ok: true,

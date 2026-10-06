@@ -35,6 +35,15 @@ const NAMED_VIEWS = [
   "ea_operational_assignments",
 ] as const;
 
+/** Internal activity-clock views; never granted to anon or authenticated. */
+const SERVICE_ROLE_ONLY_VIEWS = [
+  "property_operational_clock_fallback",
+  "property_operational_clock",
+  "chain_node_operational_clock",
+] as const;
+const SERVICE_ROLE_ONLY_VIEWS_MIGRATION =
+  "20261006120000_operational_intelligence_refresh_queue.sql";
+
 type NamedView = (typeof NAMED_VIEWS)[number];
 type TestResult = { name: string; pass: boolean; detail?: string };
 
@@ -266,8 +275,25 @@ function runStaticMigrationChecks(): void {
     }
   }
 
+  const clockMigration = readProjectFile(
+    join("supabase", "migrations", SERVICE_ROLE_ONLY_VIEWS_MIGRATION)
+  );
+  for (const view of SERVICE_ROLE_ONLY_VIEWS) {
+    otherViews.delete(view);
+    record(
+      `Migration: ${view} is service_role only (revoked from public, anon, authenticated)`,
+      clockMigration.includes(
+        `revoke all on public.${view} from public, anon, authenticated;`
+      ) &&
+        clockMigration.includes(`grant select on public.${view} to service_role;`) &&
+        !new RegExp(`grant[^;]*on public\\.${view}\\b[^;]*to (anon|authenticated)`, "i").test(
+          clockMigration
+        )
+    );
+  }
+
   record(
-    "No additional public-schema views created in migrations beyond the five named",
+    "No additional public-schema views created in migrations beyond the five named (and the service-role-only clocks)",
     otherViews.size === 0,
     otherViews.size === 0 ? "only five views" : [...otherViews].join(",")
   );

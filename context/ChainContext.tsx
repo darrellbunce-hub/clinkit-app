@@ -73,8 +73,10 @@ import {
   resolveActivityUpdaterRole,
   resolveMutationOperationalPosition,
 } from "@/lib/mutationPermission";
-import { refreshOperationalSummary } from "@/lib/operationalSummary/refreshOperationalSummary";
-import type { RefreshOperationalSummaryResult } from "@/lib/operationalSummary/refreshOperationalSummaryResult";
+import {
+  requestOperationalSummaryRefresh,
+  type OperationalSummaryRefreshRequestResult,
+} from "@/lib/operationalSummary/requestOperationalSummaryRefresh";
 import { captureObservabilityException } from "@/lib/observability/sentryShared";
 type Activity = OperationalActivity;
 
@@ -134,6 +136,8 @@ type ChainContextType = {
   participantDataReady: boolean;
   isAuthenticated: boolean;
   refreshParticipantData: () => Promise<void>;
+  /** Increments after each operational summary refresh request settles. */
+  operationalIntelligenceRevision: number;
 
   updatePropertyStage: (
     propertyId: number,
@@ -548,6 +552,10 @@ const [chains, setChains] =
     useState(false);
   const [isAuthenticated, setIsAuthenticated] =
     useState(false);
+  const [
+    operationalIntelligenceRevision,
+    setOperationalIntelligenceRevision,
+  ] = useState(0);
 
   const pathname = usePathname();
   const shouldLoadParticipantData =
@@ -871,35 +879,22 @@ const [chains, setChains] =
   const getActivityUpdaterRole = () =>
     resolveActivityUpdaterRole(accountType);
 
-  function reportOperationalSummaryRefreshFailure(
-    result: RefreshOperationalSummaryResult
-  ) {
-    if (result.ok) {
-      return;
-    }
-
-    captureObservabilityException(
-      new Error(
-        result.error ?? "operational_summary_refresh_failed"
-      ),
-      {
-        operation: "refresh_operational_summary",
-        errorCode: result.errorCode ?? undefined,
-      }
-    );
-  }
-
   async function refreshOperationalSummariesForChain(
     chainId: number
-  ): Promise<RefreshOperationalSummaryResult> {
-    const result = await refreshOperationalSummary(
-      supabase,
-      { chainId }
-    );
+  ): Promise<OperationalSummaryRefreshRequestResult> {
+    const result =
+      await requestOperationalSummaryRefresh(chainId);
 
     if (!result.ok) {
-      reportOperationalSummaryRefreshFailure(result);
+      captureObservabilityException(
+        new Error("operational_summary_refresh_request_failed"),
+        { operation: "refresh_operational_summary" }
+      );
     }
+
+    setOperationalIntelligenceRevision(
+      (revision) => revision + 1
+    );
 
     return result;
   }
@@ -1892,6 +1887,7 @@ return (
         participantDataReady,
         isAuthenticated,
         refreshParticipantData,
+        operationalIntelligenceRevision,
         updatePropertyStage,
         addStructuredUpdate,
         reportOperationalDelay,

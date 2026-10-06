@@ -40,6 +40,7 @@
     { "schema": "public", "name": "get_active_ea_branch_invitation", "args": "uuid, text", "reason": "user_facing_product_rpc" },
     { "schema": "public", "name": "get_auth_user_ea_branch_ids", "args": "", "reason": "user_facing_product_rpc" },
     { "schema": "public", "name": "get_auth_user_email", "args": "", "reason": "user_facing_product_rpc" },
+    { "schema": "public", "name": "get_chain_operational_intelligence", "args": "bigint", "reason": "user_facing_product_rpc" },
     { "schema": "public", "name": "get_property_lifecycle_status", "args": "bigint", "reason": "user_facing_product_rpc" },
     { "schema": "public", "name": "get_ea_branch_subscription_summary", "args": "uuid", "reason": "user_facing_product_rpc" },
     { "schema": "public", "name": "get_ea_branch_team_directory", "args": "uuid", "reason": "user_facing_product_rpc" },

@@ -6,11 +6,15 @@ import {
 import { evaluateOperationalAlerts } from "@/lib/operationalAlerts/registry";
 import { OPERATIONAL_SUMMARY_VERSION } from "@/lib/operationalSummary/constants";
 import {
-  daysSinceLastActivity,
+  daysSinceOperationalClock,
   hasActiveDelayReport,
+  type OperationalActivity,
   STALE_DAYS_PAGE_ALERT,
 } from "@/lib/activityIntelligence";
-import { isBuyerReadyOperationallyStale } from "@/lib/chainIntelligence";
+import {
+  isBuyerReadyOperationallyStale,
+  isConfidenceScopeProperty,
+} from "@/lib/chainIntelligence";
 import {
   COMPLETION_LIFECYCLE_STATUS,
   isChainInScheduledCompletionMode,
@@ -25,13 +29,45 @@ import type {
   PropertyOperationalSummaryRecord,
 } from "@/lib/operationalSummary/types";
 
+function genuineOrLatestActivityAt(target: {
+  genuineLastActivityAt?: string | null;
+  activities: OperationalActivity[];
+}): string | null {
+  if (target.genuineLastActivityAt !== undefined) {
+    return target.genuineLastActivityAt;
+  }
+
+  return getLatestActivityTimestamp([target.activities]);
+}
+
+function latestTimestamp(
+  timestamps: Array<string | null>
+): string | null {
+  let latest: string | null = null;
+
+  for (const timestamp of timestamps) {
+    if (
+      timestamp &&
+      (!latest ||
+        new Date(timestamp).getTime() >
+          new Date(latest).getTime())
+    ) {
+      latest = timestamp;
+    }
+  }
+
+  return latest;
+}
+
 export function derivePropertySummary(params: {
   property: OperationalRefreshDataset["properties"][number];
   dataset: OperationalRefreshDataset;
   chainSummary: ChainOperationalSummaryRecord;
+  referenceDate?: Date;
 }): PropertyOperationalSummaryRecord {
   const { property, dataset, chainSummary } =
     params;
+  const referenceDate = params.referenceDate ?? new Date();
 
   const scheduledCompletionMode =
     isChainInScheduledCompletionMode({
@@ -41,11 +77,14 @@ export function derivePropertySummary(params: {
         dataset.chain.completionScheduledDate,
     });
 
-  const daysSinceLastUpdate =
-    daysSinceLastActivity(property.activities);
+  const daysSinceLastUpdate = daysSinceOperationalClock(
+    property,
+    referenceDate
+  );
 
   const staleUpdate =
     !scheduledCompletionMode &&
+    isConfidenceScopeProperty(property) &&
     daysSinceLastUpdate > STALE_DAYS_PAGE_ALERT;
 
   const buyerReadyNode =
@@ -82,6 +121,9 @@ export function derivePropertySummary(params: {
         },
         buyerReadyActivities:
           buyerReadyNode.activities,
+        buyerReadyActivityClockAt:
+          buyerReadyNode.activityClockAt,
+        referenceDate,
       })
     : false;
 
@@ -112,27 +154,21 @@ export function derivePropertySummary(params: {
       scheduledCompletionMode,
     });
 
-  const lastUpdateAt = getLatestActivityTimestamp([
-    property.activities,
-    buyerReadyNode?.activities ?? [],
-  ]);
+  // Property-level "last updated" never includes Buyer Ready or other
+  // properties' activity; Buyer Ready feeds chain health separately.
+  const propertyLastUpdateAt =
+    genuineOrLatestActivityAt(property);
 
-  const buyerReadyLastUpdate =
-    buyerReadyNode &&
-    buyerReadyNode.activities.length > 0
-      ? getLatestActivityTimestamp([
-          buyerReadyNode.activities,
-        ])
-      : null;
+  const buyerReadyLastUpdate = buyerReadyNode
+    ? genuineOrLatestActivityAt(buyerReadyNode)
+    : null;
 
   return {
     property_id: property.id,
     chain_id: dataset.chain.id,
     current_stage: property.stage,
     property_status: property.status,
-    last_update_at: getLatestActivityTimestamp([
-      property.activities,
-    ]),
+    last_update_at: propertyLastUpdateAt,
     days_since_last_update: daysSinceLastUpdate,
     stale_update: staleUpdate,
     buyer_ready_stage: buyerReadyNode?.stage ?? null,
@@ -157,15 +193,29 @@ export function derivePropertySummary(params: {
       deriveNextRecommendedAction(
         operationalAlerts
       ),
-    computed_at: new Date().toISOString(),
+    computed_at: referenceDate.toISOString(),
     summary_version: OPERATIONAL_SUMMARY_VERSION,
-    derived_from_activity_at: lastUpdateAt,
+    derived_from_activity_at: latestTimestamp([
+      propertyLastUpdateAt,
+      buyerReadyLastUpdate,
+    ]),
+    activity_clock_at:
+      property.activityClockAt !== undefined
+        ? property.activityClockAt
+        : propertyLastUpdateAt,
+    activity_clock_source:
+      property.activityClockAt !== undefined
+        ? (property.activityClockSource ?? null)
+        : propertyLastUpdateAt
+          ? "latest_activity"
+          : null,
   };
 }
 
 export function derivePropertySummariesForChain(params: {
   dataset: OperationalRefreshDataset;
   chainSummary: ChainOperationalSummaryRecord;
+  referenceDate?: Date;
 }): PropertyOperationalSummaryRecord[] {
   return params.dataset.properties.map(
     (property) =>
@@ -173,6 +223,7 @@ export function derivePropertySummariesForChain(params: {
         property,
         dataset: params.dataset,
         chainSummary: params.chainSummary,
+        referenceDate: params.referenceDate,
       })
   );
 }

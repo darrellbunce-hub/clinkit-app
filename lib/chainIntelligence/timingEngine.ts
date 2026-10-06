@@ -198,6 +198,7 @@ export function computeTimingChainIntelligence(params: {
     activities: OperationalActivity[];
     authoritativeLost?: boolean;
     hasActiveOperationalDelay?: boolean | null;
+    activityClockAt?: string | null;
   } | null;
   buyerReadySummary?: ChainNodesChainSummary | null;
   referenceDate?: Date;
@@ -293,13 +294,20 @@ export function computeTimingChainIntelligence(params: {
     );
   }
 
-  for (const activities of [
-    ...params.properties.map((property) => property.activities),
-    params.buyerReadyNode?.activities ?? [],
-  ]) {
+  const stalenessClocks: Array<{
+    activityClockAt?: string | null;
+    activities: OperationalActivity[];
+  }> = [
+    ...params.properties,
+    ...(params.buyerReadyNode ? [params.buyerReadyNode] : []),
+  ];
+
+  for (const clock of stalenessClocks) {
     recalculationCandidates.push(
       ...computeStalenessRecalculationCandidates(
-        getLatestActivity(activities)?.timestamp
+        clock.activityClockAt !== undefined
+          ? clock.activityClockAt
+          : getLatestActivity(clock.activities)?.timestamp
       )
     );
   }

@@ -62,6 +62,7 @@ const LATER_MIGRATIONS = [
   "20261005160000_drop_properties_address_match_key_idx.sql",
   "20261005170000_dashboard_genuine_last_update.sql",
   "20261005180000_activities_select_property_chain_viewer.sql",
+  "20261006120000_operational_intelligence_refresh_queue.sql",
 ];
 
 type TestResult = { name: string; pass: boolean; detail?: string };

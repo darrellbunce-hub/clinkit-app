@@ -80,6 +80,14 @@ export type AgentBranchPropertySummary = {
   invitation_rejection_reason?: string | null;
   invitation_rejection_acknowledged_at?: string | null;
   invite_email?: string | null;
+  /** operational_summary_state: missing, stale (refresh pending) or fresh. */
+  summary_state?: OperationalSummaryState | null;
+  summary_computed_at?: string | null;
+  /** Live staleness clock: latest genuine activity, else stage entry / creation. */
+  activity_clock_at?: string | null;
+  activity_clock_source?: string | null;
 };
+
+export type OperationalSummaryState = "missing" | "stale" | "fresh";
 
 export type AgentDashboardTab = "active" | "archived";

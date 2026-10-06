@@ -1,11 +1,10 @@
 import { STAGES } from "@/data/stages";
 import {
-  daysSinceLastActivity,
+  daysSinceOperationalClock,
   type OperationalActivity,
 } from "@/lib/activityIntelligence";
 import {
   computeChainIntelligence,
-  getStaleProperties,
   type IntelligenceProperty,
 } from "@/lib/chainIntelligence";
 import type { ChainNodesChainSummary } from "@/lib/chainNodesSummary";
@@ -55,7 +54,8 @@ function toBuyerReadySummary(
 }
 
 function toIntelligenceProperty(
-  property: OperationalRefreshDataset["properties"][number]
+  property: OperationalRefreshDataset["properties"][number],
+  referenceDate: Date
 ): IntelligenceProperty {
   return {
     id: property.id,
@@ -63,18 +63,21 @@ function toIntelligenceProperty(
     stage: property.stage,
     status: property.status,
     address: property.address,
-    lastUpdatedDays: daysSinceLastActivity(
-      property.activities
+    lastUpdatedDays: daysSinceOperationalClock(
+      property,
+      referenceDate
     ),
     activities: property.activities,
     stageEnteredAt: property.stageEnteredAt,
     hasActiveOperationalDelay:
       property.hasActiveOperationalDelay,
+    activityClockAt: property.activityClockAt,
   };
 }
 
 export function deriveChainSummary(
-  dataset: OperationalRefreshDataset
+  dataset: OperationalRefreshDataset,
+  referenceDate: Date = new Date()
 ): ChainOperationalSummaryRecord {
   const scheduledCompletionMode =
     isChainInScheduledCompletionMode({
@@ -94,8 +97,9 @@ export function deriveChainSummary(
       )
     : null;
 
-  const intelligenceProperties =
-    dataset.properties.map(toIntelligenceProperty);
+  const intelligenceProperties = dataset.properties.map(
+    (property) => toIntelligenceProperty(property, referenceDate)
+  );
 
   const intelligence = computeChainIntelligence({
     chainProperties: intelligenceProperties,
@@ -111,17 +115,15 @@ export function deriveChainSummary(
           activities: buyerReadyNode.activities,
           hasActiveOperationalDelay:
             buyerReadyNode.hasActiveOperationalDelay,
+          activityClockAt: buyerReadyNode.activityClockAt,
         }
       : null,
     stages: STAGES,
     scheduledCompletionMode,
+    referenceDate,
   });
 
-  const staleCount = scheduledCompletionMode
-    ? 0
-    : getStaleProperties(
-        intelligenceProperties
-      ).length;
+  const staleCount = intelligence.staleProperties.length;
 
   return {
     chain_id: dataset.chain.id,
@@ -146,8 +148,13 @@ export function deriveChainSummary(
       intelligence.buyerReadyStale,
     requires_replacement_buyer:
       intelligence.requiresReplacementBuyer,
-    computed_at: new Date().toISOString(),
+    computed_at: referenceDate.toISOString(),
     summary_version: OPERATIONAL_SUMMARY_VERSION,
+    bottleneck_property_id:
+      intelligence.bottleneckProperty?.id ?? null,
+    stale_property_ids: intelligence.staleProperties.map(
+      (property) => property.id
+    ),
   };
 }
 

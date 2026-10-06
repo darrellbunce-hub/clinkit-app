@@ -1,5 +1,12 @@
 import type { AgentBranchPropertySummary } from "../lib/estateAgent/assignmentTypes";
-import { filterActionRequiredSummaries } from "../lib/estateAgent/commandCentrePresentation";
+import {
+  filterActionRequiredSummaries,
+  formatSummaryHealthLabel,
+  getCustomerFacingConfidenceScore,
+  hasLiveStaleActivityClock,
+  isSummaryUpdating,
+  resolveDaysSinceLastUpdate,
+} from "../lib/estateAgent/commandCentrePresentation";
 import {
   buildOperationalBriefModel,
   getHomeownerConnectionStatusLabel,
@@ -49,13 +56,34 @@ function summary(
   };
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+const HOUR_MS = 60 * 60 * 1000;
+
+function clockDaysAgo(days: number): string {
+  return new Date(Date.now() - days * DAY_MS - HOUR_MS).toISOString();
+}
+
+function calculated(
+  overrides: Parameters<typeof summary>[0]
+): AgentBranchPropertySummary {
+  return summary({
+    summary_state: "fresh",
+    health_status: "stable",
+    confidence_score: 90,
+    needs_attention: false,
+    activity_clock_at: clockDaysAgo(2),
+    activity_clock_source: "genuine_activity",
+    last_update_at: clockDaysAgo(2),
+    ...overrides,
+  });
+}
+
 function testOperationalBriefHero() {
   const brief = buildOperationalBriefModel([
-    summary({
+    calculated({
       assignment_id: "a",
       property_id: 1,
       chain_id: 10,
-      needs_attention: false,
       origin_type: "estate_agent",
       claim_status: "claimed",
       invitation_lifecycle_status: "claimed",
@@ -210,8 +238,115 @@ function testManagedDeclinedState() {
   );
 }
 
+function testMissingSummaryIsNeverHealthy() {
+  const missing = summary({
+    assignment_id: "missing",
+    property_id: 4,
+    chain_id: 13,
+    origin_type: "estate_agent",
+    claim_status: "claimed",
+    invitation_lifecycle_status: "claimed",
+    summary_state: "missing",
+    activity_clock_at: clockDaysAgo(2),
+    activity_clock_source: "property_record_created",
+  });
+
+  assert(
+    getManagedPropertyOperationalState(missing) ===
+      "Calculating operational status",
+    "missing summary shows calculating state"
+  );
+  assert(
+    getManagedPropertyOperationalState(missing) !==
+      "Progressing normally",
+    "missing summary is never progressing normally"
+  );
+  assert(
+    resolveOperationalHealthLevel([missing]) === "pending",
+    "missing summary makes the branch level pending, not normal"
+  );
+  assert(
+    formatSummaryHealthLabel(missing) === "Not yet calculated",
+    "missing summary health label"
+  );
+  assert(
+    getCustomerFacingConfidenceScore(missing) == null,
+    "missing summary has no confidence"
+  );
+}
+
+function testLiveStalenessSafetyNet() {
+  const day14 = calculated({
+    assignment_id: "d14",
+    property_id: 5,
+    chain_id: 14,
+    activity_clock_at: clockDaysAgo(14),
+    activity_clock_source: "stage_entered_at",
+    last_update_at: null,
+  });
+  const day15 = calculated({
+    assignment_id: "d15",
+    property_id: 6,
+    chain_id: 15,
+    activity_clock_at: clockDaysAgo(15),
+    activity_clock_source: "stage_entered_at",
+    last_update_at: null,
+  });
+
+  assert(
+    !hasLiveStaleActivityClock(day14) &&
+      getManagedPropertyOperationalState(day14) ===
+        "Progressing normally",
+    "14 days on the clock is not stale"
+  );
+  assert(
+    hasLiveStaleActivityClock(day15) &&
+      filterActionRequiredSummaries([day15]).length === 1,
+    "15 days on the fallback clock requires action without a cached alert"
+  );
+  assert(
+    getManagedPropertyOperationalState(day15).startsWith(
+      "No updates received for"
+    ),
+    "15-day fallback clock shows the stale wording"
+  );
+  assert(
+    resolveDaysSinceLastUpdate(day15) == null,
+    "fallback clock never becomes Last updated"
+  );
+
+  const scheduled = calculated({
+    assignment_id: "sched",
+    property_id: 7,
+    chain_id: 16,
+    activity_clock_at: clockDaysAgo(30),
+    completion_lifecycle_status: "scheduled",
+    completion_scheduled_date: "2026-12-01",
+  });
+
+  assert(
+    !hasLiveStaleActivityClock(scheduled),
+    "scheduled completion suppresses the live stale safety net"
+  );
+
+  const updating = calculated({
+    assignment_id: "upd",
+    property_id: 8,
+    chain_id: 17,
+    summary_state: "stale",
+  });
+
+  assert(
+    isSummaryUpdating(updating) &&
+      formatSummaryHealthLabel(updating) === "Stable",
+    "stale summary keeps its last health and shows Updating"
+  );
+}
+
 const tests = [
   ["operational brief hero", testOperationalBriefHero],
+  ["missing summary is never healthy", testMissingSummaryIsNeverHealthy],
+  ["live staleness safety net", testLiveStalenessSafetyNet],
   [
     "deferred excludes action required",
     testDeferredExcludesActionRequired,

@@ -1,6 +1,6 @@
 "use client";
 import ChainNode from "@/components/ChainNode";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Navbar from "@/components/Navbar";
 import {
   CARD_PADDING_CLASS,
@@ -22,11 +22,21 @@ import {
   isSearchingPlaceholder,
 } from "@/lib/buildChainTopology";
 import { buildChainActivityTimeline } from "@/lib/chainActivityTimeline";
-import { computeChainIntelligence } from "@/lib/chainIntelligence";
+import {
+  computeAverageProgress,
+  getConfidenceScopeProperties,
+} from "@/lib/chainIntelligence";
 import {
   CHAIN_CONFIDENCE_TOOLTIP,
   CHAIN_PROGRESS_TOOLTIP,
 } from "@/lib/chainIntelligence/presentation";
+import {
+  CHAIN_INTELLIGENCE_UPDATING_NOTE,
+  loadCachedChainIntelligence,
+  presentCachedChainIntelligence,
+  type CachedChainIntelligence,
+} from "@/lib/chainIntelligence/cachedChainIntelligence";
+import { requestOperationalSummaryRefresh } from "@/lib/operationalSummary/requestOperationalSummaryRefresh";
 import {
   CHAIN_STATUS_EXPLAINER,
   CHAIN_STATUS_LABEL,
@@ -145,7 +155,60 @@ export default function ChainPage() {
       recordChainCompletionDate,
       amendChainCompletionDate,
       confirmChainCompletion,
+      operationalIntelligenceRevision,
     } = useChain();
+
+    const [cachedIntelligence, setCachedIntelligence] = useState<
+      CachedChainIntelligence | null | undefined
+    >(undefined);
+    const refreshRequestedForRef = useRef<number | null>(null);
+
+    useEffect(() => {
+      let cancelled = false;
+
+      void loadCachedChainIntelligence(supabase, chainId).then(
+        (cached) => {
+          if (!cancelled) {
+            setCachedIntelligence(cached);
+          }
+        }
+      );
+
+      return () => {
+        cancelled = true;
+      };
+    }, [chainId, operationalIntelligenceRevision]);
+
+    // Missing or queued summaries are processed once on request (server
+    // gated); fresh summaries are only ever read.
+    useEffect(() => {
+      if (
+        !cachedIntelligence ||
+        cachedIntelligence.summary_state === "fresh" ||
+        refreshRequestedForRef.current === chainId
+      ) {
+        return;
+      }
+
+      refreshRequestedForRef.current = chainId;
+
+      void requestOperationalSummaryRefresh(chainId).then(
+        async (result) => {
+          if (!result.processed) {
+            return;
+          }
+
+          const cached = await loadCachedChainIntelligence(
+            supabase,
+            chainId
+          );
+
+          if (refreshRequestedForRef.current === chainId) {
+            setCachedIntelligence(cached);
+          }
+        }
+      );
+    }, [cachedIntelligence, chainId]);
 
   const isEstateAgentViewer =
     isEstateAgent({
@@ -345,39 +408,25 @@ export default function ChainPage() {
       buyerReadySummaries,
     });
 
-  const intelligence =
-    computeChainIntelligence({
-      chainProperties,
-      buyerReadySummary:
-        buyerReadySummaryForIntelligence,
-      buyerReadyActivities,
-      buyerReadyNode: buyerReadyNode?.stage
-        ? {
-            id: Number(buyerReadyNode.id),
-            stage: buyerReadyNode.stage,
-            status:
-              buyerReadyNode.status ?? "healthy",
-            stageEnteredAt:
-              (buyerReadyNode as { stage_entered_at?: string | null })
-                .stage_entered_at ?? null,
-            activities: buyerReadyActivities,
-            hasActiveOperationalDelay:
-              Boolean(
-                (buyerReadyNode as { hasActiveOperationalDelay?: boolean })
-                  .hasActiveOperationalDelay
-              ),
-          }
-        : null,
-      stages: STAGES,
-      scheduledCompletionMode:
-        isCompletionLifecycleFrozen,
-    });
+  const averageProgress = computeAverageProgress(
+    getConfidenceScopeProperties(chainProperties),
+    buyerReadySummaryForIntelligence?.progress ?? 0,
+    !!buyerReadySummaryForIntelligence,
+    STAGES
+  );
+
+  const intelligence = presentCachedChainIntelligence({
+    cached: cachedIntelligence,
+    chainProperties,
+    scheduledCompletionMode: isCompletionLifecycleFrozen,
+  });
 
   const {
+    state: intelligenceState,
     staleProperties,
     chainHealth,
+    chainHealthLabel,
     chainHealthMessage,
-    averageProgress,
     confidenceScore,
     confidenceLabel,
     confidenceColour,
@@ -709,7 +758,10 @@ export default function ChainPage() {
       px-4 py-2 rounded-full text-sm font-semibold
 
       ${
-        chainHealth === "Stable"
+        chainHealth == null
+          ? "bg-slate-100 text-slate-600"
+
+        : chainHealth === "Stable"
           ? "bg-green-100 text-green-700"
 
         : chainHealth === "Active"
@@ -720,9 +772,15 @@ export default function ChainPage() {
     `}
   >
 
-    {chainHealth}
+    {chainHealthLabel}
 
   </div>
+
+  {intelligenceState === "stale" && (
+    <span className="text-xs font-medium text-slate-500">
+      {CHAIN_INTELLIGENCE_UPDATING_NOTE}
+    </span>
+  )}
 
 </div>
 
@@ -814,7 +872,10 @@ export default function ChainPage() {
                 {confidenceUnavailable ? (
                   <>
                     <p className="text-lg sm:text-xl font-semibold text-text-muted">
-                      Unavailable
+                      {intelligenceState === "missing" ||
+                      intelligenceState === "loading"
+                        ? "Calculating"
+                        : "Unavailable"}
                     </p>
                     <p className="text-sm mt-2 text-text-muted max-w-xs">
                       {confidenceUnavailableMessage}
