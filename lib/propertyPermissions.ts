@@ -45,6 +45,7 @@ export {
   formatActivityUpdaterLabel,
   getBuyerReadyActionMessage,
   getBuyerReadyStatusDescription,
+  getPropertyActionMessage,
   resolveWorkflowAccess,
   WORKFLOW_EA_DELEGATED_BANNER_MESSAGE,
   WORKFLOW_READ_ONLY_BANNER_MESSAGE,

@@ -12,6 +12,8 @@
  *   B  Buyer Ready feeds chain intelligence, never property Last updated
  *   P  Dashboard / Chain RPC parity; outsiders, homeowners of other chains and
  *      anon get nothing
+ *   PP Property page action state from the cached property clock (fallback
+ *      clock, system notices, genuine reset, 14/15 boundary, EA wording)
  *
  * Fixtures use real auth users (admin API) and are removed at the end.
  *
@@ -30,9 +32,16 @@ import {
   loadAgentBranchPropertySummaries,
 } from "../lib/estateAgent/assignments";
 import {
+  cachedPropertyClockDays,
+  isCachedPropertyClockBehind,
+  loadCachedPropertyClock,
+  type CachedPropertyClock,
+} from "../lib/operationalSummary/cachedPropertyClock";
+import {
   loadOperationalRefreshDatasets,
   processOperationalRefreshForChains,
 } from "../lib/operationalSummary/processOperationalRefresh";
+import { getPropertyActionMessage, type WorkflowAccess } from "../lib/workflowPermissions";
 
 const DEVELOPMENT_SUPABASE_PROJECT_REF = "bbbsxzxcjkmpqsfvmhbo";
 const PASSWORD = "OpIntelQueueVerify123!";
@@ -724,6 +733,141 @@ async function run(ctx: Ctx) {
     "L: the activity clock views are not readable by authenticated users or anon",
     clockViewErrors.length === 0,
     clockViewErrors.join(",")
+  );
+
+  // -------------------------------------------------------------------------
+  // PP: Property page action state from the cached property clock
+  // -------------------------------------------------------------------------
+  const ownerAccess: WorkflowAccess = {
+    canView: true,
+    canEdit: true,
+    mode: "editable",
+    viewerRole: "owner",
+    bannerMessage: null,
+  };
+  const eaAccess: WorkflowAccess = { ...ownerAccess, viewerRole: "estate_agent" };
+  const pageAction = (access: WorkflowAccess, clock: CachedPropertyClock | null) =>
+    getPropertyActionMessage({
+      access,
+      activeDelayReason: null,
+      staleClockDays: cachedPropertyClockDays(clock),
+      isCompletionLifecycleFrozen: false,
+    });
+
+  const eClock = await loadCachedPropertyClock(ea.client, fE.propertyId);
+  const eAction = pageAction(eaAccess, eClock);
+  record(
+    "PP-A/G: genuine activity 16 days ago → the assigned EA's Property page reads the cached clock and shows the EA stale wording",
+    sameInstant(eClock?.activity_clock_at, eActivity.timestamp) &&
+      sameInstant(eClock?.last_update_at, eActivity.timestamp) &&
+      cachedPropertyClockDays(eClock) === 16 &&
+      eAction.title === "Progress Update Recommended" &&
+      eAction.message ===
+        "No updates have been added for 16 days. Consider posting an update on behalf of the homeowner.",
+    JSON.stringify({ days: cachedPropertyClockDays(eClock), action: eAction })
+  );
+
+  const { data: outsiderClockRows } = await outsider.client
+    .from("property_operational_summary")
+    .select("property_id")
+    .eq("property_id", fE.propertyId);
+  const otherHomeownerClock = await loadCachedPropertyClock(fB.client, fE.propertyId);
+  const anonClock = await loadCachedPropertyClock(anonClient(), fE.propertyId);
+  record(
+    "PP: the cached property clock is not readable by an outsider EA, another chain's homeowner or anon",
+    (outsiderClockRows ?? []).length === 0 && otherHomeownerClock == null && anonClock == null,
+    JSON.stringify({
+      outsider: (outsiderClockRows ?? []).length,
+      other: otherHomeownerClock?.property_id ?? null,
+      anon: anonClock?.property_id ?? null,
+    })
+  );
+
+  await adminActivity(
+    { property_id: fE.propertyId },
+    "Estate agent branch reconnected to this property.",
+    "system",
+    new Date().toISOString()
+  );
+  const eNoticeQueue = await queueRow(fE.chainId);
+  const { data: eActivityRows } = await admin
+    .from("activities")
+    .select("timestamp, update, updated_by")
+    .eq("property_id", fE.propertyId);
+  const eActivities = (eActivityRows ?? []) as Array<{ timestamp: string; update: string; updated_by?: string }>;
+  const eClockAfterNotice = await loadCachedPropertyClock(ea.client, fE.propertyId);
+  const eNoticeBehind = isCachedPropertyClockBehind(eClockAfterNotice, eActivities);
+  await process([fE.chainId]);
+  const eClockAfterNoticeRun = await loadCachedPropertyClock(ea.client, fE.propertyId);
+  record(
+    "PP-D: a newer system notice does not queue or reset the Property page clock, even after recalculation",
+    eNoticeQueue == null &&
+      eNoticeBehind &&
+      sameInstant(eClockAfterNoticeRun?.activity_clock_at, eActivity.timestamp) &&
+      pageAction(eaAccess, eClockAfterNoticeRun).title === "Progress Update Recommended",
+    JSON.stringify({
+      queue: eNoticeQueue,
+      behind: eNoticeBehind,
+      clock: eClockAfterNoticeRun?.activity_clock_at,
+    })
+  );
+
+  const eFresh = await adminActivity(
+    { property_id: fE.propertyId },
+    "Searches Ordered",
+    "homeowner",
+    new Date().toISOString()
+  );
+  const eBehindBeforeRun = isCachedPropertyClockBehind(
+    await loadCachedPropertyClock(ea.client, fE.propertyId),
+    [...eActivities, { timestamp: eFresh.timestamp, update: "Searches Ordered", updated_by: "homeowner" }]
+  );
+  await process([fE.chainId]);
+  const eClockAfterGenuine = await loadCachedPropertyClock(ea.client, fE.propertyId);
+  const eActionAfterGenuine = pageAction(eaAccess, eClockAfterGenuine);
+  record(
+    "PP-E/G: genuine activity resets the Property page clock once the chain is recalculated (EA wording)",
+    eBehindBeforeRun &&
+      sameInstant(eClockAfterGenuine?.activity_clock_at, eFresh.timestamp) &&
+      cachedPropertyClockDays(eClockAfterGenuine) === 0 &&
+      eActionAfterGenuine.title === "No Immediate Actions" &&
+      eActionAfterGenuine.message === "This transaction appears to be progressing normally.",
+    JSON.stringify({ behind: eBehindBeforeRun, action: eActionAfterGenuine })
+  );
+
+  const fallbackClockAt = async (days: number) => {
+    await admin
+      .from("properties")
+      .update({ stage_entered_at: new Date(Date.now() - days * DAY_MS - HOUR_MS).toISOString() })
+      .eq("id", fB.propertyId);
+    await process([fB.chainId]);
+    return loadCachedPropertyClock(fB.client, fB.propertyId);
+  };
+  const b20 = await fallbackClockAt(20);
+  const b20Action = pageAction(ownerAccess, b20);
+  record(
+    "PP-B: no activity, fallback clock 20 days → the owner's Property page shows Update Recommended without a Last updated date",
+    b20?.last_update_at == null &&
+      cachedPropertyClockDays(b20) === 20 &&
+      b20Action.title === "Update Recommended" &&
+      b20Action.message ===
+        "No updates have been added for 20 days. Consider checking progress with your estate agent or conveyancer.",
+    JSON.stringify({ lastUpdate: b20?.last_update_at, days: cachedPropertyClockDays(b20), action: b20Action })
+  );
+  const b14 = await fallbackClockAt(14);
+  const b15 = await fallbackClockAt(15);
+  const b10 = await fallbackClockAt(10);
+  record(
+    "PP-C: no activity, fallback clock 10 and 14 days → no stale alert; 15 days → Update Recommended",
+    pageAction(ownerAccess, b10).title === "No Immediate Actions" &&
+      pageAction(ownerAccess, b14).title === "No Immediate Actions" &&
+      pageAction(ownerAccess, b15).title === "Update Recommended" &&
+      pageAction(ownerAccess, b10).message === "Your transaction appears to be progressing normally.",
+    JSON.stringify({
+      d10: cachedPropertyClockDays(b10),
+      d14: cachedPropertyClockDays(b14),
+      d15: cachedPropertyClockDays(b15),
+    })
   );
 }
 

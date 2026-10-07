@@ -4,6 +4,7 @@ import { useParams } from "next/navigation";
 import {
   useState,
   useEffect,
+  useRef,
 } from "react";
 import Link from "next/link";
 import {
@@ -28,8 +29,17 @@ import { STAGES } from "@/data/stages";
 import { ROUTES } from "@/lib/auth/routes";
 import { isEstateAgent } from "@/lib/accountType";
 import {
+  getPropertyActionMessage,
   resolveWorkflowAccess,
 } from "@/lib/propertyPermissions";
+import { supabase } from "@/lib/supabase";
+import {
+  cachedPropertyClockDays,
+  isCachedPropertyClockBehind,
+  loadCachedPropertyClock,
+  type CachedPropertyClock,
+} from "@/lib/operationalSummary/cachedPropertyClock";
+import { requestOperationalSummaryRefresh } from "@/lib/operationalSummary/requestOperationalSummaryRefresh";
 import {
   getOperationalEditingModeLabelForViewer,
   getOperationalUpdateSuccessMessage,
@@ -82,9 +92,7 @@ import {
   isChainInScheduledCompletionMode,
 } from "@/lib/completionLifecycle";
 import {
-  daysSinceLastActivity,
   hasActiveDelayReport,
-  STALE_DAYS_PAGE_ALERT,
 } from "@/lib/activityIntelligence";
 import {
   OPERATIONAL_DELAY_REASONS,
@@ -142,11 +150,98 @@ const [breakReason, setBreakReason] =
     recordChainCompletionDate,
     amendChainCompletionDate,
     confirmChainCompletion,
+    operationalIntelligenceRevision,
   } = useChain();
 
   const currentProperty = properties.find(
     (property) => property.id === propertyId
   );
+
+  const currentPropertyChainId =
+    currentProperty?.chainId ?? null;
+  const currentPropertyActivities =
+    currentProperty?.activities;
+
+  const [cachedClockLoad, setCachedClockLoad] = useState<{
+    propertyId: number;
+    clock: CachedPropertyClock | null;
+  } | null>(null);
+  const clockRefreshRequestedForRef = useRef<number | null>(null);
+
+  const cachedClockLoaded =
+    cachedClockLoad?.propertyId === propertyId;
+  const cachedPropertyClock = cachedClockLoaded
+    ? cachedClockLoad?.clock ?? null
+    : null;
+
+  useEffect(() => {
+    if (
+      !participantDataReady ||
+      currentPropertyChainId == null
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+
+    void loadCachedPropertyClock(supabase, propertyId).then(
+      (clock) => {
+        if (!cancelled) {
+          setCachedClockLoad({ propertyId, clock });
+        }
+      }
+    );
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    propertyId,
+    currentPropertyChainId,
+    participantDataReady,
+    operationalIntelligenceRevision,
+  ]);
+
+  // A missing or behind cache is processed once on request (server gated);
+  // an up-to-date cache is only ever read.
+  useEffect(() => {
+    if (
+      !cachedClockLoaded ||
+      currentPropertyChainId == null ||
+      clockRefreshRequestedForRef.current === propertyId ||
+      !isCachedPropertyClockBehind(
+        cachedPropertyClock,
+        currentPropertyActivities
+      )
+    ) {
+      return;
+    }
+
+    clockRefreshRequestedForRef.current = propertyId;
+
+    void requestOperationalSummaryRefresh(
+      currentPropertyChainId
+    ).then(async (result) => {
+      if (!result.processed) {
+        return;
+      }
+
+      const clock = await loadCachedPropertyClock(
+        supabase,
+        propertyId
+      );
+
+      if (clockRefreshRequestedForRef.current === propertyId) {
+        setCachedClockLoad({ propertyId, clock });
+      }
+    });
+  }, [
+    cachedClockLoaded,
+    cachedPropertyClock,
+    currentPropertyChainId,
+    currentPropertyActivities,
+    propertyId,
+  ]);
 
   const chainPropertiesForCompletion =
     mapToOperationalProperties(
@@ -454,46 +549,20 @@ const activeDelayReport =
         currentProperty.hasActiveOperationalDelay,
     }
   );
-const propertyLastUpdatedDays =
-  daysSinceLastActivity(
-    currentProperty.activities
-  );
-
-let actionTitle =
-  "No Immediate Actions";
-
-let actionMessage =
-  "Your transaction appears to be progressing normally.";
-
-let actionColour =
-  "bg-green-100 text-green-700";
-
-if (activeDelayReport && activeDelay) {
-
-  actionTitle =
-    "Delay reported";
-
-  actionMessage =
-    activeDelay.reason;
-
-  actionColour =
-    "bg-amber-100 text-amber-700";
-}
-
-if (
-  !isCompletionLifecycleFrozen &&
-  propertyLastUpdatedDays > STALE_DAYS_PAGE_ALERT
-) {
-
-  actionTitle =
-    "Update Recommended";
-
-  actionMessage =
-    `No updates have been added for ${propertyLastUpdatedDays} days. Consider checking progress with your estate agent or conveyancer.`;
-
-  actionColour =
-    "bg-red-100 text-red-700";
-}
+const {
+  title: actionTitle,
+  message: actionMessage,
+  colour: actionColour,
+} = getPropertyActionMessage({
+  access,
+  activeDelayReason:
+    activeDelayReport && activeDelay
+      ? activeDelay.reason
+      : null,
+  staleClockDays:
+    cachedPropertyClockDays(cachedPropertyClock),
+  isCompletionLifecycleFrozen,
+});
 
 const currentStageIndex =
   STAGES.findIndex(
@@ -811,7 +880,7 @@ async function handleReportDelay() {
           }
         />
 
-        {!isCompletedCompletionMode && (
+        {!isCompletedCompletionMode && cachedClockLoaded && (
           <div
             className={`mt-8 bg-surface-card rounded-3xl shadow-sm border border-surface-card-border ${CARD_PADDING_CLASS}`}
           >

@@ -345,55 +345,53 @@ export function getBuyerReadyStatusDescription(
   return "This participant's buyer readiness is currently progressing through this stage of the chain process.";
 }
 
-export function getBuyerReadyActionMessage(params: {
-  access: WorkflowAccess;
-  activeDelayReport: boolean;
-  latestDelayUpdate: string | null;
-  buyerLastUpdatedDays: number;
-  isCompletionLifecycleFrozen: boolean;
-}): {
+export type WorkflowActionMessage = {
   title: string;
   message: string;
   colour: string;
-} {
-  const {
-    access,
-    activeDelayReport,
-    latestDelayUpdate,
-    buyerLastUpdatedDays,
-    isCompletionLifecycleFrozen,
-  } = params;
+};
 
+function getDelayReportedActionMessage(
+  delayUpdate: string
+): WorkflowActionMessage {
+  return {
+    title: "Delay reported",
+    message: delayUpdate,
+    colour: "bg-amber-100 text-amber-700",
+  };
+}
+
+/** Stale-update panel worded for the owner, a delegated EA or an observer. */
+export function getStaleUpdateActionMessage(
+  access: WorkflowAccess,
+  lastUpdatedDays: number
+): WorkflowActionMessage {
   const isObserver = access.mode === "read_only";
   const isDelegatedManager =
     access.viewerRole === "estate_agent" && access.canEdit;
 
-  if (activeDelayReport && latestDelayUpdate) {
-    return {
-      title: "Delay reported",
-      message: latestDelayUpdate,
-      colour: "bg-amber-100 text-amber-700",
-    };
-  }
-
-  if (
-    !isCompletionLifecycleFrozen &&
-    buyerLastUpdatedDays > STALE_DAYS_PAGE_ALERT
-  ) {
-    return {
-      title: isObserver
+  return {
+    title: isObserver
+      ? "Progress Update Recommended"
+      : isDelegatedManager
         ? "Progress Update Recommended"
-        : isDelegatedManager
-          ? "Progress Update Recommended"
-          : "Update Recommended",
-      message: isObserver
-        ? `No updates have been added for ${buyerLastUpdatedDays} days. This participant may need to check progress with their estate agent or conveyancer.`
-        : isDelegatedManager
-          ? `No updates have been added for ${buyerLastUpdatedDays} days. Consider posting an update on behalf of the homeowner.`
-          : `No updates have been added for ${buyerLastUpdatedDays} days. Consider checking progress with your estate agent or conveyancer.`,
-      colour: "bg-red-100 text-red-700",
-    };
-  }
+        : "Update Recommended",
+    message: isObserver
+      ? `No updates have been added for ${lastUpdatedDays} days. This participant may need to check progress with their estate agent or conveyancer.`
+      : isDelegatedManager
+        ? `No updates have been added for ${lastUpdatedDays} days. Consider posting an update on behalf of the homeowner.`
+        : `No updates have been added for ${lastUpdatedDays} days. Consider checking progress with your estate agent or conveyancer.`,
+    colour: "bg-red-100 text-red-700",
+  };
+}
+
+/** Default panel worded for the owner, a delegated EA or an observer. */
+export function getNoImmediateActionMessage(
+  access: WorkflowAccess
+): WorkflowActionMessage {
+  const isObserver = access.mode === "read_only";
+  const isDelegatedManager =
+    access.viewerRole === "estate_agent" && access.canEdit;
 
   return {
     title: "No Immediate Actions",
@@ -404,6 +402,72 @@ export function getBuyerReadyActionMessage(params: {
         : "Your transaction appears to be progressing normally.",
     colour: "bg-green-100 text-green-700",
   };
+}
+
+export function getBuyerReadyActionMessage(params: {
+  access: WorkflowAccess;
+  activeDelayReport: boolean;
+  latestDelayUpdate: string | null;
+  buyerLastUpdatedDays: number;
+  isCompletionLifecycleFrozen: boolean;
+}): WorkflowActionMessage {
+  const {
+    access,
+    activeDelayReport,
+    latestDelayUpdate,
+    buyerLastUpdatedDays,
+    isCompletionLifecycleFrozen,
+  } = params;
+
+  if (activeDelayReport && latestDelayUpdate) {
+    return getDelayReportedActionMessage(latestDelayUpdate);
+  }
+
+  if (
+    !isCompletionLifecycleFrozen &&
+    buyerLastUpdatedDays > STALE_DAYS_PAGE_ALERT
+  ) {
+    return getStaleUpdateActionMessage(
+      access,
+      buyerLastUpdatedDays
+    );
+  }
+
+  return getNoImmediateActionMessage(access);
+}
+
+/**
+ * Property page Action Required panel. An active delay report shows unless
+ * the staleness clock has passed the page alert threshold outside a frozen
+ * completion lifecycle. `staleClockDays` is the cached property activity
+ * clock (genuine activity, else fallback); null when no cached clock exists.
+ */
+export function getPropertyActionMessage(params: {
+  access: WorkflowAccess;
+  activeDelayReason: string | null;
+  staleClockDays: number | null;
+  isCompletionLifecycleFrozen: boolean;
+}): WorkflowActionMessage {
+  const {
+    access,
+    activeDelayReason,
+    staleClockDays,
+    isCompletionLifecycleFrozen,
+  } = params;
+
+  if (
+    !isCompletionLifecycleFrozen &&
+    staleClockDays != null &&
+    staleClockDays > STALE_DAYS_PAGE_ALERT
+  ) {
+    return getStaleUpdateActionMessage(access, staleClockDays);
+  }
+
+  if (activeDelayReason != null) {
+    return getDelayReportedActionMessage(activeDelayReason);
+  }
+
+  return getNoImmediateActionMessage(access);
 }
 
 export function formatActivityUpdaterLabel(
