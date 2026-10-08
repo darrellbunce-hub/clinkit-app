@@ -404,18 +404,25 @@ export function getNoImmediateActionMessage(
   };
 }
 
+/**
+ * Buyer Ready "Next Recommended Action" panel. An active delay report always
+ * shows first; otherwise the staleness clock past the page alert threshold
+ * outside a frozen completion lifecycle. `staleClockDays` is the cached Buyer
+ * Ready node clock (genuine activity, else node stage entry / creation); null
+ * when no cached clock exists for the node.
+ */
 export function getBuyerReadyActionMessage(params: {
   access: WorkflowAccess;
   activeDelayReport: boolean;
   latestDelayUpdate: string | null;
-  buyerLastUpdatedDays: number;
+  staleClockDays: number | null;
   isCompletionLifecycleFrozen: boolean;
 }): WorkflowActionMessage {
   const {
     access,
     activeDelayReport,
     latestDelayUpdate,
-    buyerLastUpdatedDays,
+    staleClockDays,
     isCompletionLifecycleFrozen,
   } = params;
 
@@ -425,12 +432,10 @@ export function getBuyerReadyActionMessage(params: {
 
   if (
     !isCompletionLifecycleFrozen &&
-    buyerLastUpdatedDays > STALE_DAYS_PAGE_ALERT
+    staleClockDays != null &&
+    staleClockDays > STALE_DAYS_PAGE_ALERT
   ) {
-    return getStaleUpdateActionMessage(
-      access,
-      buyerLastUpdatedDays
-    );
+    return getStaleUpdateActionMessage(access, staleClockDays);
   }
 
   return getNoImmediateActionMessage(access);

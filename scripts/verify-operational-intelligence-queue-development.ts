@@ -14,6 +14,9 @@
  *      anon get nothing
  *   PP Property page action state from the cached property clock (fallback
  *      clock, system notices, genuine reset, 14/15 boundary, EA wording)
+ *   BR Buyer Ready page action state from the cached Buyer Ready node clock
+ *      (stage-entry fallback, 0/10/14/15 boundary, system notices, genuine
+ *      reset, node ID guard, reader authorisation, property clock untouched)
  *
  * Fixtures use real auth users (admin API) and are removed at the end.
  *
@@ -32,6 +35,12 @@ import {
   loadAgentBranchPropertySummaries,
 } from "../lib/estateAgent/assignments";
 import {
+  cachedBuyerReadyClockDays,
+  cachedBuyerReadyClockForNode,
+  loadCachedBuyerReadyClock,
+  type CachedBuyerReadyClock,
+} from "../lib/operationalSummary/cachedBuyerReadyClock";
+import {
   cachedPropertyClockDays,
   isCachedPropertyClockBehind,
   loadCachedPropertyClock,
@@ -41,7 +50,11 @@ import {
   loadOperationalRefreshDatasets,
   processOperationalRefreshForChains,
 } from "../lib/operationalSummary/processOperationalRefresh";
-import { getPropertyActionMessage, type WorkflowAccess } from "../lib/workflowPermissions";
+import {
+  getBuyerReadyActionMessage,
+  getPropertyActionMessage,
+  type WorkflowAccess,
+} from "../lib/workflowPermissions";
 
 const DEVELOPMENT_SUPABASE_PROJECT_REF = "bbbsxzxcjkmpqsfvmhbo";
 const PASSWORD = "OpIntelQueueVerify123!";
@@ -867,6 +880,240 @@ async function run(ctx: Ctx) {
       d10: cachedPropertyClockDays(b10),
       d14: cachedPropertyClockDays(b14),
       d15: cachedPropertyClockDays(b15),
+    })
+  );
+
+  // -------------------------------------------------------------------------
+  // BR: Buyer Ready page action state from the cached Buyer Ready node clock
+  // -------------------------------------------------------------------------
+  const observerAccess: WorkflowAccess = {
+    ...ownerAccess,
+    canEdit: false,
+    mode: "read_only",
+    viewerRole: "chain_participant",
+  };
+  const brPage = (access: WorkflowAccess, clock: CachedBuyerReadyClock | null) =>
+    getBuyerReadyActionMessage({
+      access,
+      activeDelayReport: false,
+      latestDelayUpdate: null,
+      staleClockDays: cachedBuyerReadyClockDays(clock),
+      isCompletionLifecycleFrozen: false,
+    });
+  const ownerStale = (days: number) =>
+    `No updates have been added for ${days} days. Consider checking progress with your estate agent or conveyancer.`;
+
+  const fBR = await homeownerSale("br", ea.branchId);
+  const brBuyer = await user("ho-br-buyer");
+  await brBuyer.client.from("profiles").upsert({
+    id: brBuyer.userId,
+    role: "homeowner",
+    account_type: "homeowner",
+    contact_name: "HO OPQ br buyer",
+    onboarding_completed_at: new Date().toISOString(),
+  });
+  const { error: brMemberError } = await admin
+    .from("property_members")
+    .insert({ property_id: fBR.propertyId, user_id: brBuyer.userId, role: "buyer" });
+  const brStageEnteredAt = (days: number) => new Date(Date.now() - days * DAY_MS - HOUR_MS).toISOString();
+  const { data: brNode, error: brNodeError } = await admin
+    .from("chain_nodes")
+    .insert({
+      chain_id: fBR.chainId,
+      linked_property_id: fBR.propertyId,
+      node_type: "buyer_ready",
+      user_id: brBuyer.userId,
+      position: 0,
+      stage: "mortgage_in_principle",
+      status: "healthy",
+      progress: 10,
+      stage_entered_at: brStageEnteredAt(20),
+    })
+    .select("id, stage_entered_at")
+    .single();
+  const brNodeId = (brNode?.id as number | undefined) ?? -1;
+  await process([fBR.chainId]);
+
+  const brBuyerClock = cachedBuyerReadyClockForNode(
+    await loadCachedBuyerReadyClock(brBuyer.client, fBR.chainId),
+    brNodeId
+  );
+  const { data: brServerClock } = await admin
+    .from("chain_node_operational_clock")
+    .select("activity_clock_at, activity_clock_source")
+    .eq("chain_node_id", brNodeId)
+    .maybeSingle();
+  const brChain20 = await chainSummary(fBR.chainId);
+  const brProperty20 = await propertySummary(fBR.propertyId);
+  const brAction20 = brPage(ownerAccess, brBuyerClock);
+  record(
+    "BR-3/9/12: no activity, node stage entry 20 days ago → cached node clock = server node clock; the buyer sees Update Recommended with no Last updated; chain not yet Buyer Ready stale (21 days)",
+    !brMemberError &&
+      !brNodeError &&
+      brBuyerClock?.buyer_ready_node_id === brNodeId &&
+      sameInstant(brBuyerClock?.buyer_ready_activity_clock_at, brNode?.stage_entered_at) &&
+      sameInstant(brBuyerClock?.buyer_ready_activity_clock_at, brServerClock?.activity_clock_at) &&
+      brBuyerClock?.buyer_ready_activity_clock_source === "stage_entered_at" &&
+      cachedBuyerReadyClockDays(brBuyerClock) === 20 &&
+      brAction20.title === "Update Recommended" &&
+      brAction20.message === ownerStale(20) &&
+      brProperty20?.buyer_ready_last_update == null &&
+      brChain20?.buyer_ready_stale === false,
+    JSON.stringify({
+      memberError: brMemberError?.message,
+      nodeError: brNodeError?.message,
+      source: brBuyerClock?.buyer_ready_activity_clock_source,
+      days: cachedBuyerReadyClockDays(brBuyerClock),
+      action: brAction20.title,
+      chainBrStale: brChain20?.buyer_ready_stale,
+    })
+  );
+
+  const brSellerClock = cachedBuyerReadyClockForNode(
+    await loadCachedBuyerReadyClock(fBR.client, fBR.chainId),
+    brNodeId
+  );
+  const brEaClock = cachedBuyerReadyClockForNode(
+    await loadCachedBuyerReadyClock(ea.client, fBR.chainId),
+    brNodeId
+  );
+  const brObserverAction = brPage(observerAccess, brEaClock);
+  record(
+    "BR-16/14: the seller (another chain participant) and the assigned EA read the same cached node clock and see observer wording",
+    sameInstant(brSellerClock?.buyer_ready_activity_clock_at, brBuyerClock?.buyer_ready_activity_clock_at) &&
+      sameInstant(brEaClock?.buyer_ready_activity_clock_at, brBuyerClock?.buyer_ready_activity_clock_at) &&
+      brObserverAction.title === "Progress Update Recommended" &&
+      brObserverAction.message ===
+        "No updates have been added for 20 days. This participant may need to check progress with their estate agent or conveyancer.",
+    JSON.stringify({ seller: brSellerClock != null, ea: brEaClock != null, action: brObserverAction })
+  );
+
+  const brOutsiderClock = await loadCachedBuyerReadyClock(outsider.client, fBR.chainId);
+  const brOtherHomeownerClock = await loadCachedBuyerReadyClock(fB.client, fBR.chainId);
+  const brAnonClock = await loadCachedBuyerReadyClock(anonClient(), fBR.chainId);
+  record(
+    "BR-17: the cached Buyer Ready clock is not readable by an outsider EA, another chain's homeowner or anon",
+    brOutsiderClock == null && brOtherHomeownerClock == null && brAnonClock == null,
+    JSON.stringify({
+      outsider: brOutsiderClock?.chain_id ?? null,
+      other: brOtherHomeownerClock?.chain_id ?? null,
+      anon: brAnonClock?.chain_id ?? null,
+    })
+  );
+
+  const otherChainClock = await loadCachedBuyerReadyClock(ea.client, fA.chainId);
+  record(
+    "BR-15: another chain's cached Buyer Ready clock is never used for this node",
+    otherChainClock?.buyer_ready_node_id != null &&
+      otherChainClock.buyer_ready_node_id !== brNodeId &&
+      cachedBuyerReadyClockForNode(otherChainClock, brNodeId) == null,
+    JSON.stringify({ otherNode: otherChainClock?.buyer_ready_node_id ?? null })
+  );
+
+  const brFallbackAt = async (days: number) => {
+    await admin.from("chain_nodes").update({ stage_entered_at: brStageEnteredAt(days) }).eq("id", brNodeId);
+    await process([fBR.chainId]);
+    return cachedBuyerReadyClockForNode(await loadCachedBuyerReadyClock(brBuyer.client, fBR.chainId), brNodeId);
+  };
+  const br0 = await brFallbackAt(0);
+  const br10 = await brFallbackAt(10);
+  const br14 = await brFallbackAt(14);
+  const br15 = await brFallbackAt(15);
+  record(
+    "BR-4/5: no activity, node stage entry 0/10/14 days → no stale alert; 15 days → Update Recommended",
+    brPage(ownerAccess, br0).title === "No Immediate Actions" &&
+      brPage(ownerAccess, br10).title === "No Immediate Actions" &&
+      brPage(ownerAccess, br14).title === "No Immediate Actions" &&
+      brPage(ownerAccess, br15).title === "Update Recommended" &&
+      brPage(ownerAccess, br10).message === "Your transaction appears to be progressing normally.",
+    JSON.stringify({
+      d0: cachedBuyerReadyClockDays(br0),
+      d10: cachedBuyerReadyClockDays(br10),
+      d14: cachedBuyerReadyClockDays(br14),
+      d15: cachedBuyerReadyClockDays(br15),
+    })
+  );
+
+  const brProperty15 = await propertySummary(fBR.propertyId);
+  await adminActivity(
+    { chain_node_id: brNodeId },
+    "Estate agent branch reconnected to this property.",
+    "system",
+    new Date().toISOString()
+  );
+  const brNoticeQueue = await queueRow(fBR.chainId);
+  const { data: brNodeActivityRows } = await admin
+    .from("activities")
+    .select("timestamp, update, updated_by")
+    .eq("chain_node_id", brNodeId);
+  const brNoticeBehind = isCachedPropertyClockBehind(
+    br15,
+    (brNodeActivityRows ?? []) as Array<{ timestamp: string; update: string; updated_by?: string }>
+  );
+  await process([fBR.chainId]);
+  const brAfterNotice = cachedBuyerReadyClockForNode(
+    await loadCachedBuyerReadyClock(brBuyer.client, fBR.chainId),
+    brNodeId
+  );
+  record(
+    "BR-7: a newer system notice on the Buyer Ready node does not queue or move the cached node clock",
+    brNoticeQueue == null &&
+      brNoticeBehind &&
+      sameInstant(brAfterNotice?.buyer_ready_activity_clock_at, br15?.buyer_ready_activity_clock_at) &&
+      brAfterNotice?.buyer_ready_activity_clock_source === "stage_entered_at" &&
+      brPage(ownerAccess, brAfterNotice).title === "Update Recommended",
+    JSON.stringify({ queue: brNoticeQueue, behind: brNoticeBehind, source: brAfterNotice?.buyer_ready_activity_clock_source })
+  );
+
+  const brGenuineAt = async (daysAgo: number, update: string) => {
+    const activity = await adminActivity(
+      { chain_node_id: brNodeId },
+      update,
+      "homeowner",
+      new Date(Date.now() - daysAgo * DAY_MS - (daysAgo > 0 ? HOUR_MS : 0)).toISOString()
+    );
+    const queued = await queueRow(fBR.chainId);
+    await process([fBR.chainId]);
+    const clock = cachedBuyerReadyClockForNode(
+      await loadCachedBuyerReadyClock(brBuyer.client, fBR.chainId),
+      brNodeId
+    );
+    return { activity, queued, clock };
+  };
+  const br30 = await brGenuineAt(30, "Mortgage In Principle");
+  record(
+    "BR-2: genuine Buyer Ready activity 30 days ago (older than stage entry) is the clock → Update Recommended",
+    br30.queued?.reason === "buyer_ready_activity" &&
+      sameInstant(br30.clock?.buyer_ready_activity_clock_at, br30.activity.timestamp) &&
+      br30.clock?.buyer_ready_activity_clock_source === "genuine_activity" &&
+      cachedBuyerReadyClockDays(br30.clock) === 30 &&
+      brPage(ownerAccess, br30.clock).title === "Update Recommended" &&
+      brPage(ownerAccess, br30.clock).message === ownerStale(30),
+    JSON.stringify({ queue: br30.queued?.reason, days: cachedBuyerReadyClockDays(br30.clock) })
+  );
+  const br3 = await brGenuineAt(3, "Mortgage Application Submitted");
+  record(
+    "BR-1/8: genuine Buyer Ready activity 3 days ago resets the clock → No Immediate Actions",
+    sameInstant(br3.clock?.buyer_ready_activity_clock_at, br3.activity.timestamp) &&
+      cachedBuyerReadyClockDays(br3.clock) === 3 &&
+      brPage(ownerAccess, br3.clock).title === "No Immediate Actions" &&
+      brPage(ownerAccess, br3.clock).message === "Your transaction appears to be progressing normally.",
+    JSON.stringify({ days: cachedBuyerReadyClockDays(br3.clock) })
+  );
+  const brNow = await brGenuineAt(0, "Mortgage Offer Received");
+  const brPropertyAfter = await propertySummary(fBR.propertyId);
+  record(
+    "BR-8/18: genuine Buyer Ready activity now → 0 days; the property's own clock and Last updated are unaffected",
+    cachedBuyerReadyClockDays(brNow.clock) === 0 &&
+      sameInstant(brPropertyAfter?.buyer_ready_last_update, brNow.activity.timestamp) &&
+      brPropertyAfter?.last_update_at == null &&
+      brProperty15?.last_update_at == null &&
+      sameInstant(brPropertyAfter?.activity_clock_at, brProperty15?.activity_clock_at) &&
+      brPropertyAfter?.activity_clock_source === brProperty15?.activity_clock_source,
+    JSON.stringify({
+      lastUpdate: brPropertyAfter?.last_update_at,
+      clockBefore: brProperty15?.activity_clock_at,
+      clockAfter: brPropertyAfter?.activity_clock_at,
     })
   );
 }

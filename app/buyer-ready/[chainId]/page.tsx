@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Navbar from "@/components/Navbar";
 import ActivityActorBadge from "@/components/operational/ActivityActorBadge";
 import OperationalContextStrip from "@/components/operational/OperationalContextStrip";
@@ -23,6 +23,14 @@ import {
 import { useChain } from "@/context/ChainContext";
 import { BUYER_READY_STAGES } from "@/data/buyerReadyStages";
 import { supabase } from "@/lib/supabase";
+import {
+  cachedBuyerReadyClockDays,
+  cachedBuyerReadyClockForNode,
+  loadCachedBuyerReadyClock,
+  type CachedBuyerReadyClock,
+} from "@/lib/operationalSummary/cachedBuyerReadyClock";
+import { isCachedPropertyClockBehind } from "@/lib/operationalSummary/cachedPropertyClock";
+import { requestOperationalSummaryRefresh } from "@/lib/operationalSummary/requestOperationalSummaryRefresh";
 import {
   findBuyerReadyNodeForChain,
   getBuyerReadyActionMessage,
@@ -72,7 +80,6 @@ import { canShowOperationalCompletionDateEntry } from "@/lib/recordChainCompleti
 import { canAmendChainCompletionDate } from "@/lib/amendChainCompletionDate";
 import { canConfirmChainCompletion } from "@/lib/confirmChainCompletion";
 import {
-  daysSinceLastActivity,
   hasActiveDelayReport,
   type OperationalActivity,
 } from "@/lib/activityIntelligence";
@@ -170,12 +177,99 @@ export default function BuyerReadyPage() {
     recordChainCompletionDate,
     amendChainCompletionDate,
     confirmChainCompletion,
+    operationalIntelligenceRevision,
   } = useChain();
 
   const buyerNode = findBuyerReadyNodeForChain(
     chainId,
     chainNodes
   ) as BuyerReadyChainNode | undefined;
+
+  const buyerNodeId = buyerNode?.id ?? null;
+  const buyerNodeActivities = buyerNode?.activities as
+    | OperationalActivity[]
+    | undefined;
+
+  const [cachedClockLoad, setCachedClockLoad] = useState<{
+    chainId: number;
+    clock: CachedBuyerReadyClock | null;
+  } | null>(null);
+  const clockRefreshRequestedForRef = useRef<number | null>(null);
+
+  const cachedClockLoaded =
+    cachedClockLoad?.chainId === chainId;
+  const cachedBuyerReadyClock = cachedClockLoaded
+    ? cachedBuyerReadyClockForNode(
+        cachedClockLoad?.clock,
+        buyerNodeId
+      )
+    : null;
+
+  useEffect(() => {
+    if (!participantDataReady || buyerNodeId == null) {
+      return;
+    }
+
+    let cancelled = false;
+
+    void loadCachedBuyerReadyClock(supabase, chainId).then(
+      (clock) => {
+        if (!cancelled) {
+          setCachedClockLoad({ chainId, clock });
+        }
+      }
+    );
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    chainId,
+    buyerNodeId,
+    participantDataReady,
+    operationalIntelligenceRevision,
+  ]);
+
+  // A missing, mismatched or behind cache is processed once on request
+  // (server gated); an up-to-date cache is only ever read.
+  useEffect(() => {
+    if (
+      !cachedClockLoaded ||
+      buyerNodeId == null ||
+      clockRefreshRequestedForRef.current === chainId ||
+      !isCachedPropertyClockBehind(
+        cachedBuyerReadyClock,
+        buyerNodeActivities
+      )
+    ) {
+      return;
+    }
+
+    clockRefreshRequestedForRef.current = chainId;
+
+    void requestOperationalSummaryRefresh(chainId).then(
+      async (result) => {
+        if (!result.processed) {
+          return;
+        }
+
+        const clock = await loadCachedBuyerReadyClock(
+          supabase,
+          chainId
+        );
+
+        if (clockRefreshRequestedForRef.current === chainId) {
+          setCachedClockLoad({ chainId, clock });
+        }
+      }
+    );
+  }, [
+    cachedClockLoaded,
+    cachedBuyerReadyClock,
+    buyerNodeId,
+    buyerNodeActivities,
+    chainId,
+  ]);
 
   const chainPropertiesForAccess =
     mapToOperationalProperties(
@@ -584,14 +678,13 @@ export default function BuyerReadyPage() {
         workflowNode.hasActiveOperationalDelay,
     }
   );
-  const buyerLastUpdatedDays =
-    daysSinceLastActivity(nodeActivities);
-
   const actionPanel = getBuyerReadyActionMessage({
     access,
     activeDelayReport,
     latestDelayUpdate: activeDelay?.reason ?? null,
-    buyerLastUpdatedDays,
+    staleClockDays: cachedBuyerReadyClockDays(
+      cachedBuyerReadyClock
+    ),
     isCompletionLifecycleFrozen,
   });
 
@@ -811,7 +904,7 @@ export default function BuyerReadyPage() {
           }
         />
 
-        {!isCompletedCompletionMode && (
+        {!isCompletedCompletionMode && cachedClockLoaded && (
           <div
             className={`mt-8 bg-surface-card rounded-3xl shadow-sm border border-surface-card-border ${CARD_PADDING_CLASS}`}
           >

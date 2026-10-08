@@ -224,21 +224,21 @@ assert(
     access: owner,
     activeDelayReport: true,
     latestDelayUpdate: delay,
-    buyerLastUpdatedDays: 40,
+    staleClockDays: 40,
     isCompletionLifecycleFrozen: false,
   }).title === "Delay reported" &&
     getBuyerReadyActionMessage({
       access: delegatedEa,
       activeDelayReport: false,
       latestDelayUpdate: null,
-      buyerLastUpdatedDays: 40,
+      staleClockDays: 40,
       isCompletionLifecycleFrozen: false,
     }).title === "Progress Update Recommended" &&
     getBuyerReadyActionMessage({
       access: owner,
       activeDelayReport: false,
       latestDelayUpdate: null,
-      buyerLastUpdatedDays: 3,
+      staleClockDays: 3,
       isCompletionLifecycleFrozen: false,
     }).message === "Your transaction appears to be progressing normally."
 );

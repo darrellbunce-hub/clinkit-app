@@ -51,11 +51,11 @@ export function cachedPropertyClockDays(
 }
 
 /**
- * True when the cache is absent or older than the property's newest loaded
- * activity, i.e. the chain may still be queued for recalculation.
+ * True when the cache is absent or older than the newest loaded activity,
+ * i.e. the chain may still be queued for recalculation.
  */
 export function isCachedPropertyClockBehind(
-  clock: CachedPropertyClock | null,
+  clock: Pick<CachedPropertyClock, "computed_at"> | null,
   activities: OperationalActivity[] | null | undefined
 ): boolean {
   if (!clock) {

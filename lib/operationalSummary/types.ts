@@ -29,6 +29,10 @@ export type ChainOperationalSummaryRecord = {
   summary_version: number;
   bottleneck_property_id: number | null;
   stale_property_ids: number[];
+  /** Primary Buyer Ready node and its server clock (chain_node_operational_clock). */
+  buyer_ready_node_id: number | null;
+  buyer_ready_activity_clock_at: string | null;
+  buyer_ready_activity_clock_source: string | null;
 };
 
 export type PropertyOperationalSummaryRecord = {

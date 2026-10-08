@@ -155,6 +155,11 @@ export function deriveChainSummary(
     stale_property_ids: intelligence.staleProperties.map(
       (property) => property.id
     ),
+    buyer_ready_node_id: buyerReadyNode?.id ?? null,
+    buyer_ready_activity_clock_at:
+      buyerReadyNode?.activityClockAt ?? null,
+    buyer_ready_activity_clock_source:
+      buyerReadyNode?.activityClockSource ?? null,
   };
 }
 
