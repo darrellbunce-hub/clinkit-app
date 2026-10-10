@@ -21,6 +21,7 @@ import DuplicatePropertyDialog, {
 import PropertyAddressLookup from "@/components/address/PropertyAddressLookup";
 import { formatUkPostcodeForStorage } from "@/lib/address/normalize";
 import { checkStartMoveAddress } from "@/lib/onboarding/addressReservation";
+import { linkStartMoveOnwardPurchase } from "@/lib/onboarding/startMoveOnwardPurchase";
 import {
   buildJoinExistingChainHref,
   resolveBuyingAwaitingConnectionAction,
@@ -506,6 +507,22 @@ export default function StartMovePage() {
                   : START_MOVE_FAILED_MESSAGE
               );
               return;
+            }
+
+            if (sellingPropertyId != null) {
+              const linkResult =
+                await linkStartMoveOnwardPurchase(supabase, {
+                  salePropertyId: sellingPropertyId,
+                  purchasePropertyId: buyingProperty.id,
+                });
+
+              if (!linkResult.ok) {
+                await fail(
+                  "[start-move] onward purchase link failed:",
+                  linkResult.error
+                );
+                return;
+              }
             }
           }
     

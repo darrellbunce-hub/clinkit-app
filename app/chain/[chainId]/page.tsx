@@ -57,6 +57,7 @@ import {
 import PageHeaderBand from "@/components/theme/PageHeaderBand";
 import {
   chainAwaitingBuyerConnectorClasses,
+  chainAwaitingConnectionGapClasses,
   chainConnectorClasses,
 } from "@/lib/theme/chainViz";
 import {
@@ -1135,22 +1136,21 @@ export default function ChainPage() {
           "awaiting_connection" && (
 
           <div
-            className="flex flex-col items-center mx-10 shrink-0"
+            className="relative flex items-center mx-5 shrink-0"
             aria-label="Awaiting connection"
           >
 
             <div
-              className="
-                h-20
-                border-l-4
-                border-dashed
-                border-amber-400
-              "
+              className={chainAwaitingConnectionGapClasses()}
             />
 
             <p
               className="
+                absolute
+                left-1/2
+                top-full
                 mt-2
+                -translate-x-1/2
                 text-xs
                 font-semibold
                 text-amber-700

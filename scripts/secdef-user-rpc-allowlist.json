@@ -74,6 +74,7 @@
     { "schema": "public", "name": "join_chain_property", "args": "text, text, text", "reason": "user_facing_product_rpc" },
     { "schema": "public", "name": "join_ea_operational_chain", "args": "text, text, text, text, uuid, boolean, text, text, boolean", "reason": "user_facing_product_rpc" },
     { "schema": "public", "name": "link_sale_to_searching_placeholder", "args": "bigint, bigint", "reason": "user_facing_product_rpc" },
+    { "schema": "public", "name": "link_start_move_onward_purchase", "args": "bigint, bigint", "reason": "user_facing_product_rpc" },
     { "schema": "public", "name": "owns_chain_node", "args": "bigint", "reason": "authenticated_readonly_predicate_helper" },
     { "schema": "public", "name": "prevent_client_ea_branch_stripe_customer_mutation", "args": "", "reason": "user_facing_product_rpc" },
     { "schema": "public", "name": "preview_ea_branch_invitation", "args": "text", "reason": "user_facing_product_rpc" },
