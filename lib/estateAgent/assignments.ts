@@ -7,18 +7,41 @@ import type {
 } from "@/lib/estateAgent/assignmentTypes";
 import type { PropertyClaimStatus } from "@/lib/propertyClaim/types";
 
-export async function loadEaBranchDirectory(
-  supabase: SupabaseClient
+export const EA_BRANCH_DIRECTORY_MIN_QUERY_LENGTH = 2;
+
+export const EA_BRANCH_DIRECTORY_SEARCH_LIMIT = 20;
+
+/**
+ * Server-side search of eligible branches. Every term must match company,
+ * branch, town or postcode; matching happens before the row limit.
+ */
+export async function searchEaBranchDirectory(
+  supabase: SupabaseClient,
+  query: string,
+  limit = EA_BRANCH_DIRECTORY_SEARCH_LIMIT
 ): Promise<{
   branches: EaBranchDirectoryEntry[];
   error: string | null;
 }> {
-  const { data, error } = await supabase
-    .from("ea_branch_directory")
-    .select("*")
-    .order("company_name")
-    .order("branch_name")
-    .limit(200);
+  const trimmedQuery = query.trim();
+
+  if (
+    trimmedQuery.length <
+    EA_BRANCH_DIRECTORY_MIN_QUERY_LENGTH
+  ) {
+    return {
+      branches: [],
+      error: null,
+    };
+  }
+
+  const { data, error } = await supabase.rpc(
+    "search_ea_branch_directory",
+    {
+      p_query: trimmedQuery,
+      p_limit: limit,
+    }
+  );
 
   if (error) {
     return {
@@ -32,58 +55,6 @@ export async function loadEaBranchDirectory(
       []) as EaBranchDirectoryEntry[],
     error: null,
   };
-}
-
-export function filterEaBranchDirectory(
-  branches: EaBranchDirectoryEntry[],
-  query: string,
-  minimumLength = 2
-): EaBranchDirectoryEntry[] {
-  const trimmedQuery = query
-    .trim()
-    .toLowerCase();
-
-  if (
-    trimmedQuery.length < minimumLength
-  ) {
-    return [];
-  }
-
-  const terms = trimmedQuery
-    .split(/\s+/)
-    .filter(Boolean);
-
-  return branches.filter((entry) => {
-    const haystack = [
-      entry.company_name,
-      entry.branch_name,
-      entry.town_or_city,
-      entry.postcode,
-    ]
-      .join(" ")
-      .toLowerCase();
-
-    return terms.every((term) =>
-      haystack.includes(term)
-    );
-  });
-}
-
-export async function searchEaBranchDirectory(
-  supabase: SupabaseClient,
-  query: string
-): Promise<EaBranchDirectoryEntry[]> {
-  const { branches, error } =
-    await loadEaBranchDirectory(supabase);
-
-  if (error) {
-    return [];
-  }
-
-  return filterEaBranchDirectory(
-    branches,
-    query
-  );
 }
 
 export async function loadPropertyEaAssignment(
@@ -274,16 +245,21 @@ export async function loadAssignmentWithBranchDirectory(
     };
   }
 
-  const { data: branch } = await supabase
-    .from("ea_branch_directory")
-    .select("*")
-    .eq("branch_id", assignment.branch_id)
-    .maybeSingle();
+  const { data: branches } = await supabase.rpc(
+    "get_property_ea_branch_entry",
+    { p_property_id: propertyId }
+  );
+
+  const branch =
+    (
+      (branches ?? []) as EaBranchDirectoryEntry[]
+    ).find(
+      (entry) =>
+        entry.branch_id === assignment.branch_id
+    ) ?? null;
 
   return {
     assignment,
-    branch:
-      (branch as EaBranchDirectoryEntry | null) ??
-      null,
+    branch,
   };
 }

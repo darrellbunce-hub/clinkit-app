@@ -2,16 +2,16 @@
 
 import {
   useEffect,
-  useMemo,
   useState,
 } from "react";
 
 import type { EaBranchDirectoryEntry } from "@/lib/estateAgent/assignmentTypes";
 import {
   assignPropertyToBranch,
-  filterEaBranchDirectory,
+  EA_BRANCH_DIRECTORY_MIN_QUERY_LENGTH,
+  EA_BRANCH_DIRECTORY_SEARCH_LIMIT,
   loadAssignmentWithBranchDirectory,
-  loadEaBranchDirectory,
+  searchEaBranchDirectory,
   updatePropertyEaDelegation,
 } from "@/lib/estateAgent/assignments";
 import { getAgentAssignmentAccessLabel } from "@/lib/estateAgent/delegatedUpdates";
@@ -20,7 +20,16 @@ import { supabase } from "@/lib/supabase";
 const inputClassName =
   "w-full border border-slate-300 rounded-2xl px-4 py-3 text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300";
 
-const MIN_SEARCH_LENGTH = 2;
+const MIN_SEARCH_LENGTH =
+  EA_BRANCH_DIRECTORY_MIN_QUERY_LENGTH;
+
+const SEARCH_DEBOUNCE_MS = 250;
+
+type SearchState = {
+  query: string;
+  branches: EaBranchDirectoryEntry[];
+  error: string | null;
+};
 
 export default function PropertyEstateAgentAssignment({
   propertyId,
@@ -29,13 +38,8 @@ export default function PropertyEstateAgentAssignment({
 }) {
   const [searchQuery, setSearchQuery] =
     useState("");
-  const [directory, setDirectory] = useState<
-    EaBranchDirectoryEntry[]
-  >([]);
-  const [
-    directoryLoadError,
-    setDirectoryLoadError,
-  ] = useState<string | null>(null);
+  const [searchState, setSearchState] =
+    useState<SearchState | null>(null);
   const [selectedBranch, setSelectedBranch] =
     useState<EaBranchDirectoryEntry | null>(
       null
@@ -57,27 +61,11 @@ export default function PropertyEstateAgentAssignment({
 
   useEffect(() => {
     async function loadExistingAssignment() {
-      const [
-        assignmentResult,
-        directoryResult,
-      ] = await Promise.all([
-        loadAssignmentWithBranchDirectory(
+      const { assignment, branch } =
+        await loadAssignmentWithBranchDirectory(
           supabase,
           propertyId
-        ),
-        loadEaBranchDirectory(supabase),
-      ]);
-
-      if (directoryResult.error) {
-        setDirectoryLoadError(
-          directoryResult.error
         );
-      } else {
-        setDirectory(directoryResult.branches);
-      }
-
-      const { assignment, branch } =
-        assignmentResult;
 
       if (assignment) {
         setCurrentAssignmentId(assignment.id);
@@ -96,19 +84,54 @@ export default function PropertyEstateAgentAssignment({
     loadExistingAssignment();
   }, [propertyId]);
 
-  const filteredBranches = useMemo(
-    () =>
-      filterEaBranchDirectory(
-        directory,
-        searchQuery,
-        MIN_SEARCH_LENGTH
-      ),
-    [directory, searchQuery]
-  );
+  const trimmedSearchQuery = searchQuery.trim();
 
   const showSearchPrompt =
-    searchQuery.trim().length <
+    trimmedSearchQuery.length <
     MIN_SEARCH_LENGTH;
+
+  useEffect(() => {
+    if (showSearchPrompt) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const timer = setTimeout(async () => {
+      const result =
+        await searchEaBranchDirectory(
+          supabase,
+          trimmedSearchQuery
+        );
+
+      if (!cancelled) {
+        setSearchState({
+          query: trimmedSearchQuery,
+          branches: result.branches,
+          error: result.error,
+        });
+      }
+    }, SEARCH_DEBOUNCE_MS);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [showSearchPrompt, trimmedSearchQuery]);
+
+  const currentSearch =
+    searchState?.query === trimmedSearchQuery
+      ? searchState
+      : null;
+
+  const isSearching =
+    !showSearchPrompt && currentSearch === null;
+
+  const matchingBranches =
+    currentSearch?.branches ?? [];
+
+  const searchError =
+    currentSearch?.error ?? null;
 
   function handleSelectBranch(
     branch: EaBranchDirectoryEntry
@@ -312,55 +335,69 @@ export default function PropertyEstateAgentAssignment({
             autoComplete="off"
           />
 
-          {directoryLoadError && (
-            <p
-              role="alert"
-              className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800"
-            >
-              Could not load registered branches:{" "}
-              {directoryLoadError}
-            </p>
-          )}
-
           {showSearchPrompt ? (
             <p className="text-sm text-slate-500">
               Type at least {MIN_SEARCH_LENGTH}{" "}
               characters to search registered estate
               agent branches.
             </p>
-          ) : filteredBranches.length === 0 ? (
+          ) : isSearching ? (
+            <p className="text-sm text-slate-500">
+              Searching registered branches...
+            </p>
+          ) : searchError ? (
+            <p
+              role="alert"
+              className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800"
+            >
+              Could not search registered branches:{" "}
+              {searchError}
+            </p>
+          ) : matchingBranches.length === 0 ? (
             <p className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
               No registered branches match your search.
             </p>
           ) : (
-            <ul
-              className="max-h-64 overflow-y-auto rounded-2xl border border-slate-200 divide-y divide-slate-100"
-              role="listbox"
-              aria-label="Matching estate agent branches"
-            >
-              {filteredBranches.map((branch) => (
-                <li key={branch.branch_id}>
-                  <button
-                    type="button"
-                    role="option"
-                    onClick={() =>
-                      handleSelectBranch(branch)
-                    }
-                    className="w-full px-4 py-4 text-left hover:bg-slate-50 transition"
-                  >
-                    <p className="font-semibold text-slate-900">
-                      {branch.company_name}
-                    </p>
+            <>
+              <ul
+                className="max-h-64 overflow-y-auto rounded-2xl border border-slate-200 divide-y divide-slate-100"
+                role="listbox"
+                aria-label="Matching estate agent branches"
+              >
+                {matchingBranches.map((branch) => (
+                  <li key={branch.branch_id}>
+                    <button
+                      type="button"
+                      role="option"
+                      onClick={() =>
+                        handleSelectBranch(branch)
+                      }
+                      className="w-full px-4 py-4 text-left hover:bg-slate-50 transition"
+                    >
+                      <p className="font-semibold text-slate-900">
+                        {branch.company_name}
+                      </p>
 
-                    <p className="mt-1 text-sm text-slate-700">
-                      {branch.branch_name} ·{" "}
-                      {branch.town_or_city},{" "}
-                      {branch.postcode}
-                    </p>
-                  </button>
-                </li>
-              ))}
-            </ul>
+                      <p className="mt-1 text-sm text-slate-700">
+                        {branch.branch_name} ·{" "}
+                        {branch.town_or_city},{" "}
+                        {branch.postcode}
+                      </p>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+
+              {matchingBranches.length >=
+                EA_BRANCH_DIRECTORY_SEARCH_LIMIT && (
+                <p className="text-sm text-slate-500">
+                  Showing the first{" "}
+                  {EA_BRANCH_DIRECTORY_SEARCH_LIMIT}{" "}
+                  matches. Add a town or postcode to
+                  narrow your search.
+                </p>
+              )}
+            </>
           )}
         </div>
       )}

@@ -232,7 +232,7 @@ function runStaticMigrationChecks(): void {
     chain_properties_participant:
       "supabase/migrations/20260725140000_chain_properties_participant_stage_entered_at.sql",
     ea_branch_directory:
-      "supabase/migrations/20260902120000_smoke_test_fixtures.sql",
+      "supabase/migrations/20261010120000_ea_branch_directory_search_eligibility.sql",
     ea_operational_assignments:
       "supabase/migrations/20260612000000_phase7a_ea_originated_properties.sql",
   };
@@ -320,6 +320,12 @@ function runStaticMigrationChecks(): void {
     "ea_branch_directory excludes active smoke-test fixture branches",
     directoryBody.includes("smoke_test_fixture_objects") &&
       directoryBody.includes("'ea_branch'")
+  );
+  record(
+    "ea_branch_directory excludes reserved test domains and unentitled branches",
+    directoryBody.includes("auth.users") &&
+      directoryBody.includes("test|example|invalid|localhost") &&
+      directoryBody.includes("public.is_ea_branch_commercially_entitled(b.id)")
   );
 
   const summarySql = readProjectFile(currentDefs.agent_branch_property_summaries);
@@ -975,18 +981,19 @@ async function runExecuteProbes(fixture: FixtureContext): Promise<void> {
     `rows=${strangerNodesAll.rowCount}`
   );
 
-  // --- ea_branch_directory (intentional authenticated directory) ---
+  // --- ea_branch_directory (authenticated directory of eligible branches) ---
   const strangerDirectory = await selectView(stranger, "ea_branch_directory", {
     columns: "branch_id, branch_name, town_or_city, postcode, company_id, company_name",
     limit: 200,
   });
   record(
     "Authenticated stranger can read ea_branch_directory (intentional)",
-    !strangerDirectory.permissionDenied && strangerDirectory.rowCount >= 1,
+    !strangerDirectory.permissionDenied && strangerDirectory.errorMessage == null,
     `rows=${strangerDirectory.rowCount}`
   );
-  // Look the fixture branches up by id: an unfiltered page depends on how many
-  // other branches the shared Development directory holds.
+  // The fixture branches have no subscription, so they are not entitled and
+  // must not be listed (Rule 25.16). Look them up by id so the result does not
+  // depend on how many other branches the shared Development directory holds.
   const strangerFixtureRows = (
     await Promise.all(
       [fixture.branchAId, fixture.branchBId].map((branchId) =>
@@ -997,20 +1004,22 @@ async function runExecuteProbes(fixture: FixtureContext): Promise<void> {
       )
     )
   ).flatMap((probe) => probe.rows);
-  const seesFixtureBranches =
-    strangerFixtureRows.some((r) => r.branch_id === fixture.branchAId) &&
-    strangerFixtureRows.some((r) => r.branch_id === fixture.branchBId);
+  const seesFixtureBranches = strangerFixtureRows.length > 0;
   record(
-    "Directory exposes fixture branch/company identity fields only (no member emails)",
-    seesFixtureBranches &&
-      [...strangerDirectory.rows, ...strangerFixtureRows].every(
-        (r) =>
-          !("invite_email" in r) &&
-          !("email" in r) &&
-          !("user_id" in r) &&
-          !("subject_user_id" in r)
-      ),
-    seesFixtureBranches ? "fixture branches visible" : "fixture branches missing"
+    "Directory hides unentitled fixture branches, even when queried by id",
+    !seesFixtureBranches,
+    seesFixtureBranches ? "fixture branches visible" : "fixture branches hidden"
+  );
+  record(
+    "Directory exposes branch/company identity fields only (no member emails)",
+    strangerDirectory.rows.every(
+      (r) =>
+        !("invite_email" in r) &&
+        !("email" in r) &&
+        !("user_id" in r) &&
+        !("subject_user_id" in r)
+    ),
+    `rows=${strangerDirectory.rowCount}`
   );
 
   const homeownerDirectory = await selectView(homeownerA, "ea_branch_directory", {
@@ -1018,8 +1027,8 @@ async function runExecuteProbes(fixture: FixtureContext): Promise<void> {
     filters: [{ column: "branch_id", value: fixture.branchAId }],
   });
   record(
-    "Homeowner can use ea_branch_directory for assignment search",
-    homeownerDirectory.rowCount === 1,
+    "Homeowner directory read does not list the unentitled fixture branch",
+    homeownerDirectory.errorMessage == null && homeownerDirectory.rowCount === 0,
     `rows=${homeownerDirectory.rowCount}`
   );
 
@@ -1196,9 +1205,9 @@ async function runExecuteProbes(fixture: FixtureContext): Promise<void> {
 
   // Enumeration note for directory (documented intentional)
   record(
-    "ea_branch_directory enumerates branch/company IDs to authenticated users (by design)",
-    seesFixtureBranches,
-    "documented intentional directory — not treated as exploit"
+    "ea_branch_directory enumerates only eligible branch/company IDs to authenticated users (by design)",
+    !seesFixtureBranches,
+    "documented intentional directory of eligible branches — not treated as exploit"
   );
 
   void homeownerC;

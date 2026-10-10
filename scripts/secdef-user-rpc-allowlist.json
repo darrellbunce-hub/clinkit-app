@@ -48,6 +48,7 @@
     { "schema": "public", "name": "get_next_chain_position", "args": "bigint", "reason": "user_facing_product_rpc" },
     { "schema": "public", "name": "get_participation_delink_options", "args": "bigint", "reason": "user_facing_product_rpc" },
     { "schema": "public", "name": "get_property_claim_invitation_status", "args": "bigint", "reason": "user_facing_product_rpc" },
+    { "schema": "public", "name": "get_property_ea_branch_entry", "args": "bigint", "reason": "user_facing_product_rpc" },
     { "schema": "public", "name": "get_property_lifecycle_signals", "args": "bigint", "reason": "user_facing_product_rpc" },
     { "schema": "public", "name": "get_property_operational_owner_user_id", "args": "bigint", "reason": "user_facing_product_rpc" },
     { "schema": "public", "name": "homeowner_has_meaningful_participation", "args": "bigint", "reason": "user_facing_product_rpc" },
