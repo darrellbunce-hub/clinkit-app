@@ -6,9 +6,10 @@
  *       placeholder; no EA assignment, identity or authority on it; awaiting its seller
  *   AP2 duplicate onward address is refused with a customer message
  *   AP3 seller's EA in Join mode: sale creation reports property_already_exists for a
- *       purchase awaiting its seller; the connect fallback takes the seller side
- *       (assignment only); onward plans run from the purchase anchor; the onward
- *       purchase carries no EA authority; wrong details stay generic
+ *       purchase awaiting its seller; connect_ea_to_awaiting_property refuses (generic,
+ *       nothing written); on a legacy EA-managed purchase (assignment written by the
+ *       service role, as before 20261010090000) onward plans run from the purchase
+ *       anchor and the onward purchase carries no EA authority
  *   AP4 Start Move pre-check: available / yours / awaiting_connection /
  *       already_represented per side; invalid input mapped to a message
  *
@@ -25,7 +26,6 @@ import { completeEstateAgentOnboarding } from "../lib/estateAgent/completeOnboar
 import { completeEaManagedPropertyOrigination } from "../lib/estateAgent/completeEaManagedPropertyOrigination";
 import { createEstateAgentProfile } from "../lib/estateAgent/createEstateAgentProfile";
 import {
-  connectEaToAwaitingProperty,
   createEaOperationalProperty,
   joinEaOperationalChain,
 } from "../lib/estateAgent/originateOperationalProperty";
@@ -412,40 +412,54 @@ async function runScenarios(ctx: Ctx): Promise<void> {
     awaitingBuyer: false,
   });
   record(
-    "AP3 Join mode sale creation reports property_already_exists (triggers connect fallback)",
+    "AP3 Join mode sale creation reports property_already_exists (no connect fallback)",
     joinAttempt.error === "property_already_exists",
     JSON.stringify(joinAttempt)
   );
 
-  const wrongCode = await connectEaToAwaitingProperty(eaB.client, {
-    accessCode: "KN-ZZZ-0000",
-    address: flatAddress,
-    postcode: "PO16 7HB",
-    branchId: eaB.branchId,
+  const { data: wrongCode } = await eaB.client.rpc("connect_ea_to_awaiting_property", {
+    p_access_code: "KN-ZZZ-0000",
+    p_address: flatAddress,
+    p_postcode: "PO16 7HB",
+    p_branch_id: eaB.branchId,
   });
   record(
     "AP3 connect with wrong access code is generic and creates nothing",
-    wrongCode.error === GENERIC && (await activeAssignments(ctx, flatA)).length === 0,
+    wrongCode?.error === GENERIC && (await activeAssignments(ctx, flatA)).length === 0,
     JSON.stringify(wrongCode)
   );
 
-  const connected = await connectEaToAwaitingProperty(eaB.client, {
-    accessCode: chainA.accessCode,
-    address: flatAddress,
-    postcode: "PO16 7HB",
-    branchId: eaB.branchId,
+  const { data: refused } = await eaB.client.rpc("connect_ea_to_awaiting_property", {
+    p_access_code: chainA.accessCode,
+    p_address: flatAddress,
+    p_postcode: "PO16 7HB",
+    p_branch_id: eaB.branchId,
   });
   record(
-    "AP3 connect fallback takes the purchase's seller side",
-    connected.error == null && connected.propertyId === flatA && connected.chainId === chainA.chainId,
-    JSON.stringify(connected)
+    "AP3 connect with the right access code and address is refused (generic) and creates nothing",
+    refused?.ok === false &&
+      refused?.error === GENERIC &&
+      (await activeAssignments(ctx, flatA)).length === 0 &&
+      (await adminState(ctx, flatA)) === "awaiting_seller",
+    JSON.stringify(refused)
   );
+
+  // Purchases connected before 20261010090000 keep their EA assignment; the
+  // remaining AP3 checks run on one written the same way by the service role.
+  const { error: legacyAssignError } = await ctx.admin.from("property_ea_assignments").insert({
+    property_id: flatA,
+    branch_id: eaB.branchId,
+    status: "active",
+    assigned_by_user_id: eaB.userId,
+  });
   const flatAssignments = await activeAssignments(ctx, flatA);
   record(
-    "AP3 connect writes one assignment for EA B only; identity stays with the buyer",
-    flatAssignments.length === 1 &&
+    "AP3 legacy fixture: one assignment for EA B only; identity stays with the buyer",
+    legacyAssignError == null &&
+      flatAssignments.length === 1 &&
       flatAssignments[0].branch_id === eaB.branchId &&
-      (await identityOwner(ctx, flatA)) === personA.userId
+      (await identityOwner(ctx, flatA)) === personA.userId,
+    legacyAssignError?.message
   );
   record("AP3 EA B operates the purchase while EA-only", (await canOperate(eaB, flatA)) === true);
   record("AP3 buyer cannot operate the purchase", (await canOperate(personA, flatA)) === false);

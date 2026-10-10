@@ -14,7 +14,6 @@ import { completeEaManagedPropertyOrigination } from "@/lib/estateAgent/complete
 import type { AgentHomeContext } from "@/lib/estateAgent/loadAgentHomeContext";
 import { loadAgentHomeContext } from "@/lib/estateAgent/loadAgentHomeContext";
 import {
-  connectEaToAwaitingProperty,
   createEaOperationalChain,
   createEaOperationalProperty,
   generateOperationalAccessCode,
@@ -182,29 +181,13 @@ export default function AgentOriginatePage() {
       );
 
       if (result.error === "property_already_exists") {
-        // The address may be a buyer's purchase awaiting its seller: the
-        // seller's agent connects to it instead of creating a second row.
-        const connectResult =
-          await connectEaToAwaitingProperty(supabase, {
-            accessCode,
-            address: saleAddress,
-            postcode: salePostcodeStored,
-            branchId: context.branch.id,
-          });
-
-        if (
-          connectResult.error ||
-          connectResult.propertyId == null
-        ) {
-          setIsSubmitting(false);
-          setErrorMessage(
-            "This property is already part of MoveLoop. Check the chain access code and address, or contact support."
-          );
-          return;
-        }
-
-        chainId = connectResult.chainId;
-        propertyId = connectResult.propertyId;
+        // An access code and address never give the branch the seller side;
+        // the seller connects and appoints the branch.
+        setIsSubmitting(false);
+        setErrorMessage(
+          "This property is already part of MoveLoop. If you act for its seller, the seller needs to connect to the property and appoint your branch. Check the chain access code and address, or contact support."
+        );
+        return;
       } else if (result.error || result.propertyId == null) {
         setIsSubmitting(false);
         setErrorMessage(

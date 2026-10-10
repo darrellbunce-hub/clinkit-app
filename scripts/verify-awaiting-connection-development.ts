@@ -1,7 +1,7 @@
 /**
  * Seller-side authority and awaiting connection (M2) — live Development scenarios.
  *
- * Requires 20261005100000, 20261005110000 and 20261005120000 on Development.
+ * Requires 20261005100000, 20261005110000, 20261005120000 and 20261010090000 on Development.
  *
  *   AW1 EA-only sale: the assigned EA operates it (even with homeowner-only updates) and
  *       converts the onward purchase; the purchase stays awaiting its seller, with no EA
@@ -9,8 +9,9 @@
  *   AW2 the actual seller connects by access code (normalised address) and operates the
  *       purchase; a second seller is refused (slot held); the seller adds and converts
  *       their own onward purchase from the purchase row; EA A stays view-only
- *   AW3 the seller's EA connects to an awaiting purchase by access code (assignment only)
- *       and operates it while EA-only; a second EA is refused; EA B's onward purchase is unowned
+ *   AW3 no EA can connect to an awaiting purchase by access code (generic refusal, nothing
+ *       written); a legacy EA-managed purchase (assignment written by the service role, as
+ *       before 20261010090000) is operated by its EA while EA-only; EA B's onward purchase is unowned
  *   AW4 the seller joins the EA-managed purchase: EA B's onward purchase converges to the
  *       seller; EA B's subject is the seller; EA B's capability follows the seller's
  *       EA-update permission; EA A stays view-only
@@ -19,7 +20,7 @@
  *       side is unrepresented are refused
  *   AW7 EA purchase origination refused (create and access-code join)
  *   AW8 grants: internal helpers not callable by clients; predicates not callable by anon
- *   AW9 connect requires branch membership
+ *   AW9 connect is refused for non-members too (generic)
  *   AW10 homeowner + EA: EA A creates Person A's onward purchase (Flat 2); Person B, its
  *       seller, connects by access code; no identity, assignment or authority moves from
  *       House 1 / EA A to Flat 2; EA A cannot appoint itself, Person A cannot appoint, and
@@ -474,33 +475,44 @@ async function runScenarios(ctx: Ctx): Promise<void> {
     JSON.stringify(saleConnect)
   );
   const eaBConnect = await connect(eaB, chain2.accessCode, variant(flat2Address), "po16 7ab", eaB.branchId);
-  const flat2Assignments = await assignments(ctx, flat2);
+  const eaCConnect = await connect(eaC, chain2.accessCode, flat2Address, "PO16 7AB", eaC.branchId);
   record(
-    "AW3 EA B connects to the awaiting purchase",
-    eaBConnect?.ok === true && eaBConnect?.property_id === flat2,
-    JSON.stringify(eaBConnect)
+    "AW3 no EA can take the awaiting purchase's seller side by access code (generic)",
+    eaBConnect?.ok === false &&
+      eaBConnect?.error === GENERIC &&
+      eaCConnect?.ok === false &&
+      eaCConnect?.error === GENERIC,
+    JSON.stringify({ eaBConnect, eaCConnect })
   );
   record(
-    "AW3 one active assignment to EA B's branch, homeowner-only updates by default",
-    flat2Assignments.length === 1 &&
-      flat2Assignments[0].branch_id === eaB.branchId &&
-      flat2Assignments[0].status === "active" &&
-      flat2Assignments[0].homeowner_only_updates === true,
-    JSON.stringify(flat2Assignments)
-  );
-  record(
-    "AW3 connect wrote no identity, claim metadata or counterparty",
-    (await identity(ctx, flat2)) == null &&
+    "AW3 refused connect wrote no assignment, identity, claim metadata or counterparty",
+    (await assignments(ctx, flat2)).length === 0 &&
+      (await identity(ctx, flat2)) == null &&
       (await count(ctx, "property_claim_metadata", { property_id: flat2 })) === 0 &&
       (await count(ctx, "property_counterparty_participants", { property_id: flat2 })) === 0
   );
-  record("AW3 purchase now live and EA-managed", (await adminState(ctx, flat2)) === "live_ea_managed");
-  const eaCConnect = await connect(eaC, chain2.accessCode, flat2Address, "PO16 7AB", eaC.branchId);
+  record("AW3 purchase still awaiting its seller", (await adminState(ctx, flat2)) === "awaiting_seller");
+  record("AW3 EA B cannot operate the awaiting purchase", (await canOperate(eaB, flat2)) === false);
+
+  // Purchases connected before 20261010090000 keep their EA assignment; the
+  // remaining AW3/AW4 checks run on one written the same way by the service role.
+  const { error: legacyAssignError } = await ctx.admin.from("property_ea_assignments").insert({
+    property_id: flat2,
+    branch_id: eaB.branchId,
+    status: "active",
+    assigned_by_user_id: eaB.userId,
+  });
+  const flat2Assignments = await assignments(ctx, flat2);
   record(
-    "AW3 second EA refused (generic)",
-    eaCConnect?.ok === false && eaCConnect?.error === GENERIC && (await assignments(ctx, flat2)).length === 1,
-    JSON.stringify(eaCConnect)
+    "AW3 legacy fixture: one active assignment to EA B's branch, homeowner-only updates by default",
+    !legacyAssignError &&
+      flat2Assignments.length === 1 &&
+      flat2Assignments[0].branch_id === eaB.branchId &&
+      flat2Assignments[0].status === "active" &&
+      flat2Assignments[0].homeowner_only_updates === true,
+    legacyAssignError?.message ?? JSON.stringify(flat2Assignments)
   );
+  record("AW3 legacy purchase is live and EA-managed", (await adminState(ctx, flat2)) === "live_ea_managed");
   record("AW3 EA B operates the EA-only purchase", (await canOperate(eaB, flat2)) === true);
   record("AW3 EA A cannot operate EA B's purchase", (await canOperate(eaA, flat2)) === false);
   const eaBView = await viewRow(eaB, flat2);
@@ -681,11 +693,11 @@ async function runScenarios(ctx: Ctx): Promise<void> {
     record(`AW8 authenticated refused: ${name}`, !!error && data == null, error?.message ?? JSON.stringify(data));
   }
 
-  // AW9 — connect requires branch membership
+  // AW9 — connect is closed for non-members too
   const nonMember = await connect(personA, chain2.accessCode, flat2Address, "PO16 7AB", eaB.branchId);
   record(
-    "AW9 non-member refused (not_ea_branch_member)",
-    nonMember?.ok === false && nonMember?.error === "not_ea_branch_member",
+    "AW9 non-member refused (generic)",
+    nonMember?.ok === false && nonMember?.error === GENERIC,
     JSON.stringify(nonMember)
   );
 
