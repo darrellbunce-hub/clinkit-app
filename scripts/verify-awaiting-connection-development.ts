@@ -24,8 +24,9 @@
  *   AW10 homeowner + EA: EA A creates Person A's onward purchase (Flat 2); Person B, its
  *       seller, connects by access code; no identity, assignment or authority moves from
  *       House 1 / EA A to Flat 2; EA A cannot appoint itself, Person A cannot appoint, and
- *       Person B cannot appoint EA A (branch_acts_for_buyer); Person B appoints EA B through
- *       assign_property_ea_branch and EA B operates per Person B's permission
+ *       Person B cannot appoint EA A (branch_acts_for_buyer); assign_property_ea_branch
+ *       refuses ineligible EA B (branch_not_found, 20261011090000); with EA B's appointment
+ *       written by the service role, EA B operates per Person B's permission
  *       (set_property_ea_update_permission); direct assignment writes are refused
  *
  * Usage (Development ONLY — bbbsxzxcjkmpqsfvmhbo):
@@ -838,19 +839,33 @@ async function runScenarios(ctx: Ctx): Promise<void> {
     directAssignError?.message ?? "insert succeeded"
   );
 
+  // Verifier branches are never directory-eligible (20261011090000): the RPC
+  // refuses EA B, and its appointment is written by the service role.
   const assignB = await rpc(personB.client, "assign_property_ea_branch", {
     p_property_id: flat10,
     p_branch_id: eaB.branchId,
     p_homeowner_only_updates: true,
   });
+  record(
+    "AW10 Person B cannot appoint ineligible EA B on Flat 2 (branch_not_found, nothing written)",
+    assignB?.ok === false && assignB?.error === "branch_not_found" && (await assignments(ctx, flat10)).length === 0,
+    JSON.stringify(assignB)
+  );
+  const { error: seedBError } = await ctx.admin.from("property_ea_assignments").insert({
+    property_id: flat10,
+    branch_id: eaB.branchId,
+    status: "active",
+    homeowner_only_updates: true,
+    assigned_by_user_id: personB.userId,
+  });
   const flat10Assignments = await assignments(ctx, flat10);
   record(
-    "AW10 Person B appoints EA B on Flat 2 (EA updates disabled)",
-    assignB?.ok === true &&
+    "AW10 fixture: EA B appointed on Flat 2 (EA updates disabled)",
+    !seedBError &&
       flat10Assignments.length === 1 &&
       flat10Assignments[0].branch_id === eaB.branchId &&
       flat10Assignments[0].homeowner_only_updates === true,
-    JSON.stringify({ assignB, flat10Assignments })
+    JSON.stringify({ seedBError: seedBError?.message, flat10Assignments })
   );
   record("AW10 EA B cannot operate Flat 2 while EA updates are disabled", (await canOperate(eaB, flat10)) === false);
   record("AW10 EA B's subject on Flat 2 is Person B", (await viewRow(eaB, flat10))?.subject_user_id === personB.userId);

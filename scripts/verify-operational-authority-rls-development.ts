@@ -13,8 +13,9 @@
  *       onward purchase Flat 2 and gains no authority over it; Person A (its buyer) has
  *       none either; neither can appoint an EA or run the connected hop; Person B, Flat 2's
  *       seller, connects and operates it; Person B cannot appoint EA A
- *       (branch_acts_for_buyer); Person B appoints EA B, who operates Flat 2 exactly while
- *       Person B allows EA updates; nothing moves to or from House 1
+ *       (branch_acts_for_buyer); Person B cannot appoint ineligible EA B (branch_not_found);
+ *       with EA B's appointment written by the service role, EA B operates Flat 2 exactly
+ *       while Person B allows EA updates; nothing moves to or from House 1
  *   OA2 the five authority states:
  *       1. homeowner + EA + updates enabled → EA operates
  *       2. homeowner + EA + updates disabled → EA cannot operate (and follows the toggle)
@@ -24,8 +25,10 @@
  *       5. EA assigned to a different property → cannot operate this one
  *   OA3 Buyer Ready node: owner only (activity, delay, node update); others refused
  *   OA4 placement: plain members cannot insert properties or Buyer Ready nodes in the chain
- *   OA5 appointment RPCs: direct property_ea_assignments writes are refused; replacement
- *       revokes the previous branch; anon refused
+ *   OA5 appointment RPCs: direct property_ea_assignments writes are refused; replacing with
+ *       an ineligible branch is refused and leaves the current assignment untouched; the
+ *       same ineligible branch cannot gain EA updates but can be kept restricted; anon
+ *       refused (20261011090000)
  *
  * Usage (Development ONLY — bbbsxzxcjkmpqsfvmhbo):
  *   npx tsx scripts/verify-operational-authority-rls-development.ts --execute
@@ -485,8 +488,22 @@ async function runScenarios(ctx: Ctx): Promise<void> {
     bPicksEaA?.ok === false && bPicksEaA?.error === "branch_acts_for_buyer" && (await activeAssignments(ctx, flat2)).length === 0,
     JSON.stringify(bPicksEaA)
   );
+  // Verifier branches are never directory-eligible (20261011090000): the RPC
+  // refuses EA B, and its appointment is written by the service role.
   const bPicksEaB = await assign(personB, flat2, eaB.branchId, true);
-  record("OA1 Person B appoints EA B to Flat 2 (EA updates disabled)", bPicksEaB?.ok === true, JSON.stringify(bPicksEaB));
+  record(
+    "OA1 Person B cannot appoint ineligible EA B to Flat 2 (branch_not_found, nothing written)",
+    bPicksEaB?.ok === false && bPicksEaB?.error === "branch_not_found" && (await activeAssignments(ctx, flat2)).length === 0,
+    JSON.stringify(bPicksEaB)
+  );
+  const { error: seedFlat2Error } = await ctx.admin.from("property_ea_assignments").insert({
+    property_id: flat2,
+    branch_id: eaB.branchId,
+    status: "active",
+    homeowner_only_updates: true,
+    assigned_by_user_id: personB.userId,
+  });
+  record("OA1 fixture: EA B appointed to Flat 2 (EA updates disabled)", !seedFlat2Error, seedFlat2Error?.message);
   await probe(ctx, "OA1 EA B on Flat 2, updates disabled", eaB, flat, false, { operator: personB });
   const allow = await setPermission(personB, flat2, false);
   record("OA1 Person B enables EA updates", allow?.ok === true, JSON.stringify(allow));
@@ -700,26 +717,63 @@ async function runScenarios(ctx: Ctx): Promise<void> {
     directDelete?.message ?? "deleted"
   );
 
+  const beforeReplace = await activeAssignments(ctx, s1);
   const replace = await assign(personH1, s1, eaB.branchId, true);
+  const afterRefusedReplace = await activeAssignments(ctx, s1);
+  record(
+    "OA5 replacing EA A with ineligible EA B is refused (branch_not_found); EA A's assignment is untouched",
+    replace?.ok === false &&
+      replace?.error === "branch_not_found" &&
+      JSON.stringify(afterRefusedReplace) === JSON.stringify(beforeReplace) &&
+      afterRefusedReplace.length === 1 &&
+      afterRefusedReplace[0].branch_id === eaA.branchId,
+    JSON.stringify({ replace, beforeReplace, afterRefusedReplace })
+  );
+
+  // Replacement as the RPC performs it for an eligible branch, written by the
+  // service role so the remaining checks have EA B assigned.
+  const { error: revokeAError } = await ctx.admin
+    .from("property_ea_assignments")
+    .update({ status: "revoked", revoked_at: new Date().toISOString(), revocation_reason: "replaced" })
+    .eq("property_id", s1)
+    .eq("status", "active");
+  const { error: seedBError } = await ctx.admin.from("property_ea_assignments").insert({
+    property_id: s1,
+    branch_id: eaB.branchId,
+    status: "active",
+    homeowner_only_updates: true,
+    assigned_by_user_id: personH1.userId,
+  });
   const afterReplace = await activeAssignments(ctx, s1);
   record(
-    "OA5 homeowner replaces EA A with EA B: one active row (EA B), EA A revoked",
-    replace?.ok === true &&
-      replace?.replaced === true &&
+    "OA5 fixture: EA A revoked (replaced), EA B active with updates disabled",
+    !revokeAError &&
+      !seedBError &&
       afterReplace.length === 1 &&
       afterReplace[0].branch_id === eaB.branchId &&
       afterReplace[0].homeowner_only_updates === true,
-    JSON.stringify({ replace, afterReplace })
+    JSON.stringify({ revokeAError: revokeAError?.message, seedBError: seedBError?.message, afterReplace })
   );
   record(
     "OA5 after replacement: EA A cannot operate; EA B (updates disabled) cannot operate",
     (await canOperate(eaA, s1)) === false && (await canOperate(eaB, s1)) === false
   );
-  const sameBranch = await assign(personH1, s1, eaB.branchId, false);
+  const sameBranchExpand = await assign(personH1, s1, eaB.branchId, false);
   record(
-    "OA5 re-appointing the same branch only updates its permission",
-    sameBranch?.ok === true && sameBranch?.replaced === false && (await canOperate(eaB, s1)) === true,
-    JSON.stringify(sameBranch)
+    "OA5 re-appointing the same ineligible branch cannot enable its updates (branch_not_found)",
+    sameBranchExpand?.ok === false &&
+      sameBranchExpand?.error === "branch_not_found" &&
+      (await activeAssignments(ctx, s1))[0]?.homeowner_only_updates === true &&
+      (await canOperate(eaB, s1)) === false,
+    JSON.stringify(sameBranchExpand)
+  );
+  const sameBranchKeep = await assign(personH1, s1, eaB.branchId, true);
+  record(
+    "OA5 re-appointing the same ineligible branch with updates disabled still succeeds (not replaced)",
+    sameBranchKeep?.ok === true &&
+      sameBranchKeep?.replaced === false &&
+      (await activeAssignments(ctx, s1)).length === 1,
+    JSON.stringify(sameBranchKeep)
   );
 
   const anon = anonClient(ctx);

@@ -15,7 +15,9 @@
  *       no chain, rows or identities behind
  *   SM5 the purchase's seller joins by access code and establish_connected_hop
  *       runs: the link is kept; the branch acting for the homeowner's sale cannot
- *       take the purchase's seller side (branch_acts_for_buyer); another branch can
+ *       take the purchase's seller side (branch_acts_for_buyer); another branch
+ *       passes that check and, as a verifier branch, is refused for directory
+ *       eligibility (20261011090000)
  *
  * Usage (Development ONLY — bbbsxzxcjkmpqsfvmhbo):
  *   npx tsx scripts/verify-start-move-onward-purchase-link-development.ts --execute
@@ -461,12 +463,29 @@ async function runScenarios(ctx: Ctx) {
     topo5.segments.some((s) => s.propertyNodes.map((p) => p.id).join().includes(`${sale1},${purchase1}`))
   );
 
+  // Verifier branches are never directory-eligible (20261011090000), so EA A's
+  // appointment on the sale is written by the service role, as one made while
+  // the branch was eligible would be.
   const appointA = await rpc(owner.client, "assign_property_ea_branch", {
     p_property_id: sale1,
     p_branch_id: eaA.branchId,
     p_homeowner_only_updates: true,
   });
-  record("SM5 owner appoints EA A on their sale", appointA?.ok === true, JSON.stringify(appointA));
+  record(
+    "SM5 the owner cannot appoint an ineligible branch (branch_not_found, nothing written)",
+    appointA?.ok === false &&
+      appointA?.error === "branch_not_found" &&
+      (await activeAssignmentBranches(ctx, sale1)).length === 0,
+    JSON.stringify(appointA)
+  );
+  const { error: seedAError } = await ctx.admin.from("property_ea_assignments").insert({
+    property_id: sale1,
+    branch_id: eaA.branchId,
+    status: "active",
+    homeowner_only_updates: true,
+    assigned_by_user_id: owner.userId,
+  });
+  record("SM5 EA A's existing appointment on the sale (service role)", seedAError == null, seedAError?.message);
   const sellerAppointsA = await rpc(seller.client, "assign_property_ea_branch", {
     p_property_id: purchase1,
     p_branch_id: eaA.branchId,
@@ -482,7 +501,22 @@ async function runScenarios(ctx: Ctx) {
     p_branch_id: eaB.branchId,
     p_homeowner_only_updates: true,
   });
-  record("SM5 the seller can appoint a different branch", sellerAppointsB?.ok === true, JSON.stringify(sellerAppointsB));
+  record(
+    "SM5 another branch passes the buyer-side check and is refused only for eligibility (branch_not_found)",
+    sellerAppointsB?.ok === false &&
+      sellerAppointsB?.error === "branch_not_found" &&
+      (await activeAssignmentBranches(ctx, purchase1)).length === 0,
+    JSON.stringify(sellerAppointsB)
+  );
+}
+
+async function activeAssignmentBranches(ctx: Ctx, propertyId: number): Promise<string[]> {
+  const { data } = await ctx.admin
+    .from("property_ea_assignments")
+    .select("branch_id")
+    .eq("property_id", propertyId)
+    .eq("status", "active");
+  return (data ?? []).map((row) => row.branch_id as string);
 }
 
 async function cleanupFixtures(ctx: Ctx): Promise<void> {

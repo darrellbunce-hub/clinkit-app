@@ -40,7 +40,6 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { readFileSync } from "fs";
 import { join } from "path";
 
-import { assignPropertyToBranch } from "../lib/estateAgent/assignments";
 import { createGdprErasureRequest } from "../lib/gdpr/erasureRequest";
 
 const DEVELOPMENT_SUPABASE_PROJECT_REF = "bbbsxzxcjkmpqsfvmhbo";
@@ -178,12 +177,16 @@ async function main() {
       .single();
     const propertyId = sale!.id as number;
     await client.rpc("establish_operational_homeowner_for_created_property", { p_property_id: propertyId });
-    const assigned = await assignPropertyToBranch(client, {
-      propertyId,
-      branchId,
-      homeownerOnlyUpdates: false,
+    // Verifier branches are never directory-eligible (20261011090000); the
+    // appointment is written by the service role.
+    const { error: assignError } = await admin.from("property_ea_assignments").insert({
+      property_id: propertyId,
+      branch_id: branchId,
+      status: "active",
+      homeowner_only_updates: false,
+      assigned_by_user_id: userId,
     });
-    if (assigned.error) throw new Error(`assign failed (${label}): ${assigned.error}`);
+    if (assignError) throw new Error(`assign failed (${label}): ${assignError.message}`);
     return { client, userId, propertyId };
   }
 

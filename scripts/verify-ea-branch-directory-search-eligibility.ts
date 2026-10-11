@@ -50,10 +50,21 @@ const code = withoutComments(sql);
 {
   const version = MIGRATION.split("_")[0];
   record(
-    "ordering: migration follows the Start Move link migration and is the latest",
+    "ordering: migration follows the Start Move link migration",
     migrationFiles.includes(PREVIOUS) &&
-      migrationFiles.indexOf(MIGRATION) === migrationFiles.indexOf(PREVIOUS) + 1 &&
-      migrationFiles[migrationFiles.length - 1] === MIGRATION
+      migrationFiles.indexOf(MIGRATION) === migrationFiles.indexOf(PREVIOUS) + 1
+  );
+  const redefining = migrationFiles
+    .slice(migrationFiles.indexOf(MIGRATION) + 1)
+    .filter((file) =>
+      /create\s+(or\s+replace\s+)?(view\s+public\.ea_branch_directory\b|function\s+public\.(search_ea_branch_directory|get_property_ea_branch_entry)\s*\()/i.test(
+        withoutComments(read(`supabase/migrations/${file}`))
+      )
+    );
+  record(
+    "ordering: no later migration redefines the directory view, search or label RPC",
+    redefining.length === 0,
+    redefining.join(", ")
   );
   record(
     "ordering: version is unique",

@@ -30,6 +30,7 @@ const DEPENDENT_FOLLOW_UP_MIGRATIONS = [
   "20261010090000_close_ea_self_connect_awaiting_property.sql",
   "20261010110000_link_start_move_onward_purchase.sql",
   "20261010120000_ea_branch_directory_search_eligibility.sql",
+  "20261011090000_assign_property_ea_branch_directory_eligibility.sql",
 ];
 
 const HELPERS = [
