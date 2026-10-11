@@ -16,6 +16,8 @@
 import { readdirSync, readFileSync } from "fs";
 import { join } from "path";
 
+import { formatPropertyEaAssignmentError, formatPropertyEaDelegationError } from "../lib/estateAgent/assignments";
+
 const ROOT = join(import.meta.dirname, "..");
 const MIGRATIONS_DIR = "supabase/migrations";
 const FILE = "20261011100000_set_property_ea_update_permission_directory_eligibility.sql";
@@ -222,10 +224,27 @@ function main() {
 
   // Application
   const assignments = read("lib/estateAgent/assignments.ts");
-  const message = assignments.match(/case "branch_not_found":\s*return "([^"]+)";/)?.[1] ?? "";
+  const delegationMessage = formatPropertyEaDelegationError("branch_not_found");
   record(
-    "App: branch_not_found is shown with the existing generic message (no billing or fixture detail)",
-    message === "That estate agent branch could not be found." && !/subscri|billing|entitle|trial|payment|fixture|test/i.test(message)
+    "App: a refused delegation toggle shows the neutral eligibility message (no billing or fixture detail)",
+    delegationMessage ===
+      "This Estate Agent branch is not currently eligible for delegated updates. Please contact support if you think this is incorrect." &&
+      !/subscri|billing|entitle|trial|payment|fixture|test|directory|smoke/i.test(delegationMessage)
+  );
+  const otherCodes = ["not_authorized", "no_active_assignment", "invalid_value", "not_authenticated", null, undefined];
+  record(
+    "App: every other delegation failure keeps its existing message",
+    otherCodes.every((code) => formatPropertyEaDelegationError(code) === formatPropertyEaAssignmentError(code))
+  );
+  record(
+    "App: appointment keeps the generic branch_not_found message (unknown and ineligible ids look the same)",
+    formatPropertyEaAssignmentError("branch_not_found") === "That estate agent branch could not be found."
+  );
+  record(
+    "App: only the delegation toggle uses the delegation message",
+    /"set_property_ea_update_permission",[\s\S]*?\},\s*formatPropertyEaDelegationError\s*\)/.test(assignments) &&
+      /"assign_property_ea_branch",[\s\S]*?\}\s*\);/.test(assignments) &&
+      (assignments.match(/formatPropertyEaDelegationError\b/g) ?? []).length === 2
   );
   const panel = read("components/estate-agents/PropertyEstateAgentAssignment.tsx");
   record(

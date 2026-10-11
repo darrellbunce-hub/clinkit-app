@@ -143,17 +143,34 @@ export function formatPropertyEaAssignmentError(
   }
 }
 
+/**
+ * The delegation toggle returns branch_not_found only when the assigned branch
+ * cannot be given delegated updates; the message must not reveal why.
+ */
+export function formatPropertyEaDelegationError(
+  code: string | null | undefined
+): string {
+  if (code === "branch_not_found") {
+    return "This Estate Agent branch is not currently eligible for delegated updates. Please contact support if you think this is incorrect.";
+  }
+
+  return formatPropertyEaAssignmentError(code);
+}
+
 async function callAssignmentRpc(
   supabase: SupabaseClient,
   name: string,
-  args: Record<string, unknown>
+  args: Record<string, unknown>,
+  formatError: (
+    code: string | null | undefined
+  ) => string = formatPropertyEaAssignmentError
 ): Promise<{ assignmentId: string | null; error: string | null }> {
   const { data, error } = await supabase.rpc(name, args);
 
   if (error) {
     return {
       assignmentId: null,
-      error: formatPropertyEaAssignmentError(null),
+      error: formatError(null),
     };
   }
 
@@ -162,7 +179,7 @@ async function callAssignmentRpc(
   if (!result?.ok) {
     return {
       assignmentId: null,
-      error: formatPropertyEaAssignmentError(result?.error),
+      error: formatError(result?.error),
     };
   }
 
@@ -202,7 +219,8 @@ export async function updatePropertyEaDelegation(
       p_property_id: propertyId,
       p_homeowner_only_updates:
         homeownerOnlyUpdates,
-    }
+    },
+    formatPropertyEaDelegationError
   );
 
   return { error };
