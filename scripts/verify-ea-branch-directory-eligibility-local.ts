@@ -10,7 +10,7 @@
  * scenarios whose branches stay hidden.
  *
  * Requires a local stack (`supabase start`) with every migration applied,
- * including 20261010120000 and 20261011090000.
+ * including 20261010120000, 20261011090000 and 20261011100000.
  *
  *   L1 a branch sorting after row 200 of the directory is found by search
  *   L2 entitlement per branch: trial, paid and grace are listed; expired grace,
@@ -27,7 +27,8 @@
  *      replaced; every unlisted branch is refused with branch_not_found and
  *      nothing changes; once entitlement ends the branch leaves search, keeps
  *      its assignment and label, can keep or restrict delegation but cannot be
- *      given delegated updates
+ *      given delegated updates, by re-appointment or by the delegation toggle
+ *      (set_property_ea_update_permission, 20261011100000)
  *   L7 EA onboarding still works; the new branch is listed once it has a trial
  *
  * Safety: refuses any URL that is not http(s) on 127.0.0.1, localhost or ::1;
@@ -295,6 +296,15 @@ async function assign(
   const { data, error } = await client.rpc("assign_property_ea_branch", {
     p_property_id: propertyId,
     p_branch_id: branchId,
+    p_homeowner_only_updates: homeownerOnlyUpdates,
+  });
+  if (error) return { ok: false, error: error.message };
+  return (data ?? {}) as AssignResult;
+}
+
+async function setPermission(client: SupabaseClient, propertyId: number, homeownerOnlyUpdates: boolean): Promise<AssignResult> {
+  const { data, error } = await client.rpc("set_property_ea_update_permission", {
+    p_property_id: propertyId,
     p_homeowner_only_updates: homeownerOnlyUpdates,
   });
   if (error) return { ok: false, error: error.message };
@@ -636,6 +646,13 @@ async function runScenarios(ctx: Ctx) {
   );
   const restrict = await assign(owner.client, sale, targetBy["Target Trial"], true);
   record("L6 delegation can be restricted again", restrict.ok === true && (await assignments(ctx, sale))[0]?.homeowner_only_updates === true);
+  const toggleOn = await setPermission(owner.client, sale, false);
+  const toggleOff = await setPermission(owner.client, sale, true);
+  record(
+    "L6 the delegation toggle enables and restricts updates for a listed branch",
+    toggleOn.ok === true && toggleOff.ok === true && (await assignments(ctx, sale))[0]?.homeowner_only_updates === true,
+    JSON.stringify({ toggleOn, toggleOff })
+  );
 
   const replacedBy = await assign(owner.client, sale, targetBy["Target Paid"], true);
   const afterReplace = await assignments(ctx, sale);
@@ -667,6 +684,12 @@ async function runScenarios(ctx: Ctx) {
     "L6 the ended branch cannot be given delegated updates (branch_not_found, unchanged)",
     endedEnable.error === "branch_not_found" && JSON.stringify(endedEnableRows) === JSON.stringify(afterReplace)
   );
+  const endedToggle = await setPermission(owner.client, sale, false);
+  record(
+    "L6 the delegation toggle cannot give the ended branch delegated updates (branch_not_found, unchanged)",
+    endedToggle.error === "branch_not_found" && JSON.stringify(await assignments(ctx, sale)) === JSON.stringify(afterReplace),
+    JSON.stringify(endedToggle)
+  );
   const endedKeep = await assign(owner.client, sale, targetBy["Target Paid"], true);
   record(
     "L6 the ended branch can still be kept with homeowner-only updates (not replaced)",
@@ -679,17 +702,21 @@ async function runScenarios(ctx: Ctx) {
   const delegated = await assign(owner.client, delegatedSale, targetBy["Target Grace"], false);
   await endEntitlement(ctx, targetBy["Target Grace"]);
   const keepDelegated = await assign(owner.client, delegatedSale, targetBy["Target Grace"], false);
-  const restrictDelegated = await assign(owner.client, delegatedSale, targetBy["Target Grace"], true);
+  const toggleKeepDelegated = await setPermission(owner.client, delegatedSale, false);
+  const restrictDelegated = await setPermission(owner.client, delegatedSale, true);
+  const toggleReEnable = await setPermission(owner.client, delegatedSale, false);
   const delegatedRows = await assignments(ctx, delegatedSale);
   record(
-    "L6 an ended branch that already had delegated updates keeps them, and they can be restricted",
+    "L6 an ended branch that already had delegated updates keeps them; once restricted they cannot be re-enabled",
     delegated.ok === true &&
       keepDelegated.ok === true &&
+      toggleKeepDelegated.ok === true &&
       restrictDelegated.ok === true &&
+      toggleReEnable.error === "branch_not_found" &&
       delegatedRows.length === 1 &&
       delegatedRows[0].status === "active" &&
       delegatedRows[0].homeowner_only_updates === true,
-    JSON.stringify({ delegated, keepDelegated, restrictDelegated })
+    JSON.stringify({ delegated, keepDelegated, toggleKeepDelegated, restrictDelegated, toggleReEnable })
   );
 
   // L4 labels: assignment on the multi-branch user's ended branch

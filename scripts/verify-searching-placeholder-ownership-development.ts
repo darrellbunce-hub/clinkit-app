@@ -68,6 +68,7 @@ const LATER_MIGRATIONS = [
   "20261010110000_link_start_move_onward_purchase.sql",
   "20261010120000_ea_branch_directory_search_eligibility.sql",
   "20261011090000_assign_property_ea_branch_directory_eligibility.sql",
+  "20261011100000_set_property_ea_update_permission_directory_eligibility.sql",
 ];
 
 type TestResult = { name: string; pass: boolean; detail?: string };

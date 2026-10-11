@@ -13,8 +13,9 @@
  *       written); a legacy EA-managed purchase (assignment written by the service role, as
  *       before 20261010090000) is operated by its EA while EA-only; EA B's onward purchase is unowned
  *   AW4 the seller joins the EA-managed purchase: EA B's onward purchase converges to the
- *       seller; EA B's subject is the seller; EA B's capability follows the seller's
- *       EA-update permission; EA A stays view-only
+ *       seller; EA B's subject is the seller; the seller cannot give ineligible EA B
+ *       delegated updates (branch_not_found, 20261011100000); with delegation written by
+ *       the service role EA B operates; EA A stays view-only
  *   AW5 homeowner + EA with updates disabled: homeowner operates, EA refused
  *   AW6 opposite-side rule: a buyer may join an EA-only sale; joins to rows whose opposite
  *       side is unrepresented are refused
@@ -26,8 +27,10 @@
  *       House 1 / EA A to Flat 2; EA A cannot appoint itself, Person A cannot appoint, and
  *       Person B cannot appoint EA A (branch_acts_for_buyer); assign_property_ea_branch
  *       refuses ineligible EA B (branch_not_found, 20261011090000); with EA B's appointment
- *       written by the service role, EA B operates per Person B's permission
- *       (set_property_ea_update_permission); direct assignment writes are refused
+ *       written by the service role, Person B cannot enable EA B's updates
+ *       (set_property_ea_update_permission, branch_not_found, 20261011100000); with
+ *       delegation written by the service role EA B operates until Person B restricts it,
+ *       and cannot be re-enabled; direct assignment writes are refused
  *
  * Usage (Development ONLY — bbbsxzxcjkmpqsfvmhbo):
  *   npx tsx scripts/verify-awaiting-connection-development.ts --execute
@@ -308,6 +311,22 @@ async function assignments(ctx: Ctx, propertyId: number) {
   return (data ?? []) as { id: string; branch_id: string; status: string; homeowner_only_updates: boolean }[];
 }
 
+/**
+ * Verifier branches are never directory-eligible, so the homeowner cannot give
+ * them delegated updates (20261011100000); the delegation is written by the
+ * service role. Returns an error message, or null on success.
+ */
+async function allowEaUpdatesAsFixture(ctx: Ctx, propertyId: number): Promise<string | null> {
+  const { data, error } = await ctx.admin
+    .from("property_ea_assignments")
+    .update({ homeowner_only_updates: false, updated_at: new Date().toISOString() })
+    .eq("property_id", propertyId)
+    .eq("status", "active")
+    .select("id");
+  if (error) return error.message;
+  return (data ?? []).length === 1 ? null : `expected one active assignment, updated ${(data ?? []).length}`;
+}
+
 async function count(ctx: Ctx, table: string, filters: Record<string, unknown>): Promise<number> {
   let query = ctx.admin.from(table).select("*", { count: "exact", head: true });
   for (const [key, value] of Object.entries(filters)) query = query.eq(key, value as never);
@@ -568,9 +587,15 @@ async function runScenarios(ctx: Ctx): Promise<void> {
     p_homeowner_only_updates: false,
   });
   record(
-    "AW4 EA B operates once the seller allows EA updates",
-    allow4?.ok === true && (await canOperate(eaB, flat2)) === true,
+    "AW4 the seller cannot give ineligible EA B delegated updates (branch_not_found, still view-only)",
+    allow4?.ok === false && allow4?.error === "branch_not_found" && (await canOperate(eaB, flat2)) === false,
     JSON.stringify(allow4)
+  );
+  const allow4Fixture = await allowEaUpdatesAsFixture(ctx, flat2);
+  record(
+    "AW4 EA B operates once EA updates are allowed (fixture written by the service role)",
+    allow4Fixture == null && (await canOperate(eaB, flat2)) === true,
+    allow4Fixture ?? undefined
   );
   record("AW4 EA A remains view-only on the purchase", (await canOperate(eaA, flat2)) === false);
   record("AW4 EA A still operates its own sale", (await canOperate(eaA, house2)) === true);
@@ -875,9 +900,15 @@ async function runScenarios(ctx: Ctx): Promise<void> {
     p_homeowner_only_updates: false,
   });
   record(
-    "AW10 EA B operates Flat 2 once Person B enables EA updates",
-    allowB?.ok === true && (await canOperate(eaB, flat10)) === true,
+    "AW10 Person B cannot give ineligible EA B delegated updates (branch_not_found, still view-only)",
+    allowB?.ok === false && allowB?.error === "branch_not_found" && (await canOperate(eaB, flat10)) === false,
     JSON.stringify(allowB)
+  );
+  const allowBFixture = await allowEaUpdatesAsFixture(ctx, flat10);
+  record(
+    "AW10 EA B operates Flat 2 once EA updates are allowed (fixture written by the service role)",
+    allowBFixture == null && (await canOperate(eaB, flat10)) === true,
+    allowBFixture ?? undefined
   );
   record("AW10 EA A remains view-only on Flat 2", (await canOperate(eaA, flat10)) === false);
   const eaBTogglesItself = await rpc(eaB.client, "set_property_ea_update_permission", {
@@ -907,6 +938,15 @@ async function runScenarios(ctx: Ctx): Promise<void> {
     "AW10 EA B cannot operate once Person B disables EA updates",
     restrictB?.ok === true && (await canOperate(eaB, flat10)) === false,
     JSON.stringify(restrictB)
+  );
+  const reEnableB = await rpc(personB.client, "set_property_ea_update_permission", {
+    p_property_id: flat10,
+    p_homeowner_only_updates: false,
+  });
+  record(
+    "AW10 Person B cannot re-enable delegated updates for ineligible EA B (branch_not_found)",
+    reEnableB?.ok === false && reEnableB?.error === "branch_not_found" && (await canOperate(eaB, flat10)) === false,
+    JSON.stringify(reEnableB)
   );
   record("AW10 Person B still operates Flat 2", (await canOperate(personB, flat10)) === true);
   record(

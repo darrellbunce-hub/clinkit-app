@@ -2,7 +2,7 @@
  * Estate Agent branch directory eligibility and appointment — shared
  * Development scenarios that never list a verifier branch.
  *
- * Requires 20261010120000 and 20261011090000 on Development.
+ * Requires 20261010120000, 20261011090000 and 20261011100000 on Development.
  *
  * Every branch this verifier creates stays out of ea_branch_directory for its
  * whole life, so no signed-in Development user can ever find it:
@@ -31,7 +31,9 @@
  *   DV4 replacing an existing assignment with an unlisted branch is refused
  *       and the existing assignment is untouched
  *   DV5 the assigned, unlisted branch keeps its assignment: keeping or
- *       restricting delegation succeeds; enabling delegated updates is refused
+ *       restricting delegation succeeds; enabling delegated updates is refused,
+ *       through re-appointment (20261011090000) and through the delegation
+ *       toggle, set_property_ea_update_permission (20261011100000)
  *   DV6 labels for an existing assignment: homeowner and branch member see
  *       them; a stranger and a member of another branch do not
  *   DV7 EA onboarding still creates company, branch and admin; the new branch
@@ -316,6 +318,15 @@ async function assign(
   return (data ?? {}) as AssignResult;
 }
 
+async function setPermission(client: SupabaseClient, propertyId: number, homeownerOnlyUpdates: boolean): Promise<AssignResult> {
+  const { data, error } = await client.rpc("set_property_ea_update_permission", {
+    p_property_id: propertyId,
+    p_homeowner_only_updates: homeownerOnlyUpdates,
+  });
+  if (error) return { ok: false, error: error.message };
+  return (data ?? {}) as AssignResult;
+}
+
 type AssignmentRow = { id: string; branch_id: string; status: string; homeowner_only_updates: boolean };
 
 async function assignments(ctx: Ctx, propertyId: number): Promise<AssignmentRow[]> {
@@ -523,6 +534,17 @@ async function runScenarios(ctx: Ctx) {
     enable.error === "branch_not_found" && JSON.stringify(afterEnable) === JSON.stringify(before) && canOperate === false,
     JSON.stringify({ enable, canOperate })
   );
+  const toggleOn = await setPermission(owner.client, sale, false);
+  const { data: canOperateAfterToggle } = await adminA.client.rpc("can_operate_property", { p_property_id: sale });
+  record(
+    "DV5 the delegation toggle cannot give the unlisted branch delegated updates (branch_not_found, unchanged)",
+    toggleOn.error === "branch_not_found" &&
+      JSON.stringify(await assignments(ctx, sale)) === JSON.stringify(before) &&
+      canOperateAfterToggle === false,
+    JSON.stringify({ toggleOn, canOperateAfterToggle })
+  );
+  const toggleOff = await setPermission(owner.client, sale, true);
+  record("DV5 the delegation toggle can still keep homeowner-only updates", toggleOff.ok === true, JSON.stringify(toggleOff));
   const keep = await assign(owner.client, sale, unentitled, true);
   const keepNull = await assign(owner.client, sale, unentitled, null);
   const afterKeep = await assignments(ctx, sale);
@@ -541,23 +563,29 @@ async function runScenarios(ctx: Ctx) {
   const delegatedSale = await homeownerSale(ctx, owner);
   await seedAssignment(ctx, delegatedSale, second, false, owner.userId);
   const keepDelegated = await assign(owner.client, delegatedSale, second, false);
+  const toggleKeep = await setPermission(owner.client, delegatedSale, false);
   const keptDelegated = await assignments(ctx, delegatedSale);
   record(
-    "DV5 an existing delegated assignment is kept as it is (no new authority)",
-    keepDelegated.ok === true && keptDelegated.length === 1 && keptDelegated[0].homeowner_only_updates === false,
-    JSON.stringify(keepDelegated)
+    "DV5 an existing delegated assignment is kept as it is by re-appointment and by the toggle (no new authority)",
+    keepDelegated.ok === true &&
+      toggleKeep.ok === true &&
+      keptDelegated.length === 1 &&
+      keptDelegated[0].homeowner_only_updates === false,
+    JSON.stringify({ keepDelegated, toggleKeep })
   );
-  const restrict = await assign(owner.client, delegatedSale, second, true);
+  const restrict = await setPermission(owner.client, delegatedSale, true);
   const reEnable = await assign(owner.client, delegatedSale, second, false);
+  const toggleReEnable = await setPermission(owner.client, delegatedSale, false);
   const afterReEnable = await assignments(ctx, delegatedSale);
   record(
-    "DV5 once restricted, delegated updates cannot be re-enabled for the unlisted branch",
+    "DV5 once restricted, delegated updates cannot be re-enabled for the unlisted branch (re-appointment or toggle)",
     restrict.ok === true &&
       reEnable.error === "branch_not_found" &&
+      toggleReEnable.error === "branch_not_found" &&
       afterReEnable.length === 1 &&
       afterReEnable[0].status === "active" &&
       afterReEnable[0].homeowner_only_updates === true,
-    JSON.stringify({ restrict, reEnable })
+    JSON.stringify({ restrict, reEnable, toggleReEnable })
   );
 
   // DV6 -------------------------------------------------------------------
@@ -710,7 +738,7 @@ async function cleanupFixtures(ctx: Ctx): Promise<boolean> {
 async function main() {
   if (!process.argv.includes("--execute")) {
     console.log(
-      `Writes to shared Development. Run only once approved, with --execute ${CONFIRM_FLAG}, after applying 20261010120000 and 20261011090000.`
+      `Writes to shared Development. Run only once approved, with --execute ${CONFIRM_FLAG}, after applying 20261010120000, 20261011090000 and 20261011100000.`
     );
     return;
   }
