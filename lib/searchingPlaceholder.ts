@@ -374,13 +374,17 @@ type ConvertSearchingPlaceholderRpcResult = {
 const CONVERT_SEARCHING_PLACEHOLDER_RPC =
   "convert_searching_placeholder_for_sale";
 
+/** Identifiers only: addresses and postcodes must not reach logs or error details. */
 type ConvertRpcRequestContext = {
   chainId: number;
   salePropertyId: number;
-  address: string;
-  postcode: string;
 };
 
+/**
+ * Postgres `details` can echo row values (e.g. "Failing row contains (...)" or
+ * "Key (...)=(...)"), which here include the address and postcode, so only
+ * the code and message are kept.
+ */
 function logConvertRpcTransportError(
   request: ConvertRpcRequestContext,
   error: PostgrestError
@@ -391,9 +395,6 @@ function logConvertRpcTransportError(
       request,
       code: error.code ?? null,
       message: error.message ?? null,
-      details: error.details ?? null,
-      hint: error.hint ?? null,
-      error,
     }
   );
 }
@@ -425,8 +426,6 @@ function buildConvertFailureError(
       ? {
           code: options.transportError.code ?? null,
           message: options.transportError.message ?? null,
-          details: options.transportError.details ?? null,
-          hint: options.transportError.hint ?? null,
         }
       : undefined,
     applicationPayload: options.applicationPayload ?? null,
@@ -494,8 +493,6 @@ export async function convertSearchingPlaceholder(
   const request: ConvertRpcRequestContext = {
     chainId: params.chainId,
     salePropertyId: params.salePropertyId,
-    address: params.address,
-    postcode: params.postcode,
   };
 
   const { data, error } = await supabase.rpc(

@@ -1,6 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import Navbar from "@/components/Navbar";
 import {
@@ -26,16 +28,47 @@ import {
   buildJoinExistingChainHref,
   resolveBuyingAwaitingConnectionAction,
 } from "@/lib/onboarding/joinChainIntent";
+import {
+  clearJoinAddressHandoff,
+  setJoinAddressHandoff,
+} from "@/lib/onboarding/joinAddressHandoff";
+import {
+  EMPTY_START_MOVE_ANSWERS,
+  findMissingStartMoveAddress,
+  isStartMoveAddressComplete,
+  nextStartMoveStep,
+  resolveStartMovePlan,
+  selectStartMoveAddresses,
+  START_MOVE_FIRST_STEP,
+  type StartMoveAnswers,
+  type StartMoveQuestion,
+  type StartMoveSelectedAddresses,
+  type StartMoveStep,
+  type YesNo,
+} from "@/lib/onboarding/startMoveJourney";
+
+/** The address Join Chain pre-fills; held in memory only, never in the URL. */
+type CarriedJoinAddress = {
+  userId: string;
+  address: string;
+  postcode: string;
+  /** Accepted onward purchase, added only after a successful seller-side join. */
+  onwardPurchase?: { address: string; postcode: string } | null;
+};
 
 type PendingDuplicateAction =
   /** The caller's own chain already holds the address. */
   | { kind: "open_chain"; chainId: number | null }
   /** Join without a source chain (nothing created yet). */
-  | { kind: "join"; notSelling: boolean }
+  | { kind: "join"; notSelling: boolean; carried: CarriedJoinAddress }
   /** Create the caller's sale first, then join carrying it across. */
   | { kind: "join_after_sale" }
   /** A source chain was already created; Join Chain migrates and removes it. */
-  | { kind: "join_source_chain"; chainId: number }
+  | {
+      kind: "join_source_chain";
+      chainId: number;
+      carried: CarriedJoinAddress;
+    }
   | { kind: "none" };
 
 const START_MOVE_FAILED_MESSAGE =
@@ -43,6 +76,25 @@ const START_MOVE_FAILED_MESSAGE =
 
 const START_MOVE_ADDRESS_RESERVED_MESSAGE =
   "One of these addresses has just been added to MoveLoop by someone else. Please try again and we will show you how to join it.";
+
+const START_MOVE_INCOMPLETE_ANSWERS_MESSAGE =
+  "Please answer the questions above before creating your chain.";
+
+const START_MOVE_MISSING_ADDRESS_MESSAGE =
+  "Select the property address, or enter the address and postcode manually.";
+
+const STEP_SECTION_LABEL: Record<StartMoveStep, string> = {
+  selling: "Your sale",
+  saleAgreed: "Your sale",
+  saleAddress: "Your sale",
+  buying: "Your purchase",
+  offerAccepted: "Your purchase",
+  purchaseAddress: "Your purchase",
+  review: "Check your details",
+  stop_sale_not_agreed: "Your sale",
+  stop_nothing_to_add: "Your move",
+  stop_no_offer_accepted: "Your purchase",
+};
 
 function isAddressReservedFailure(
   insertError: { code?: string; message?: string } | null,
@@ -56,16 +108,13 @@ function isAddressReservedFailure(
 }
 
 export default function StartMovePage() {
- 
-  const [notSelling, setNotSelling] =
-    useState(false);
+  const router = useRouter();
 
-  const [notBuying, setNotBuying] =
-    useState(false);
-    const [
-      searchingForProperty,
-      setSearchingForProperty,
-    ] = useState(false);
+  const [answers, setAnswers] =
+    useState<StartMoveAnswers>(EMPTY_START_MOVE_ANSWERS);
+  const [stepHistory, setStepHistory] = useState<StartMoveStep[]>([
+    START_MOVE_FIRST_STEP,
+  ]);
   const [duplicateDialogOpen, setDuplicateDialogOpen] =
     useState(false);
   const [duplicateDialogVariant, setDuplicateDialogVariant] =
@@ -76,6 +125,8 @@ export default function StartMovePage() {
     useState(false);
   const [errorMessage, setErrorMessage] =
     useState("");
+  const [incompleteChainId, setIncompleteChainId] =
+    useState<number | null>(null);
   const [sellingAddress, setSellingAddress] =
     useState("");
 
@@ -88,15 +139,75 @@ export default function StartMovePage() {
   const [buyingPostcode, setBuyingPostcode] =
     useState("");
 
+  const step = stepHistory[stepHistory.length - 1];
+  const plan = resolveStartMovePlan(answers);
+  const moveFlags = plan.kind === "move" ? plan.flags : null;
+  const selectedAddresses: StartMoveSelectedAddresses = moveFlags
+    ? selectStartMoveAddresses(moveFlags, {
+        selling: { address: sellingAddress, postcode: sellingPostcode },
+        buying: { address: buyingAddress, postcode: buyingPostcode },
+      })
+    : { selling: null, buying: null };
+
+  function answerQuestion(question: StartMoveQuestion, value: YesNo) {
+    const nextAnswers = { ...answers, [question]: value };
+    setAnswers(nextAnswers);
+    setStepHistory((history) => [
+      ...history,
+      nextStartMoveStep(question, nextAnswers),
+    ]);
+    setErrorMessage("");
+  }
+
+  function continueFromAddressStep(
+    addressStep: "saleAddress" | "purchaseAddress"
+  ) {
+    const entered =
+      addressStep === "saleAddress"
+        ? { address: sellingAddress, postcode: sellingPostcode }
+        : { address: buyingAddress, postcode: buyingPostcode };
+
+    if (!isStartMoveAddressComplete(entered)) {
+      setErrorMessage(START_MOVE_MISSING_ADDRESS_MESSAGE);
+      return;
+    }
+
+    setErrorMessage("");
+    setStepHistory((history) => [
+      ...history,
+      nextStartMoveStep(addressStep, answers),
+    ]);
+  }
+
+  function goBack() {
+    setErrorMessage("");
+    setStepHistory((history) =>
+      history.length > 1 ? history.slice(0, -1) : history
+    );
+  }
+
     function redirectToJoinExistingChain(
       chainId: number | null,
-      options: { notSelling?: boolean } = {}
+      options: { notSelling?: boolean; carried?: CarriedJoinAddress } = {}
     ) {
-      window.location.href = buildJoinExistingChainHref({
-        sourceChainId: chainId,
-        searching: searchingForProperty,
-        notSelling: options.notSelling === true,
-      });
+      if (options.carried) {
+        setJoinAddressHandoff(options.carried);
+      } else {
+        clearJoinAddressHandoff();
+      }
+
+      setIsSubmitting(true);
+      router.push(
+        buildJoinExistingChainHref({
+          sourceChainId: chainId,
+          // A carried purchase is converted from the Searching step, which
+          // also remains the fallback if the in-memory hand-over is lost.
+          searching:
+            moveFlags?.searchingForProperty === true ||
+            options.carried?.onwardPurchase != null,
+          notSelling: options.notSelling === true,
+        })
+      );
     }
 
     function openDuplicateDialog(
@@ -108,10 +219,14 @@ export default function StartMovePage() {
       setDuplicateDialogOpen(true);
     }
 
-    function promptJoinExistingChain(chainId: number) {
+    function promptJoinExistingChain(
+      chainId: number,
+      carried: CarriedJoinAddress
+    ) {
       openDuplicateDialog("existing", {
         kind: "join_source_chain",
         chainId,
+        carried,
       });
     }
 
@@ -129,20 +244,28 @@ export default function StartMovePage() {
       }
     }
 
-    function hasSellingAddress() {
-      return !notSelling && Boolean(sellingAddress);
-    }
-
-    function hasBuyingAddress() {
-      return !notBuying && Boolean(buyingAddress);
-    }
-
     /** Returns true when routing took over and nothing should be created. */
-    async function routeExistingAddresses(): Promise<boolean> {
-      if (hasSellingAddress()) {
+    async function routeExistingAddresses(
+      userId: string
+    ): Promise<boolean> {
+      const sellingSelection = selectedAddresses.selling;
+      const buyingSelection = selectedAddresses.buying;
+      const onwardPurchase = buyingSelection
+        ? {
+            address: buyingSelection.address,
+            postcode: formatUkPostcodeForStorage(
+              buyingSelection.postcode
+            ),
+          }
+        : null;
+
+      if (sellingSelection) {
+        const sellingPostcodeStored = formatUkPostcodeForStorage(
+          sellingSelection.postcode
+        );
         const selling = await checkStartMoveAddress(supabase, {
-          address: sellingAddress,
-          postcode: formatUkPostcodeForStorage(sellingPostcode),
+          address: sellingSelection.address,
+          postcode: sellingPostcodeStored,
           side: "selling",
         });
 
@@ -160,10 +283,21 @@ export default function StartMovePage() {
         }
 
         if (selling.state === "awaiting_connection") {
-          openDuplicateDialog("awaiting_seller", {
-            kind: "join",
-            notSelling: false,
-          });
+          openDuplicateDialog(
+            onwardPurchase
+              ? "awaiting_seller_with_purchase"
+              : "awaiting_seller",
+            {
+              kind: "join",
+              notSelling: false,
+              carried: {
+                userId,
+                address: sellingSelection.address,
+                postcode: sellingPostcodeStored,
+                onwardPurchase,
+              },
+            }
+          );
           return true;
         }
 
@@ -173,10 +307,13 @@ export default function StartMovePage() {
         }
       }
 
-      if (hasBuyingAddress()) {
+      if (buyingSelection) {
+        const buyingPostcodeStored = formatUkPostcodeForStorage(
+          buyingSelection.postcode
+        );
         const buying = await checkStartMoveAddress(supabase, {
-          address: buyingAddress,
-          postcode: formatUkPostcodeForStorage(buyingPostcode),
+          address: buyingSelection.address,
+          postcode: buyingPostcodeStored,
           side: "buying",
         });
 
@@ -194,11 +331,22 @@ export default function StartMovePage() {
         }
 
         if (buying.state === "awaiting_connection") {
+          const buyingAction = resolveBuyingAwaitingConnectionAction({
+            hasSellingAddress: sellingSelection != null,
+          });
+
           openDuplicateDialog(
             "awaiting_buyer",
-            resolveBuyingAwaitingConnectionAction({
-              hasSellingAddress: hasSellingAddress(),
-            })
+            buyingAction.kind === "join"
+              ? {
+                  ...buyingAction,
+                  carried: {
+                    userId,
+                    address: buyingSelection.address,
+                    postcode: buyingPostcodeStored,
+                  },
+                }
+              : buyingAction
           );
           return true;
         }
@@ -218,6 +366,20 @@ export default function StartMovePage() {
       if (isSubmitting) {
         return;
       }
+
+      if (!moveFlags) {
+        setErrorMessage(START_MOVE_INCOMPLETE_ANSWERS_MESSAGE);
+        return;
+      }
+
+      if (findMissingStartMoveAddress(moveFlags, selectedAddresses)) {
+        setErrorMessage(START_MOVE_MISSING_ADDRESS_MESSAGE);
+        return;
+      }
+
+      const { notSelling, notBuying, searchingForProperty } = moveFlags;
+      const selling = selectedAddresses.selling;
+      const buying = selectedAddresses.buying;
 
       setIsSubmitting(true);
       setErrorMessage("");
@@ -259,7 +421,7 @@ export default function StartMovePage() {
 
         if (
           !options.joinBuyingAfterSale &&
-          (await routeExistingAddresses())
+          (await routeExistingAddresses(user.id))
         ) {
           return;
         }
@@ -311,13 +473,13 @@ export default function StartMovePage() {
           null;
 
         // SELLING PROPERTY
-        if (!notSelling && sellingAddress) {
+        if (selling) {
           const sellingPostcodeStored =
-            formatUkPostcodeForStorage(sellingPostcode);
+            formatUkPostcodeForStorage(selling.postcode);
           const { data: sellingCheck } = await supabase.rpc(
             "validate_onboarding_property_address",
             {
-              p_address: sellingAddress,
+              p_address: selling.address,
               p_postcode: sellingPostcodeStored,
               p_chain_id: chainId,
             }
@@ -327,7 +489,19 @@ export default function StartMovePage() {
             sellingCheck?.ok === false &&
             sellingCheck.error === "address_unavailable"
           ) {
-            promptJoinExistingChain(chainId);
+            promptJoinExistingChain(chainId, {
+              userId: user.id,
+              address: selling.address,
+              postcode: sellingPostcodeStored,
+              onwardPurchase: buying
+                ? {
+                    address: buying.address,
+                    postcode: formatUkPostcodeForStorage(
+                      buying.postcode
+                    ),
+                  }
+                : null,
+            });
             return;
           }
     
@@ -341,7 +515,7 @@ export default function StartMovePage() {
     
               chain_position: 1,
     
-              address: sellingAddress,
+              address: selling.address,
     
               postcode: sellingPostcodeStored,
     
@@ -408,21 +582,28 @@ export default function StartMovePage() {
           }
     
         }
-        let buyerReadyPropertyId = null;
+        let buyerReadyPropertyId: number | null = null;
         // BUYING PROPERTY
-        if (!notBuying && buyingAddress) {
+        if (buying) {
+          const buyingPostcodeStored =
+            formatUkPostcodeForStorage(buying.postcode);
+
           if (options.joinBuyingAfterSale) {
             redirected = true;
-            redirectToJoinExistingChain(chainId);
+            redirectToJoinExistingChain(chainId, {
+              carried: {
+                userId: user.id,
+                address: buying.address,
+                postcode: buyingPostcodeStored,
+              },
+            });
             return;
           }
 
-          const buyingPostcodeStored =
-            formatUkPostcodeForStorage(buyingPostcode);
           const { data: buyingCheck } = await supabase.rpc(
             "validate_onboarding_property_address",
             {
-              p_address: buyingAddress,
+              p_address: buying.address,
               p_postcode: buyingPostcodeStored,
               p_chain_id: chainId,
             }
@@ -432,7 +613,11 @@ export default function StartMovePage() {
             buyingCheck?.ok === false &&
             buyingCheck.error === "address_unavailable"
           ) {
-            promptJoinExistingChain(chainId);
+            promptJoinExistingChain(chainId, {
+              userId: user.id,
+              address: buying.address,
+              postcode: buyingPostcodeStored,
+            });
             return;
           }
     
@@ -446,7 +631,7 @@ export default function StartMovePage() {
     
               chain_position: 2,
     
-              address: buyingAddress,
+              address: buying.address,
     
               postcode: buyingPostcodeStored,
     
@@ -531,7 +716,7 @@ export default function StartMovePage() {
         // SEARCHING PLACEHOLDER (stage-authoritative; no buying address)
         if (
           searchingForProperty &&
-          !buyingAddress &&
+          !buying &&
           sellingPropertyId
         ) {
           const attachResult =
@@ -553,33 +738,30 @@ export default function StartMovePage() {
           }
         }
 
-        if (notSelling) {
+        if (notSelling && buyerReadyPropertyId != null) {
+          const { error: buyerReadyError } = await supabase
+            .from("chain_nodes")
+            .insert({
+              chain_id: chainId,
+              linked_property_id: buyerReadyPropertyId,
+              node_type: "buyer_ready",
+              user_id: user.id,
+              position: 0,
+              stage: "mortgage_in_principle",
+              status: "healthy",
+              progress: 10,
+              stage_entered_at: new Date().toISOString(),
+            });
 
-          await supabase
-  .from("chain_nodes")
-  .insert({
-
-    chain_id: chainId,
-
-    linked_property_id:
-  buyerReadyPropertyId,
-
-    node_type: "buyer_ready",
-
-    user_id: user.id,
-
-    position: 0,
-
-    stage: "mortgage_in_principle",
-
-    status: "healthy",
-
-    progress: 10,
-
-    stage_entered_at: new Date().toISOString(),
-
-  });
-        
+          // The purchase is already committed; chain cleanup here would delete it.
+          if (buyerReadyError) {
+            console.error(
+              "[start-move] buyer ready create failed:",
+              buyerReadyError.message
+            );
+            setIncompleteChainId(chainId);
+            return;
+          }
         }
         redirected = true;
         window.location.href =
@@ -598,19 +780,215 @@ export default function StartMovePage() {
     
     }
 
+  function renderStep() {
+    switch (step) {
+      case "selling":
+        return (
+          <YesNoQuestion
+            question="Are you selling a property, or have you agreed the sale?"
+            value={answers.selling}
+            yesLabel="Yes, I'm selling a property"
+            noLabel="No, I'm not selling"
+            onAnswer={(value) => answerQuestion("selling", value)}
+          />
+        );
+      case "saleAgreed":
+        return (
+          <YesNoQuestion
+            question="Have you agreed the sale of your property?"
+            hint="Your sale is agreed once you have accepted an offer from a buyer."
+            value={answers.saleAgreed}
+            yesLabel="Yes, my sale is agreed"
+            noLabel="Not yet"
+            onAnswer={(value) => answerQuestion("saleAgreed", value)}
+          />
+        );
+      case "saleAddress":
+        return (
+          <AddressStep
+            heading="What is the address of the property you are selling?"
+            onContinue={() => continueFromAddressStep("saleAddress")}
+          >
+            <PropertyAddressLookup
+              idPrefix="start-move-selling"
+              label="Property address"
+              address={sellingAddress}
+              postcode={sellingPostcode}
+              onAddressChange={setSellingAddress}
+              onPostcodeChange={setSellingPostcode}
+            />
+          </AddressStep>
+        );
+      case "buying":
+        return (
+          <YesNoQuestion
+            question="Are you / will you be buying a property?"
+            value={answers.buying}
+            yesLabel="Yes"
+            noLabel="No"
+            onAnswer={(value) => answerQuestion("buying", value)}
+          />
+        );
+      case "offerAccepted":
+        return (
+          <YesNoQuestion
+            question="Have you had an offer accepted?"
+            hint="This is an offer you made on the property you are buying."
+            value={answers.offerAccepted}
+            yesLabel="Yes, my offer has been accepted"
+            noLabel="Not yet"
+            onAnswer={(value) => answerQuestion("offerAccepted", value)}
+          />
+        );
+      case "purchaseAddress":
+        return (
+          <AddressStep
+            heading="What is the address of the property you are buying?"
+            onContinue={() => continueFromAddressStep("purchaseAddress")}
+          >
+            <PropertyAddressLookup
+              idPrefix="start-move-buying"
+              label="Property address"
+              address={buyingAddress}
+              postcode={buyingPostcode}
+              onAddressChange={setBuyingAddress}
+              onPostcodeChange={setBuyingPostcode}
+            />
+          </AddressStep>
+        );
+      case "review":
+        return renderReview();
+      case "stop_sale_not_agreed":
+        return (
+          <StopMessage title="It's a little early for MoveLoop">
+            <p>
+              MoveLoop helps you keep track of your property move once your
+              sale has been agreed. If you&apos;re still preparing to sell or
+              your property hasn&apos;t sold yet, there&apos;s nothing you
+              need to add just now.
+            </p>
+            <p>
+              Come back when your sale has been agreed, and we&apos;ll help
+              you get your move connected.
+            </p>
+            <p className="font-semibold text-slate-900">
+              Your move starts here when your sale is agreed.
+            </p>
+          </StopMessage>
+        );
+      case "stop_nothing_to_add":
+        return (
+          <StopMessage title="There's nothing to add yet">
+            <p>
+              MoveLoop keeps track of a property move once a sale has been
+              agreed or an offer has been accepted on a property you are
+              buying.
+            </p>
+            <p>
+              As you&apos;re not selling or buying a property, there&apos;s
+              no move to add just now. Nothing has been created.
+            </p>
+          </StopMessage>
+        );
+      case "stop_no_offer_accepted":
+        return (
+          <StopMessage title="It's a little early for MoveLoop">
+            <p>
+              MoveLoop helps you keep track of your property move once an
+              offer has been accepted on the property you are buying. Until
+              then, there&apos;s nothing you need to add.
+            </p>
+            <p>
+              Come back when your offer has been accepted, and we&apos;ll help
+              you get your move connected.
+            </p>
+          </StopMessage>
+        );
+      default:
+        return null;
+    }
+  }
+
+  function renderReview() {
+    if (!moveFlags) {
+      return null;
+    }
+
+    return (
+      <div>
+        <h2 className="text-2xl font-bold text-slate-900">
+          Check your details
+        </h2>
+
+        <dl className="mt-6 space-y-5 text-slate-700">
+          <div>
+            <dt className="text-sm font-medium text-slate-500">
+              Your sale
+            </dt>
+            <dd className="mt-1">
+              {selectedAddresses.selling ? (
+                <AddressSummary value={selectedAddresses.selling} />
+              ) : (
+                "You are not selling a property."
+              )}
+            </dd>
+          </div>
+
+          <div>
+            <dt className="text-sm font-medium text-slate-500">
+              Your purchase
+            </dt>
+            <dd className="mt-1 space-y-2">
+              {selectedAddresses.buying ? (
+                <AddressSummary value={selectedAddresses.buying} />
+              ) : moveFlags.searchingForProperty ? (
+                <>
+                  <p className="font-medium text-slate-900">Searching</p>
+                  <p>
+                    Until you have an offer accepted, your next home will
+                    show as Searching in your chain. You can add the property
+                    from your chain once your offer is accepted.
+                  </p>
+                </>
+              ) : (
+                "You are not buying another property. Your chain will show your sale only."
+              )}
+              {moveFlags.notSelling ? (
+                <p>
+                  As you have nothing to sell, you&apos;ll be shown as a buyer
+                  with no property to sell.
+                </p>
+              ) : null}
+            </dd>
+          </div>
+        </dl>
+
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          className="mt-10 w-full bg-slate-900 text-white rounded-2xl py-5 text-lg font-semibold disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {isSubmitting ? "Creating..." : "Create Chain"}
+        </button>
+      </div>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-slate-100">
 
       <Navbar />
 
       <form
-  noValidate
-  onSubmit={(event) => {
-    event.preventDefault();
-    handleStartMove();
-  }}
-  className="max-w-3xl mx-auto px-6 py-12"
->
+        noValidate
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (step === "review") {
+            void handleStartMove();
+          }
+        }}
+        className="max-w-3xl mx-auto px-6 py-12"
+      >
 
         <h1 className={PAGE_TITLE_CLASS}>
           Start Your Move
@@ -626,162 +1004,61 @@ export default function StartMovePage() {
           className="mt-4"
           context="property-address"
         />
-      
- 
-        {/* Selling */}
-<div className={`mt-12 bg-white rounded-3xl border border-slate-200 ${CARD_PADDING_CLASS}`}>
 
-<div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6">
+        <div className={`mt-12 bg-white rounded-3xl border border-slate-200 ${CARD_PADDING_CLASS}`}>
+          {incompleteChainId != null ? (
+            <div role="alert">
+              <h2 className="text-2xl font-bold text-slate-900">
+                Your chain was created, but one step didn&apos;t finish
+              </h2>
+              <p className="mt-4 text-slate-700">
+                Your purchase has been added, but we couldn&apos;t finish
+                showing you as a buyer with no property to sell. Please open
+                your chain to check it, and contact MoveLoop support if
+                anything looks wrong.
+              </p>
+              <Link
+                href={`/chain/${incompleteChainId}`}
+                className="mt-8 block w-full bg-slate-900 text-white rounded-2xl py-5 text-center text-lg font-semibold"
+              >
+                Open your chain
+              </Link>
+            </div>
+          ) : (
+            <>
+              <p
+                className="text-sm font-medium text-slate-500"
+                aria-live="polite"
+              >
+                Step {stepHistory.length} · {STEP_SECTION_LABEL[step]}
+              </p>
 
-  <div>
+              <div className="mt-4">{renderStep()}</div>
 
-    <h2 className="text-3xl font-bold text-slate-900">
-      Property You Are Selling
-    </h2>
+              {errorMessage ? (
+                <p
+                  role="alert"
+                  className="mt-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+                >
+                  {errorMessage}
+                </p>
+              ) : null}
 
-    <p className="mt-2 text-slate-600">
-      Only add a selling property once you have accepted an offer
-    </p>
+              {stepHistory.length > 1 ? (
+                <button
+                  type="button"
+                  onClick={goBack}
+                  disabled={isSubmitting}
+                  className="mt-8 text-sm font-medium text-slate-700 underline underline-offset-2 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Back
+                </button>
+              ) : null}
+            </>
+          )}
+        </div>
 
-  </div>
-
-  <label className="flex items-center gap-3 shrink-0 mt-1">
-
-    <input
-      type="checkbox"
-      checked={notSelling}
-      onChange={() =>
-        setNotSelling(!notSelling)
-      }
-    />
-
-    <span className="text-slate-700">
-      I am not selling
-    </span>
-
-  </label>
-
-</div>
-
-{!notSelling && (
-
-  <div className="mt-8">
-    <PropertyAddressLookup
-      idPrefix="start-move-selling"
-      label="Property address"
-      address={sellingAddress}
-      postcode={sellingPostcode}
-      onAddressChange={setSellingAddress}
-      onPostcodeChange={setSellingPostcode}
-    />
-  </div>
-
-)}
-
-</div>
-
-{/* Buying */}
-<div className={`mt-10 bg-white rounded-3xl border border-slate-200 ${CARD_PADDING_CLASS}`}>
-
-<div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6">
-
-  <div>
-
-    <h2 className="text-3xl font-bold text-slate-900">
-      Property You Are Buying
-    </h2>
-
-    <p className="mt-2 text-slate-600">
-      Only add a buying property once your offer has been accepted
-    </p>
-
-  </div>
-
-  <div className="flex flex-col gap-4 shrink-0 mt-1">
-
-    <label className="flex items-center gap-3">
-
-      <input
-        type="checkbox"
-        checked={searchingForProperty}
-        onChange={() => {
-
-          setSearchingForProperty(
-            !searchingForProperty
-          );
-
-          if (!searchingForProperty) {
-            setNotBuying(false);
-          }
-        }}
-      />
-
-      <span className="text-slate-700">
-        I am searching for my next property
-      </span>
-
-    </label>
-
-    <label className="flex items-center gap-3">
-
-      <input
-        type="checkbox"
-        checked={notBuying}
-        onChange={() => {
-
-          setNotBuying(!notBuying);
-
-          if (!notBuying) {
-            setSearchingForProperty(false);
-          }
-        }}
-      />
-
-      <span className="text-slate-700">
-        I am not buying another property
-      </span>
-
-    </label>
-
-  </div>
-
-</div>
-
-{!notBuying && !searchingForProperty && (
-
-  <div className="mt-8">
-    <PropertyAddressLookup
-      idPrefix="start-move-buying"
-      label="Property address"
-      address={buyingAddress}
-      postcode={buyingPostcode}
-      onAddressChange={setBuyingAddress}
-      onPostcodeChange={setBuyingPostcode}
-    />
-  </div>
-
-)}
-
-</div>
-<div className="mt-10">
-{errorMessage ? (
-  <p
-    role="alert"
-    className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
-  >
-    {errorMessage}
-  </p>
-) : null}
-<button
-  type="submit"
-  disabled={isSubmitting}
-  className="mt-10 w-full bg-slate-900 text-white rounded-2xl py-5 text-lg font-semibold disabled:cursor-not-allowed disabled:opacity-60"
->
-  {isSubmitting ? "Creating..." : "Create Chain"}
-</button>
-</div>
-
-</form>
+      </form>
 
       <DuplicatePropertyDialog
         isOpen={duplicateDialogOpen}
@@ -798,9 +1075,12 @@ export default function StartMovePage() {
           } else if (action.kind === "join") {
             redirectToJoinExistingChain(null, {
               notSelling: action.notSelling,
+              carried: action.carried,
             });
           } else if (action.kind === "join_source_chain") {
-            redirectToJoinExistingChain(action.chainId);
+            redirectToJoinExistingChain(action.chainId, {
+              carried: action.carried,
+            });
           } else if (action.kind === "join_after_sale") {
             setDuplicateDialogOpen(false);
             setPendingDuplicateAction({ kind: "none" });
@@ -812,6 +1092,7 @@ export default function StartMovePage() {
 
           setDuplicateDialogOpen(false);
           setPendingDuplicateAction({ kind: "none" });
+          clearJoinAddressHandoff();
 
           if (action.kind === "join_source_chain") {
             void cleanupOnboardingChain(action.chainId);
@@ -820,5 +1101,133 @@ export default function StartMovePage() {
       />
 
     </main>
+  );
+}
+
+function YesNoQuestion({
+  question,
+  hint,
+  value,
+  yesLabel,
+  noLabel,
+  onAnswer,
+}: {
+  question: string;
+  hint?: string;
+  value: YesNo | null;
+  yesLabel: string;
+  noLabel: string;
+  onAnswer: (value: YesNo) => void;
+}) {
+  return (
+    <fieldset>
+      <legend className="text-2xl font-bold text-slate-900">
+        {question}
+      </legend>
+
+      {hint ? (
+        <p className="mt-2 text-slate-600">{hint}</p>
+      ) : null}
+
+      <div className="mt-6 grid gap-3 sm:grid-cols-2">
+        <AnswerButton
+          label={yesLabel}
+          selected={value === "yes"}
+          onClick={() => onAnswer("yes")}
+        />
+        <AnswerButton
+          label={noLabel}
+          selected={value === "no"}
+          onClick={() => onAnswer("no")}
+        />
+      </div>
+    </fieldset>
+  );
+}
+
+function AnswerButton({
+  label,
+  selected,
+  onClick,
+}: {
+  label: string;
+  selected: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={selected}
+      onClick={onClick}
+      className={`rounded-2xl border px-4 py-4 text-left text-base font-semibold transition ${
+        selected
+          ? "border-brand-primary bg-brand-primary/10 text-slate-900"
+          : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
+
+function AddressStep({
+  heading,
+  onContinue,
+  children,
+}: {
+  heading: string;
+  onContinue: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <h2 className="text-2xl font-bold text-slate-900">{heading}</h2>
+
+      <div className="mt-6">{children}</div>
+
+      <button
+        type="button"
+        onClick={onContinue}
+        className="mt-8 w-full bg-slate-900 text-white rounded-2xl py-4 text-lg font-semibold"
+      >
+        Continue
+      </button>
+    </div>
+  );
+}
+
+function StopMessage({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <h2 className="text-2xl font-bold text-slate-900">{title}</h2>
+
+      <div className="mt-4 space-y-4 text-slate-700">{children}</div>
+
+      <Link
+        href="/dashboard"
+        className="mt-8 inline-block text-sm font-medium text-slate-700 underline underline-offset-2 hover:text-slate-900"
+      >
+        Go to your dashboard
+      </Link>
+    </div>
+  );
+}
+
+function AddressSummary({
+  value,
+}: {
+  value: { address: string; postcode: string };
+}) {
+  return (
+    <>
+      <p className="font-medium text-slate-900">{value.address}</p>
+      <p>{formatUkPostcodeForStorage(value.postcode)}</p>
+    </>
   );
 }

@@ -20,10 +20,10 @@ import {
   joinEaOperationalChain,
 } from "@/lib/estateAgent/originateOperationalProperty";
 import {
-  DEFAULT_SELLER_ONWARD_PLAN,
   requiresOnwardPurchaseAddress,
+  resolveSellerOnwardPlan,
   saleAwaitingBuyerForOnwardPlan,
-  type SellerOnwardPlan,
+  type SellerOnwardAnswer,
 } from "@/lib/estateAgent/sellerOnwardPlan";
 import {
   BTN_PRIMARY_CLASS,
@@ -34,24 +34,6 @@ import PropertyAddressLookup from "@/components/address/PropertyAddressLookup";
 import { formatUkPostcodeForStorage } from "@/lib/address/normalize";
 
 type OriginateMode = "new_chain" | "join_chain";
-
-const ONWARD_PLAN_OPTIONS: {
-  value: SellerOnwardPlan;
-  label: string;
-}[] = [
-  {
-    value: "searching",
-    label: "Searching for next property",
-  },
-  {
-    value: "purchase_agreed",
-    label: "Purchase agreed",
-  },
-  {
-    value: "no_onward",
-    label: "No onward purchase",
-  },
-];
 
 export default function AgentOriginatePage() {
   const router = useRouter();
@@ -79,12 +61,19 @@ export default function AgentOriginatePage() {
     useState("");
   const [delegatedUpdates, setDelegatedUpdates] =
     useState(true);
-  const [onwardPlan, setOnwardPlan] =
-    useState<SellerOnwardPlan>(
-      DEFAULT_SELLER_ONWARD_PLAN
-    );
+  const [saleAgreed, setSaleAgreed] =
+    useState<SellerOnwardAnswer | null>(null);
+  const [sellerBuying, setSellerBuying] =
+    useState<SellerOnwardAnswer | null>(null);
+  const [offerAccepted, setOfferAccepted] =
+    useState<SellerOnwardAnswer | null>(null);
   const [createdAccessCode, setCreatedAccessCode] =
     useState<string | null>(null);
+
+  const selectedOnwardPlan = resolveSellerOnwardPlan({
+    buying: sellerBuying,
+    offerAccepted,
+  });
 
   useEffect(() => {
     async function loadContext() {
@@ -119,9 +108,28 @@ export default function AgentOriginatePage() {
       return;
     }
 
+    if (saleAgreed !== "yes") {
+      setErrorMessage(
+        "Add the property once the seller has agreed the sale."
+      );
+      return;
+    }
+
     if (!saleAddress.trim() || !salePostcode.trim()) {
       setErrorMessage(
         "Enter the sale property address and postcode."
+      );
+      return;
+    }
+
+    const onwardPlan = resolveSellerOnwardPlan({
+      buying: sellerBuying,
+      offerAccepted,
+    });
+
+    if (!onwardPlan) {
+      setErrorMessage(
+        "Tell us whether the seller is buying another property."
       );
       return;
     }
@@ -155,9 +163,12 @@ export default function AgentOriginatePage() {
 
     const salePostcodeStored =
       formatUkPostcodeForStorage(salePostcode);
-    const onwardPostcodeStored = onwardPostcode.trim()
-      ? formatUkPostcodeForStorage(onwardPostcode)
-      : "";
+    const submitsOnwardAddress =
+      requiresOnwardPurchaseAddress(onwardPlan);
+    const onwardPostcodeStored =
+      submitsOnwardAddress && onwardPostcode.trim()
+        ? formatUkPostcodeForStorage(onwardPostcode)
+        : "";
 
     let chainId: number | null = null;
     let propertyId: number | null = null;
@@ -301,7 +312,9 @@ export default function AgentOriginatePage() {
           branchId: context.branch.id,
           homeownerOnlyUpdates,
           onwardPlan,
-          onwardAddress,
+          onwardAddress: submitsOnwardAddress
+            ? onwardAddress
+            : "",
           onwardPostcode: onwardPostcodeStored,
         }
       );
@@ -395,6 +408,42 @@ export default function AgentOriginatePage() {
               onSubmit={handleSubmit}
               className={`rounded-3xl border border-slate-200 bg-white shadow-sm ${CARD_PADDING_CLASS} space-y-6`}
             >
+              <YesNoField
+                legend="Has the seller agreed the sale?"
+                hint="The sale is agreed once the seller has accepted an offer from a buyer."
+                value={saleAgreed}
+                yesLabel="Yes, the sale is agreed"
+                noLabel="Not yet"
+                onAnswer={(value) => {
+                  setSaleAgreed(value);
+                  setErrorMessage("");
+                }}
+              />
+
+              {saleAgreed === "no" ? (
+                <div
+                  role="note"
+                  className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700"
+                >
+                  <p className="font-medium text-slate-900">
+                    It&apos;s a little early to add this property
+                  </p>
+                  <p className="mt-2">
+                    MoveLoop keeps track of a property move once
+                    the sale has been agreed. If the seller is
+                    still preparing to sell or hasn&apos;t
+                    accepted an offer yet, there&apos;s nothing
+                    to add just now.
+                  </p>
+                  <p className="mt-2">
+                    Come back when the sale has been agreed, and
+                    add the property then.
+                  </p>
+                </div>
+              ) : null}
+
+              {saleAgreed === "yes" ? (
+                <>
               {mode === "join_chain" ? (
                 <Field
                   label="Chain access code"
@@ -449,45 +498,48 @@ export default function AgentOriginatePage() {
                 </span>
               </label>
 
-              <fieldset className="space-y-3 rounded-2xl border border-slate-200 px-4 py-4">
-                <legend className="px-1 text-sm font-medium text-slate-900">
-                  Seller&apos;s onward plans
-                </legend>
+              <YesNoField
+                legend="Is the seller buying, or will they be buying, a property?"
+                value={sellerBuying}
+                yesLabel="Yes"
+                noLabel="No"
+                onAnswer={(value) => {
+                  setSellerBuying(value);
+                  setErrorMessage("");
+                }}
+              />
 
-                {ONWARD_PLAN_OPTIONS.map((option) => (
-                  <label
-                    key={option.value}
-                    className="flex items-start gap-3"
-                  >
-                    <input
-                      type="radio"
-                      name="onwardPlan"
-                      value={option.value}
-                      checked={
-                        onwardPlan === option.value
-                      }
-                      onChange={() => {
-                        setOnwardPlan(option.value);
-                        if (
-                          option.value !==
-                          "purchase_agreed"
-                        ) {
-                          setOnwardAddress("");
-                          setOnwardPostcode("");
-                        }
-                      }}
-                      className="mt-1"
-                    />
+              {sellerBuying === "yes" ? (
+                <YesNoField
+                  legend="Has the seller had an offer accepted on the property they are buying?"
+                  value={offerAccepted}
+                  yesLabel="Yes, their offer has been accepted"
+                  noLabel="Not yet"
+                  onAnswer={(value) => {
+                    setOfferAccepted(value);
+                    setErrorMessage("");
+                  }}
+                />
+              ) : null}
 
-                    <span className="text-sm text-slate-700">
-                      {option.label}
-                    </span>
-                  </label>
-                ))}
-              </fieldset>
+              {selectedOnwardPlan === "searching" ? (
+                <p className="text-sm text-slate-600">
+                  Until the seller has an offer accepted, their
+                  onward purchase will show as Searching in the
+                  chain.
+                </p>
+              ) : null}
 
-              {requiresOnwardPurchaseAddress(
-                onwardPlan
+              {selectedOnwardPlan === "no_onward" ? (
+                <p className="text-sm text-slate-600">
+                  The chain will show this sale with no onward
+                  purchase.
+                </p>
+              ) : null}
+
+              {selectedOnwardPlan &&
+              requiresOnwardPurchaseAddress(
+                selectedOnwardPlan
               ) ? (
                 <div className="space-y-6 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
                   <PropertyAddressLookup
@@ -499,6 +551,8 @@ export default function AgentOriginatePage() {
                     onPostcodeChange={setOnwardPostcode}
                   />
                 </div>
+              ) : null}
+                </>
               ) : null}
 
               {errorMessage ? (
@@ -514,15 +568,17 @@ export default function AgentOriginatePage() {
                 </p>
               ) : null}
 
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className={`w-full rounded-xl px-6 py-4 text-lg font-semibold disabled:cursor-not-allowed disabled:opacity-60 ${BTN_PRIMARY_CLASS}`}
-              >
-                {isSubmitting
-                  ? "Adding..."
-                  : "Add Managed Property"}
-              </button>
+              {saleAgreed === "yes" ? (
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className={`w-full rounded-xl px-6 py-4 text-lg font-semibold disabled:cursor-not-allowed disabled:opacity-60 ${BTN_PRIMARY_CLASS}`}
+                >
+                  {isSubmitting
+                    ? "Adding..."
+                    : "Add Managed Property"}
+                </button>
+              ) : null}
             </form>
           </div>
         )}
@@ -552,6 +608,47 @@ function ModeButton({
     >
       {label}
     </button>
+  );
+}
+
+function YesNoField({
+  legend,
+  hint,
+  value,
+  yesLabel,
+  noLabel,
+  onAnswer,
+}: {
+  legend: string;
+  hint?: string;
+  value: SellerOnwardAnswer | null;
+  yesLabel: string;
+  noLabel: string;
+  onAnswer: (value: SellerOnwardAnswer) => void;
+}) {
+  return (
+    <fieldset>
+      <legend className="text-sm font-medium text-slate-900">
+        {legend}
+      </legend>
+
+      {hint ? (
+        <p className="mt-1 text-xs text-slate-500">{hint}</p>
+      ) : null}
+
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <ModeButton
+          active={value === "yes"}
+          label={yesLabel}
+          onClick={() => onAnswer("yes")}
+        />
+        <ModeButton
+          active={value === "no"}
+          label={noLabel}
+          onClick={() => onAnswer("no")}
+        />
+      </div>
+    </fieldset>
   );
 }
 

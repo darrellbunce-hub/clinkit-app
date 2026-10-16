@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
@@ -28,6 +28,19 @@ import {
   readJoinChainIntent,
   shouldCreateBuyerReadyOnJoin,
 } from "@/lib/onboarding/joinChainIntent";
+import {
+  clearJoinAddressHandoff,
+  isJoinAddressHandoffUsable,
+  peekJoinAddressHandoff,
+} from "@/lib/onboarding/joinAddressHandoff";
+import {
+  classifyOnwardPurchaseConversion,
+  onwardPurchaseOutcomeMessage,
+  planCarriedOnwardPurchase,
+  shouldAddCarriedOnwardPurchase,
+  type OnwardPurchaseConversionResult,
+} from "@/lib/onboarding/joinOnwardPurchase";
+import { convertSearchingPlaceholder } from "@/lib/searchingPlaceholder";
 import PropertyAddressLookup from "@/components/address/PropertyAddressLookup";
 import { formatUkPostcodeForStorage } from "@/lib/address/normalize";
 
@@ -44,16 +57,88 @@ function JoinChainContent() {
   const [accessCode, setAccessCode] =
     useState("");
 
+  // Read once on mount; page state keeps it through a failed join attempt.
+  const [carriedAddress, setCarriedAddress] =
+    useState(() => peekJoinAddressHandoff());
+
   const [address, setAddress] =
-    useState("");
+    useState(carriedAddress?.address ?? "");
 
   const [postcode, setPostcode] =
-    useState("");
+    useState(carriedAddress?.postcode ?? "");
 
   const [nothingToSell, setNothingToSell] =
     useState(notSellingIntent);
 
+  const [onwardPurchaseRemoved, setOnwardPurchaseRemoved] =
+    useState(false);
+
+  // The ref blocks a second click before the disabled state renders.
+  const joinInProgress = useRef(false);
+  const leavingAfterJoin = useRef(false);
+  const [isJoining, setIsJoining] = useState(false);
+
+  useEffect(() => {
+    return () => {
+      clearJoinAddressHandoff();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!carriedAddress) {
+      return;
+    }
+
+    let cancelled = false;
+
+    void supabase.auth.getUser().then(({ data: { user } }) => {
+      if (
+        !cancelled &&
+        !isJoinAddressHandoffUsable(carriedAddress, user?.id)
+      ) {
+        discardCarriedAddress();
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [carriedAddress]);
+
+  function discardCarriedAddress() {
+    clearJoinAddressHandoff();
+    setCarriedAddress(null);
+    setAddress("");
+    setPostcode("");
+  }
+
+  function handleChangeAddress() {
+    if (carriedAddress?.onwardPurchase) {
+      setOnwardPurchaseRemoved(true);
+    }
+
+    discardCarriedAddress();
+  }
+
   async function handleJoinChain() {
+    if (joinInProgress.current) {
+      return;
+    }
+
+    joinInProgress.current = true;
+    setIsJoining(true);
+
+    try {
+      await submitJoin();
+    } finally {
+      if (!leavingAfterJoin.current) {
+        joinInProgress.current = false;
+        setIsJoining(false);
+      }
+    }
+  }
+
+  async function submitJoin() {
 
     const {
       data: { user },
@@ -61,6 +146,15 @@ function JoinChainContent() {
 
     if (!user) {
       alert("Please log in first");
+      return;
+    }
+
+    if (
+      carriedAddress &&
+      !isJoinAddressHandoffUsable(carriedAddress, user.id)
+    ) {
+      discardCarriedAddress();
+      alert("Please select the property address again.");
       return;
     }
 
@@ -94,6 +188,8 @@ function JoinChainContent() {
       alert("Could not join this property.");
       return;
     }
+
+    clearJoinAddressHandoff();
 
     const property = {
       id: joinResult.property_id as number,
@@ -208,6 +304,15 @@ function JoinChainContent() {
         linked_property_id: property.linked_property_id,
       };
 
+      const carriedOnwardPurchase =
+        carriedAddress?.onwardPurchase ?? null;
+
+      const onwardPurchasePlan = planCarriedOnwardPurchase({
+        joiningRole,
+        hasCarriedOnwardPurchase: carriedOnwardPurchase != null,
+        joinedPropertyLinkedId: property.linked_property_id,
+      });
+
       const intentResult =
         await resolveSearchingFromJoinIntent(
           supabase,
@@ -215,7 +320,9 @@ function JoinChainContent() {
             userId: user.id,
             joinedProperty:
               joinedPropertyState,
-            searchingIntent,
+            searchingIntent:
+              searchingIntent &&
+              onwardPurchasePlan !== "convert_existing_link",
             migratedSearchingId,
           }
         );
@@ -253,6 +360,45 @@ function JoinChainContent() {
         return;
       }
 
+      if (
+        carriedOnwardPurchase &&
+        shouldAddCarriedOnwardPurchase({
+          plan: onwardPurchasePlan,
+          searchingPlaceholderLinked:
+            intentResult?.ok === true ||
+            migratedSearchingId != null,
+        })
+      ) {
+        let convertResult: OnwardPurchaseConversionResult | null =
+          null;
+
+        try {
+          convertResult =
+            await convertSearchingPlaceholder(supabase, {
+              chainId: property.chain_id,
+              salePropertyId: property.id,
+              address: carriedOnwardPurchase.address,
+              postcode: carriedOnwardPurchase.postcode,
+              updatedBy: "homeowner",
+            });
+        } catch {
+          convertResult = null;
+        }
+
+        const onwardPurchaseOutcome =
+          classifyOnwardPurchaseConversion(convertResult);
+        const onwardPurchaseMessage =
+          onwardPurchaseOutcomeMessage(onwardPurchaseOutcome);
+
+        if (onwardPurchaseMessage) {
+          console.error(
+            "[join-chain] onward purchase not added:",
+            onwardPurchaseOutcome
+          );
+          alert(onwardPurchaseMessage);
+        }
+      }
+
       if (sourceChainId) {
         const { error: cleanupError } =
           await supabase.rpc(
@@ -272,6 +418,7 @@ function JoinChainContent() {
       }
 
       joinCompleted = true;
+      leavingAfterJoin.current = true;
       window.location.href =
         `/dashboard?refresh=${Date.now()}`;
     } catch (error) {
@@ -322,13 +469,63 @@ function JoinChainContent() {
           />
 
           <div className="mt-4">
-            <PropertyAddressLookup
-              idPrefix="join-chain"
-              address={address}
-              postcode={postcode}
-              onAddressChange={setAddress}
-              onPostcodeChange={setPostcode}
-            />
+            {carriedAddress ? (
+              <div>
+                <p className="block text-sm font-medium text-slate-900">
+                  Property address
+                </p>
+                <div className="mt-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                  <p className="font-medium text-slate-900">{address}</p>
+                  <p className="mt-1">{postcode}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleChangeAddress}
+                  className="mt-3 text-sm font-medium text-slate-700 underline underline-offset-2 hover:text-slate-900"
+                >
+                  Change address
+                </button>
+
+                {carriedAddress.onwardPurchase ? (
+                  <div className="mt-6">
+                    <p className="block text-sm font-medium text-slate-900">
+                      Property you are buying
+                    </p>
+                    <div className="mt-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                      <p className="font-medium text-slate-900">
+                        {carriedAddress.onwardPurchase.address}
+                      </p>
+                      <p className="mt-1">
+                        {carriedAddress.onwardPurchase.postcode}
+                      </p>
+                    </div>
+                    <p className="mt-2 text-sm text-slate-600">
+                      Once you have joined, we will add this to your
+                      chain as your onward purchase. If you change the
+                      address above, your next home will show as
+                      Searching and you can add it from your chain.
+                    </p>
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <>
+                <PropertyAddressLookup
+                  idPrefix="join-chain"
+                  address={address}
+                  postcode={postcode}
+                  onAddressChange={setAddress}
+                  onPostcodeChange={setPostcode}
+                />
+                {onwardPurchaseRemoved ? (
+                  <p className="mt-3 text-sm text-slate-600">
+                    After you join, your next home will show as
+                    Searching. You can then add the property you are
+                    buying from your chain.
+                  </p>
+                ) : null}
+              </>
+            )}
           </div>
 
           <label className="mt-6 flex items-center gap-3">
@@ -351,9 +548,10 @@ function JoinChainContent() {
 
           <button
             onClick={handleJoinChain}
-            className="mt-6 w-full bg-slate-900 text-white rounded-2xl py-5 text-lg font-semibold"
+            disabled={isJoining}
+            className="mt-6 w-full bg-slate-900 text-white rounded-2xl py-5 text-lg font-semibold disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Join Chain
+            {isJoining ? "Joining..." : "Join Chain"}
           </button>
 
         </div>

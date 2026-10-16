@@ -9,6 +9,7 @@ export type DuplicatePropertyDialogVariant =
   | "existing"
   | "yours"
   | "awaiting_seller"
+  | "awaiting_seller_with_purchase"
   | "awaiting_buyer"
   | "represented";
 
@@ -48,7 +49,15 @@ const VARIANT_COPY: Record<
     title: "This property is already part of MoveLoop",
     paragraphs: [
       "The buyer of this property has already added it to their chain, and it is waiting for its seller to connect.",
-      "Join the existing chain using the chain access code you were given. You can add your onward purchase after joining.",
+      "Join the existing chain using the chain access code you were given. Joining connects your sale only; it does not add the property you are buying.",
+    ],
+    primaryLabel: "Join Existing Chain",
+  },
+  awaiting_seller_with_purchase: {
+    title: "This property is already part of MoveLoop",
+    paragraphs: [
+      "The buyer of this property has already added it to their chain, and it is waiting for its seller to connect.",
+      "Join the existing chain using the chain access code you were given. Once you have joined, we will add the property you are buying to your chain.",
     ],
     primaryLabel: "Join Existing Chain",
   },
@@ -56,7 +65,7 @@ const VARIANT_COPY: Record<
     title: "This property is already part of MoveLoop",
     paragraphs: [
       "The property you are buying is already in a chain and is waiting for its buyer to connect.",
-      "Join the existing chain using the chain access code you were given. Your sale will be connected to it.",
+      "Join the existing chain using the chain access code you were given. Once you have joined, your purchase will be connected to that chain.",
     ],
     primaryLabel: "Join Existing Chain",
   },

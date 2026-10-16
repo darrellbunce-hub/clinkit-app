@@ -1,6 +1,6 @@
 import {
-  DEFAULT_SELLER_ONWARD_PLAN,
   requiresOnwardPurchaseAddress,
+  resolveSellerOnwardPlan,
   saleAwaitingBuyerForOnwardPlan,
 } from "../lib/estateAgent/sellerOnwardPlan";
 
@@ -19,8 +19,31 @@ function assert(name: string, condition: boolean) {
 }
 
 assert(
-  "default onward plan is searching",
-  DEFAULT_SELLER_ONWARD_PLAN === "searching"
+  "no default onward plan: unanswered resolves to nothing",
+  resolveSellerOnwardPlan({ buying: null, offerAccepted: null }) === null
+);
+
+assert(
+  "buying without an offer answer resolves to nothing",
+  resolveSellerOnwardPlan({ buying: "yes", offerAccepted: null }) === null
+);
+
+assert(
+  "not buying resolves to no onward purchase",
+  resolveSellerOnwardPlan({ buying: "no", offerAccepted: "yes" }) ===
+    "no_onward"
+);
+
+assert(
+  "buying with an accepted offer resolves to purchase agreed",
+  resolveSellerOnwardPlan({ buying: "yes", offerAccepted: "yes" }) ===
+    "purchase_agreed"
+);
+
+assert(
+  "buying without an accepted offer resolves to searching",
+  resolveSellerOnwardPlan({ buying: "yes", offerAccepted: "no" }) ===
+    "searching"
 );
 
 assert(

@@ -59,6 +59,7 @@ export type ResolvePurchaserStateForPropertyParams = {
  * 3. buyer_connected === true + no property linked into it → Connected Buyer
  * 4. else → null (the buyer's own sale renders upstream)
  *
+ * Purchase rows only receive Buyer Ready (resolveBuyerReadyForPurchaseAnchor).
  * Searching placeholders never receive purchaser tiles.
  */
 export function resolvePurchaserStateForProperty(
@@ -76,7 +77,11 @@ export function resolvePurchaserStateForProperty(
   }
 
   if (!isPurchaserStateEligibleProperty(anchorProperty)) {
-    return null;
+    return resolveBuyerReadyForPurchaseAnchor({
+      anchorProperty,
+      chainProperties,
+      buyerReadySummaries,
+    });
   }
 
   if (!anchorProperty.buyer_connected) {
@@ -276,6 +281,55 @@ export function shouldRenderAwaitingBuyerBeforeProperty(
     ) &&
     upstreamPurchaser?.kind === "awaiting_buyer"
   );
+}
+
+/**
+ * A Buyer Ready step linked to a purchase row (a buyer-only purchase that a
+ * seller later joined) is that purchase's participating buyer. It renders
+ * for every viewer, but only when nothing links into the purchase: an
+ * inbound sale already represents the buyer. Awaiting Buyer and Connected
+ * Buyer stay sale-only.
+ */
+function resolveBuyerReadyForPurchaseAnchor(params: {
+  anchorProperty: UpstreamPurchaserAnchorProperty;
+  chainProperties: UpstreamPurchaserAnchorProperty[];
+  buyerReadySummaries: ChainNodesChainSummary[];
+}): UpstreamPurchaserState {
+  const { anchorProperty, chainProperties, buyerReadySummaries } =
+    params;
+
+  if (
+    anchorProperty.relationship_type !== "purchase" ||
+    (anchorProperty.stage === "searching" && !anchorProperty.address) ||
+    !anchorProperty.buyer_connected
+  ) {
+    return null;
+  }
+
+  const buyerReadyForAnchor = findBuyerReadySummaryForAnchor(
+    buyerReadySummaries,
+    anchorProperty.id
+  );
+
+  if (!buyerReadyForAnchor) {
+    return null;
+  }
+
+  const linkedInto = chainProperties.some(
+    (property) =>
+      property.id !== anchorProperty.id &&
+      property.linked_property_id === anchorProperty.id
+  );
+
+  if (linkedInto) {
+    return null;
+  }
+
+  return {
+    kind: "buyer_ready",
+    anchorPropertyId: anchorProperty.id,
+    summary: buyerReadyForAnchor,
+  };
 }
 
 function isPurchaserStateEligibleProperty(
