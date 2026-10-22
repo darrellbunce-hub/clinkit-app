@@ -139,7 +139,7 @@ export default function EstateAgentOnboardingPage() {
 
     if (!emailDomain) {
       setErrorMessage(
-        "Your business email domain is missing from your profile. Sign out and sign up again with a business email, or contact support."
+        "Your business email domain is missing from your profile. Sign out and sign up again with a business email."
       );
 
       return;

@@ -36,7 +36,6 @@ import { createEstateAgentProfile } from "../lib/estateAgent/createEstateAgentPr
 import { finalizeOperationalSaleCreation } from "../lib/estateAgent/finalizeOperationalSaleCreation";
 import { resolveSearchingFromJoinIntent } from "../lib/joinChainSearching";
 import {
-  attachSearchingPlaceholderToSale,
   convertSearchingPlaceholder,
   createSearchingPlaceholderForSale,
 } from "../lib/searchingPlaceholder";
@@ -487,8 +486,8 @@ function runStaticChecks(): void {
         /if \(!result\?\.ok \|\| result\.property_id == null\) \{\s*return \{\s*ok: false,/.test(wrapper)
     );
     record(
-      "app: Start Move keeps attachSearchingPlaceholderToSale",
-      read("app/start-move/page.tsx").includes("attachSearchingPlaceholderToSale(")
+      "app: Start Move uses createSearchingPlaceholderForSale",
+      read("app/start-move/page.tsx").includes("createSearchingPlaceholderForSale(")
     );
 
     const allowlist = JSON.parse(read("scripts/secdef-user-rpc-allowlist.json")) as {
@@ -1175,10 +1174,8 @@ async function runScenarios(ctx: Ctx): Promise<void> {
 
   // M — regressions
   const m = await homeownerSale(ctx, hoM);
-  const mAttach = await attachSearchingPlaceholderToSale(hoM.client, {
-    chainId: m.chainId,
+  const mAttach = await createSearchingPlaceholderForSale(hoM.client, {
     salePropertyId: m.saleId,
-    userId: hoM.userId,
   });
   const mTileIdentity = mAttach.ok ? await identity(ctx, mAttach.placeholderId) : null;
   record(

@@ -208,13 +208,13 @@ function checkStartMovePage() {
       helper.includes("p_purchase_property_id: params.purchasePropertyId")
   );
 
-  const buyingInsert = page.indexOf('relationship_type: "purchase"');
-  const buyerGrant = page.indexOf("buyerMemberError || !buyerGrant.ok");
+  const buyingInsert = page.indexOf('relationshipType: "purchase"');
+  const buyerGrant = page.indexOf("if (!buyingResult.ok) {");
   const linkCall = page.indexOf("await linkStartMoveOnwardPurchase(supabase, {");
   const placeholder = page.indexOf("// SEARCHING PLACEHOLDER");
   const redirect = page.indexOf("window.location.href =\n          `/chain/${chainId}");
   record(
-    "Start Move: links after the purchase insert and its identity grant",
+    "Start Move: links after the atomic purchase create-and-grant succeeds",
     buyingInsert > -1 && buyerGrant > buyingInsert && linkCall > buyerGrant
   );
   record(
@@ -227,14 +227,21 @@ function checkStartMovePage() {
     page.lastIndexOf("if (sellingPropertyId != null) {", linkCall) > buyerGrant
   );
   record(
-    "Start Move: link failure runs fail() (onboarding chain cleanup) and stops",
-    /if \(!linkResult\.ok\) \{\s*await fail\(\s*"\[start-move\] onward purchase link failed:",\s*linkResult\.error\s*\);\s*return;\s*\}/.test(
+    "Start Move: link failure runs fail() with the purchase_not_linked recovery and stops",
+    /if \(!linkResult\.ok\) \{\s*await fail\(\s*"\[start-move\] onward purchase link failed:",\s*linkResult\.error,\s*START_MOVE_FAILED_MESSAGE,\s*"purchase_not_linked"\s*\);\s*return;\s*\}/.test(
       linkBlock
     )
   );
   record(
-    "Start Move: fail() still cleans up the onboarding chain",
-    /async function fail\([\s\S]{0,400}?cleanupOnboardingChain\(chainId\)/.test(page)
+    "Start Move: fail() keeps an established chain and cleans up only before any property is established",
+    /async function fail\([\s\S]{0,600}?if \(chainId != null && propertyEstablished\) \{\s*setRecovery\(\{ chainId, reason: recoveryReason \}\);\s*return;\s*\}\s*if \(chainId != null\) \{\s*await cleanupOnboardingChain\(chainId\);/.test(
+      page
+    )
+  );
+  record(
+    "Start Move: the purchase is established before the link runs",
+    page.indexOf("propertyEstablished = true;", buyerGrant) > buyerGrant &&
+      page.indexOf("propertyEstablished = true;", buyerGrant) < linkCall
   );
   record(
     "Start Move: searching placeholder path unchanged (no link call inside it)",

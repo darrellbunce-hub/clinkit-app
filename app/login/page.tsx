@@ -119,7 +119,7 @@ export default function LoginPage() {
 
       if (!profileBootstrap.ok) {
         setErrorMessage(
-          "Your account is signed in but we could not finish profile setup. Try again or contact support."
+          "Your account is signed in but we could not finish profile setup. Please try signing in again."
         );
 
         return;

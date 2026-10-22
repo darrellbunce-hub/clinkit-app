@@ -228,7 +228,7 @@ function main() {
   record(
     "App: a refused delegation toggle shows the neutral eligibility message (no billing or fixture detail)",
     delegationMessage ===
-      "This Estate Agent branch is not currently eligible for delegated updates. Please contact support if you think this is incorrect." &&
+      "This Estate Agent branch is not currently eligible for delegated updates. If you think this is incorrect, check with your estate agent." &&
       !/subscri|billing|entitle|trial|payment|fixture|test|directory|smoke/i.test(delegationMessage)
   );
   const otherCodes = ["not_authorized", "no_active_assignment", "invalid_value", "not_authenticated", null, undefined];

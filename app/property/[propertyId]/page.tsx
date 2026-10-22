@@ -767,9 +767,13 @@ async function handleReportDelay() {
   const showOperationalManager =
     access.viewerRole === "estate_agent" && canEdit;
 
+  // The strip's owner, manager and mode describe the agent's assigned
+  // property in this chain, so they only belong on that property's page.
   const showOperationalContextStrip =
-    isOperationalDisplay ||
-    access.viewerRole === "estate_agent";
+    access.viewerRole === "estate_agent"
+      ? operationalSubject?.assignedPropertyId ===
+        currentProperty.id
+      : isOperationalDisplay;
 
   function renderSectionAlert(
     section: SectionFeedback["section"]

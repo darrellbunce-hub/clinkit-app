@@ -130,8 +130,6 @@ export function formatPropertyEaAssignmentError(
   switch (code) {
     case "not_authorized":
       return "Only the homeowner selling this property can appoint or change its estate agent.";
-    case "branch_acts_for_buyer":
-      return "This branch represents the buyer of this property, so it cannot also act for you as seller.";
     case "branch_not_found":
       return "That estate agent branch could not be found.";
     case "no_active_assignment":
@@ -151,7 +149,7 @@ export function formatPropertyEaDelegationError(
   code: string | null | undefined
 ): string {
   if (code === "branch_not_found") {
-    return "This Estate Agent branch is not currently eligible for delegated updates. Please contact support if you think this is incorrect.";
+    return "This Estate Agent branch is not currently eligible for delegated updates. If you think this is incorrect, check with your estate agent.";
   }
 
   return formatPropertyEaAssignmentError(code);

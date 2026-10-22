@@ -1,0 +1,478 @@
+diff --git a/app/start-move/page.tsx b/app/start-move/page.tsx
+index a33cb1e..79ff266 100644
+--- a/app/start-move/page.tsx
++++ b/app/start-move/page.tsx
+@@ -10,10 +10,7 @@ import {
+   PAGE_TITLE_CLASS,
+ } from "@/components/mobileStandards";
+ import { createChainForOnboarding } from "@/lib/createChainForOnboarding";
+-import {
+-  establishOperationalHomeowner,
+-  OPERATIONAL_IDENTITY_GRANT_VIA,
+-} from "@/lib/ownership/grants";
++import { createStartMoveProperty } from "@/lib/ownership/grants";
+ import { generateAccessCode } from "@/lib/accessCode";
+ import { attachSearchingPlaceholderToSale } from "@/lib/searchingPlaceholder";
+ import CollectionPointNotice from "@/components/legal/CollectionPointNotice";
+@@ -105,15 +102,9 @@ const STEP_SECTION_LABEL: Record<StartMoveStep, string> = {
+   stop_no_offer_accepted: "Your purchase",
+ };
+ 
+-function isAddressReservedFailure(
+-  insertError: { code?: string; message?: string } | null,
+-  grantError: string | null | undefined
+-) {
+-  return (
+-    (insertError?.code === "23505" &&
+-      insertError.message === "property_address_reserved") ||
+-    grantError === "address_reserved"
+-  );
++/** The address was taken between routing and creation. */
++function isAddressReservedFailure(error: string) {
++  return error === "address_reserved" || error === "address_unavailable";
+ }
+ 
+ export default function StartMovePage() {
+@@ -528,83 +519,27 @@ export default function StartMovePage() {
+             return;
+           }
+     
+-          const {
+-            data: sellingProperty,
+-            error: sellingError,
+-          } = await supabase
+-            .from("properties")
+-            .insert({
+-              chain_id: chainId,
+-    
+-              chain_position: 1,
+-    
+-              address: selling.address,
+-    
+-              postcode: sellingPostcodeStored,
+-    
+-              stage: "property_listed",
+-    
+-              status: "pending_connection",
+-    
+-              relationship_type: "sale",
+-    
+-              created_by_user_id: user.id,
+-    
+-              awaiting_buyer: notBuying,
+-    
+-              buyer_connected: false,
+-    
+-              seller_connected: true,
+-    
+-              is_searching: false,
+-    
+-              is_current_user: true,
+-    
+-              last_updated_days: 0,
+-            })
+-            .select()
+-            .single();
+-    
+-          if (sellingError) {
++          const sellingResult = await createStartMoveProperty(supabase, {
++            chainId,
++            relationshipType: "sale",
++            address: selling.address,
++            postcode: sellingPostcodeStored,
++            awaitingBuyer: notBuying,
++          });
++
++          if (!sellingResult.ok) {
+             await fail(
+-              "[start-move] selling property insert failed:",
+-              sellingError.message,
+-              isAddressReservedFailure(sellingError, null)
++              "[start-move] sale property creation failed:",
++              sellingResult.error,
++              isAddressReservedFailure(sellingResult.error)
+                 ? START_MOVE_ADDRESS_RESERVED_MESSAGE
+                 : START_MOVE_FAILED_MESSAGE
+             );
+             return;
+           }
+-    
+-          if (sellingProperty) {
+ 
+-            sellingPropertyId =
+-              sellingProperty.id;
+-    
+-            const { data: sellerGrant, error: sellerMemberError } =
+-              await establishOperationalHomeowner(supabase, {
+-                propertyId: sellingProperty.id,
+-                grantedVia: OPERATIONAL_IDENTITY_GRANT_VIA.startMove,
+-              });
+-
+-            if (sellerMemberError || !sellerGrant.ok) {
+-              const grantError = !sellerGrant.ok
+-                ? sellerGrant.error
+-                : null;
+-              await fail(
+-                "[start-move] operational homeowner grant failed:",
+-                sellerMemberError?.message ??
+-                  grantError ??
+-                  "unknown_error",
+-                isAddressReservedFailure(null, grantError)
+-                  ? START_MOVE_ADDRESS_RESERVED_MESSAGE
+-                  : START_MOVE_FAILED_MESSAGE
+-              );
+-              return;
+-            }
+-
+-            propertyEstablished = true;
+-          }
++          sellingPropertyId = sellingResult.propertyId;
++          propertyEstablished = true;
+     
+         }
+         let buyerReadyPropertyId: number | null = null;
+@@ -650,48 +585,19 @@ export default function StartMovePage() {
+             return;
+           }
+     
+-          const {
+-            data: buyingProperty,
+-            error: buyingError,
+-          } = await supabase
+-            .from("properties")
+-            .insert({
+-              chain_id: chainId,
+-    
+-              chain_position: 2,
+-    
+-              address: buying.address,
+-    
+-              postcode: buyingPostcodeStored,
+-    
+-              stage: "offer_accepted",
+-    
+-              status: "pending_connection",
+-    
+-              relationship_type: "purchase",
+-    
+-              created_by_user_id: user.id,
+-    
+-              awaiting_buyer: false,
+-    
+-              buyer_connected: true,
+-    
+-              seller_connected: false,
+-    
+-              is_searching: false,
+-    
+-              is_current_user: true,
+-    
+-              last_updated_days: 0,
+-            })
+-            .select()
+-            .single();
+-    
+-          if (buyingError) {
+-            const reserved = isAddressReservedFailure(buyingError, null);
++          const buyingResult = await createStartMoveProperty(supabase, {
++            chainId,
++            relationshipType: "purchase",
++            address: buying.address,
++            postcode: buyingPostcodeStored,
++            awaitingBuyer: false,
++          });
++
++          if (!buyingResult.ok) {
++            const reserved = isAddressReservedFailure(buyingResult.error);
+             await fail(
+-              "[start-move] buying property insert failed:",
+-              buyingError.message,
++              "[start-move] purchase property creation failed:",
++              buyingResult.error,
+               reserved
+                 ? START_MOVE_ADDRESS_RESERVED_MESSAGE
+                 : START_MOVE_FAILED_MESSAGE,
+@@ -699,53 +605,25 @@ export default function StartMovePage() {
+             );
+             return;
+           }
+-    
+-          if (buyingProperty) {
+-            buyerReadyPropertyId =
+-            buyingProperty.id;
+-            const { data: buyerGrant, error: buyerMemberError } =
+-              await establishOperationalHomeowner(supabase, {
+-                propertyId: buyingProperty.id,
+-                grantedVia: OPERATIONAL_IDENTITY_GRANT_VIA.startMove,
+-              });
+ 
+-            if (buyerMemberError || !buyerGrant.ok) {
+-              const grantError = !buyerGrant.ok
+-                ? buyerGrant.error
+-                : null;
+-              const reserved = isAddressReservedFailure(null, grantError);
++          buyerReadyPropertyId = buyingResult.propertyId;
++          propertyEstablished = true;
++
++          if (sellingPropertyId != null) {
++            const linkResult = await linkStartMoveOnwardPurchase(supabase, {
++              salePropertyId: sellingPropertyId,
++              purchasePropertyId: buyingResult.propertyId,
++            });
++
++            if (!linkResult.ok) {
+               await fail(
+-                "[start-move] operational homeowner grant failed:",
+-                buyerMemberError?.message ??
+-                  grantError ??
+-                  "unknown_error",
+-                reserved
+-                  ? START_MOVE_ADDRESS_RESERVED_MESSAGE
+-                  : START_MOVE_FAILED_MESSAGE,
+-                reserved ? "purchase_address_reserved" : "purchase_not_added"
++                "[start-move] onward purchase link failed:",
++                linkResult.error,
++                START_MOVE_FAILED_MESSAGE,
++                "purchase_not_linked"
+               );
+               return;
+             }
+-
+-            propertyEstablished = true;
+-
+-            if (sellingPropertyId != null) {
+-              const linkResult =
+-                await linkStartMoveOnwardPurchase(supabase, {
+-                  salePropertyId: sellingPropertyId,
+-                  purchasePropertyId: buyingProperty.id,
+-                });
+-
+-              if (!linkResult.ok) {
+-                await fail(
+-                  "[start-move] onward purchase link failed:",
+-                  linkResult.error,
+-                  START_MOVE_FAILED_MESSAGE,
+-                  "purchase_not_linked"
+-                );
+-                return;
+-              }
+-            }
+           }
+     
+         }
+diff --git a/lib/ownership/grants.ts b/lib/ownership/grants.ts
+index 38f9e00..3e4f817 100644
+--- a/lib/ownership/grants.ts
++++ b/lib/ownership/grants.ts
+@@ -79,6 +79,52 @@ export async function establishOperationalHomeowner(
+   };
+ }
+ 
++export type StartMoveCreatePropertyResult =
++  | { ok: true; propertyId: number }
++  | { ok: false; error: string };
++
++/**
++ * Start Move: inserts the caller's sale or purchase into their own onboarding
++ * chain and grants their operational homeowner identity in one transaction,
++ * so a failed grant never leaves a property behind.
++ */
++export async function createStartMoveProperty(
++  supabase: SupabaseClient,
++  params: {
++    chainId: number;
++    relationshipType: "sale" | "purchase";
++    address: string;
++    postcode: string;
++    awaitingBuyer: boolean;
++  }
++): Promise<StartMoveCreatePropertyResult> {
++  const { data, error } = await supabase.rpc("start_move_create_property", {
++    p_chain_id: params.chainId,
++    p_relationship_type: params.relationshipType,
++    p_address: params.address,
++    p_postcode: params.postcode,
++    p_awaiting_buyer: params.awaitingBuyer,
++  });
++
++  if (error) {
++    return { ok: false, error: error.message };
++  }
++
++  const row = (data ?? {}) as GrantRpcRow;
++
++  if (!row.ok || row.property_id == null) {
++    return {
++      ok: false,
++      error:
++        mapTransactionParticipationError(row.error) ??
++        row.error ??
++        "create_failed",
++    };
++  }
++
++  return { ok: true, propertyId: row.property_id };
++}
++
+ /**
+  * @deprecated Join-chain counterparty participation must use join_chain_property.
+  */
+diff --git a/scripts/secdef-user-rpc-allowlist.json b/scripts/secdef-user-rpc-allowlist.json
+index 06ed897..9beacac 100644
+--- a/scripts/secdef-user-rpc-allowlist.json
++++ b/scripts/secdef-user-rpc-allowlist.json
+@@ -102,6 +102,7 @@
+     { "schema": "public", "name": "revoke_property_claim_invitation", "args": "bigint", "reason": "user_facing_product_rpc" },
+     { "schema": "public", "name": "rotate_active_property_claim_invitation_for_delivery", "args": "bigint", "reason": "user_facing_product_rpc" },
+     { "schema": "public", "name": "set_property_ea_update_permission", "args": "bigint, boolean", "reason": "user_facing_product_rpc" },
++    { "schema": "public", "name": "start_move_create_property", "args": "bigint, text, text, text, boolean", "reason": "user_facing_product_rpc" },
+     { "schema": "public", "name": "sync_property_claim_on_membership", "args": "", "reason": "user_facing_product_rpc" },
+     { "schema": "public", "name": "transfer_ea_branch_ownership", "args": "uuid, uuid, text", "reason": "user_facing_product_rpc" },
+     { "schema": "public", "name": "update_property_claim_invite_email", "args": "bigint, text", "reason": "user_facing_product_rpc" },
+diff --git a/scripts/verify-help-and-start-move-recovery.ts b/scripts/verify-help-and-start-move-recovery.ts
+index 036b12d..bef3b52 100644
+--- a/scripts/verify-help-and-start-move-recovery.ts
++++ b/scripts/verify-help-and-start-move-recovery.ts
+@@ -254,8 +254,8 @@ assert(
+   "Start Move: fail() keeps an established chain and only cleans up before any property is established"
+ );
+ 
+-const saleGrantCheck = startMove.indexOf("sellerMemberError || !sellerGrant.ok");
+-const buyerGrantCheck = startMove.indexOf("buyerMemberError || !buyerGrant.ok");
++const saleGrantCheck = startMove.indexOf("if (!sellingResult.ok) {");
++const buyerGrantCheck = startMove.indexOf("if (!buyingResult.ok) {");
+ const established = [...startMove.matchAll(/propertyEstablished = true;/g)].map((m) => m.index ?? -1);
+ assert(
+   established.length === 2 &&
+@@ -267,8 +267,9 @@ assert(
+ );
+ 
+ assert(
+-  /if \(buyingError\) \{[\s\S]*?reserved \? "purchase_address_reserved" : "purchase_not_added"/.test(startMove) &&
+-    /if \(buyerMemberError \|\| !buyerGrant\.ok\) \{[\s\S]*?reserved \? "purchase_address_reserved" : "purchase_not_added"/.test(startMove),
++  /if \(!buyingResult\.ok\) \{\s*const reserved = isAddressReservedFailure\(buyingResult\.error\);[\s\S]*?reserved \? "purchase_address_reserved" : "purchase_not_added"\s*\);\s*return;\s*\}/.test(
++    startMove
++  ),
+   "Start Move: purchase failures after a sale keep the sale with a purchase recovery"
+ );
+ assert(
+diff --git a/scripts/verify-operational-authority-migration.ts b/scripts/verify-operational-authority-migration.ts
+index 0f7682f..d80123f 100644
+--- a/scripts/verify-operational-authority-migration.ts
++++ b/scripts/verify-operational-authority-migration.ts
+@@ -1098,11 +1098,11 @@ function main() {
+ 
+   const startMove = read("app/start-move/page.tsx");
+   record(
+-    "Start Move: trigger refusal (23505 property_address_reserved) or grant address_reserved gets its own message",
+-    startMove.includes('insertError?.code === "23505"') &&
+-      startMove.includes('insertError.message === "property_address_reserved"') &&
+-      startMove.includes('grantError === "address_reserved"') &&
+-      (startMove.match(/START_MOVE_ADDRESS_RESERVED_MESSAGE/g) ?? []).length === 5
++    "Start Move: an address taken during creation (address_reserved or address_unavailable) gets its own message",
++    startMove.includes('error === "address_reserved" || error === "address_unavailable"') &&
++      startMove.includes("isAddressReservedFailure(sellingResult.error)") &&
++      startMove.includes("isAddressReservedFailure(buyingResult.error)") &&
++      (startMove.match(/START_MOVE_ADDRESS_RESERVED_MESSAGE/g) ?? []).length === 3
+   );
+   record(
+     "Start Move: failures before any property is established clean up the chain; later failures keep it",
+diff --git a/scripts/verify-properties-chain-integrity-migration.ts b/scripts/verify-properties-chain-integrity-migration.ts
+index 79a49a6..3fa8a0a 100644
+--- a/scripts/verify-properties-chain-integrity-migration.ts
++++ b/scripts/verify-properties-chain-integrity-migration.ts
+@@ -517,23 +517,26 @@ function main() {
+   console.log("\nm. Application write paths (unchanged)");
+   {
+     const startMove = read("app/start-move/page.tsx");
+-    const startMoveInserts = [
+-      ...startMove.matchAll(/\.from\("properties"\)\s*\.insert\(\{([\s\S]*?)\}\)/g),
++    const startMoveCreates = [
++      ...startMove.matchAll(/await createStartMoveProperty\(supabase, \{([\s\S]*?)\}\)/g),
+     ].map((match) => match[1]);
++    const startMoveGrants = read("lib/ownership/grants.ts");
+ 
+-    assert(startMoveInserts.length === 2, "start-move: sale and purchase direct inserts present");
+     assert(
+-      startMoveInserts.every(
+-        (payload) =>
+-          /chain_id:\s*chainId/.test(payload) &&
+-          /created_by_user_id:\s*user\.id/.test(payload) &&
+-          !/linked_property_id/.test(payload)
+-      ),
+-      "start-move: inserts use the caller's onboarding chain, creator = user, no link"
++      startMoveCreates.length === 2 && !/\.from\(\s*["']properties["']\s*\)/.test(startMove),
++      "start-move: sale and purchase are created only through createStartMoveProperty (no direct properties write)"
++    );
++    assert(
++      startMoveCreates.every(
++        (payload) => /^\s*chainId,/.test(payload) && !/linked_property_id|createdBy/i.test(payload)
++      ) &&
++        startMoveGrants.includes('supabase.rpc("start_move_create_property", {') &&
++        !/p_created_by|p_user_id/.test(startMoveGrants),
++      "start-move: creates use the caller's onboarding chain; creator comes from auth.uid() in the RPC, no link"
+     );
+     assert(
+-      startMove.indexOf("createChainForOnboarding(") < startMove.indexOf('.from("properties")'),
+-      "start-move: chain is created (caller = chain creator) before property inserts"
++      startMove.indexOf("createChainForOnboarding(") < startMove.indexOf("await createStartMoveProperty("),
++      "start-move: chain is created (caller = chain creator) before property creation"
+     );
+ 
+     const placeholder = read("lib/searchingPlaceholder.ts");
+@@ -630,7 +633,6 @@ function main() {
+   console.log("\nn. Direct properties write inventory");
+   {
+     const expected = new Map<string, number>([
+-      ["app/start-move/page.tsx", 2],
+       ["lib/searchingPlaceholder.ts", 1],
+       ["lib/joinChainSearching.ts", 3],
+       ["lib/recordChainCompletionDate.ts", 1],
+diff --git a/scripts/verify-start-move-guided-answers.ts b/scripts/verify-start-move-guided-answers.ts
+index 7efca1e..f23b687 100644
+--- a/scripts/verify-start-move-guided-answers.ts
++++ b/scripts/verify-start-move-guided-answers.ts
+@@ -591,16 +591,17 @@ assert(
+       startMove.indexOf("createChainForOnboarding(")
+ );
+ {
+-  const insertPayloads = [
+-    ...startMove.matchAll(/\.from\("properties"\)\s*\.insert\(\{([\s\S]*?)\}\)/g),
++  const createPayloads = [
++    ...startMove.matchAll(/await createStartMoveProperty\(supabase, \{([\s\S]*?)\}\)/g),
+   ].map((match) => match[1]);
+   assert(
+     "Start Move: sale and purchase writes use only the selected addresses",
+     startMove.includes("if (selling) {") &&
+       startMove.includes("if (buying) {") &&
+-      insertPayloads.length === 2 &&
+-      /address: selling\.address,/.test(insertPayloads[0]) &&
+-      /address: buying\.address,/.test(insertPayloads[1]) &&
++      !/\.from\("properties"\)\s*\.insert\(/.test(startMove) &&
++      createPayloads.length === 2 &&
++      /address: selling\.address,/.test(createPayloads[0]) &&
++      /address: buying\.address,/.test(createPayloads[1]) &&
+       startMove.includes("p_address: selling.address") &&
+       startMove.includes("p_address: buying.address") &&
+       !/p_address: (sellingAddress|buyingAddress)/.test(startMove)
+diff --git a/scripts/verify-start-move-onward-purchase-link.ts b/scripts/verify-start-move-onward-purchase-link.ts
+index f82c778..1660461 100644
+--- a/scripts/verify-start-move-onward-purchase-link.ts
++++ b/scripts/verify-start-move-onward-purchase-link.ts
+@@ -208,13 +208,13 @@ function checkStartMovePage() {
+       helper.includes("p_purchase_property_id: params.purchasePropertyId")
+   );
+ 
+-  const buyingInsert = page.indexOf('relationship_type: "purchase"');
+-  const buyerGrant = page.indexOf("buyerMemberError || !buyerGrant.ok");
++  const buyingInsert = page.indexOf('relationshipType: "purchase"');
++  const buyerGrant = page.indexOf("if (!buyingResult.ok) {");
+   const linkCall = page.indexOf("await linkStartMoveOnwardPurchase(supabase, {");
+   const placeholder = page.indexOf("// SEARCHING PLACEHOLDER");
+   const redirect = page.indexOf("window.location.href =\n          `/chain/${chainId}");
+   record(
+-    "Start Move: links after the purchase insert and its identity grant",
++    "Start Move: links after the atomic purchase create-and-grant succeeds",
+     buyingInsert > -1 && buyerGrant > buyingInsert && linkCall > buyerGrant
+   );
+   record(

@@ -10,16 +10,20 @@ import {
   PAGE_TITLE_CLASS,
 } from "@/components/mobileStandards";
 import { createChainForOnboarding } from "@/lib/createChainForOnboarding";
-import {
-  establishOperationalHomeowner,
-  OPERATIONAL_IDENTITY_GRANT_VIA,
-} from "@/lib/ownership/grants";
+import { createStartMoveProperty } from "@/lib/ownership/grants";
 import { generateAccessCode } from "@/lib/accessCode";
-import { attachSearchingPlaceholderToSale } from "@/lib/searchingPlaceholder";
+import { createSearchingPlaceholderForSale } from "@/lib/searchingPlaceholder";
 import CollectionPointNotice from "@/components/legal/CollectionPointNotice";
 import DuplicatePropertyDialog, {
   type DuplicatePropertyDialogVariant,
 } from "@/components/onboarding/DuplicatePropertyDialog";
+import StartMoveRecoveryPanel from "@/components/onboarding/StartMoveRecoveryPanel";
+import HelpLink from "@/components/help/HelpLink";
+import { HELP_SECTION_IDS } from "@/lib/help/helpContent";
+import type {
+  StartMoveRecovery,
+  StartMoveRecoveryReason,
+} from "@/lib/onboarding/startMoveRecovery";
 import PropertyAddressLookup from "@/components/address/PropertyAddressLookup";
 import { formatUkPostcodeForStorage } from "@/lib/address/normalize";
 import { checkStartMoveAddress } from "@/lib/onboarding/addressReservation";
@@ -68,6 +72,8 @@ type PendingDuplicateAction =
       kind: "join_source_chain";
       chainId: number;
       carried: CarriedJoinAddress;
+      /** The sale already exists; cancelling must keep the chain. */
+      preserveSourceChain: boolean;
     }
   | { kind: "none" };
 
@@ -96,15 +102,9 @@ const STEP_SECTION_LABEL: Record<StartMoveStep, string> = {
   stop_no_offer_accepted: "Your purchase",
 };
 
-function isAddressReservedFailure(
-  insertError: { code?: string; message?: string } | null,
-  grantError: string | null | undefined
-) {
-  return (
-    (insertError?.code === "23505" &&
-      insertError.message === "property_address_reserved") ||
-    grantError === "address_reserved"
-  );
+/** The address was taken between routing and creation. */
+function isAddressReservedFailure(error: string) {
+  return error === "address_reserved" || error === "address_unavailable";
 }
 
 export default function StartMovePage() {
@@ -125,8 +125,8 @@ export default function StartMovePage() {
     useState(false);
   const [errorMessage, setErrorMessage] =
     useState("");
-  const [incompleteChainId, setIncompleteChainId] =
-    useState<number | null>(null);
+  const [recovery, setRecovery] =
+    useState<StartMoveRecovery | null>(null);
   const [sellingAddress, setSellingAddress] =
     useState("");
 
@@ -221,12 +221,14 @@ export default function StartMovePage() {
 
     function promptJoinExistingChain(
       chainId: number,
-      carried: CarriedJoinAddress
+      carried: CarriedJoinAddress,
+      preserveSourceChain: boolean
     ) {
       openDuplicateDialog("existing", {
         kind: "join_source_chain",
         chainId,
         carried,
+        preserveSourceChain,
       });
     }
 
@@ -386,13 +388,21 @@ export default function StartMovePage() {
 
       let chainId: number | null = null;
       let redirected = false;
+      /** Set once a property exists with the caller's homeowner access. */
+      let propertyEstablished = false;
 
       async function fail(
         logMessage: string,
         detail?: unknown,
-        userMessage: string = START_MOVE_FAILED_MESSAGE
+        userMessage: string = START_MOVE_FAILED_MESSAGE,
+        recoveryReason: StartMoveRecoveryReason = "step_incomplete"
       ) {
         console.error(logMessage, detail ?? "");
+
+        if (chainId != null && propertyEstablished) {
+          setRecovery({ chainId, reason: recoveryReason });
+          return;
+        }
 
         if (chainId != null) {
           await cleanupOnboardingChain(chainId);
@@ -489,97 +499,47 @@ export default function StartMovePage() {
             sellingCheck?.ok === false &&
             sellingCheck.error === "address_unavailable"
           ) {
-            promptJoinExistingChain(chainId, {
-              userId: user.id,
-              address: selling.address,
-              postcode: sellingPostcodeStored,
-              onwardPurchase: buying
-                ? {
-                    address: buying.address,
-                    postcode: formatUkPostcodeForStorage(
-                      buying.postcode
-                    ),
-                  }
-                : null,
-            });
+            promptJoinExistingChain(
+              chainId,
+              {
+                userId: user.id,
+                address: selling.address,
+                postcode: sellingPostcodeStored,
+                onwardPurchase: buying
+                  ? {
+                      address: buying.address,
+                      postcode: formatUkPostcodeForStorage(
+                        buying.postcode
+                      ),
+                    }
+                  : null,
+              },
+              false
+            );
             return;
           }
     
-          const {
-            data: sellingProperty,
-            error: sellingError,
-          } = await supabase
-            .from("properties")
-            .insert({
-              chain_id: chainId,
-    
-              chain_position: 1,
-    
-              address: selling.address,
-    
-              postcode: sellingPostcodeStored,
-    
-              stage: "property_listed",
-    
-              status: "pending_connection",
-    
-              relationship_type: "sale",
-    
-              created_by_user_id: user.id,
-    
-              awaiting_buyer: notBuying,
-    
-              buyer_connected: false,
-    
-              seller_connected: true,
-    
-              is_searching: false,
-    
-              is_current_user: true,
-    
-              last_updated_days: 0,
-            })
-            .select()
-            .single();
-    
-          if (sellingError) {
+          const sellingResult = await createStartMoveProperty(supabase, {
+            chainId,
+            relationshipType: "sale",
+            address: selling.address,
+            postcode: sellingPostcodeStored,
+            awaitingBuyer: notBuying,
+          });
+
+          if (!sellingResult.ok) {
             await fail(
-              "[start-move] selling property insert failed:",
-              sellingError.message,
-              isAddressReservedFailure(sellingError, null)
+              "[start-move] sale property creation failed:",
+              sellingResult.error,
+              isAddressReservedFailure(sellingResult.error)
                 ? START_MOVE_ADDRESS_RESERVED_MESSAGE
                 : START_MOVE_FAILED_MESSAGE
             );
             return;
           }
-    
-          if (sellingProperty) {
 
-            sellingPropertyId =
-              sellingProperty.id;
-    
-            const { data: sellerGrant, error: sellerMemberError } =
-              await establishOperationalHomeowner(supabase, {
-                propertyId: sellingProperty.id,
-                grantedVia: OPERATIONAL_IDENTITY_GRANT_VIA.startMove,
-              });
-
-            if (sellerMemberError || !sellerGrant.ok) {
-              const grantError = !sellerGrant.ok
-                ? sellerGrant.error
-                : null;
-              await fail(
-                "[start-move] operational homeowner grant failed:",
-                sellerMemberError?.message ??
-                  grantError ??
-                  "unknown_error",
-                isAddressReservedFailure(null, grantError)
-                  ? START_MOVE_ADDRESS_RESERVED_MESSAGE
-                  : START_MOVE_FAILED_MESSAGE
-              );
-              return;
-            }
-          }
+          sellingPropertyId = sellingResult.propertyId;
+          propertyEstablished = true;
     
         }
         let buyerReadyPropertyId: number | null = null;
@@ -613,101 +573,56 @@ export default function StartMovePage() {
             buyingCheck?.ok === false &&
             buyingCheck.error === "address_unavailable"
           ) {
-            promptJoinExistingChain(chainId, {
-              userId: user.id,
-              address: buying.address,
-              postcode: buyingPostcodeStored,
-            });
-            return;
-          }
-    
-          const {
-            data: buyingProperty,
-            error: buyingError,
-          } = await supabase
-            .from("properties")
-            .insert({
-              chain_id: chainId,
-    
-              chain_position: 2,
-    
-              address: buying.address,
-    
-              postcode: buyingPostcodeStored,
-    
-              stage: "offer_accepted",
-    
-              status: "pending_connection",
-    
-              relationship_type: "purchase",
-    
-              created_by_user_id: user.id,
-    
-              awaiting_buyer: false,
-    
-              buyer_connected: true,
-    
-              seller_connected: false,
-    
-              is_searching: false,
-    
-              is_current_user: true,
-    
-              last_updated_days: 0,
-            })
-            .select()
-            .single();
-    
-          if (buyingError) {
-            await fail(
-              "[start-move] buying property insert failed:",
-              buyingError.message,
-              isAddressReservedFailure(buyingError, null)
-                ? START_MOVE_ADDRESS_RESERVED_MESSAGE
-                : START_MOVE_FAILED_MESSAGE
+            promptJoinExistingChain(
+              chainId,
+              {
+                userId: user.id,
+                address: buying.address,
+                postcode: buyingPostcodeStored,
+              },
+              propertyEstablished
             );
             return;
           }
     
-          if (buyingProperty) {
-            buyerReadyPropertyId =
-            buyingProperty.id;
-            const { data: buyerGrant, error: buyerMemberError } =
-              await establishOperationalHomeowner(supabase, {
-                propertyId: buyingProperty.id,
-                grantedVia: OPERATIONAL_IDENTITY_GRANT_VIA.startMove,
-              });
+          const buyingResult = await createStartMoveProperty(supabase, {
+            chainId,
+            relationshipType: "purchase",
+            address: buying.address,
+            postcode: buyingPostcodeStored,
+            awaitingBuyer: false,
+          });
 
-            if (buyerMemberError || !buyerGrant.ok) {
-              const grantError = !buyerGrant.ok
-                ? buyerGrant.error
-                : null;
+          if (!buyingResult.ok) {
+            const reserved = isAddressReservedFailure(buyingResult.error);
+            await fail(
+              "[start-move] purchase property creation failed:",
+              buyingResult.error,
+              reserved
+                ? START_MOVE_ADDRESS_RESERVED_MESSAGE
+                : START_MOVE_FAILED_MESSAGE,
+              reserved ? "purchase_address_reserved" : "purchase_not_added"
+            );
+            return;
+          }
+
+          buyerReadyPropertyId = buyingResult.propertyId;
+          propertyEstablished = true;
+
+          if (sellingPropertyId != null) {
+            const linkResult = await linkStartMoveOnwardPurchase(supabase, {
+              salePropertyId: sellingPropertyId,
+              purchasePropertyId: buyingResult.propertyId,
+            });
+
+            if (!linkResult.ok) {
               await fail(
-                "[start-move] operational homeowner grant failed:",
-                buyerMemberError?.message ??
-                  grantError ??
-                  "unknown_error",
-                isAddressReservedFailure(null, grantError)
-                  ? START_MOVE_ADDRESS_RESERVED_MESSAGE
-                  : START_MOVE_FAILED_MESSAGE
+                "[start-move] onward purchase link failed:",
+                linkResult.error,
+                START_MOVE_FAILED_MESSAGE,
+                "purchase_not_linked"
               );
               return;
-            }
-
-            if (sellingPropertyId != null) {
-              const linkResult =
-                await linkStartMoveOnwardPurchase(supabase, {
-                  salePropertyId: sellingPropertyId,
-                  purchasePropertyId: buyingProperty.id,
-                });
-
-              if (!linkResult.ok) {
-                await fail(
-                  "[start-move] onward purchase link failed:",
-                  linkResult.error
-                );
-                return;
-              }
             }
           }
     
@@ -720,19 +635,19 @@ export default function StartMovePage() {
           sellingPropertyId
         ) {
           const attachResult =
-            await attachSearchingPlaceholderToSale(
+            await createSearchingPlaceholderForSale(
               supabase,
               {
-                chainId,
                 salePropertyId: sellingPropertyId,
-                userId: user.id,
               }
             );
 
           if (!attachResult.ok) {
             await fail(
               "[start-move] searching placeholder attach failed:",
-              attachResult.error
+              attachResult.error,
+              START_MOVE_FAILED_MESSAGE,
+              "searching_not_added"
             );
             return;
           }
@@ -759,7 +674,7 @@ export default function StartMovePage() {
               "[start-move] buyer ready create failed:",
               buyerReadyError.message
             );
-            setIncompleteChainId(chainId);
+            setRecovery({ chainId, reason: "buyer_ready_not_added" });
             return;
           }
         }
@@ -1006,24 +921,8 @@ export default function StartMovePage() {
         />
 
         <div className={`mt-12 bg-white rounded-3xl border border-slate-200 ${CARD_PADDING_CLASS}`}>
-          {incompleteChainId != null ? (
-            <div role="alert">
-              <h2 className="text-2xl font-bold text-slate-900">
-                Your chain was created, but one step didn&apos;t finish
-              </h2>
-              <p className="mt-4 text-slate-700">
-                Your purchase has been added, but we couldn&apos;t finish
-                showing you as a buyer with no property to sell. Please open
-                your chain to check it, and contact MoveLoop support if
-                anything looks wrong.
-              </p>
-              <Link
-                href={`/chain/${incompleteChainId}`}
-                className="mt-8 block w-full bg-slate-900 text-white rounded-2xl py-5 text-center text-lg font-semibold"
-              >
-                Open your chain
-              </Link>
-            </div>
+          {recovery != null ? (
+            <StartMoveRecoveryPanel recovery={recovery} />
           ) : (
             <>
               <p
@@ -1036,12 +935,20 @@ export default function StartMovePage() {
               <div className="mt-4">{renderStep()}</div>
 
               {errorMessage ? (
-                <p
+                <div
                   role="alert"
                   className="mt-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
                 >
-                  {errorMessage}
-                </p>
+                  <p>{errorMessage}</p>
+                  <p className="mt-2">
+                    Need help?{" "}
+                    <HelpLink
+                      section={HELP_SECTION_IDS.somethingWentWrong}
+                      newTab
+                      className="font-medium text-red-900 underline underline-offset-2 hover:text-red-950"
+                    />
+                  </p>
+                </div>
               ) : null}
 
               {stepHistory.length > 1 ? (
@@ -1095,7 +1002,14 @@ export default function StartMovePage() {
           clearJoinAddressHandoff();
 
           if (action.kind === "join_source_chain") {
-            void cleanupOnboardingChain(action.chainId);
+            if (action.preserveSourceChain) {
+              setRecovery({
+                chainId: action.chainId,
+                reason: "purchase_already_on_moveloop",
+              });
+            } else {
+              void cleanupOnboardingChain(action.chainId);
+            }
           }
         }}
       />

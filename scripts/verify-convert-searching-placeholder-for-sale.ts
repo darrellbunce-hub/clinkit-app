@@ -13,8 +13,8 @@ import { createClient } from "@supabase/supabase-js";
 import { readFileSync } from "fs";
 import { finalizeOperationalSaleCreation } from "../lib/estateAgent/finalizeOperationalSaleCreation";
 import {
-  attachSearchingPlaceholderToSale,
   convertSearchingPlaceholder,
+  createSearchingPlaceholderForSale,
 } from "../lib/searchingPlaceholder";
 
 for (const line of readFileSync(".env.local", "utf8").split("\n")) {
@@ -174,10 +174,8 @@ async function main() {
   await hoA.rpc("establish_operational_homeowner_for_created_property", {
     p_property_id: saleA!.id,
   });
-  const attachA = await attachSearchingPlaceholderToSale(hoA, {
-    chainId: chainAId,
+  const attachA = await createSearchingPlaceholderForSale(hoA, {
     salePropertyId: saleA!.id,
-    userId: hoAId,
   });
   assert(attachA.ok, "Scenario A attach failed");
   const convertA = await convertSearchingPlaceholder(hoA, {

@@ -336,7 +336,8 @@ async function runExecuteChecks(): Promise<void> {
     const nonEmptyId = await createEmptyOnboardingChain(owner, stamp, "c");
     chainIds.push(nonEmptyId);
 
-    const { data: prop, error: propError } = await owner
+    // No .select(): properties' SELECT policy refuses INSERT ... RETURNING for homeowners.
+    const { error: propError } = await owner
       .from("properties")
       .insert({
         chain_id: nonEmptyId,
@@ -350,12 +351,10 @@ async function runExecuteChecks(): Promise<void> {
         buyer_connected: false,
         seller_connected: true,
         is_searching: false,
-      })
-      .select("id")
-      .single();
+      });
 
-    if (propError || !prop?.id) {
-      throw new Error(`property insert: ${propError?.message}`);
+    if (propError) {
+      throw new Error(`property insert: ${propError.message}`);
     }
 
     const { data: case3, error: case3Error } = await owner.rpc(

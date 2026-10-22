@@ -120,11 +120,8 @@ export async function confirmChainCompletion(
         completion_lifecycle_status,
         completion_scheduled_date,
         completion_date_recorded_at,
-        completion_date_recorded_by_user_id,
         completion_date_updated_at,
-        completion_date_updated_by_user_id,
         completion_confirmed_at,
-        completion_confirmed_by_user_id,
         completion_confirmed_by_role,
         completed_at
       `
@@ -188,11 +185,8 @@ export async function confirmChainCompletion(
         completion_lifecycle_status,
         completion_scheduled_date,
         completion_date_recorded_at,
-        completion_date_recorded_by_user_id,
         completion_date_updated_at,
-        completion_date_updated_by_user_id,
         completion_confirmed_at,
-        completion_confirmed_by_user_id,
         completion_confirmed_by_role,
         completed_at
       `

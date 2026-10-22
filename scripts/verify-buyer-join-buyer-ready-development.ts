@@ -46,7 +46,7 @@ import {
   establishOperationalHomeowner,
   OPERATIONAL_IDENTITY_GRANT_VIA,
 } from "../lib/ownership/grants";
-import { attachSearchingPlaceholderToSale } from "../lib/searchingPlaceholder";
+import { createSearchingPlaceholderForSale } from "../lib/searchingPlaceholder";
 import { checkStartMoveAddress } from "../lib/onboarding/addressReservation";
 import {
   buildJoinExistingChainHref,
@@ -314,10 +314,8 @@ async function homeownerStartMoveSale(
 
   let search: number | null = null;
   if (options.searching) {
-    const attach = await attachSearchingPlaceholderToSale(ho.client, {
-      chainId,
+    const attach = await createSearchingPlaceholderForSale(ho.client, {
       salePropertyId: sale,
-      userId: ho.userId,
     });
     if (!attach.ok) throw new Error(`attach searching placeholder: ${attach.error}`);
     search = attach.placeholderId;

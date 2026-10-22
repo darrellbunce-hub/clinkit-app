@@ -181,10 +181,10 @@ function main() {
     originate.includes("joinEaOperationalChain(")
   );
   record(
-    "App: property_already_exists stops with a message directing the user to the seller or support",
-    /result\.error === "property_already_exists"\)\s*\{[\s\S]{0,400}?setErrorMessage\([\s\S]{0,400}?contact support/.test(
+    "App: property_already_exists stops with a message directing the user to the seller, without a missing support channel",
+    /result\.error === "property_already_exists"\)\s*\{[\s\S]{0,400}?setErrorMessage\([\s\S]{0,400}?the seller needs to connect to the property and appoint your branch/.test(
       originate
-    )
+    ) && !/contact support/i.test(originate)
   );
 
   // Approved route intact

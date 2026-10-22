@@ -14,6 +14,10 @@ import {
   searchEaBranchDirectory,
   updatePropertyEaDelegation,
 } from "@/lib/estateAgent/assignments";
+import {
+  BRANCH_ACCESS_ENDED_NOTICE,
+  loadBranchAccessEndedNotice,
+} from "@/lib/estateAgent/branchAccessNotice";
 import { getAgentAssignmentAccessLabel } from "@/lib/estateAgent/delegatedUpdates";
 import { supabase } from "@/lib/supabase";
 
@@ -58,6 +62,8 @@ export default function PropertyEstateAgentAssignment({
     useState(false);
   const [isLoading, setIsLoading] =
     useState(true);
+  const [branchAccessEnded, setBranchAccessEnded] =
+    useState(false);
 
   useEffect(() => {
     async function loadExistingAssignment() {
@@ -76,6 +82,13 @@ export default function PropertyEstateAgentAssignment({
         if (branch) {
           setSelectedBranch(branch);
         }
+      } else {
+        setBranchAccessEnded(
+          await loadBranchAccessEndedNotice(
+            supabase,
+            propertyId
+          )
+        );
       }
 
       setIsLoading(false);
@@ -271,6 +284,20 @@ export default function PropertyEstateAgentAssignment({
         one to assign to this property. Assignments are
         property-specific, not chain-wide.
       </p>
+
+      {!currentAssignmentId && branchAccessEnded && (
+        <div
+          role="status"
+          className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4"
+        >
+          <p className="font-semibold text-slate-900">
+            {BRANCH_ACCESS_ENDED_NOTICE.title}
+          </p>
+          <p className="mt-1 text-sm text-slate-600">
+            {BRANCH_ACCESS_ENDED_NOTICE.body}
+          </p>
+        </div>
+      )}
 
       {selectedBranch && (
         <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">

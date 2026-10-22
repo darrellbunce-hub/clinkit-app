@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { LegalMarkdown } from "@/components/legal/LegalMarkdown";
+import { ROUTES } from "@/lib/auth/routes";
 import {
   LEGAL_NAV_ITEMS,
   PRIVACY_EMAIL,
@@ -64,6 +65,9 @@ export function LegalFooterLinks({
   return (
     <div className={className}>
       <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
+        <Link href={ROUTES.help} className="hover:text-white transition">
+          Help &amp; FAQs
+        </Link>
         {LEGAL_NAV_ITEMS.map((item) => (
           <Link
             key={item.href}

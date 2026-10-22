@@ -102,6 +102,7 @@
     { "schema": "public", "name": "revoke_property_claim_invitation", "args": "bigint", "reason": "user_facing_product_rpc" },
     { "schema": "public", "name": "rotate_active_property_claim_invitation_for_delivery", "args": "bigint", "reason": "user_facing_product_rpc" },
     { "schema": "public", "name": "set_property_ea_update_permission", "args": "bigint, boolean", "reason": "user_facing_product_rpc" },
+    { "schema": "public", "name": "start_move_create_property", "args": "bigint, text, text, text, boolean", "reason": "user_facing_product_rpc" },
     { "schema": "public", "name": "sync_property_claim_on_membership", "args": "", "reason": "user_facing_product_rpc" },
     { "schema": "public", "name": "transfer_ea_branch_ownership", "args": "uuid, uuid, text", "reason": "user_facing_product_rpc" },
     { "schema": "public", "name": "update_property_claim_invite_email", "args": "bigint, text", "reason": "user_facing_product_rpc" },

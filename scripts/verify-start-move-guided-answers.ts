@@ -521,13 +521,16 @@ assert(
       )
   );
   assert(
-    "Onward purchase messages: duplicate says support may help (no promise to connect it)",
-    message("duplicate_address").includes("support may be able to help") &&
+    "Onward purchase messages: duplicate points to Help (no promise to connect it)",
+    message("duplicate_address").includes("see Help & FAQs") &&
+      !/support/i.test(message("duplicate_address")) &&
       !/so it can be connected/.test(message("duplicate_address"))
   );
   assert(
-    "Onward purchase messages: unfixable failures go to support, not a retry",
-    message("support").includes("contact MoveLoop support") &&
+    "Onward purchase messages: unfixable failures point to the chain and Help, not a retry or a support channel",
+    message("support").includes("Open your chain") &&
+      message("support").includes("see Help & FAQs") &&
+      !/support/i.test(message("support")) &&
       !message("support").includes("Add Onward Purchase") &&
       !message("support").includes("try again")
   );
@@ -588,16 +591,17 @@ assert(
       startMove.indexOf("createChainForOnboarding(")
 );
 {
-  const insertPayloads = [
-    ...startMove.matchAll(/\.from\("properties"\)\s*\.insert\(\{([\s\S]*?)\}\)/g),
+  const createPayloads = [
+    ...startMove.matchAll(/await createStartMoveProperty\(supabase, \{([\s\S]*?)\}\)/g),
   ].map((match) => match[1]);
   assert(
     "Start Move: sale and purchase writes use only the selected addresses",
     startMove.includes("if (selling) {") &&
       startMove.includes("if (buying) {") &&
-      insertPayloads.length === 2 &&
-      /address: selling\.address,/.test(insertPayloads[0]) &&
-      /address: buying\.address,/.test(insertPayloads[1]) &&
+      !/\.from\("properties"\)\s*\.insert\(/.test(startMove) &&
+      createPayloads.length === 2 &&
+      /address: selling\.address,/.test(createPayloads[0]) &&
+      /address: buying\.address,/.test(createPayloads[1]) &&
       startMove.includes("p_address: selling.address") &&
       startMove.includes("p_address: buying.address") &&
       !/p_address: (sellingAddress|buyingAddress)/.test(startMove)
@@ -620,7 +624,7 @@ assert(
     startMove.includes("if (notSelling && buyerReadyPropertyId != null) {") &&
       buyerReadyStart > -1 &&
       buyerReadyBlock.includes("if (buyerReadyError) {") &&
-      buyerReadyBlock.includes("setIncompleteChainId(chainId)") &&
+      buyerReadyBlock.includes('setRecovery({ chainId, reason: "buyer_ready_not_added" })') &&
       !buyerReadyBlock.includes("fail(") &&
       !buyerReadyBlock.includes("cleanupOnboardingChain(")
   );

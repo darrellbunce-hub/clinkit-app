@@ -79,6 +79,52 @@ export async function establishOperationalHomeowner(
   };
 }
 
+export type StartMoveCreatePropertyResult =
+  | { ok: true; propertyId: number }
+  | { ok: false; error: string };
+
+/**
+ * Start Move: inserts the caller's sale or purchase into their own onboarding
+ * chain and grants their operational homeowner identity in one transaction,
+ * so a failed grant never leaves a property behind.
+ */
+export async function createStartMoveProperty(
+  supabase: SupabaseClient,
+  params: {
+    chainId: number;
+    relationshipType: "sale" | "purchase";
+    address: string;
+    postcode: string;
+    awaitingBuyer: boolean;
+  }
+): Promise<StartMoveCreatePropertyResult> {
+  const { data, error } = await supabase.rpc("start_move_create_property", {
+    p_chain_id: params.chainId,
+    p_relationship_type: params.relationshipType,
+    p_address: params.address,
+    p_postcode: params.postcode,
+    p_awaiting_buyer: params.awaitingBuyer,
+  });
+
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+
+  const row = (data ?? {}) as GrantRpcRow;
+
+  if (!row.ok || row.property_id == null) {
+    return {
+      ok: false,
+      error:
+        mapTransactionParticipationError(row.error) ??
+        row.error ??
+        "create_failed",
+    };
+  }
+
+  return { ok: true, propertyId: row.property_id };
+}
+
 /**
  * @deprecated Join-chain counterparty participation must use join_chain_property.
  */

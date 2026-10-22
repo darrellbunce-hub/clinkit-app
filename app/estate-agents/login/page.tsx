@@ -89,7 +89,7 @@ function EstateAgentLoginContent() {
       if (!profileBootstrap.ok) {
         setIsCheckingSession(false);
         setErrorMessage(
-          "We could not finish profile setup for your account. Try again or contact support."
+          "We could not finish profile setup for your account. Refresh the page to try again."
         );
 
         return;
@@ -106,7 +106,7 @@ function EstateAgentLoginContent() {
       if (!profile) {
         setIsCheckingSession(false);
         setErrorMessage(
-          "We could not load your profile. Try again or contact support."
+          "We could not load your profile. Refresh the page to try again."
         );
 
         return;
@@ -167,7 +167,7 @@ function EstateAgentLoginContent() {
 
       if (!profileBootstrap.ok) {
         setErrorMessage(
-          "Your account is signed in but we could not finish profile setup. Try again or contact support."
+          "Your account is signed in but we could not finish profile setup. Please try signing in again."
         );
 
         return;
@@ -183,7 +183,7 @@ function EstateAgentLoginContent() {
 
       if (!profile) {
         setErrorMessage(
-          "We could not load your profile. Try again or contact support."
+          "We could not load your profile. Please try signing in again."
         );
 
         return;

@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-import { normalizePathname } from "@/lib/auth/routes";
+import { normalizePathname, ROUTES } from "@/lib/auth/routes";
+import { LEGAL_ROUTES } from "@/lib/legal/constants";
 
 /** Soft pre-launch access gate. Off unless LAUNCH_GATE_ENABLED=true. */
 export const LAUNCH_GATE_COOKIE_NAME = "keynetic_launch_bypass";
@@ -13,7 +14,8 @@ const LAUNCH_GATE_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 7; // 7 days
 
 /**
  * Paths that must remain reachable without a bypass cookie while the gate
- * is enabled. Infrastructure, auth recovery, and the holding page itself.
+ * is enabled. Infrastructure, auth recovery, public Help, Privacy and Terms,
+ * and the holding page itself.
  */
 export function isLaunchGateExemptPath(pathname: string): boolean {
   const path = normalizePathname(pathname);
@@ -30,6 +32,16 @@ export function isLaunchGateExemptPath(pathname: string): boolean {
   }
 
   if (path === "/reset-password" || path === "/verify-email") {
+    return true;
+  }
+
+  // Static public Help, Privacy Policy and Terms of Service pages; exact
+  // paths only, no nested routes.
+  if (
+    path === ROUTES.help ||
+    path === LEGAL_ROUTES.privacy ||
+    path === LEGAL_ROUTES.terms
+  ) {
     return true;
   }
 

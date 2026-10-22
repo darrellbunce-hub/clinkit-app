@@ -129,11 +129,11 @@ export function onwardPurchaseOutcomeMessage(
     case "already_linked":
       return "You have joined the chain. The property you are selling already has an onward purchase in this chain, so nothing further was added. Open your chain to check it.";
     case "duplicate_address":
-      return "You have joined the chain, but the property you are buying is already on MoveLoop, so it could not be added again. Your next home shows as Searching for now. MoveLoop support may be able to help.";
+      return "You have joined the chain, but the property you are buying is already on MoveLoop, so it could not be added again. Your next home shows as Searching for now. For what to do next, see Help & FAQs.";
     case "retry":
       return "You have joined the chain, but we could not add the property you are buying. Open your chain and, if your next home still shows as Searching, use Add Onward Purchase to try again.";
     case "support":
-      return "You have joined the chain, but we could not add the property you are buying. Please contact MoveLoop support for help adding it.";
+      return "You have joined the chain, but we could not add the property you are buying. Open your chain to check it. For what to do next, see Help & FAQs.";
     case "uncertain":
       return "You have joined the chain, but we could not confirm whether the property you are buying was added. Please open your chain and check before trying again.";
   }

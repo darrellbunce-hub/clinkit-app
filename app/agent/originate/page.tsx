@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import AgentShell from "@/components/agent/AgentShell";
+import HelpLink from "@/components/help/HelpLink";
 import {
   CARD_PADDING_CLASS,
   PAGE_TITLE_CLASS,
@@ -196,7 +197,7 @@ export default function AgentOriginatePage() {
         // the seller connects and appoints the branch.
         setIsSubmitting(false);
         setErrorMessage(
-          "This property is already part of MoveLoop. If you act for its seller, the seller needs to connect to the property and appoint your branch. Check the chain access code and address, or contact support."
+          "This property is already part of MoveLoop. If you act for its seller, the seller needs to connect to the property and appoint your branch. Check the chain access code and address."
         );
         return;
       } else if (result.error || result.propertyId == null) {
@@ -556,9 +557,16 @@ export default function AgentOriginatePage() {
               ) : null}
 
               {errorMessage ? (
-                <p className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-                  {errorMessage}
-                </p>
+                <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+                  <p>{errorMessage}</p>
+                  <p className="mt-2">
+                    Need help?{" "}
+                    <HelpLink
+                      newTab
+                      className="font-medium text-red-900 underline underline-offset-2 hover:text-red-950"
+                    />
+                  </p>
+                </div>
               ) : null}
 
               {createdAccessCode ? (

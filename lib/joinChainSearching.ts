@@ -1,8 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
+  createSearchingPlaceholderForSale,
   findSearchingPlaceholderForUser,
-  insertSearchingPlaceholder,
 } from "@/lib/searchingPlaceholder";
 
 export type JoinedPropertyRef = {
@@ -42,7 +42,7 @@ export class SourceChainMigrationError extends Error {
 export const SOURCE_CHAIN_MIGRATION_FAILED_MESSAGE =
   "We could not finish joining this chain because your existing move details " +
   "could not be moved across. Your original move details have been kept and " +
-  "nothing was removed. Please contact support before trying again.";
+  "nothing was removed. Please check your chains before trying again. For what to do next, see Help & FAQs.";
 
 export type TopologyRelinkResult =
   | { ok: true; linkedSearchingId: number }
@@ -253,7 +253,6 @@ export async function resolveSearchingFromJoinIntent(
   }
 
   let searchingId: number | null = null;
-  let created = false;
 
   const existingPlaceholder =
     await findSearchingPlaceholderForUser(
@@ -265,38 +264,46 @@ export async function resolveSearchingFromJoinIntent(
   if (existingPlaceholder) {
     searchingId = existingPlaceholder.id;
   } else {
-    const {
-      placeholder,
-      error,
-    } = await insertSearchingPlaceholder(
+    // Inserts, links from the joined property and grants in one transaction.
+    const createResult = await createSearchingPlaceholderForSale(
       supabase,
       {
-        chainId:
-          params.joinedProperty.chain_id,
-        userId: params.userId,
+        salePropertyId: params.joinedProperty.id,
       }
     );
 
-    if (error || !placeholder) {
-      const racedPlaceholder =
-        await findSearchingPlaceholderForUser(
-          supabase,
-          params.joinedProperty.chain_id,
-          params.userId
-        );
+    if (createResult.ok) {
+      return {
+        ok: true,
+        searchingId: createResult.placeholderId,
+        created: createResult.created,
+      };
+    }
 
-      if (racedPlaceholder) {
-        searchingId = racedPlaceholder.id;
-      } else {
-        return {
-          ok: false,
-          reason: "insert_failed",
-          error,
-        };
-      }
+    if (createResult.error === "sale_already_linked") {
+      return {
+        ok: false,
+        reason: "downstream_link_exists",
+        existingLinkedPropertyId:
+          params.joinedProperty.linked_property_id ?? 0,
+      };
+    }
+
+    const racedPlaceholder =
+      await findSearchingPlaceholderForUser(
+        supabase,
+        params.joinedProperty.chain_id,
+        params.userId
+      );
+
+    if (racedPlaceholder) {
+      searchingId = racedPlaceholder.id;
     } else {
-      searchingId = placeholder.id;
-      created = true;
+      return {
+        ok: false,
+        reason: "insert_failed",
+        error: createResult.error,
+      };
     }
   }
 
@@ -323,14 +330,14 @@ export async function resolveSearchingFromJoinIntent(
   return {
     ok: true,
     searchingId: searchingId!,
-    created,
+    created: false,
   };
 }
 
 /** Customer-safe message when the joined property could not be linked to the next-home search step. */
 export const JOINED_PROPERTY_RELINK_NOT_APPLIED_MESSAGE =
   "Join completed, but we could not link your next-home search step to this property. " +
-  "Nothing was removed. Please try again from the chain page or contact support.";
+  "Nothing was removed. Please try again from the chain page. For what to do next, see Help & FAQs.";
 
 export function formatJoinedPropertyRelinkFailure(
   result: Extract<JoinedPropertyRelinkResult, { ok: false }>
@@ -351,6 +358,6 @@ export function formatTopologyConflictMessage(
   return (
     "This property already has a downstream link in the chain. " +
     "Join completed, but we could not set up your next-home search step " +
-    "without replacing an existing link. Please review the chain or contact support."
+    "without replacing an existing link. Please review the chain. For what to do next, see Help & FAQs."
   );
 }

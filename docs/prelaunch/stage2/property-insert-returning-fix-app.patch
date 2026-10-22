@@ -1,0 +1,930 @@
+diff --git a/app/start-move/page.tsx b/app/start-move/page.tsx
+index 79ff266..55bb1f5 100644
+--- a/app/start-move/page.tsx
++++ b/app/start-move/page.tsx
+@@ -12,7 +12,7 @@ import {
+ import { createChainForOnboarding } from "@/lib/createChainForOnboarding";
+ import { createStartMoveProperty } from "@/lib/ownership/grants";
+ import { generateAccessCode } from "@/lib/accessCode";
+-import { attachSearchingPlaceholderToSale } from "@/lib/searchingPlaceholder";
++import { createSearchingPlaceholderForSale } from "@/lib/searchingPlaceholder";
+ import CollectionPointNotice from "@/components/legal/CollectionPointNotice";
+ import DuplicatePropertyDialog, {
+   type DuplicatePropertyDialogVariant,
+@@ -635,12 +635,10 @@ export default function StartMovePage() {
+           sellingPropertyId
+         ) {
+           const attachResult =
+-            await attachSearchingPlaceholderToSale(
++            await createSearchingPlaceholderForSale(
+               supabase,
+               {
+-                chainId,
+                 salePropertyId: sellingPropertyId,
+-                userId: user.id,
+               }
+             );
+ 
+diff --git a/lib/joinChainSearching.ts b/lib/joinChainSearching.ts
+index 9cc5219..aa79207 100644
+--- a/lib/joinChainSearching.ts
++++ b/lib/joinChainSearching.ts
+@@ -1,8 +1,8 @@
+ import type { SupabaseClient } from "@supabase/supabase-js";
+ 
+ import {
++  createSearchingPlaceholderForSale,
+   findSearchingPlaceholderForUser,
+-  insertSearchingPlaceholder,
+ } from "@/lib/searchingPlaceholder";
+ 
+ export type JoinedPropertyRef = {
+@@ -253,7 +253,6 @@ export async function resolveSearchingFromJoinIntent(
+   }
+ 
+   let searchingId: number | null = null;
+-  let created = false;
+ 
+   const existingPlaceholder =
+     await findSearchingPlaceholderForUser(
+@@ -265,38 +264,46 @@ export async function resolveSearchingFromJoinIntent(
+   if (existingPlaceholder) {
+     searchingId = existingPlaceholder.id;
+   } else {
+-    const {
+-      placeholder,
+-      error,
+-    } = await insertSearchingPlaceholder(
++    // Inserts, links from the joined property and grants in one transaction.
++    const createResult = await createSearchingPlaceholderForSale(
+       supabase,
+       {
+-        chainId:
+-          params.joinedProperty.chain_id,
+-        userId: params.userId,
++        salePropertyId: params.joinedProperty.id,
+       }
+     );
+ 
+-    if (error || !placeholder) {
+-      const racedPlaceholder =
+-        await findSearchingPlaceholderForUser(
+-          supabase,
+-          params.joinedProperty.chain_id,
+-          params.userId
+-        );
+-
+-      if (racedPlaceholder) {
+-        searchingId = racedPlaceholder.id;
+-      } else {
+-        return {
+-          ok: false,
+-          reason: "insert_failed",
+-          error,
+-        };
+-      }
++    if (createResult.ok) {
++      return {
++        ok: true,
++        searchingId: createResult.placeholderId,
++        created: createResult.created,
++      };
++    }
++
++    if (createResult.error === "sale_already_linked") {
++      return {
++        ok: false,
++        reason: "downstream_link_exists",
++        existingLinkedPropertyId:
++          params.joinedProperty.linked_property_id ?? 0,
++      };
++    }
++
++    const racedPlaceholder =
++      await findSearchingPlaceholderForUser(
++        supabase,
++        params.joinedProperty.chain_id,
++        params.userId
++      );
++
++    if (racedPlaceholder) {
++      searchingId = racedPlaceholder.id;
+     } else {
+-      searchingId = placeholder.id;
+-      created = true;
++      return {
++        ok: false,
++        reason: "insert_failed",
++        error: createResult.error,
++      };
+     }
+   }
+ 
+@@ -323,7 +330,7 @@ export async function resolveSearchingFromJoinIntent(
+   return {
+     ok: true,
+     searchingId: searchingId!,
+-    created,
++    created: false,
+   };
+ }
+ 
+diff --git a/lib/searchingPlaceholder.ts b/lib/searchingPlaceholder.ts
+index 343e4b5..c1e08a1 100644
+--- a/lib/searchingPlaceholder.ts
++++ b/lib/searchingPlaceholder.ts
+@@ -5,11 +5,6 @@ import {
+   isSearchingPlaceholder,
+   walkLinkedPropertySegment,
+ } from "@/lib/buildChainTopology";
+-import {
+-  establishOperationalHomeowner,
+-  OPERATIONAL_IDENTITY_GRANT_VIA,
+-} from "@/lib/ownership/grants";
+-
+ export type SearchingPlaceholderRef = {
+   id: number;
+ };
+@@ -111,211 +106,27 @@ export async function findSearchingPlaceholderForUser(
+   return data;
+ }
+ 
+-export async function getNextChainPosition(
+-  supabase: SupabaseClient,
+-  chainId: number
+-): Promise<number> {
+-  const { data, error } = await supabase.rpc(
+-    "get_next_chain_position",
+-    {
+-      p_chain_id: chainId,
+-    }
+-  );
+-
+-  if (error || data == null) {
+-    console.error(error);
+-    return 1;
+-  }
+-
+-  return Number(data);
+-}
+-
+-export async function insertSearchingPlaceholder(
+-  supabase: SupabaseClient,
+-  params: {
+-    chainId: number;
+-    userId: string;
+-    chainPosition?: number;
+-  }
+-): Promise<{
+-  placeholder: SearchingPlaceholderRef | null;
+-  error: unknown | null;
+-}> {
+-  const chainPosition =
+-    params.chainPosition ??
+-    (await getNextChainPosition(
+-      supabase,
+-      params.chainId
+-    ));
+-
+-  const {
+-    data: placeholder,
+-    error,
+-  } = await supabase
+-    .from("properties")
+-    .insert({
+-      chain_id: params.chainId,
+-      chain_position: chainPosition,
+-      stage: "searching",
+-      address: null,
+-      postcode: null,
+-      relationship_type: "purchase",
+-      status: "pending_connection",
+-      created_by_user_id: params.userId,
+-      linked_property_id: null,
+-      awaiting_buyer: false,
+-      buyer_connected: false,
+-      seller_connected: true,
+-      is_searching: true,
+-      is_current_user: true,
+-      last_updated_days: 0,
+-    })
+-    .select("id")
+-    .single();
+-
+-  if (error || !placeholder) {
+-    return {
+-      placeholder: null,
+-      error: error ?? new Error("Searching placeholder insert failed"),
+-    };
+-  }
+-
+-  const { data: grant, error: memberError } =
+-    await establishOperationalHomeowner(supabase, {
+-      propertyId: placeholder.id,
+-      grantedVia: OPERATIONAL_IDENTITY_GRANT_VIA.startMove,
+-    });
+-
+-  if (memberError || !grant.ok) {
+-    return {
+-      placeholder: null,
+-      error:
+-        memberError ??
+-        new Error(!grant.ok ? grant.error : "grant_failed"),
+-    };
+-  }
+-
+-  return {
+-    placeholder,
+-    error: null,
+-  };
+-}
+-
+-export async function linkSaleToSearchingPlaceholder(
+-  supabase: SupabaseClient,
+-  params: {
+-    salePropertyId: number;
+-    searchingPropertyId: number;
+-  }
+-): Promise<{ ok: true } | { ok: false; error: string }> {
+-  const { data, error } = await supabase.rpc(
+-    "link_sale_to_searching_placeholder",
+-    {
+-      p_sale_property_id: params.salePropertyId,
+-      p_searching_property_id:
+-        params.searchingPropertyId,
+-    }
+-  );
+-
+-  if (error) {
+-    return {
+-      ok: false,
+-      error: error.message,
+-    };
+-  }
+-
+-  const result = data as { ok?: boolean; error?: string } | null;
+-
+-  if (!result?.ok) {
+-    return {
+-      ok: false,
+-      error: result?.error ?? "link_failed",
+-    };
+-  }
+-
+-  return { ok: true };
+-}
+-
+ export type AttachSearchingPlaceholderResult =
+-  | { ok: true; placeholderId: number }
++  | { ok: true; placeholderId: number; created: boolean }
+   | { ok: false; error: string };
+ 
+-/**
+- * Inserts a searching placeholder and links it from the sale — shared by
+- * Start Move and EA sale origination.
+- */
+-export async function attachSearchingPlaceholderToSale(
+-  supabase: SupabaseClient,
+-  params: {
+-    chainId: number;
+-    salePropertyId: number;
+-    userId: string;
+-  }
+-): Promise<AttachSearchingPlaceholderResult> {
+-  const existingPlaceholder =
+-    await resolveConvertibleSearchingPlaceholderForChain(
+-      supabase,
+-      {
+-        chainId: params.chainId,
+-        salePropertyId: params.salePropertyId,
+-      }
+-    );
+-
+-  if (existingPlaceholder) {
+-    return {
+-      ok: true,
+-      placeholderId: existingPlaceholder.id,
+-    };
+-  }
+-
+-  const {
+-    placeholder,
+-    error: insertError,
+-  } = await insertSearchingPlaceholder(supabase, {
+-    chainId: params.chainId,
+-    userId: params.userId,
+-  });
+-
+-  if (insertError || !placeholder) {
+-    return {
+-      ok: false,
+-      error:
+-        insertError instanceof Error
+-          ? insertError.message
+-          : "searching_placeholder_insert_failed",
+-    };
+-  }
+-
+-  const linkResult =
+-    await linkSaleToSearchingPlaceholder(supabase, {
+-      salePropertyId: params.salePropertyId,
+-      searchingPropertyId: placeholder.id,
+-    });
+-
+-  if (!linkResult.ok) {
+-    return {
+-      ok: false,
+-      error: linkResult.error,
+-    };
+-  }
+-
+-  return {
+-    ok: true,
+-    placeholderId: placeholder.id,
+-  };
+-}
+-
+ type CreateSearchingPlaceholderForSaleRpcResult = {
+   ok?: boolean;
+   error?: string;
+   property_id?: number;
++  created?: boolean;
+ };
+ 
+ /**
+  * Creates (or returns) the searching placeholder linked from a sale in one
+  * transaction. Authorised via the sale; only the sale's existing homeowner
+- * receives an operational identity — never an estate agent. Used by EA sale
+- * origination; Start Move keeps attachSearchingPlaceholderToSale.
++ * receives an operational identity — never an estate agent. The creator is
++ * auth.uid() inside the RPC. Used by Start Move, Join Chain and EA sale
++ * origination.
++ *
++ * Homeowners cannot insert into properties directly: properties' SELECT
++ * policy cannot see a row inside its own INSERT ... RETURNING, so
++ * .insert().select() is refused by RLS.
+  */
+ export async function createSearchingPlaceholderForSale(
+   supabase: SupabaseClient,
+@@ -349,6 +160,7 @@ export async function createSearchingPlaceholderForSale(
+   return {
+     ok: true,
+     placeholderId: Number(result.property_id),
++    created: result.created === true,
+   };
+ }
+ 
+diff --git a/scripts/verify-address-lookup-development.ts b/scripts/verify-address-lookup-development.ts
+index 7f4e8e6..c8d99a4 100644
+--- a/scripts/verify-address-lookup-development.ts
++++ b/scripts/verify-address-lookup-development.ts
+@@ -214,7 +214,7 @@ function runStaticChecks() {
+ 
+   record(
+     "TEST16 Searching placeholder path does not call address APIs",
+-    startMove.includes("attachSearchingPlaceholderToSale") &&
++    startMove.includes("createSearchingPlaceholderForSale") &&
+       !startMove.includes("/api/address/") &&
+       startMove.includes("searchingForProperty")
+   );
+diff --git a/scripts/verify-buyer-join-buyer-ready-development.ts b/scripts/verify-buyer-join-buyer-ready-development.ts
+index aec3271..d0ed3c0 100644
+--- a/scripts/verify-buyer-join-buyer-ready-development.ts
++++ b/scripts/verify-buyer-join-buyer-ready-development.ts
+@@ -46,7 +46,7 @@ import {
+   establishOperationalHomeowner,
+   OPERATIONAL_IDENTITY_GRANT_VIA,
+ } from "../lib/ownership/grants";
+-import { attachSearchingPlaceholderToSale } from "../lib/searchingPlaceholder";
++import { createSearchingPlaceholderForSale } from "../lib/searchingPlaceholder";
+ import { checkStartMoveAddress } from "../lib/onboarding/addressReservation";
+ import {
+   buildJoinExistingChainHref,
+@@ -314,10 +314,8 @@ async function homeownerStartMoveSale(
+ 
+   let search: number | null = null;
+   if (options.searching) {
+-    const attach = await attachSearchingPlaceholderToSale(ho.client, {
+-      chainId,
++    const attach = await createSearchingPlaceholderForSale(ho.client, {
+       salePropertyId: sale,
+-      userId: ho.userId,
+     });
+     if (!attach.ok) throw new Error(`attach searching placeholder: ${attach.error}`);
+     search = attach.placeholderId;
+diff --git a/scripts/verify-cleanup-abandoned-onboarding-chain-authz-development.ts b/scripts/verify-cleanup-abandoned-onboarding-chain-authz-development.ts
+index fc9fb7a..325b2c6 100644
+--- a/scripts/verify-cleanup-abandoned-onboarding-chain-authz-development.ts
++++ b/scripts/verify-cleanup-abandoned-onboarding-chain-authz-development.ts
+@@ -336,7 +336,8 @@ async function runExecuteChecks(): Promise<void> {
+     const nonEmptyId = await createEmptyOnboardingChain(owner, stamp, "c");
+     chainIds.push(nonEmptyId);
+ 
+-    const { data: prop, error: propError } = await owner
++    // No .select(): properties' SELECT policy refuses INSERT ... RETURNING for homeowners.
++    const { error: propError } = await owner
+       .from("properties")
+       .insert({
+         chain_id: nonEmptyId,
+@@ -350,12 +351,10 @@ async function runExecuteChecks(): Promise<void> {
+         buyer_connected: false,
+         seller_connected: true,
+         is_searching: false,
+-      })
+-      .select("id")
+-      .single();
++      });
+ 
+-    if (propError || !prop?.id) {
+-      throw new Error(`property insert: ${propError?.message}`);
++    if (propError) {
++      throw new Error(`property insert: ${propError.message}`);
+     }
+ 
+     const { data: case3, error: case3Error } = await owner.rpc(
+diff --git a/scripts/verify-convert-searching-placeholder-for-sale.ts b/scripts/verify-convert-searching-placeholder-for-sale.ts
+index 255ddb9..f4096d0 100644
+--- a/scripts/verify-convert-searching-placeholder-for-sale.ts
++++ b/scripts/verify-convert-searching-placeholder-for-sale.ts
+@@ -13,8 +13,8 @@ import { createClient } from "@supabase/supabase-js";
+ import { readFileSync } from "fs";
+ import { finalizeOperationalSaleCreation } from "../lib/estateAgent/finalizeOperationalSaleCreation";
+ import {
+-  attachSearchingPlaceholderToSale,
+   convertSearchingPlaceholder,
++  createSearchingPlaceholderForSale,
+ } from "../lib/searchingPlaceholder";
+ 
+ for (const line of readFileSync(".env.local", "utf8").split("\n")) {
+@@ -174,10 +174,8 @@ async function main() {
+   await hoA.rpc("establish_operational_homeowner_for_created_property", {
+     p_property_id: saleA!.id,
+   });
+-  const attachA = await attachSearchingPlaceholderToSale(hoA, {
+-    chainId: chainAId,
++  const attachA = await createSearchingPlaceholderForSale(hoA, {
+     salePropertyId: saleA!.id,
+-    userId: hoAId,
+   });
+   assert(attachA.ok, "Scenario A attach failed");
+   const convertA = await convertSearchingPlaceholder(hoA, {
+diff --git a/scripts/verify-prelaunch-stage2-proposals.ts b/scripts/verify-prelaunch-stage2-proposals.ts
+index f97d5b6..ff3b58c 100644
+--- a/scripts/verify-prelaunch-stage2-proposals.ts
++++ b/scripts/verify-prelaunch-stage2-proposals.ts
+@@ -1542,11 +1542,16 @@ function latestFunctions(proposals: string[]): Map<string, { header: string; bod
+     helperCallers.every((caller) => caller.endsWith(":definer")) && policyCallers.length === 0 && appCallers.length === 0,
+     `existence probes: after every proposal the revoked helpers have only SECURITY DEFINER callers (${helperCallers.join(", ") || "none"}), no policy (${policyCallers.join(", ") || "none"}) and no app caller`
+   );
+-  assert(
+-    /\.rpc\(\s*"get_next_chain_position"/.test(read("lib/searchingPlaceholder.ts")) &&
+-      /if \(error \|\| data == null\) \{[\s\S]*?return 1;/.test(read("lib/searchingPlaceholder.ts")),
+-    "existence probes: the app's get_next_chain_position caller already treats a missing answer as position 1"
+-  );
++  {
++    const placeholderLib = read("lib/searchingPlaceholder.ts");
++    const callsNextPosition = /\.rpc\(\s*"get_next_chain_position"/.test(placeholderLib);
++    assert(
++      callsNextPosition
++        ? /if \(error \|\| data == null\) \{[\s\S]*?return 1;/.test(placeholderLib)
++        : !placeholderLib.includes("get_next_chain_position"),
++      "existence probes: the app's get_next_chain_position caller (if any) treats a missing answer as position 1"
++    );
++  }
+ 
+   // Completeness: every user-callable function, after every proposal, either
+   // authorises before any not-found answer and checks its caller, or is on a
+diff --git a/scripts/verify-properties-chain-integrity-migration.ts b/scripts/verify-properties-chain-integrity-migration.ts
+index 3fa8a0a..d0d720b 100644
+--- a/scripts/verify-properties-chain-integrity-migration.ts
++++ b/scripts/verify-properties-chain-integrity-migration.ts
+@@ -540,18 +540,15 @@ function main() {
+     );
+ 
+     const placeholder = read("lib/searchingPlaceholder.ts");
+-    const placeholderInsert =
+-      placeholder.match(/\.from\("properties"\)\s*\.insert\(\{([\s\S]*?)\}\)/)?.[1] ?? "";
+ 
+     assert(
+-      /chain_id:\s*params\.chainId/.test(placeholderInsert) &&
+-        /created_by_user_id:\s*params\.userId/.test(placeholderInsert) &&
+-        /linked_property_id:\s*null/.test(placeholderInsert),
+-      "searching placeholder: insert with creator = user and null link"
++      !/\.from\("properties"\)\s*\.insert\(/.test(placeholder) &&
++        !placeholder.includes("establishOperationalHomeowner"),
++      "searching placeholder: no client-side insert or grant (RPC creates, links and grants atomically)"
+     );
+     assert(
+-      /establishOperationalHomeowner\(supabase,\s*\{\s*propertyId:\s*placeholder\.id,\s*grantedVia:\s*OPERATIONAL_IDENTITY_GRANT_VIA\.startMove/.test(placeholder),
+-      "searching placeholder: grant via establish_operational_homeowner_for_created_property"
++      /createSearchingPlaceholderForSale\(\s*supabase,\s*\{\s*salePropertyId:\s*sellingPropertyId,\s*\}\s*\)/.test(startMove),
++      "start-move: searching placeholder via create_searching_placeholder_for_sale (sale id only, no client user id)"
+     );
+ 
+     const grants = read("lib/ownership/grants.ts");
+@@ -633,7 +630,6 @@ function main() {
+   console.log("\nn. Direct properties write inventory");
+   {
+     const expected = new Map<string, number>([
+-      ["lib/searchingPlaceholder.ts", 1],
+       ["lib/joinChainSearching.ts", 3],
+       ["lib/recordChainCompletionDate.ts", 1],
+       ["context/ChainContext.tsx", 1],
+diff --git a/scripts/verify-property-insert-returning-fix.ts b/scripts/verify-property-insert-returning-fix.ts
+new file mode 100644
+index 0000000..e979e6e
+--- /dev/null
++++ b/scripts/verify-property-insert-returning-fix.ts
+@@ -0,0 +1,357 @@
++/**
++ * Offline checks for the 20261021130000 INSERT ... RETURNING regression.
++ *
++ * properties_select_member_or_agent (130000) authorises creators through
++ * is_property_creator_bootstrap_viewer(id), which looks the row up by id. The
++ * SELECT policy is evaluated for a RETURNING row before that row is visible,
++ * so a homeowner's .from("properties").insert(...).select() is refused with
++ * 42501. Homeowner property creation must therefore go through the
++ * SECURITY DEFINER RPCs, which derive the creator from auth.uid(), and the
++ * policy must not be widened to make direct inserts work.
++ *
++ * Run: npx tsx scripts/verify-property-insert-returning-fix.ts
++ */
++
++import { readdirSync, readFileSync, statSync } from "node:fs";
++import { join, relative } from "node:path";
++
++import type { SupabaseClient } from "@supabase/supabase-js";
++
++import {
++  formatTopologyConflictMessage,
++  resolveSearchingFromJoinIntent,
++} from "../lib/joinChainSearching";
++import { createSearchingPlaceholderForSale } from "../lib/searchingPlaceholder";
++
++const ROOT = process.cwd();
++
++let passed = 0;
++let failed = 0;
++
++function assert(condition: boolean, label: string) {
++  if (condition) {
++    passed += 1;
++    console.log(`  ✓ ${label}`);
++    return;
++  }
++
++  failed += 1;
++  console.error(`  ✗ ${label}`);
++}
++
++function read(path: string) {
++  return readFileSync(join(ROOT, path), "utf8");
++}
++
++function sourceFiles(dir: string): string[] {
++  const out: string[] = [];
++  for (const entry of readdirSync(join(ROOT, dir))) {
++    const rel = join(dir, entry);
++    if (statSync(join(ROOT, rel)).isDirectory()) {
++      out.push(...sourceFiles(rel));
++    } else if (/\.(ts|tsx)$/.test(entry)) {
++      out.push(rel);
++    }
++  }
++  return out;
++}
++
++type Rpc = { fn: string; args: Record<string, unknown> };
++type Query = {
++  table: string;
++  op: "select" | "insert" | "update" | "";
++  payload?: Record<string, unknown>;
++  filters: Array<[string, unknown]>;
++  returning: boolean;
++};
++
++type FakeOptions = {
++  existingPlaceholderId?: number | null;
++  rpc?: { data: unknown; error: unknown };
++  racedPlaceholderId?: number | null;
++};
++
++function createFakeClient(options: FakeOptions) {
++  const rpcs: Rpc[] = [];
++  const queries: Query[] = [];
++  let lookups = 0;
++
++  function resolve(query: Query) {
++    if (query.op === "select") {
++      lookups += 1;
++      const id =
++        lookups === 1 ? options.existingPlaceholderId : options.racedPlaceholderId;
++      return { data: id == null ? null : { id }, error: null };
++    }
++
++    if (query.op === "update") {
++      const id = query.filters.find(([column]) => column === "id")?.[1];
++      return { data: query.returning ? [{ id }] : null, error: null };
++    }
++
++    return { data: null, error: { code: "42501", message: "unexpected direct write" } };
++  }
++
++  function from(table: string) {
++    const query: Query = { table, op: "", filters: [], returning: false };
++    const run = () => {
++      queries.push(query);
++      return Promise.resolve(resolve(query));
++    };
++    const builder = {
++      select() {
++        if (query.op === "") query.op = "select";
++        else query.returning = true;
++        return builder;
++      },
++      insert(payload: Record<string, unknown>) {
++        query.op = "insert";
++        query.payload = payload;
++        return builder;
++      },
++      update(payload: Record<string, unknown>) {
++        query.op = "update";
++        query.payload = payload;
++        return builder;
++      },
++      eq(column: string, value: unknown) {
++        query.filters.push([column, value]);
++        return builder;
++      },
++      single: run,
++      maybeSingle: run,
++      then(onFulfilled: (value: unknown) => unknown, onRejected?: (reason: unknown) => unknown) {
++        return run().then(onFulfilled, onRejected);
++      },
++    };
++    return builder;
++  }
++
++  function rpc(fn: string, args: Record<string, unknown>) {
++    rpcs.push({ fn, args });
++    return Promise.resolve(options.rpc ?? { data: null, error: null });
++  }
++
++  const client = { from, rpc } as unknown as SupabaseClient;
++  return { client, rpcs, queries };
++}
++
++const USER_ID = "user-under-test";
++const JOINED = { id: 99, chain_id: 500, linked_property_id: null };
++
++function joinIntent(client: SupabaseClient, joinedProperty = JOINED) {
++  return resolveSearchingFromJoinIntent(client, {
++    userId: USER_ID,
++    joinedProperty,
++    searchingIntent: true,
++    migratedSearchingId: null,
++  });
++}
++
++async function main() {
++  console.log("Property INSERT ... RETURNING regression checks\n");
++
++  console.log("a. No homeowner-side direct property insert in application code");
++  {
++    const files = ["app", "lib", "components", "context"].flatMap(sourceFiles);
++    const writers = files.filter((file) =>
++      /\.from\(\s*["']properties["']\s*\)\s*\.(insert|upsert)\(/.test(read(file))
++    );
++    const allowed = "lib/smokeTest/createSyntheticFixture.ts";
++    const unexpected = writers
++      .map((file) => relative(ROOT, join(ROOT, file)).replace(/\\/g, "/"))
++      .filter((file) => file !== allowed);
++
++    assert(
++      unexpected.length === 0,
++      `only the service-role smoke fixture inserts into properties directly${
++        unexpected.length ? ` (found: ${unexpected.join(", ")})` : ""
++      }`
++    );
++    assert(
++      /await admin\s*\.from\("properties"\)\s*\.insert\(/.test(read(allowed)),
++      "smoke fixture insert uses the service-role admin client"
++    );
++  }
++
++  console.log("\nb. Start Move creates through SECURITY DEFINER RPCs");
++  {
++    const startMove = read("app/start-move/page.tsx");
++    const grants = read("lib/ownership/grants.ts");
++    assert(
++      grants.includes('supabase.rpc("start_move_create_property", {') &&
++        !/p_created_by|p_user_id/.test(grants),
++      "sale and purchase via start_move_create_property; creator from auth.uid()"
++    );
++    assert(
++      (startMove.match(/await createStartMoveProperty\(supabase, \{/g) ?? []).length === 2,
++      "Start Move creates both the sale and the purchase through createStartMoveProperty"
++    );
++    assert(
++      /createSearchingPlaceholderForSale\(\s*supabase,\s*\{\s*salePropertyId:\s*sellingPropertyId,\s*\}\s*\)/.test(startMove),
++      "searching placeholder via create_searching_placeholder_for_sale with the sale id only"
++    );
++    assert(
++      !/\.from\("properties"\)\s*\.insert\(/.test(startMove),
++      "no direct property insert in Start Move"
++    );
++  }
++
++  console.log("\nc. Placeholder wrapper sends only the sale id");
++  {
++    const fake = createFakeClient({
++      rpc: { data: { ok: true, property_id: 41, created: true }, error: null },
++    });
++    const result = await createSearchingPlaceholderForSale(fake.client, { salePropertyId: 7 });
++    assert(
++      result.ok === true && result.placeholderId === 41 && result.created === true,
++      "returns the created placeholder id to the caller"
++    );
++    assert(
++      fake.rpcs.length === 1 &&
++        fake.rpcs[0].fn === "create_searching_placeholder_for_sale" &&
++        JSON.stringify(fake.rpcs[0].args) === JSON.stringify({ p_sale_property_id: 7 }),
++      "RPC arguments carry no user id or actor"
++    );
++
++    const again = await createSearchingPlaceholderForSale(
++      createFakeClient({
++        rpc: { data: { ok: true, property_id: 41, created: false }, error: null },
++      }).client,
++      { salePropertyId: 7 }
++    );
++    assert(
++      again.ok === true && again.placeholderId === 41 && again.created === false,
++      "retry returns the existing linked placeholder (no duplicate)"
++    );
++
++    const transport = await createSearchingPlaceholderForSale(
++      createFakeClient({ rpc: { data: null, error: { message: "boom" } } }).client,
++      { salePropertyId: 7 }
++    );
++    assert(transport.ok === false && transport.error === "boom", "transport error is surfaced");
++
++    const refused = await createSearchingPlaceholderForSale(
++      createFakeClient({ rpc: { data: { ok: false, error: "not_authorized" }, error: null } }).client,
++      { salePropertyId: 7 }
++    );
++    assert(
++      refused.ok === false && refused.error === "not_authorized",
++      "application refusal is surfaced (no false success)"
++    );
++  }
++
++  console.log("\nd. Join Chain searching intent");
++  {
++    const fake = createFakeClient({
++      rpc: { data: { ok: true, property_id: 52, created: true }, error: null },
++    });
++    const result = await joinIntent(fake.client);
++    assert(
++      result?.ok === true && result.searchingId === 52 && result.created === true,
++      "new placeholder created and returned by the RPC"
++    );
++    assert(
++      fake.rpcs.length === 1 &&
++        JSON.stringify(fake.rpcs[0].args) === JSON.stringify({ p_sale_property_id: JOINED.id }),
++      "RPC anchored on the joined property id only"
++    );
++    assert(
++      !fake.queries.some((q) => q.op === "insert" || q.op === "update"),
++      "no direct insert or separate relink write (RPC links atomically)"
++    );
++  }
++  {
++    const fake = createFakeClient({ existingPlaceholderId: 31 });
++    const result = await joinIntent(fake.client);
++    assert(
++      result?.ok === true && result.searchingId === 31 && result.created === false,
++      "existing placeholder reused and relinked"
++    );
++    assert(fake.rpcs.length === 0, "no RPC when a placeholder already exists");
++  }
++  {
++    const fake = createFakeClient({
++      rpc: { data: { ok: false, error: "sale_already_linked" }, error: null },
++    });
++    const result = await joinIntent(fake.client);
++    assert(
++      result?.ok === false &&
++        result.reason === "downstream_link_exists" &&
++        formatTopologyConflictMessage(result.existingLinkedPropertyId!) !== "",
++      "sale_already_linked → downstream_link_exists with a visible message"
++    );
++    assert(
++      !fake.queries.some((q) => q.op === "update"),
++      "no relink attempted over an existing link"
++    );
++  }
++  {
++    const fake = createFakeClient({
++      rpc: { data: { ok: false, error: "searching_placeholder_exists" }, error: null },
++      racedPlaceholderId: 33,
++    });
++    const result = await joinIntent(fake.client);
++    assert(
++      result?.ok === true && result.searchingId === 33 && result.created === false,
++      "concurrent creation: raced placeholder reused"
++    );
++  }
++  {
++    const fake = createFakeClient({
++      rpc: { data: { ok: false, error: "not_authorized" }, error: null },
++    });
++    const result = await joinIntent(fake.client);
++    assert(
++      result?.ok === false && result.reason === "insert_failed" && result.error === "not_authorized",
++      "refusal reported as insert_failed, not success"
++    );
++  }
++
++  console.log("\ne. Policy is not widened");
++  {
++    const m130 = read("docs/prelaunch/stage2/20261021130000_former_branch_scope_and_delink_options.sql");
++    const m160 = read("docs/prelaunch/stage2/20261021160000_existence_probes_and_helper_grants.sql");
++    assert(
++      /create policy properties_select_member_or_agent[\s\S]*?using \(\s*public\.is_property_member\(id\)\s+or public\.is_ea_assigned_to_property\(id\)\s+or public\.is_property_creator_bootstrap_viewer\(id\)\s*\);/.test(m130),
++      "130000 SELECT policy unchanged (bootstrap viewer helper only)"
++    );
++    assert(
++      /is_property_creator_bootstrap_viewer[\s\S]*?p\.created_by_user_id = auth\.uid\(\)/.test(m130),
++      "bootstrap helper still requires the caller to be the creator (no id probe)"
++    );
++    const stage2Sql = readdirSync(join(ROOT, "docs/prelaunch/stage2"))
++      .filter((file) => file.endsWith(".sql"))
++      .map((file) => read(join("docs/prelaunch/stage2", file)))
++      .join("\n");
++    assert(
++      !/grant\s+execute\s+on\s+function\s+public\.property_has_any_member\([^)]*\)\s+to\s+[^;]*authenticated/i.test(stage2Sql),
++      "no Stage 2 SQL re-grants property_has_any_member to authenticated"
++    );
++    assert(
++      m160.includes("property_has_any_member"),
++      "160000 still covers property_has_any_member"
++    );
++  }
++
++  console.log("\nf. Live trial script is rolled back");
++  {
++    const trial = read("docs/prelaunch/stage2/property-insert-returning-trial.development-rollback.sql");
++    assert(
++      /raise exception 'TRIAL_RESULT: %'/.test(trial.trim().split("\n").slice(-3).join("\n")),
++      "trial ends by raising, so the transaction rolls back"
++    );
++    assert(!trial.includes("qguwzsdonffgfebchfqy"), "trial does not reference Production");
++  }
++
++  console.log(`\n${passed} passed, ${failed} failed`);
++
++  if (failed > 0) {
++    process.exit(1);
++  }
++}
++
++main().catch((error) => {
++  console.error(error);
++  process.exit(1);
++});
+diff --git a/scripts/verify-searching-placeholder-ownership-development.ts b/scripts/verify-searching-placeholder-ownership-development.ts
+index bf933ed..fe4177d 100644
+--- a/scripts/verify-searching-placeholder-ownership-development.ts
++++ b/scripts/verify-searching-placeholder-ownership-development.ts
+@@ -36,7 +36,6 @@ import { createEstateAgentProfile } from "../lib/estateAgent/createEstateAgentPr
+ import { finalizeOperationalSaleCreation } from "../lib/estateAgent/finalizeOperationalSaleCreation";
+ import { resolveSearchingFromJoinIntent } from "../lib/joinChainSearching";
+ import {
+-  attachSearchingPlaceholderToSale,
+   convertSearchingPlaceholder,
+   createSearchingPlaceholderForSale,
+ } from "../lib/searchingPlaceholder";
+@@ -487,8 +486,8 @@ function runStaticChecks(): void {
+         /if \(!result\?\.ok \|\| result\.property_id == null\) \{\s*return \{\s*ok: false,/.test(wrapper)
+     );
+     record(
+-      "app: Start Move keeps attachSearchingPlaceholderToSale",
+-      read("app/start-move/page.tsx").includes("attachSearchingPlaceholderToSale(")
++      "app: Start Move uses createSearchingPlaceholderForSale",
++      read("app/start-move/page.tsx").includes("createSearchingPlaceholderForSale(")
+     );
+ 
+     const allowlist = JSON.parse(read("scripts/secdef-user-rpc-allowlist.json")) as {
+@@ -1175,10 +1174,8 @@ async function runScenarios(ctx: Ctx): Promise<void> {
+ 
+   // M — regressions
+   const m = await homeownerSale(ctx, hoM);
+-  const mAttach = await attachSearchingPlaceholderToSale(hoM.client, {
+-    chainId: m.chainId,
++  const mAttach = await createSearchingPlaceholderForSale(hoM.client, {
+     salePropertyId: m.saleId,
+-    userId: hoM.userId,
+   });
+   const mTileIdentity = mAttach.ok ? await identity(ctx, mAttach.placeholderId) : null;
+   record(

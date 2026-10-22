@@ -517,38 +517,38 @@ function main() {
   console.log("\nm. Application write paths (unchanged)");
   {
     const startMove = read("app/start-move/page.tsx");
-    const startMoveInserts = [
-      ...startMove.matchAll(/\.from\("properties"\)\s*\.insert\(\{([\s\S]*?)\}\)/g),
+    const startMoveCreates = [
+      ...startMove.matchAll(/await createStartMoveProperty\(supabase, \{([\s\S]*?)\}\)/g),
     ].map((match) => match[1]);
+    const startMoveGrants = read("lib/ownership/grants.ts");
 
-    assert(startMoveInserts.length === 2, "start-move: sale and purchase direct inserts present");
     assert(
-      startMoveInserts.every(
-        (payload) =>
-          /chain_id:\s*chainId/.test(payload) &&
-          /created_by_user_id:\s*user\.id/.test(payload) &&
-          !/linked_property_id/.test(payload)
-      ),
-      "start-move: inserts use the caller's onboarding chain, creator = user, no link"
+      startMoveCreates.length === 2 && !/\.from\(\s*["']properties["']\s*\)/.test(startMove),
+      "start-move: sale and purchase are created only through createStartMoveProperty (no direct properties write)"
     );
     assert(
-      startMove.indexOf("createChainForOnboarding(") < startMove.indexOf('.from("properties")'),
-      "start-move: chain is created (caller = chain creator) before property inserts"
+      startMoveCreates.every(
+        (payload) => /^\s*chainId,/.test(payload) && !/linked_property_id|createdBy/i.test(payload)
+      ) &&
+        startMoveGrants.includes('supabase.rpc("start_move_create_property", {') &&
+        !/p_created_by|p_user_id/.test(startMoveGrants),
+      "start-move: creates use the caller's onboarding chain; creator comes from auth.uid() in the RPC, no link"
+    );
+    assert(
+      startMove.indexOf("createChainForOnboarding(") < startMove.indexOf("await createStartMoveProperty("),
+      "start-move: chain is created (caller = chain creator) before property creation"
     );
 
     const placeholder = read("lib/searchingPlaceholder.ts");
-    const placeholderInsert =
-      placeholder.match(/\.from\("properties"\)\s*\.insert\(\{([\s\S]*?)\}\)/)?.[1] ?? "";
 
     assert(
-      /chain_id:\s*params\.chainId/.test(placeholderInsert) &&
-        /created_by_user_id:\s*params\.userId/.test(placeholderInsert) &&
-        /linked_property_id:\s*null/.test(placeholderInsert),
-      "searching placeholder: insert with creator = user and null link"
+      !/\.from\("properties"\)\s*\.insert\(/.test(placeholder) &&
+        !placeholder.includes("establishOperationalHomeowner"),
+      "searching placeholder: no client-side insert or grant (RPC creates, links and grants atomically)"
     );
     assert(
-      /establishOperationalHomeowner\(supabase,\s*\{\s*propertyId:\s*placeholder\.id,\s*grantedVia:\s*OPERATIONAL_IDENTITY_GRANT_VIA\.startMove/.test(placeholder),
-      "searching placeholder: grant via establish_operational_homeowner_for_created_property"
+      /createSearchingPlaceholderForSale\(\s*supabase,\s*\{\s*salePropertyId:\s*sellingPropertyId,\s*\}\s*\)/.test(startMove),
+      "start-move: searching placeholder via create_searching_placeholder_for_sale (sale id only, no client user id)"
     );
 
     const grants = read("lib/ownership/grants.ts");
@@ -630,8 +630,6 @@ function main() {
   console.log("\nn. Direct properties write inventory");
   {
     const expected = new Map<string, number>([
-      ["app/start-move/page.tsx", 2],
-      ["lib/searchingPlaceholder.ts", 1],
       ["lib/joinChainSearching.ts", 3],
       ["lib/recordChainCompletionDate.ts", 1],
       ["context/ChainContext.tsx", 1],

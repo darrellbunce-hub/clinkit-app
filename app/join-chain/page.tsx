@@ -5,6 +5,8 @@ import { useEffect, useRef, useState } from "react";
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Navbar from "@/components/Navbar";
+import HelpLink from "@/components/help/HelpLink";
+import { HELP_SECTION_IDS } from "@/lib/help/helpContent";
 import {
   CARD_PADDING_CLASS,
   PAGE_TITLE_CLASS,
@@ -242,7 +244,7 @@ function JoinChainContent() {
           buyerReadyResult.error
         );
         alert(
-          "Join completed, but Buyer Ready could not be recorded. Please contact support."
+          "Join completed, but Buyer Ready could not be recorded. Check your chain on your dashboard. For what to do next, see Help & FAQs."
         );
       }
     }
@@ -349,7 +351,7 @@ function JoinChainContent() {
           );
         } else {
           alert(
-            "Join completed, but we could not set up your next-home search step. Please try again from the chain page or contact support."
+            "Join completed, but we could not set up your next-home search step. Please try again from the chain page. For what to do next, see Help & FAQs."
           );
           console.error(
             "[join-chain] searching intent failed:",
@@ -555,6 +557,11 @@ function JoinChainContent() {
           </button>
 
         </div>
+
+        <p className="mt-6 text-sm text-slate-600">
+          Having trouble joining?{" "}
+          <HelpLink section={HELP_SECTION_IDS.accessCodes} newTab />
+        </p>
 
       </div>
 

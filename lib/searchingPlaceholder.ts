@@ -5,11 +5,6 @@ import {
   isSearchingPlaceholder,
   walkLinkedPropertySegment,
 } from "@/lib/buildChainTopology";
-import {
-  establishOperationalHomeowner,
-  OPERATIONAL_IDENTITY_GRANT_VIA,
-} from "@/lib/ownership/grants";
-
 export type SearchingPlaceholderRef = {
   id: number;
 };
@@ -111,211 +106,27 @@ export async function findSearchingPlaceholderForUser(
   return data;
 }
 
-export async function getNextChainPosition(
-  supabase: SupabaseClient,
-  chainId: number
-): Promise<number> {
-  const { data, error } = await supabase.rpc(
-    "get_next_chain_position",
-    {
-      p_chain_id: chainId,
-    }
-  );
-
-  if (error || data == null) {
-    console.error(error);
-    return 1;
-  }
-
-  return Number(data);
-}
-
-export async function insertSearchingPlaceholder(
-  supabase: SupabaseClient,
-  params: {
-    chainId: number;
-    userId: string;
-    chainPosition?: number;
-  }
-): Promise<{
-  placeholder: SearchingPlaceholderRef | null;
-  error: unknown | null;
-}> {
-  const chainPosition =
-    params.chainPosition ??
-    (await getNextChainPosition(
-      supabase,
-      params.chainId
-    ));
-
-  const {
-    data: placeholder,
-    error,
-  } = await supabase
-    .from("properties")
-    .insert({
-      chain_id: params.chainId,
-      chain_position: chainPosition,
-      stage: "searching",
-      address: null,
-      postcode: null,
-      relationship_type: "purchase",
-      status: "pending_connection",
-      created_by_user_id: params.userId,
-      linked_property_id: null,
-      awaiting_buyer: false,
-      buyer_connected: false,
-      seller_connected: true,
-      is_searching: true,
-      is_current_user: true,
-      last_updated_days: 0,
-    })
-    .select("id")
-    .single();
-
-  if (error || !placeholder) {
-    return {
-      placeholder: null,
-      error: error ?? new Error("Searching placeholder insert failed"),
-    };
-  }
-
-  const { data: grant, error: memberError } =
-    await establishOperationalHomeowner(supabase, {
-      propertyId: placeholder.id,
-      grantedVia: OPERATIONAL_IDENTITY_GRANT_VIA.startMove,
-    });
-
-  if (memberError || !grant.ok) {
-    return {
-      placeholder: null,
-      error:
-        memberError ??
-        new Error(!grant.ok ? grant.error : "grant_failed"),
-    };
-  }
-
-  return {
-    placeholder,
-    error: null,
-  };
-}
-
-export async function linkSaleToSearchingPlaceholder(
-  supabase: SupabaseClient,
-  params: {
-    salePropertyId: number;
-    searchingPropertyId: number;
-  }
-): Promise<{ ok: true } | { ok: false; error: string }> {
-  const { data, error } = await supabase.rpc(
-    "link_sale_to_searching_placeholder",
-    {
-      p_sale_property_id: params.salePropertyId,
-      p_searching_property_id:
-        params.searchingPropertyId,
-    }
-  );
-
-  if (error) {
-    return {
-      ok: false,
-      error: error.message,
-    };
-  }
-
-  const result = data as { ok?: boolean; error?: string } | null;
-
-  if (!result?.ok) {
-    return {
-      ok: false,
-      error: result?.error ?? "link_failed",
-    };
-  }
-
-  return { ok: true };
-}
-
 export type AttachSearchingPlaceholderResult =
-  | { ok: true; placeholderId: number }
+  | { ok: true; placeholderId: number; created: boolean }
   | { ok: false; error: string };
-
-/**
- * Inserts a searching placeholder and links it from the sale — shared by
- * Start Move and EA sale origination.
- */
-export async function attachSearchingPlaceholderToSale(
-  supabase: SupabaseClient,
-  params: {
-    chainId: number;
-    salePropertyId: number;
-    userId: string;
-  }
-): Promise<AttachSearchingPlaceholderResult> {
-  const existingPlaceholder =
-    await resolveConvertibleSearchingPlaceholderForChain(
-      supabase,
-      {
-        chainId: params.chainId,
-        salePropertyId: params.salePropertyId,
-      }
-    );
-
-  if (existingPlaceholder) {
-    return {
-      ok: true,
-      placeholderId: existingPlaceholder.id,
-    };
-  }
-
-  const {
-    placeholder,
-    error: insertError,
-  } = await insertSearchingPlaceholder(supabase, {
-    chainId: params.chainId,
-    userId: params.userId,
-  });
-
-  if (insertError || !placeholder) {
-    return {
-      ok: false,
-      error:
-        insertError instanceof Error
-          ? insertError.message
-          : "searching_placeholder_insert_failed",
-    };
-  }
-
-  const linkResult =
-    await linkSaleToSearchingPlaceholder(supabase, {
-      salePropertyId: params.salePropertyId,
-      searchingPropertyId: placeholder.id,
-    });
-
-  if (!linkResult.ok) {
-    return {
-      ok: false,
-      error: linkResult.error,
-    };
-  }
-
-  return {
-    ok: true,
-    placeholderId: placeholder.id,
-  };
-}
 
 type CreateSearchingPlaceholderForSaleRpcResult = {
   ok?: boolean;
   error?: string;
   property_id?: number;
+  created?: boolean;
 };
 
 /**
  * Creates (or returns) the searching placeholder linked from a sale in one
  * transaction. Authorised via the sale; only the sale's existing homeowner
- * receives an operational identity — never an estate agent. Used by EA sale
- * origination; Start Move keeps attachSearchingPlaceholderToSale.
+ * receives an operational identity — never an estate agent. The creator is
+ * auth.uid() inside the RPC. Used by Start Move, Join Chain and EA sale
+ * origination.
+ *
+ * Homeowners cannot insert into properties directly: properties' SELECT
+ * policy cannot see a row inside its own INSERT ... RETURNING, so
+ * .insert().select() is refused by RLS.
  */
 export async function createSearchingPlaceholderForSale(
   supabase: SupabaseClient,
@@ -349,6 +160,7 @@ export async function createSearchingPlaceholderForSale(
   return {
     ok: true,
     placeholderId: Number(result.property_id),
+    created: result.created === true,
   };
 }
 

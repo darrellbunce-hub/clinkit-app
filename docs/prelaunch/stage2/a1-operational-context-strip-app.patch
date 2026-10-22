@@ -1,0 +1,37 @@
+diff --git a/app/property/[propertyId]/page.tsx b/app/property/[propertyId]/page.tsx
+index 71d9bdc..639c9de 100644
+--- a/app/property/[propertyId]/page.tsx
++++ b/app/property/[propertyId]/page.tsx
+@@ -767,9 +767,13 @@ async function handleReportDelay() {
+   const showOperationalManager =
+     access.viewerRole === "estate_agent" && canEdit;
+ 
++  // The strip's owner, manager and mode describe the agent's assigned
++  // property in this chain, so they only belong on that property's page.
+   const showOperationalContextStrip =
+-    isOperationalDisplay ||
+-    access.viewerRole === "estate_agent";
++    access.viewerRole === "estate_agent"
++      ? operationalSubject?.assignedPropertyId ===
++        currentProperty.id
++      : isOperationalDisplay;
+ 
+   function renderSectionAlert(
+     section: SectionFeedback["section"]
+diff --git a/app/buyer-ready/[chainId]/page.tsx b/app/buyer-ready/[chainId]/page.tsx
+index 9e290ef..ca276af 100644
+--- a/app/buyer-ready/[chainId]/page.tsx
++++ b/app/buyer-ready/[chainId]/page.tsx
+@@ -410,9 +410,9 @@ export default function BuyerReadyPage() {
+   const showOperationalManager =
+     access.viewerRole === "estate_agent" && access.canEdit;
+ 
+-  const showOperationalContextStrip =
+-    isOperationalDisplay ||
+-    access.viewerRole === "estate_agent";
++  // The strip's owner, manager and mode describe the viewer's own operational
++  // position, so they only belong on that position's page.
++  const showOperationalContextStrip = isOperationalDisplay;
+ 
+   const homeHref = isEstateAgent({
+     account_type: accountType ?? "homeowner",

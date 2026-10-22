@@ -1,0 +1,22 @@
+diff --git a/docs/business-rules.md b/docs/business-rules.md
+index bceedd4..2c82761 100644
+--- a/docs/business-rules.md
++++ b/docs/business-rules.md
+@@ -660,7 +660,7 @@ chain.
+ 
+ The Buyer Ready node must be displayed at the buyer end of the chain to every authorised chain participant, consistent with section 9.8. It must appear once against the addressed purchase to which it is linked. It must not be duplicated for the same purchase, displayed where an existing sale in the chain already leads to that purchase, or displayed against a Searching placeholder.
+ 
+-If the purchase and chain are successfully created but the Buyer Ready node cannot be created, MoveLoop must preserve the existing purchase and chain, explain that a step remains incomplete, and direct the homeowner to support. It must not silently discard the purchase or create a duplicate chain.
++If the purchase and chain are successfully created but the Buyer Ready node cannot be created, MoveLoop must preserve the existing purchase and chain, explain that a step remains incomplete, and direct the homeowner to their existing chain and to the recovery guidance in MoveLoop's Help & FAQs. It must not silently discard the purchase or create a duplicate chain.
+ 
+ A homeowner who is not selling and does not yet know the purchase  
+ property must not create a buying-only chain through this route. Where  
+@@ -1302,7 +1302,7 @@ MoveLoop must not merge transactions without an explicit, validated joining acti
+ 
+ If joining a chain succeeds but a subsequent onboarding step fails, the successful join and membership must be preserved. MoveLoop must preserve successful actions when a later step fails and clearly tell the homeowner which step remains incomplete.
+ 
+-Where an onward purchase is known but could not be added or linked, MoveLoop must not represent that purchase as Searching merely because the operation failed. It must preserve the successful join, avoid creating duplicate properties or chains, and provide an appropriate recovery route. This may include retrying the failed operation where safe, using an existing supported join route, or contacting support.
++Where an onward purchase is known but could not be added or linked, MoveLoop must not represent that purchase as Searching merely because the operation failed. It must preserve the successful join, avoid creating duplicate properties or chains, and provide an appropriate recovery route. This may include retrying the failed operation where safe, using an existing supported join route, or following the recovery guidance in MoveLoop's Help & FAQs.
+ 
+ Where the outcome of an operation cannot be confirmed, MoveLoop must tell the homeowner to check their chain before retrying. A retry must repeat only the incomplete operation and must not repeat a successful join.
+ 
