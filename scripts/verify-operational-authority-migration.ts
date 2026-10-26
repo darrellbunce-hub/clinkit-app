@@ -1098,15 +1098,15 @@ function main() {
 
   const startMove = read("app/start-move/page.tsx");
   record(
-    "Start Move: trigger refusal (23505 property_address_reserved) or grant address_reserved gets its own message",
-    startMove.includes('insertError?.code === "23505"') &&
-      startMove.includes('insertError.message === "property_address_reserved"') &&
-      startMove.includes('grantError === "address_reserved"') &&
-      (startMove.match(/START_MOVE_ADDRESS_RESERVED_MESSAGE/g) ?? []).length === 5
+    "Start Move: an address taken during creation (address_reserved or address_unavailable) gets its own message",
+    startMove.includes('error === "address_reserved" || error === "address_unavailable"') &&
+      startMove.includes("isAddressReservedFailure(sellingResult.error)") &&
+      startMove.includes("isAddressReservedFailure(buyingResult.error)") &&
+      (startMove.match(/START_MOVE_ADDRESS_RESERVED_MESSAGE/g) ?? []).length === 3
   );
   record(
-    "Start Move: every failure still cleans up the chain",
-    /async function fail\([\s\S]*?cleanupOnboardingChain\(chainId\)[\s\S]*?setErrorMessage\(userMessage\)/.test(startMove)
+    "Start Move: failures clean up the chain only while it is known to be empty; otherwise it is kept",
+    /async function fail\([\s\S]*?if \(chainId != null && \(propertyEstablished \|\| createOutcomeUnknown\)\) \{[\s\S]*?setRecovery\([\s\S]*?return;[\s\S]*?cleanupOnboardingChain\(chainId\)[\s\S]*?setErrorMessage\(userMessage\)/.test(startMove)
   );
 
   const reconnectLib = read("lib/estateAgent/reconnectReturningBranch.ts");

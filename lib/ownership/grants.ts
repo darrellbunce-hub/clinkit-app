@@ -79,6 +79,91 @@ export async function establishOperationalHomeowner(
   };
 }
 
+export type StartMoveCreatePropertyResult =
+  | { ok: true; propertyId: number }
+  | { ok: false; error: string; outcomeUnknown: boolean };
+
+/**
+ * Start Move: inserts the caller's sale or purchase into their own onboarding
+ * chain and grants their operational homeowner identity in one transaction,
+ * so a failed grant never leaves a property behind.
+ *
+ * A refusal in the response ({ ok: false }) means nothing was written. Any
+ * other failure may follow a commit whose response was lost, so the chain is
+ * read back for the exact property requested; outcomeUnknown is set if it
+ * still cannot be seen.
+ */
+export async function createStartMoveProperty(
+  supabase: SupabaseClient,
+  params: {
+    chainId: number;
+    relationshipType: "sale" | "purchase";
+    address: string;
+    postcode: string;
+    awaitingBuyer: boolean;
+  }
+): Promise<StartMoveCreatePropertyResult> {
+  const { data, error } = await supabase.rpc("start_move_create_property", {
+    p_chain_id: params.chainId,
+    p_relationship_type: params.relationshipType,
+    p_address: params.address,
+    p_postcode: params.postcode,
+    p_awaiting_buyer: params.awaitingBuyer,
+  });
+
+  if (error) {
+    const existingId = await findStartMoveProperty(supabase, params);
+
+    if (existingId != null) {
+      return { ok: true, propertyId: existingId };
+    }
+
+    return { ok: false, error: error.message, outcomeUnknown: true };
+  }
+
+  const row = (data ?? {}) as GrantRpcRow;
+
+  if (!row.ok || row.property_id == null) {
+    return {
+      ok: false,
+      error:
+        mapTransactionParticipationError(row.error) ??
+        row.error ??
+        "create_failed",
+      outcomeUnknown: row.ok !== false,
+    };
+  }
+
+  return { ok: true, propertyId: row.property_id };
+}
+
+async function findStartMoveProperty(
+  supabase: SupabaseClient,
+  params: {
+    chainId: number;
+    relationshipType: "sale" | "purchase";
+    address: string;
+    postcode: string;
+  }
+): Promise<number | null> {
+  const { data, error } = await supabase
+    .from("properties")
+    .select("id")
+    .eq("chain_id", params.chainId)
+    .eq("relationship_type", params.relationshipType)
+    .eq("is_searching", false)
+    .eq("address", params.address.trim())
+    .eq("postcode", params.postcode.trim())
+    .limit(1)
+    .maybeSingle();
+
+  if (error || data == null) {
+    return null;
+  }
+
+  return Number(data.id);
+}
+
 /**
  * @deprecated Join-chain counterparty participation must use join_chain_property.
  */
