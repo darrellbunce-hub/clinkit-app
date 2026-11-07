@@ -428,7 +428,7 @@ export function formatEaBranchInvitationError(
       case "not_branch_admin":
         return "Only branch owners can manage team invitations.";
       case "not_branch_member":
-        return "Your account is not linked to this branch yet. Ask your branch owner or support to restore branch membership.";
+        return "Your account is not linked to this branch yet. Ask your branch owner to restore branch membership.";
       case "team_directory_unavailable":
         return "The team directory could not be loaded.";
       case "team_directory_rpc_failed":
@@ -470,7 +470,7 @@ export function formatEaBranchInvitationError(
       case "cannot_transfer_to_self":
         return "You cannot transfer ownership to yourself.";
       case "owner_invariant_violation":
-        return "This branch does not have a valid Owner record. Contact support.";
+        return "This branch does not have a valid Owner record, so this change cannot be made.";
       case "invalid_outgoing_action":
         return "Choose what should happen to your branch access after transfer.";
       case "transfer_failed":

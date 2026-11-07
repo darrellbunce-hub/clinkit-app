@@ -7,7 +7,6 @@
  */
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { readFileSync } from "fs";
-import { assignPropertyToBranch } from "../lib/estateAgent/assignments";
 
 for (const line of readFileSync(".env.local", "utf8").split("\n")) {
   const m = line.match(/^([^=]+)=(.*)$/);
@@ -92,6 +91,25 @@ async function setupEa(email: string, stamp: number) {
   return { client, userId, branchId: branch!.id as string };
 }
 
+/**
+ * Verifier branches are never directory-eligible, so assign_property_ea_branch
+ * refuses them (20261011090000). The appointment these scenarios start from is
+ * written by the service role, as one made while the branch was eligible.
+ */
+async function seedAssignment(
+  admin: SupabaseClient,
+  input: { propertyId: number; branchId: string; homeownerOnlyUpdates: boolean; assignedByUserId: string }
+): Promise<{ error: string | null }> {
+  const { error } = await admin.from("property_ea_assignments").insert({
+    property_id: input.propertyId,
+    branch_id: input.branchId,
+    status: "active",
+    homeowner_only_updates: input.homeownerOnlyUpdates,
+    assigned_by_user_id: input.assignedByUserId,
+  });
+  return { error: error?.message ?? null };
+}
+
 async function createEaPendingProperty(
   ea: SupabaseClient,
   branchId: string,
@@ -119,6 +137,9 @@ async function createEaPendingProperty(
 
 async function main() {
   const stamp = Date.now();
+  const admin = createClient(url, serviceRoleKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
   const hoEmail = `delink-ho-${stamp}@keynetic-test.dev`;
   const eaEmail = `delink-ea-${stamp}@keynetic-test.dev`;
 
@@ -157,10 +178,11 @@ async function main() {
     p_property_id: saleId,
   });
 
-  const assignResult = await assignPropertyToBranch(ho, {
+  const assignResult = await seedAssignment(admin, {
     propertyId: saleId,
     branchId,
     homeownerOnlyUpdates: true,
+    assignedByUserId: hoId,
   });
   if (assignResult.error) {
     throw new Error(assignResult.error);
@@ -195,10 +217,11 @@ async function main() {
     JSON.stringify(removeEa)
   );
 
-  const assignAgain = await assignPropertyToBranch(ho, {
+  const assignAgain = await seedAssignment(admin, {
     propertyId: saleId,
     branchId,
     homeownerOnlyUpdates: true,
+    assignedByUserId: hoId,
   });
   if (assignAgain.error) {
     throw new Error(assignAgain.error);
@@ -309,10 +332,6 @@ async function main() {
       blocked?.error === "homeowner_actively_participating",
     JSON.stringify(blocked)
   );
-
-  const admin = createClient(url, serviceRoleKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
 
   async function selfDelinkIsolatedSale(suffix: number, reasonCode: string) {
     const ownerEmail = `delink-ho${suffix}-${stamp + suffix}@keynetic-test.dev`;
@@ -456,10 +475,11 @@ async function main() {
   await hoW.rpc("establish_operational_homeowner_for_created_property", {
     p_property_id: selfSaleId,
   });
-  const selfAssign = await assignPropertyToBranch(hoW, {
+  const selfAssign = await seedAssignment(admin, {
     propertyId: selfSaleId,
     branchId,
     homeownerOnlyUpdates: false,
+    assignedByUserId: hoWId,
   });
   const w7Offered = await offersWithdraw(ea, selfSaleId);
   const w7 = await withdraw(ea, selfSaleId, branchId);

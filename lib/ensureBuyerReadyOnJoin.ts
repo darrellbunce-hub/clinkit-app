@@ -42,11 +42,10 @@ export async function ensureBuyerReadyOnJoin(
 
   const { data: existingForUser, error: userLookupError } =
     await supabase
-      .from("chain_nodes")
+      .from("chain_nodes_own")
       .select("id")
       .eq("chain_id", params.chainId)
       .eq("node_type", "buyer_ready")
-      .eq("user_id", params.userId)
       .maybeSingle();
 
   if (userLookupError) {

@@ -19,6 +19,11 @@ const LATER_MIGRATIONS = [
   "20261005180000_activities_select_property_chain_viewer.sql",
   "20261006120000_operational_intelligence_refresh_queue.sql",
   "20261008090000_buyer_ready_cached_activity_clock.sql",
+  "20261010090000_close_ea_self_connect_awaiting_property.sql",
+  "20261010110000_link_start_move_onward_purchase.sql",
+  "20261010120000_ea_branch_directory_search_eligibility.sql",
+  "20261011090000_assign_property_ea_branch_directory_eligibility.sql",
+  "20261011100000_set_property_ea_update_permission_directory_eligibility.sql",
 ];
 
 type TestResult = { name: string; pass: boolean; detail?: string };

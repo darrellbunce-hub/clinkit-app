@@ -48,13 +48,18 @@ export default function PropertyAddressLookup({
 }: PropertyAddressLookupProps) {
   const reactId = useId();
   const prefix = idPrefix ?? `addr-${reactId}`;
-  const [query, setQuery] = useState("");
+  // A selection already held by the parent (e.g. after a remount) is shown as
+  // selected, which also keeps the suggest effect from calling the provider.
+  const heldSelection = address && postcode ? address : null;
+  const [query, setQuery] = useState(heldSelection ?? "");
   const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([]);
   const [manualMode, setManualMode] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isSuggesting, setIsSuggesting] = useState(false);
   const [isResolving, setIsResolving] = useState(false);
-  const [selectedLabel, setSelectedLabel] = useState<string | null>(null);
+  const [selectedLabel, setSelectedLabel] = useState<string | null>(
+    heldSelection
+  );
   const lastResolvedId = useRef<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 

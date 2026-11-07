@@ -24,8 +24,6 @@ export type OperationalDelay = {
   status: OperationalDelayStatus;
   createdAt: string;
   resolvedAt: string | null;
-  createdByUserId?: string | null;
-  resolvedByUserId?: string | null;
   createdByRole?: string | null;
   resolvedByRole?: string | null;
 };
@@ -97,8 +95,6 @@ export function mapOperationalDelayRow(row: {
   status: string;
   created_at: string;
   resolved_at: string | null;
-  created_by_user_id?: string | null;
-  resolved_by_user_id?: string | null;
   created_by_role?: string | null;
   resolved_by_role?: string | null;
 }): OperationalDelay | null {
@@ -118,8 +114,6 @@ export function mapOperationalDelayRow(row: {
     status: row.status,
     createdAt: row.created_at,
     resolvedAt: row.resolved_at,
-    createdByUserId: row.created_by_user_id ?? null,
-    resolvedByUserId: row.resolved_by_user_id ?? null,
     createdByRole: row.created_by_role ?? null,
     resolvedByRole: row.resolved_by_role ?? null,
   };

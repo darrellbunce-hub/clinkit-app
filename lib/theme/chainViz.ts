@@ -26,6 +26,11 @@ export function chainAwaitingBuyerConnectorClasses(): string {
   return "w-24 border-t-4 border-dashed border-amber-400";
 }
 
+/** Dashed amber connector between chain segments that are not yet linked. */
+export function chainAwaitingConnectionGapClasses(): string {
+  return "w-24 border-t-4 border-dashed border-amber-400";
+}
+
 export function chainNodeProgressFillClasses(
   status: string
 ): string {

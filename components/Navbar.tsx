@@ -92,6 +92,13 @@ export default function Navbar() {
       Account Settings
     </Link>
 
+    <Link
+      href={ROUTES.help}
+      className={`${NAV_LINK_DARK_CLASS} px-4 py-2`}
+    >
+      Help
+    </Link>
+
     <button
       onClick={async () => {
 
@@ -123,6 +130,13 @@ export default function Navbar() {
       className={`${NAV_LINK_DARK_CLASS} px-4 py-2`}
     >
       Estate Agents
+    </Link>
+
+    <Link
+      href={ROUTES.help}
+      className={`${NAV_LINK_DARK_CLASS} hidden lg:block px-4 py-2`}
+    >
+      Help
     </Link>
 
     <Link
@@ -197,6 +211,16 @@ export default function Navbar() {
       Account Settings
     </Link>
 
+    <Link
+      href={ROUTES.help}
+      className={`${NAV_LINK_DARK_CLASS} py-3`}
+      onClick={() =>
+        setMobileMenuOpen(false)
+      }
+    >
+      Help
+    </Link>
+
     <button
       onClick={async () => {
 
@@ -236,6 +260,16 @@ window.location.href = "/";
       }
     >
       Estate Agents
+    </Link>
+
+    <Link
+      href={ROUTES.help}
+      className={`${NAV_LINK_DARK_CLASS} py-3 min-h-11 inline-flex items-center`}
+      onClick={() =>
+        setMobileMenuOpen(false)
+      }
+    >
+      Help
     </Link>
 
     <Link

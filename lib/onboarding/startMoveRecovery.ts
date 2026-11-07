@@ -7,6 +7,7 @@ export type StartMoveRecoveryReason =
   | "purchase_not_added"
   | "purchase_address_reserved"
   | "purchase_already_on_moveloop"
+  | "purchase_not_linked"
   | "searching_not_added"
   | "buyer_ready_not_added"
   | "outcome_unknown"
@@ -38,6 +39,10 @@ export const START_MOVE_RECOVERY_COPY: Record<
   purchase_already_on_moveloop: [
     "Your sale has been added to your chain. The property you're buying is already on MoveLoop, so it hasn't been added to your chain.",
     KEEP_SALE,
+  ],
+  purchase_not_linked: [
+    "Your sale and the property you're buying have both been added, but we couldn't finish connecting them to each other.",
+    "Both are kept. Please don't add them again — open your chain to check them.",
   ],
   searching_not_added: [
     "Your sale has been added to your chain, but we couldn't add your next-home search.",

@@ -13,7 +13,7 @@ type RpcResult = {
   claim_status?: string;
 };
 
-/** Agents originate sales only; a purchase's EA connects for its seller. */
+/** Agents originate sales only; a purchase's EA is appointed by its seller. */
 export type OriginateOperationalPropertyInput = {
   chainId: number;
   relationshipType: "sale";
@@ -208,54 +208,6 @@ export async function joinEaOperationalChain(
     propertyId: result.property_id,
     chainId: result.chain_id,
     claimStatus: result.claim_status ?? "unclaimed",
-    error: null,
-  };
-}
-
-/**
- * The seller's EA takes the seller side of a purchase that is awaiting its
- * seller (access code + address). Writes the branch assignment only.
- */
-export async function connectEaToAwaitingProperty(
-  supabase: SupabaseClient,
-  input: {
-    accessCode: string;
-    address: string;
-    postcode: string;
-    branchId: string;
-  }
-): Promise<
-  | { propertyId: number; chainId: number; error: null }
-  | { propertyId: null; chainId: null; error: string }
-> {
-  const { data, error } = await supabase.rpc(
-    "connect_ea_to_awaiting_property",
-    {
-      p_access_code: input.accessCode,
-      p_address: input.address,
-      p_postcode: input.postcode,
-      p_branch_id: input.branchId,
-    }
-  );
-
-  const result = data as RpcResult | null;
-
-  if (
-    error ||
-    !result?.ok ||
-    result.property_id == null ||
-    result.chain_id == null
-  ) {
-    return {
-      propertyId: null,
-      chainId: null,
-      error: mapRpcError(error, result),
-    };
-  }
-
-  return {
-    propertyId: result.property_id,
-    chainId: result.chain_id,
     error: null,
   };
 }

@@ -47,11 +47,8 @@ export type ChainCompletionLifecycleRow = {
   completion_lifecycle_status: CompletionLifecycleStatus | null;
   completion_scheduled_date: string | null;
   completion_date_recorded_at: string | null;
-  completion_date_recorded_by_user_id: string | null;
   completion_date_updated_at: string | null;
-  completion_date_updated_by_user_id: string | null;
   completion_confirmed_at: string | null;
-  completion_confirmed_by_user_id: string | null;
   completion_confirmed_by_role:
     | "estate_agent"
     | "participant"

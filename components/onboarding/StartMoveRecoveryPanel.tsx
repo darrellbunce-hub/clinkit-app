@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import HelpLink from "@/components/help/HelpLink";
+import { HELP_SECTION_IDS } from "@/lib/help/helpContent";
 import {
   START_MOVE_RECOVERY_COPY,
   START_MOVE_RECOVERY_TITLE,
@@ -21,6 +23,10 @@ export default function StartMoveRecoveryPanel({
         {START_MOVE_RECOVERY_COPY[recovery.reason].map((paragraph) => (
           <p key={paragraph}>{paragraph}</p>
         ))}
+        <p>
+          For what to do next, see{" "}
+          <HelpLink section={HELP_SECTION_IDS.somethingWentWrong} />.
+        </p>
       </div>
 
       <Link

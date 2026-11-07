@@ -10,6 +10,7 @@ import { PUBLIC_LEGAL_PATHS } from "@/lib/legal/constants";
 export const ROUTES = {
   home: "/",
   about: "/about",
+  help: "/help",
   homeownerLogin: "/login",
   homeownerDashboard: "/dashboard",
   accountSettings: "/account",
@@ -92,6 +93,7 @@ export const ESTATE_AGENT_PROTECTED_PREFIXES = [
 export const PUBLIC_EXACT_PATHS = [
   ROUTES.home,
   ROUTES.about,
+  ROUTES.help,
   ROUTES.homeownerLogin,
   ROUTES.forgotPassword,
   ROUTES.resetPassword,

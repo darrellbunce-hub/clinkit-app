@@ -410,9 +410,9 @@ export default function BuyerReadyPage() {
   const showOperationalManager =
     access.viewerRole === "estate_agent" && access.canEdit;
 
-  const showOperationalContextStrip =
-    isOperationalDisplay ||
-    access.viewerRole === "estate_agent";
+  // The strip's owner, manager and mode describe the viewer's own operational
+  // position, so they only belong on that position's page.
+  const showOperationalContextStrip = isOperationalDisplay;
 
   const homeHref = isEstateAgent({
     account_type: accountType ?? "homeowner",

@@ -36,7 +36,6 @@ import { createEstateAgentProfile } from "../lib/estateAgent/createEstateAgentPr
 import { finalizeOperationalSaleCreation } from "../lib/estateAgent/finalizeOperationalSaleCreation";
 import { resolveSearchingFromJoinIntent } from "../lib/joinChainSearching";
 import {
-  attachSearchingPlaceholderToSale,
   convertSearchingPlaceholder,
   createSearchingPlaceholderForSale,
 } from "../lib/searchingPlaceholder";
@@ -63,6 +62,12 @@ const LATER_MIGRATIONS = [
   "20261005170000_dashboard_genuine_last_update.sql",
   "20261005180000_activities_select_property_chain_viewer.sql",
   "20261006120000_operational_intelligence_refresh_queue.sql",
+  "20261008090000_buyer_ready_cached_activity_clock.sql",
+  "20261010090000_close_ea_self_connect_awaiting_property.sql",
+  "20261010110000_link_start_move_onward_purchase.sql",
+  "20261010120000_ea_branch_directory_search_eligibility.sql",
+  "20261011090000_assign_property_ea_branch_directory_eligibility.sql",
+  "20261011100000_set_property_ea_update_permission_directory_eligibility.sql",
 ];
 
 type TestResult = { name: string; pass: boolean; detail?: string };
@@ -481,8 +486,8 @@ function runStaticChecks(): void {
         /if \(!result\?\.ok \|\| result\.property_id == null\) \{\s*return \{\s*ok: false,/.test(wrapper)
     );
     record(
-      "app: Start Move keeps attachSearchingPlaceholderToSale",
-      read("app/start-move/page.tsx").includes("attachSearchingPlaceholderToSale(")
+      "app: Start Move uses createSearchingPlaceholderForSale",
+      read("app/start-move/page.tsx").includes("createSearchingPlaceholderForSale(")
     );
 
     const allowlist = JSON.parse(read("scripts/secdef-user-rpc-allowlist.json")) as {
@@ -1169,10 +1174,8 @@ async function runScenarios(ctx: Ctx): Promise<void> {
 
   // M — regressions
   const m = await homeownerSale(ctx, hoM);
-  const mAttach = await attachSearchingPlaceholderToSale(hoM.client, {
-    chainId: m.chainId,
+  const mAttach = await createSearchingPlaceholderForSale(hoM.client, {
     salePropertyId: m.saleId,
-    userId: hoM.userId,
   });
   const mTileIdentity = mAttach.ok ? await identity(ctx, mAttach.placeholderId) : null;
   record(

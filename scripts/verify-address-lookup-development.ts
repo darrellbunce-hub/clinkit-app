@@ -214,7 +214,7 @@ function runStaticChecks() {
 
   record(
     "TEST16 Searching placeholder path does not call address APIs",
-    startMove.includes("attachSearchingPlaceholderToSale") &&
+    startMove.includes("createSearchingPlaceholderForSale") &&
       !startMove.includes("/api/address/") &&
       startMove.includes("searchingForProperty")
   );

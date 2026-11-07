@@ -1,0 +1,13 @@
+diff --git a/lib/estateAgent/assignments.ts b/lib/estateAgent/assignments.ts
+index 4c74b58..b8f09f1 100644
+--- a/lib/estateAgent/assignments.ts
++++ b/lib/estateAgent/assignments.ts
+@@ -130,8 +130,6 @@ export function formatPropertyEaAssignmentError(
+   switch (code) {
+     case "not_authorized":
+       return "Only the homeowner selling this property can appoint or change its estate agent.";
+-    case "branch_acts_for_buyer":
+-      return "This branch represents the buyer of this property, so it cannot also act for you as seller.";
+     case "branch_not_found":
+       return "That estate agent branch could not be found.";
+     case "no_active_assignment":

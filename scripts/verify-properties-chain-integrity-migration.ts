@@ -27,6 +27,11 @@ const DEPENDENT_FOLLOW_UP_MIGRATIONS = [
   "20261005180000_activities_select_property_chain_viewer.sql",
   "20261006120000_operational_intelligence_refresh_queue.sql",
   "20261008090000_buyer_ready_cached_activity_clock.sql",
+  "20261010090000_close_ea_self_connect_awaiting_property.sql",
+  "20261010110000_link_start_move_onward_purchase.sql",
+  "20261010120000_ea_branch_directory_search_eligibility.sql",
+  "20261011090000_assign_property_ea_branch_directory_eligibility.sql",
+  "20261011100000_set_property_ea_update_permission_directory_eligibility.sql",
 ];
 
 const HELPERS = [
@@ -535,18 +540,15 @@ function main() {
     );
 
     const placeholder = read("lib/searchingPlaceholder.ts");
-    const placeholderInsert =
-      placeholder.match(/\.from\("properties"\)\s*\.insert\(\{([\s\S]*?)\}\)/)?.[1] ?? "";
 
     assert(
-      /chain_id:\s*params\.chainId/.test(placeholderInsert) &&
-        /created_by_user_id:\s*params\.userId/.test(placeholderInsert) &&
-        /linked_property_id:\s*null/.test(placeholderInsert),
-      "searching placeholder: insert with creator = user and null link"
+      !/\.from\("properties"\)\s*\.insert\(/.test(placeholder) &&
+        !placeholder.includes("establishOperationalHomeowner"),
+      "searching placeholder: no client-side insert or grant (RPC creates, links and grants atomically)"
     );
     assert(
-      /establishOperationalHomeowner\(supabase,\s*\{\s*propertyId:\s*placeholder\.id,\s*grantedVia:\s*OPERATIONAL_IDENTITY_GRANT_VIA\.startMove/.test(placeholder),
-      "searching placeholder: grant via establish_operational_homeowner_for_created_property"
+      /createSearchingPlaceholderForSale\(\s*supabase,\s*\{\s*salePropertyId:\s*sellingPropertyId,\s*\}\s*\)/.test(startMove),
+      "start-move: searching placeholder via create_searching_placeholder_for_sale (sale id only, no client user id)"
     );
 
     const grants = read("lib/ownership/grants.ts");
@@ -628,7 +630,6 @@ function main() {
   console.log("\nn. Direct properties write inventory");
   {
     const expected = new Map<string, number>([
-      ["lib/searchingPlaceholder.ts", 1],
       ["lib/joinChainSearching.ts", 3],
       ["lib/recordChainCompletionDate.ts", 1],
       ["context/ChainContext.tsx", 1],

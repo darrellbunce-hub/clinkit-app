@@ -1,5 +1,7 @@
 "use client";
 
+import HelpLink from "@/components/help/HelpLink";
+import { HELP_SECTION_IDS } from "@/lib/help/helpContent";
 import {
   BTN_PRIMARY_CLASS,
   BTN_SECONDARY_OUTLINE_CLASS,
@@ -9,6 +11,7 @@ export type DuplicatePropertyDialogVariant =
   | "existing"
   | "yours"
   | "awaiting_seller"
+  | "awaiting_seller_with_purchase"
   | "awaiting_buyer"
   | "represented";
 
@@ -48,7 +51,15 @@ const VARIANT_COPY: Record<
     title: "This property is already part of MoveLoop",
     paragraphs: [
       "The buyer of this property has already added it to their chain, and it is waiting for its seller to connect.",
-      "Join the existing chain using the chain access code you were given. You can add your onward purchase after joining.",
+      "Join the existing chain using the chain access code you were given. Joining connects your sale only; it does not add the property you are buying.",
+    ],
+    primaryLabel: "Join Existing Chain",
+  },
+  awaiting_seller_with_purchase: {
+    title: "This property is already part of MoveLoop",
+    paragraphs: [
+      "The buyer of this property has already added it to their chain, and it is waiting for its seller to connect.",
+      "Join the existing chain using the chain access code you were given. Once you have joined, we will add the property you are buying to your chain.",
     ],
     primaryLabel: "Join Existing Chain",
   },
@@ -56,7 +67,7 @@ const VARIANT_COPY: Record<
     title: "This property is already part of MoveLoop",
     paragraphs: [
       "The property you are buying is already in a chain and is waiting for its buyer to connect.",
-      "Join the existing chain using the chain access code you were given. Your sale will be connected to it.",
+      "Join the existing chain using the chain access code you were given. Once you have joined, your purchase will be connected to that chain.",
     ],
     primaryLabel: "Join Existing Chain",
   },
@@ -64,7 +75,7 @@ const VARIANT_COPY: Record<
     title: "This property is already part of MoveLoop",
     paragraphs: [
       "This address is already connected in another chain, so it cannot be added again.",
-      "If your estate agent invited you, use the link in your invitation to connect. Otherwise, please contact MoveLoop support.",
+      "If your estate agent invited you, use the link in your invitation to connect.",
     ],
     primaryLabel: null,
   },
@@ -106,6 +117,14 @@ export default function DuplicatePropertyDialog({
           {copy.paragraphs.map((paragraph) => (
             <p key={paragraph}>{paragraph}</p>
           ))}
+          <p>
+            Not sure what to do?{" "}
+            <HelpLink
+              section={HELP_SECTION_IDS.alreadyOnMoveLoop}
+              newTab
+              className="font-medium text-text-charcoal underline underline-offset-2 hover:text-brand-primary"
+            />
+          </p>
         </div>
 
         <div className="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">

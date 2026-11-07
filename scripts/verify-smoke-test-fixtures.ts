@@ -26,6 +26,9 @@ function read(relativePath: string): string {
 const migration = read(
   "supabase/migrations/20260902120000_smoke_test_fixtures.sql"
 );
+const directoryEligibilityMigration = read(
+  "supabase/migrations/20261010120000_ea_branch_directory_search_eligibility.sql"
+);
 const onboarding = read("lib/estateAgent/completeOnboarding.ts");
 const signup = read("app/estate-agents/signup/page.tsx");
 const checkout = read("lib/billing/eaCheckout.ts");
@@ -82,8 +85,24 @@ assert(
 );
 
 assert(
-  "Directory still loaded via ea_branch_directory view",
-  assignments.includes('from("ea_branch_directory")')
+  "Current directory view still excludes active smoke-test branches",
+  directoryEligibilityMigration.includes(
+    "create or replace view public.ea_branch_directory"
+  ) &&
+    directoryEligibilityMigration.includes("smoke_test_fixture_objects") &&
+    directoryEligibilityMigration.includes(
+      "o.object_type = 'ea_branch' and o.object_id = b.id::text"
+    ) &&
+    directoryEligibilityMigration.includes("f.status = 'active'")
+);
+
+assert(
+  "Directory searched server-side via search_ea_branch_directory (over the view)",
+  assignments.includes('"search_ea_branch_directory"') &&
+    !assignments.includes('from("ea_branch_directory")') &&
+    directoryEligibilityMigration.includes(
+      "from public.ea_branch_directory d"
+    )
 );
 
 assert(

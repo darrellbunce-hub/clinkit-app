@@ -353,6 +353,137 @@ assert(
     connectedWithReady.get(1)?.kind === "buyer_ready"
 );
 
+// Buyer Ready anchored to a purchase row (buyer-only purchase a seller joined).
+
+const summaryAnchoredToPurchase: ChainNodesChainSummary = {
+  ...buyerReadySummaryForSale,
+  id: 503,
+  linked_property_id: 21,
+};
+
+const joinedBuyerOnlyPurchase = [
+  {
+    id: 21,
+    buyer_connected: true,
+    relationship_type: "purchase",
+    stage: "offer_accepted",
+    address: null,
+    linked_property_id: 22,
+  },
+  {
+    id: 22,
+    buyer_connected: true,
+    relationship_type: "purchase",
+    stage: "offer_accepted",
+    address: null,
+  },
+];
+
+assertEqual(
+  "Purchase with its Buyer Ready summary and nothing linked in resolves Buyer Ready",
+  resolvePurchaserStateForProperty({
+    propertyId: 21,
+    chainProperties: joinedBuyerOnlyPurchase,
+    buyerReadySummaries: [summaryAnchoredToPurchase],
+  }),
+  {
+    kind: "buyer_ready",
+    anchorPropertyId: 21,
+    summary: summaryAnchoredToPurchase,
+  }
+);
+
+const joinedStates = resolvePurchaserStatesByPropertyId({
+  chainProperties: joinedBuyerOnlyPurchase,
+  buyerReadySummaries: [summaryAnchoredToPurchase],
+});
+
+assert(
+  "Full-chain map has exactly one Buyer Ready, on the anchored purchase",
+  joinedStates.size === 1 &&
+    joinedStates.get(21)?.kind === "buyer_ready"
+);
+
+assertEqual(
+  "Onward purchase linked from the joined purchase gets no purchaser state",
+  resolvePurchaserStateForProperty({
+    propertyId: 22,
+    chainProperties: joinedBuyerOnlyPurchase,
+    buyerReadySummaries: [summaryAnchoredToPurchase],
+  }),
+  null
+);
+
+assertEqual(
+  "Purchase without a matching Buyer Ready summary stays excluded",
+  resolvePurchaserStateForProperty({
+    propertyId: 21,
+    chainProperties: joinedBuyerOnlyPurchase,
+    buyerReadySummaries: [buyerReadySummaryOtherAnchor],
+  }),
+  null
+);
+
+assertEqual(
+  "Purchase with an inbound sale does not duplicate the buyer as Buyer Ready",
+  resolvePurchaserStateForProperty({
+    propertyId: 21,
+    chainProperties: [
+      {
+        id: 20,
+        buyer_connected: true,
+        relationship_type: "sale",
+        linked_property_id: 21,
+      },
+      ...joinedBuyerOnlyPurchase,
+    ],
+    buyerReadySummaries: [summaryAnchoredToPurchase],
+  }),
+  null
+);
+
+assertEqual(
+  "Searching placeholder with a summary pointing at it stays excluded",
+  resolvePurchaserStateForProperty({
+    propertyId: 23,
+    chainProperties: [
+      {
+        id: 23,
+        buyer_connected: true,
+        relationship_type: "purchase",
+        stage: "searching",
+        address: null,
+      },
+    ],
+    buyerReadySummaries: [
+      { ...summaryAnchoredToPurchase, linked_property_id: 23 },
+    ],
+  }),
+  null
+);
+
+assertEqual(
+  "Purchase with no connected buyer gets no Buyer Ready or Awaiting Buyer",
+  resolvePurchaserStateForProperty({
+    propertyId: 21,
+    chainProperties: [
+      { ...joinedBuyerOnlyPurchase[0], buyer_connected: false },
+    ],
+    buyerReadySummaries: [summaryAnchoredToPurchase],
+  }),
+  null
+);
+
+assertEqual(
+  "Purchase without Buyer Ready never becomes Connected Buyer",
+  resolvePurchaserStateForProperty({
+    propertyId: 21,
+    chainProperties: joinedBuyerOnlyPurchase,
+    buyerReadySummaries: [],
+  }),
+  null
+);
+
 console.log(
   process.exitCode === 1
     ? "\nSome checks failed."

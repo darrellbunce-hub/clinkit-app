@@ -30,10 +30,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 import { runChainIntelligenceWorkerBatch } from "../lib/chainIntelligence/worker";
 import type { AgentBranchPropertySummary } from "../lib/estateAgent/assignmentTypes";
-import {
-  assignPropertyToBranch,
-  loadAgentBranchPropertySummaries,
-} from "../lib/estateAgent/assignments";
+import { loadAgentBranchPropertySummaries } from "../lib/estateAgent/assignments";
 import {
   cachedBuyerReadyClockDays,
   cachedBuyerReadyClockForNode,
@@ -238,8 +235,16 @@ async function run(ctx: Ctx) {
     });
     if (establishError) throw new Error(`establish failed (${label}): ${establishError.message}`);
     if (branchId) {
-      const assigned = await assignPropertyToBranch(client, { propertyId, branchId, homeownerOnlyUpdates: false });
-      if (assigned.error) throw new Error(`assign failed (${label}): ${assigned.error}`);
+      // Verifier branches are never directory-eligible (20261011090000); the
+      // appointment is written by the service role.
+      const { error: assignError } = await admin.from("property_ea_assignments").insert({
+        property_id: propertyId,
+        branch_id: branchId,
+        status: "active",
+        homeowner_only_updates: false,
+        assigned_by_user_id: userId,
+      });
+      if (assignError) throw new Error(`assign failed (${label}): ${assignError.message}`);
     }
     return { client, userId, propertyId, chainId };
   }

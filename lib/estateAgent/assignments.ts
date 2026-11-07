@@ -7,18 +7,41 @@ import type {
 } from "@/lib/estateAgent/assignmentTypes";
 import type { PropertyClaimStatus } from "@/lib/propertyClaim/types";
 
-export async function loadEaBranchDirectory(
-  supabase: SupabaseClient
+export const EA_BRANCH_DIRECTORY_MIN_QUERY_LENGTH = 2;
+
+export const EA_BRANCH_DIRECTORY_SEARCH_LIMIT = 20;
+
+/**
+ * Server-side search of eligible branches. Every term must match company,
+ * branch, town or postcode; matching happens before the row limit.
+ */
+export async function searchEaBranchDirectory(
+  supabase: SupabaseClient,
+  query: string,
+  limit = EA_BRANCH_DIRECTORY_SEARCH_LIMIT
 ): Promise<{
   branches: EaBranchDirectoryEntry[];
   error: string | null;
 }> {
-  const { data, error } = await supabase
-    .from("ea_branch_directory")
-    .select("*")
-    .order("company_name")
-    .order("branch_name")
-    .limit(200);
+  const trimmedQuery = query.trim();
+
+  if (
+    trimmedQuery.length <
+    EA_BRANCH_DIRECTORY_MIN_QUERY_LENGTH
+  ) {
+    return {
+      branches: [],
+      error: null,
+    };
+  }
+
+  const { data, error } = await supabase.rpc(
+    "search_ea_branch_directory",
+    {
+      p_query: trimmedQuery,
+      p_limit: limit,
+    }
+  );
 
   if (error) {
     return {
@@ -32,58 +55,6 @@ export async function loadEaBranchDirectory(
       []) as EaBranchDirectoryEntry[],
     error: null,
   };
-}
-
-export function filterEaBranchDirectory(
-  branches: EaBranchDirectoryEntry[],
-  query: string,
-  minimumLength = 2
-): EaBranchDirectoryEntry[] {
-  const trimmedQuery = query
-    .trim()
-    .toLowerCase();
-
-  if (
-    trimmedQuery.length < minimumLength
-  ) {
-    return [];
-  }
-
-  const terms = trimmedQuery
-    .split(/\s+/)
-    .filter(Boolean);
-
-  return branches.filter((entry) => {
-    const haystack = [
-      entry.company_name,
-      entry.branch_name,
-      entry.town_or_city,
-      entry.postcode,
-    ]
-      .join(" ")
-      .toLowerCase();
-
-    return terms.every((term) =>
-      haystack.includes(term)
-    );
-  });
-}
-
-export async function searchEaBranchDirectory(
-  supabase: SupabaseClient,
-  query: string
-): Promise<EaBranchDirectoryEntry[]> {
-  const { branches, error } =
-    await loadEaBranchDirectory(supabase);
-
-  if (error) {
-    return [];
-  }
-
-  return filterEaBranchDirectory(
-    branches,
-    query
-  );
 }
 
 export async function loadPropertyEaAssignment(
@@ -159,8 +130,6 @@ export function formatPropertyEaAssignmentError(
   switch (code) {
     case "not_authorized":
       return "Only the homeowner selling this property can appoint or change its estate agent.";
-    case "branch_acts_for_buyer":
-      return "This branch represents the buyer of this property, so it cannot also act for you as seller.";
     case "branch_not_found":
       return "That estate agent branch could not be found.";
     case "no_active_assignment":
@@ -172,17 +141,34 @@ export function formatPropertyEaAssignmentError(
   }
 }
 
+/**
+ * The delegation toggle returns branch_not_found only when the assigned branch
+ * cannot be given delegated updates; the message must not reveal why.
+ */
+export function formatPropertyEaDelegationError(
+  code: string | null | undefined
+): string {
+  if (code === "branch_not_found") {
+    return "This Estate Agent branch is not currently eligible for delegated updates. If you think this is incorrect, check with your estate agent.";
+  }
+
+  return formatPropertyEaAssignmentError(code);
+}
+
 async function callAssignmentRpc(
   supabase: SupabaseClient,
   name: string,
-  args: Record<string, unknown>
+  args: Record<string, unknown>,
+  formatError: (
+    code: string | null | undefined
+  ) => string = formatPropertyEaAssignmentError
 ): Promise<{ assignmentId: string | null; error: string | null }> {
   const { data, error } = await supabase.rpc(name, args);
 
   if (error) {
     return {
       assignmentId: null,
-      error: formatPropertyEaAssignmentError(null),
+      error: formatError(null),
     };
   }
 
@@ -191,7 +177,7 @@ async function callAssignmentRpc(
   if (!result?.ok) {
     return {
       assignmentId: null,
-      error: formatPropertyEaAssignmentError(result?.error),
+      error: formatError(result?.error),
     };
   }
 
@@ -231,7 +217,8 @@ export async function updatePropertyEaDelegation(
       p_property_id: propertyId,
       p_homeowner_only_updates:
         homeownerOnlyUpdates,
-    }
+    },
+    formatPropertyEaDelegationError
   );
 
   return { error };
@@ -274,16 +261,21 @@ export async function loadAssignmentWithBranchDirectory(
     };
   }
 
-  const { data: branch } = await supabase
-    .from("ea_branch_directory")
-    .select("*")
-    .eq("branch_id", assignment.branch_id)
-    .maybeSingle();
+  const { data: branches } = await supabase.rpc(
+    "get_property_ea_branch_entry",
+    { p_property_id: propertyId }
+  );
+
+  const branch =
+    (
+      (branches ?? []) as EaBranchDirectoryEntry[]
+    ).find(
+      (entry) =>
+        entry.branch_id === assignment.branch_id
+    ) ?? null;
 
   return {
     assignment,
-    branch:
-      (branch as EaBranchDirectoryEntry | null) ??
-      null,
+    branch,
   };
 }

@@ -591,6 +591,16 @@ export default function HomePage() {
               </div>
             ))}
           </div>
+
+          <p className="mt-10 text-center text-slate-600">
+            More questions?{" "}
+            <Link
+              href={ROUTES.help}
+              className="font-semibold text-brand-primary underline underline-offset-2 hover:text-brand-primary-hover"
+            >
+              Read our Help &amp; FAQs
+            </Link>
+          </p>
         </div>
       </section>
 

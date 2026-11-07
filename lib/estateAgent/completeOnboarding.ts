@@ -98,7 +98,7 @@ export async function completeEstateAgentOnboarding(
       return {
         success: false,
         error:
-          "An agency with this email domain is already registered. Contact support if you need access.",
+          "An agency with this email domain is already registered. Ask a branch owner at that agency to invite you to their branch.",
       };
     }
 

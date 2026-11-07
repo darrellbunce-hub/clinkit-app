@@ -120,9 +120,7 @@ type Chain = {
   completionLifecycleStatus: string | null;
   completionScheduledDate: string | null;
   completionDateRecordedAt: string | null;
-  completionDateRecordedByUserId: string | null;
   completionConfirmedAt: string | null;
-  completionConfirmedByUserId: string | null;
   completedAt: string | null;
 };
 type ChainContextType = {
@@ -289,7 +287,7 @@ async function loadParticipantDataset(
     } = await supabase
       .from("operational_delays")
       .select(
-        "id, chain_id, property_id, chain_node_id, reason, status, created_at, resolved_at, created_by_user_id, resolved_by_user_id, created_by_role, resolved_by_role"
+        "id, chain_id, property_id, chain_node_id, reason, status, created_at, resolved_at, created_by_role, resolved_by_role"
       )
       .in("chain_id", participantChainIds)
       .eq("status", "active");
@@ -373,7 +371,16 @@ async function loadParticipantDataset(
   const chainNodesQuery = supabase
     .from("chain_nodes")
     .select(`
-        *,
+        id,
+        chain_id,
+        node_type,
+        linked_property_id,
+        position,
+        stage,
+        status,
+        progress,
+        created_at,
+        stage_entered_at,
         activities (
           id,
           timestamp,
@@ -398,6 +405,38 @@ async function loadParticipantDataset(
     return null;
   }
 
+  // Other participants' node owners are not readable; the viewer's own
+  // nodes come from chain_nodes_own.
+  const ownNodesQuery = supabase
+    .from("chain_nodes_own")
+    .select("id, user_id");
+
+  const {
+    data: ownNodesData,
+    error: ownNodesError,
+  } =
+    participantChainIds.length > 0
+      ? await ownNodesQuery.in(
+          "chain_id",
+          participantChainIds
+        )
+      : await ownNodesQuery.limit(0);
+
+  if (isStale()) {
+    return null;
+  }
+
+  if (ownNodesError) {
+    console.error(ownNodesError);
+  }
+
+  const ownNodeUserIds = new Map<number, string>(
+    (ownNodesData || []).map((row) => [
+      Number(row.id),
+      row.user_id,
+    ])
+  );
+
   const chainNodes =
     !chainNodesError && chainNodesData
       ? chainNodesData.map((node) => {
@@ -408,6 +447,9 @@ async function loadParticipantDataset(
 
           return {
             ...node,
+            user_id:
+              ownNodeUserIds.get(Number(node.id)) ??
+              null,
             activities: sortActivitiesNewestFirst(
               node.activities || []
             ),
@@ -422,7 +464,11 @@ async function loadParticipantDataset(
     console.error(chainNodesError);
   }
 
-  const chainsQuery = supabase.from("chains").select("*");
+  const chainsQuery = supabase
+    .from("chains")
+    .select(
+      "id, access_code, state, completion_lifecycle_status, completion_scheduled_date, completion_date_recorded_at, completion_confirmed_at, completed_at"
+    );
 
   const { data: chainsData } =
     participantChainIds.length > 0
@@ -479,14 +525,8 @@ async function loadParticipantDataset(
         completionDateRecordedAt:
           chain.completion_date_recorded_at ??
           null,
-        completionDateRecordedByUserId:
-          chain.completion_date_recorded_by_user_id ??
-          null,
         completionConfirmedAt:
           chain.completion_confirmed_at ??
-          null,
-        completionConfirmedByUserId:
-          chain.completion_confirmed_by_user_id ??
           null,
         completedAt: chain.completed_at ?? null,
       };
@@ -1699,9 +1739,6 @@ async function recordChainCompletionDate(
             completionDateRecordedAt:
               result.chain
                 .completion_date_recorded_at,
-            completionDateRecordedByUserId:
-              result.chain
-                .completion_date_recorded_by_user_id,
           }
         : chain
     )
@@ -1787,9 +1824,6 @@ async function amendChainCompletionDate(
             completionDateRecordedAt:
               result.chain
                 .completion_date_recorded_at,
-            completionDateRecordedByUserId:
-              result.chain
-                .completion_date_recorded_by_user_id,
           }
         : chain
     )
@@ -1851,9 +1885,6 @@ async function confirmChainCompletion(
             completionConfirmedAt:
               result.chain
                 .completion_confirmed_at,
-            completionConfirmedByUserId:
-              result.chain
-                .completion_confirmed_by_user_id,
             completedAt:
               result.chain.completed_at,
           }

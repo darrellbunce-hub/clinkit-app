@@ -46,7 +46,7 @@ import {
   establishOperationalHomeowner,
   OPERATIONAL_IDENTITY_GRANT_VIA,
 } from "../lib/ownership/grants";
-import { attachSearchingPlaceholderToSale } from "../lib/searchingPlaceholder";
+import { createSearchingPlaceholderForSale } from "../lib/searchingPlaceholder";
 import { checkStartMoveAddress } from "../lib/onboarding/addressReservation";
 import {
   buildJoinExistingChainHref,
@@ -314,10 +314,8 @@ async function homeownerStartMoveSale(
 
   let search: number | null = null;
   if (options.searching) {
-    const attach = await attachSearchingPlaceholderToSale(ho.client, {
-      chainId,
+    const attach = await createSearchingPlaceholderForSale(ho.client, {
       salePropertyId: sale,
-      userId: ho.userId,
     });
     if (!attach.ok) throw new Error(`attach searching placeholder: ${attach.error}`);
     search = attach.placeholderId;
@@ -1116,12 +1114,26 @@ async function runScenarios(ctx: Ctx): Promise<void> {
     "BJ11 homeowner-created search is owned by the homeowner seller",
     hoSearchIdentity?.homeowner_user_id === hoSeller.userId && hoSearchIdentity?.status === "active"
   );
+  // Verifier branches are never directory-eligible (20261011090000): the RPC
+  // refuses the EA, and its appointment is written by the service role.
   const appoint = await rpc(hoSeller.client, "assign_property_ea_branch", {
     p_property_id: hoChain.sale,
     p_branch_id: ea.branchId,
     p_homeowner_only_updates: true,
   });
-  record("BJ11 homeowner appoints the EA (homeowner-only updates)", appoint?.ok === true, JSON.stringify(appoint));
+  record(
+    "BJ11 homeowner cannot appoint the ineligible verifier EA (branch_not_found)",
+    appoint?.ok === false && appoint?.error === "branch_not_found",
+    JSON.stringify(appoint)
+  );
+  const { error: appointSeedError } = await ctx.admin.from("property_ea_assignments").insert({
+    property_id: hoChain.sale,
+    branch_id: ea.branchId,
+    status: "active",
+    homeowner_only_updates: true,
+    assigned_by_user_id: hoSeller.userId,
+  });
+  record("BJ11 fixture: the EA is appointed (homeowner-only updates)", !appointSeedError, appointSeedError?.message);
 
   const sellerNoBuyer = await loadPerspective(hoSeller, hoChain.chainId, "homeowner");
   const eaNoBuyerHo = await loadPerspective(ea, hoChain.chainId, "estate_agent");

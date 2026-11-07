@@ -1,0 +1,297 @@
+diff --git a/context/ChainContext.tsx b/context/ChainContext.tsx
+index 91a19ec..8b5b3b6 100644
+--- a/context/ChainContext.tsx
++++ b/context/ChainContext.tsx
+@@ -120,9 +120,7 @@ type Chain = {
+   completionLifecycleStatus: string | null;
+   completionScheduledDate: string | null;
+   completionDateRecordedAt: string | null;
+-  completionDateRecordedByUserId: string | null;
+   completionConfirmedAt: string | null;
+-  completionConfirmedByUserId: string | null;
+   completedAt: string | null;
+ };
+ type ChainContextType = {
+@@ -289,7 +287,7 @@ async function loadParticipantDataset(
+     } = await supabase
+       .from("operational_delays")
+       .select(
+-        "id, chain_id, property_id, chain_node_id, reason, status, created_at, resolved_at, created_by_user_id, resolved_by_user_id, created_by_role, resolved_by_role"
++        "id, chain_id, property_id, chain_node_id, reason, status, created_at, resolved_at, created_by_role, resolved_by_role"
+       )
+       .in("chain_id", participantChainIds)
+       .eq("status", "active");
+@@ -373,7 +371,16 @@ async function loadParticipantDataset(
+   const chainNodesQuery = supabase
+     .from("chain_nodes")
+     .select(`
+-        *,
++        id,
++        chain_id,
++        node_type,
++        linked_property_id,
++        position,
++        stage,
++        status,
++        progress,
++        created_at,
++        stage_entered_at,
+         activities (
+           id,
+           timestamp,
+@@ -398,6 +405,38 @@ async function loadParticipantDataset(
+     return null;
+   }
+ 
++  // Other participants' node owners are not readable; the viewer's own
++  // nodes come from chain_nodes_own.
++  const ownNodesQuery = supabase
++    .from("chain_nodes_own")
++    .select("id, user_id");
++
++  const {
++    data: ownNodesData,
++    error: ownNodesError,
++  } =
++    participantChainIds.length > 0
++      ? await ownNodesQuery.in(
++          "chain_id",
++          participantChainIds
++        )
++      : await ownNodesQuery.limit(0);
++
++  if (isStale()) {
++    return null;
++  }
++
++  if (ownNodesError) {
++    console.error(ownNodesError);
++  }
++
++  const ownNodeUserIds = new Map<number, string>(
++    (ownNodesData || []).map((row) => [
++      Number(row.id),
++      row.user_id,
++    ])
++  );
++
+   const chainNodes =
+     !chainNodesError && chainNodesData
+       ? chainNodesData.map((node) => {
+@@ -408,6 +447,9 @@ async function loadParticipantDataset(
+ 
+           return {
+             ...node,
++            user_id:
++              ownNodeUserIds.get(Number(node.id)) ??
++              null,
+             activities: sortActivitiesNewestFirst(
+               node.activities || []
+             ),
+@@ -422,7 +464,11 @@ async function loadParticipantDataset(
+     console.error(chainNodesError);
+   }
+ 
+-  const chainsQuery = supabase.from("chains").select("*");
++  const chainsQuery = supabase
++    .from("chains")
++    .select(
++      "id, access_code, state, completion_lifecycle_status, completion_scheduled_date, completion_date_recorded_at, completion_confirmed_at, completed_at"
++    );
+ 
+   const { data: chainsData } =
+     participantChainIds.length > 0
+@@ -479,15 +525,9 @@ async function loadParticipantDataset(
+         completionDateRecordedAt:
+           chain.completion_date_recorded_at ??
+           null,
+-        completionDateRecordedByUserId:
+-          chain.completion_date_recorded_by_user_id ??
+-          null,
+         completionConfirmedAt:
+           chain.completion_confirmed_at ??
+           null,
+-        completionConfirmedByUserId:
+-          chain.completion_confirmed_by_user_id ??
+-          null,
+         completedAt: chain.completed_at ?? null,
+       };
+     }
+@@ -1699,9 +1739,6 @@ async function recordChainCompletionDate(
+             completionDateRecordedAt:
+               result.chain
+                 .completion_date_recorded_at,
+-            completionDateRecordedByUserId:
+-              result.chain
+-                .completion_date_recorded_by_user_id,
+           }
+         : chain
+     )
+@@ -1787,9 +1824,6 @@ async function amendChainCompletionDate(
+             completionDateRecordedAt:
+               result.chain
+                 .completion_date_recorded_at,
+-            completionDateRecordedByUserId:
+-              result.chain
+-                .completion_date_recorded_by_user_id,
+           }
+         : chain
+     )
+@@ -1851,9 +1885,6 @@ async function confirmChainCompletion(
+             completionConfirmedAt:
+               result.chain
+                 .completion_confirmed_at,
+-            completionConfirmedByUserId:
+-              result.chain
+-                .completion_confirmed_by_user_id,
+             completedAt:
+               result.chain.completed_at,
+           }
+diff --git a/lib/amendChainCompletionDate.ts b/lib/amendChainCompletionDate.ts
+index 4ac1e43..06b56c7 100644
+--- a/lib/amendChainCompletionDate.ts
++++ b/lib/amendChainCompletionDate.ts
+@@ -136,11 +136,8 @@ export async function amendChainCompletionDate(
+         completion_lifecycle_status,
+         completion_scheduled_date,
+         completion_date_recorded_at,
+-        completion_date_recorded_by_user_id,
+         completion_date_updated_at,
+-        completion_date_updated_by_user_id,
+         completion_confirmed_at,
+-        completion_confirmed_by_user_id,
+         completion_confirmed_by_role,
+         completed_at
+       `
+@@ -219,11 +216,8 @@ export async function amendChainCompletionDate(
+         completion_lifecycle_status,
+         completion_scheduled_date,
+         completion_date_recorded_at,
+-        completion_date_recorded_by_user_id,
+         completion_date_updated_at,
+-        completion_date_updated_by_user_id,
+         completion_confirmed_at,
+-        completion_confirmed_by_user_id,
+         completion_confirmed_by_role,
+         completed_at
+       `
+diff --git a/lib/completionLifecycle.ts b/lib/completionLifecycle.ts
+index 19cb885..a7d16e8 100644
+--- a/lib/completionLifecycle.ts
++++ b/lib/completionLifecycle.ts
+@@ -47,11 +47,8 @@ export type ChainCompletionLifecycleRow = {
+   completion_lifecycle_status: CompletionLifecycleStatus | null;
+   completion_scheduled_date: string | null;
+   completion_date_recorded_at: string | null;
+-  completion_date_recorded_by_user_id: string | null;
+   completion_date_updated_at: string | null;
+-  completion_date_updated_by_user_id: string | null;
+   completion_confirmed_at: string | null;
+-  completion_confirmed_by_user_id: string | null;
+   completion_confirmed_by_role:
+     | "estate_agent"
+     | "participant"
+diff --git a/lib/confirmChainCompletion.ts b/lib/confirmChainCompletion.ts
+index 361a5e3..e62cb9d 100644
+--- a/lib/confirmChainCompletion.ts
++++ b/lib/confirmChainCompletion.ts
+@@ -120,11 +120,8 @@ export async function confirmChainCompletion(
+         completion_lifecycle_status,
+         completion_scheduled_date,
+         completion_date_recorded_at,
+-        completion_date_recorded_by_user_id,
+         completion_date_updated_at,
+-        completion_date_updated_by_user_id,
+         completion_confirmed_at,
+-        completion_confirmed_by_user_id,
+         completion_confirmed_by_role,
+         completed_at
+       `
+@@ -188,11 +185,8 @@ export async function confirmChainCompletion(
+         completion_lifecycle_status,
+         completion_scheduled_date,
+         completion_date_recorded_at,
+-        completion_date_recorded_by_user_id,
+         completion_date_updated_at,
+-        completion_date_updated_by_user_id,
+         completion_confirmed_at,
+-        completion_confirmed_by_user_id,
+         completion_confirmed_by_role,
+         completed_at
+       `
+diff --git a/lib/ensureBuyerReadyOnJoin.ts b/lib/ensureBuyerReadyOnJoin.ts
+index 107cf88..09c9bd3 100644
+--- a/lib/ensureBuyerReadyOnJoin.ts
++++ b/lib/ensureBuyerReadyOnJoin.ts
+@@ -42,11 +42,10 @@ export async function ensureBuyerReadyOnJoin(
+ 
+   const { data: existingForUser, error: userLookupError } =
+     await supabase
+-      .from("chain_nodes")
++      .from("chain_nodes_own")
+       .select("id")
+       .eq("chain_id", params.chainId)
+       .eq("node_type", "buyer_ready")
+-      .eq("user_id", params.userId)
+       .maybeSingle();
+ 
+   if (userLookupError) {
+diff --git a/lib/operationalDelays.ts b/lib/operationalDelays.ts
+index cf2a5cc..4471f4c 100644
+--- a/lib/operationalDelays.ts
++++ b/lib/operationalDelays.ts
+@@ -24,8 +24,6 @@ export type OperationalDelay = {
+   status: OperationalDelayStatus;
+   createdAt: string;
+   resolvedAt: string | null;
+-  createdByUserId?: string | null;
+-  resolvedByUserId?: string | null;
+   createdByRole?: string | null;
+   resolvedByRole?: string | null;
+ };
+@@ -97,8 +95,6 @@ export function mapOperationalDelayRow(row: {
+   status: string;
+   created_at: string;
+   resolved_at: string | null;
+-  created_by_user_id?: string | null;
+-  resolved_by_user_id?: string | null;
+   created_by_role?: string | null;
+   resolved_by_role?: string | null;
+ }): OperationalDelay | null {
+@@ -118,8 +114,6 @@ export function mapOperationalDelayRow(row: {
+     status: row.status,
+     createdAt: row.created_at,
+     resolvedAt: row.resolved_at,
+-    createdByUserId: row.created_by_user_id ?? null,
+-    resolvedByUserId: row.resolved_by_user_id ?? null,
+     createdByRole: row.created_by_role ?? null,
+     resolvedByRole: row.resolved_by_role ?? null,
+   };
+diff --git a/lib/recordChainCompletionDate.ts b/lib/recordChainCompletionDate.ts
+index 761629e..112dfd0 100644
+--- a/lib/recordChainCompletionDate.ts
++++ b/lib/recordChainCompletionDate.ts
+@@ -180,11 +180,8 @@ export async function recordChainCompletionDate(
+         completion_lifecycle_status,
+         completion_scheduled_date,
+         completion_date_recorded_at,
+-        completion_date_recorded_by_user_id,
+         completion_date_updated_at,
+-        completion_date_updated_by_user_id,
+         completion_confirmed_at,
+-        completion_confirmed_by_user_id,
+         completion_confirmed_by_role,
+         completed_at
+       `
+@@ -234,11 +231,8 @@ export async function recordChainCompletionDate(
+         completion_lifecycle_status,
+         completion_scheduled_date,
+         completion_date_recorded_at,
+-        completion_date_recorded_by_user_id,
+         completion_date_updated_at,
+-        completion_date_updated_by_user_id,
+         completion_confirmed_at,
+-        completion_confirmed_by_user_id,
+         completion_confirmed_by_role,
+         completed_at
+       `
