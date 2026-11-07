@@ -27,7 +27,7 @@ const migration = read(
   "supabase/migrations/20260902120000_smoke_test_fixtures.sql"
 );
 const directoryEligibilityMigration = read(
-  "supabase/migrations/20261010120000_ea_branch_directory_search_eligibility.sql"
+  "supabase/migrations/20261108110000_ea_branch_directory_search_eligibility.sql"
 );
 const onboarding = read("lib/estateAgent/completeOnboarding.ts");
 const signup = read("app/estate-agents/signup/page.tsx");

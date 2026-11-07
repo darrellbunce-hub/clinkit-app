@@ -88,23 +88,71 @@ function checkCommon(label: string, raw: string, functions: { name: string; args
 }
 
 // ---------------------------------------------------------------------------
-// Proposals stay out of supabase/migrations
+// Only reviewed proposals are promoted into supabase/migrations, unchanged
 // ---------------------------------------------------------------------------
 
 const migrationFiles = readdirSync(join(ROOT, "supabase/migrations"));
-for (const proposal of [ATOMIC, CLEANUP, VISIBILITY, FORMER_BRANCH, ATTRIBUTION, PROBES, EXISTENCE, CHAINS_GUARD, ENTITLEMENT, OWN_NODES, USER_ID_COLUMNS, LEGACY_AUDIT]) {
+const PROPOSAL_HEADER =
+  "-- PROPOSED — NOT APPLIED. Stage 2 pre-launch review draft.\n" +
+  "-- Promote by copying into supabase/migrations/ only after approval.\n";
+const PROMOTED: { proposal: string; migration: string; header: string | null; object: string }[] = [
+  {
+    proposal: ATOMIC,
+    migration: "20261021100000_start_move_create_property_atomic.sql",
+    header: null,
+    object: "start_move_create_property",
+  },
+  {
+    proposal: OWN_NODES,
+    migration: "20261108140000_chain_nodes_own_view.sql",
+    header:
+      "-- Promoted from Stage 2 proposal docs/prelaunch/stage2/20261021190000_chain_nodes_own_view.sql\n" +
+      "-- for the MoveLoop Production release. Definition unchanged.\n",
+    object: "chain_nodes_own",
+  },
+];
+for (const { proposal, migration, header, object } of PROMOTED) {
   const fileName = proposal.split("/").pop()!;
   assert(existsSync(join(ROOT, proposal)), `proposal present: ${fileName}`);
-  assert(!migrationFiles.includes(fileName), `not promoted into supabase/migrations: ${fileName}`);
+  assert(migrationFiles.includes(migration), `promoted as supabase/migrations/${migration}`);
+  const proposed = read(proposal);
+  const promoted = read(`supabase/migrations/${migration}`);
+  const expected = header === null ? proposed : proposed.startsWith(PROPOSAL_HEADER) ? header + proposed.slice(PROPOSAL_HEADER.length) : null;
+  assert(
+    expected !== null && promoted === expected,
+    `promoted ${migration} is the proposal verbatim${header === null ? "" : " apart from the reviewed header"}`
+  );
+  const referencing = migrationFiles.filter((file) => read(`supabase/migrations/${file}`).includes(object));
+  assert(
+    JSON.stringify(referencing) === JSON.stringify([migration]),
+    `only ${migration} defines or references ${object} (found: ${referencing.join(", ") || "none"})`
+  );
 }
+const migrationVersions = new Set(migrationFiles.map((file) => /^(\d{14})_/.exec(file)?.[1]).filter(Boolean));
+for (const proposal of [CLEANUP, VISIBILITY, FORMER_BRANCH, ATTRIBUTION, PROBES, EXISTENCE, CHAINS_GUARD, ENTITLEMENT, USER_ID_COLUMNS, LEGACY_AUDIT]) {
+  const fileName = proposal.split("/").pop()!;
+  const version = /^(\d{14})_/.exec(fileName)?.[1];
+  const suffix = version ? fileName.slice(15) : fileName;
+  assert(existsSync(join(ROOT, proposal)), `proposal present: ${fileName}`);
+  assert(
+    !migrationFiles.some((file) => file === fileName || file.endsWith(`_${suffix}`) || file === suffix) &&
+      !(version && migrationVersions.has(version)),
+    `not promoted into supabase/migrations: ${fileName}`
+  );
+}
+const RELEASE_TAIL = [
+  "20261021100000_start_move_create_property_atomic.sql",
+  "20261108100000_link_start_move_onward_purchase.sql",
+  "20261108110000_ea_branch_directory_search_eligibility.sql",
+  "20261108120000_assign_property_ea_branch_directory_eligibility.sql",
+  "20261108130000_set_property_ea_update_permission_directory_eligibility.sql",
+  "20261108140000_chain_nodes_own_view.sql",
+  "20261108150000_close_ea_self_connect_awaiting_property.sql",
+];
+const versionedMigrations = migrationFiles.filter((file) => /^\d{14}_/.test(file)).sort();
 assert(
-  !migrationFiles.some((file) => read(`supabase/migrations/${file}`).includes("start_move_create_property")),
-  "no applied migration defines or references start_move_create_property"
-);
-const latestMigration = migrationFiles.filter((file) => /^\d{14}_/.test(file)).sort().pop() ?? "";
-assert(
-  latestMigration.slice(0, 14) < "20261021100000",
-  "proposal versions sort after every existing migration"
+  JSON.stringify(versionedMigrations.slice(-RELEASE_TAIL.length)) === JSON.stringify(RELEASE_TAIL),
+  "promoted migrations sort after every earlier migration, in the reviewed release order"
 );
 
 // ---------------------------------------------------------------------------
@@ -976,7 +1024,7 @@ ${idempotent}
   );
 
   // 1) assign_property_ea_branch
-  const eligibility = read("supabase/migrations/20261011090000_assign_property_ea_branch_directory_eligibility.sql");
+  const eligibility = read("supabase/migrations/20261108120000_assign_property_ea_branch_directory_eligibility.sql");
   const assignStart = "create or replace function public.assign_property_ea_branch(";
   const assignEnd = "An existing assignment is never revoked or altered for eligibility.';";
   assert(
@@ -1033,7 +1081,7 @@ ${idempotent}
         "Another household''s sale in the same chain may use the same branch; the answer never depends on other rows'' assignments (Business Rules 3.4, 19.23). Unknown and foreign property ids both return not_authorized.",
       ],
     ]),
-    "probes: assign_property_ea_branch is the 20261011090000 body verbatim except the merged existence / authorisation check and the removed linked-sale branch refusal"
+    "probes: assign_property_ea_branch is the 20261108120000 body verbatim except the merged existence / authorisation check and the removed linked-sale branch refusal"
   );
   const assign = functionBody(sql, "assign_property_ea_branch");
   const steps = [
@@ -1591,7 +1639,7 @@ function latestFunctions(proposals: string[]): Map<string, { header: string; bod
   };
   const scope = /auth\.uid\(\)|public\.(is_|can_|caller_|_is_|_caller)|_require_verified_email_for_transaction|\bpublic\._?execute_participation_delink\(/;
   const reviewedUnscoped: Record<string, string> = {
-    connect_ea_to_awaiting_property: "closed: always join_details_not_matched (20261010090000)",
+    connect_ea_to_awaiting_property: "closed: always join_details_not_matched (20261108150000)",
     ensure_property_membership: "no end-user execute",
     get_ea_founding_availability: "public founding-offer counts; no participant data",
     is_allowed_structured_activity_update: "validates its text argument only",

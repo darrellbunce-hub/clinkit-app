@@ -2,7 +2,7 @@
  * Static checks for closing Estate Agent self-attachment to a purchase awaiting
  * its seller:
  *
- *   supabase/migrations/20261010090000_close_ea_self_connect_awaiting_property.sql
+ *   supabase/migrations/20261108150000_close_ea_self_connect_awaiting_property.sql
  *
  * connect_ea_to_awaiting_property must refuse every call generically and be
  * unable to write an assignment; the app must no longer call it; the approved
@@ -17,12 +17,12 @@ import { join, relative } from "path";
 
 const ROOT = join(import.meta.dirname, "..");
 const MIGRATIONS_DIR = "supabase/migrations";
-const FILE = "20261010090000_close_ea_self_connect_awaiting_property.sql";
-const PREVIOUS_LATEST = "20261008090000_buyer_ready_cached_activity_clock.sql";
+const FILE = "20261108150000_close_ea_self_connect_awaiting_property.sql";
+const PREVIOUS_LATEST = "20261108140000_chain_nodes_own_view.sql";
 const RP = "20261005140000_reservation_placeholders_awaiting_seller.sql";
 const M2 = "20261005110000_seller_side_authority_and_awaiting_connection.sql";
 const M3 = "20261005120000_operational_authority_enforcement.sql";
-const ASSIGN_ELIGIBILITY = "20261011090000_assign_property_ea_branch_directory_eligibility.sql";
+const ASSIGN_ELIGIBILITY = "20261108120000_assign_property_ea_branch_directory_eligibility.sql";
 const SIGNATURE = "public.connect_ea_to_awaiting_property(text, text, text, uuid)";
 const APP_DIRS = ["app", "lib", "components", "hooks", "emails"];
 
@@ -206,7 +206,7 @@ function main() {
       latestDefiner("is_property_seller_side_homeowner") === M2
   );
   record(
-    "Approved route: assign_property_ea_branch (20261005120000, eligibility added by 20261011090000) requires the seller-side homeowner",
+    "Approved route: assign_property_ea_branch (20261005120000, eligibility added by 20261108120000) requires the seller-side homeowner",
     latestDefiner("assign_property_ea_branch") === ASSIGN_ELIGIBILITY &&
       [M3, ASSIGN_ELIGIBILITY].every((file) =>
         functionBody(sqlOf.get(file)!, "assign_property_ea_branch").includes(

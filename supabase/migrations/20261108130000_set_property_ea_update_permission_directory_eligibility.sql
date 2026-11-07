@@ -7,7 +7,7 @@
 -- authority for the branch's members, so a branch that is not in
 -- ea_branch_directory (an internal, smoke-test, development or fixture branch,
 -- Rule 17.15, or one that is not entitled, Rule 25.16) could still be given new
--- authority after appointment. 20261011090000 closed the same route through
+-- authority after appointment. 20261108120000 closed the same route through
 -- assign_property_ea_branch; this closes it here. Rule 25.37: enforcement must
 -- be server-side.
 --
@@ -87,7 +87,7 @@ begin
   where p.oid = to_regprocedure('public.assign_property_ea_branch(bigint, uuid, boolean)');
 
   if v_assign_src is null or v_assign_src not like '%from public.ea_branch_directory d%' then
-    raise exception 'set_property_ea_update_permission_directory_eligibility aborted: 20261011090000 (assign_property_ea_branch directory eligibility) is not applied';
+    raise exception 'set_property_ea_update_permission_directory_eligibility aborted: 20261108120000 (assign_property_ea_branch directory eligibility) is not applied';
   end if;
 
   if to_regclass('public.ea_branch_directory') is null then
@@ -111,7 +111,7 @@ begin
          and a.atttypid = 'uuid'::regtype
      )
   then
-    raise exception 'set_property_ea_update_permission_directory_eligibility aborted: ea_branch_directory is not the 20261010120000 eligibility view';
+    raise exception 'set_property_ea_update_permission_directory_eligibility aborted: ea_branch_directory is not the 20261108110000 eligibility view';
   end if;
 
   perform set_config('moveloop.set_property_ea_update_permission_acl', v_acl, false);

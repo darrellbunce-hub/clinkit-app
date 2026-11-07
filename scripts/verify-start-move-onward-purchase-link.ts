@@ -2,7 +2,7 @@
  * Offline checks for linking a Start Move sale to its onward purchase and for
  * the chain view's segment-gap rendering:
  *
- *   supabase/migrations/20261010110000_link_start_move_onward_purchase.sql
+ *   supabase/migrations/20261108100000_link_start_move_onward_purchase.sql
  *
  * Migration shape and scope, the Start Move call order and failure path,
  * chain topology for linked / unlinked / broken pairs, and the connector
@@ -26,8 +26,8 @@ import {
 
 const ROOT = join(import.meta.dirname, "..");
 const MIGRATIONS_DIR = "supabase/migrations";
-const FILE = "20261010110000_link_start_move_onward_purchase.sql";
-const STEP1 = "20261010090000_close_ea_self_connect_awaiting_property.sql";
+const FILE = "20261108100000_link_start_move_onward_purchase.sql";
+const STEP1 = "20261021100000_start_move_create_property_atomic.sql";
 const SIGNATURE = "public.link_start_move_onward_purchase(bigint, bigint)";
 
 type TestResult = { name: string; pass: boolean; detail?: string };
@@ -233,8 +233,8 @@ function checkStartMovePage() {
     )
   );
   record(
-    "Start Move: fail() keeps an established chain and cleans up only before any property is established",
-    /async function fail\([\s\S]{0,600}?if \(chainId != null && propertyEstablished\) \{\s*setRecovery\(\{ chainId, reason: recoveryReason \}\);\s*return;\s*\}\s*if \(chainId != null\) \{\s*await cleanupOnboardingChain\(chainId\);/.test(
+    "Start Move: fail() keeps an established chain (or one whose create outcome is unknown) and cleans up only before any property is established",
+    /async function fail\([\s\S]{0,600}?if \(chainId != null && \(propertyEstablished \|\| createOutcomeUnknown\)\) \{\s*setRecovery\(\{\s*chainId,\s*reason: createOutcomeUnknown \? "outcome_unknown" : recoveryReason,\s*\}\);\s*return;\s*\}\s*if \(chainId != null\) \{\s*await cleanupOnboardingChain\(chainId\);/.test(
       page
     )
   );

@@ -248,10 +248,10 @@ const startMove = read("app/start-move/page.tsx");
 
 assert(!startMove.includes("incompleteChainId"), "Start Move: recovery state replaces incompleteChainId");
 assert(
-  /async function fail\([\s\S]*?recoveryReason: StartMoveRecoveryReason = "step_incomplete"[\s\S]*?if \(chainId != null && propertyEstablished\) \{\s*setRecovery\(\{ chainId, reason: recoveryReason \}\);\s*return;\s*\}\s*if \(chainId != null\) \{\s*await cleanupOnboardingChain\(chainId\);\s*\}/.test(
+  /async function fail\([\s\S]*?recoveryReason: StartMoveRecoveryReason = "step_incomplete"[\s\S]*?if \(chainId != null && \(propertyEstablished \|\| createOutcomeUnknown\)\) \{\s*setRecovery\(\{\s*chainId,\s*reason: createOutcomeUnknown \? "outcome_unknown" : recoveryReason,\s*\}\);\s*return;\s*\}\s*if \(chainId != null\) \{\s*await cleanupOnboardingChain\(chainId\);\s*\}/.test(
     startMove
   ),
-  "Start Move: fail() keeps an established chain and only cleans up before any property is established"
+  "Start Move: fail() keeps an established chain (or one whose create outcome is unknown) and only cleans up before any property is established"
 );
 
 const saleGrantCheck = startMove.indexOf("if (!sellingResult.ok) {");
@@ -299,8 +299,8 @@ assert(
   "Start Move: no new cleanup call sites (definition, fail(), empty-chain cancel)"
 );
 assert(
-  /"cleanup_abandoned_onboarding_chain",\s*\{ p_chain_id: chainId \}/.test(startMove),
-  "Start Move: cleanup RPC call itself is unchanged (database stage handles it)"
+  /"cleanup_abandoned_onboarding_chain",\s*\{ p_chain_id: chainId, p_require_empty: true \}/.test(startMove),
+  "Start Move: cleanup RPC asks for an empty chain, so the server refuses a chain that holds a property"
 );
 assert(
   startMove.includes("<StartMoveRecoveryPanel recovery={recovery} />"),

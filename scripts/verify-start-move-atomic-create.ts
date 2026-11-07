@@ -3,7 +3,7 @@
  * Run: npx tsx scripts/verify-start-move-atomic-create.ts
  */
 
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { START_MOVE_RECOVERY_COPY } from "../lib/onboarding/startMoveRecovery";
@@ -63,15 +63,49 @@ assert(
   /if \(action\.preserveSourceChain\) \{\s*setRecovery\([\s\S]*?\} else \{\s*void cleanupOnboardingChain\(action\.chainId\);/.test(page),
   "page: cancelling the duplicate dialog keeps a chain that already holds the sale"
 );
-assert(
-  page.includes("promptJoinExistingChain(chainId, false);") &&
-    page.includes("promptJoinExistingChain(chainId, propertyEstablished);"),
-  "page: only the purchase duplicate prompt can carry an established sale"
-);
-assert(
-  !/link_start_move_onward_purchase|linkStartMoveOnwardPurchase|search_ea_branch_directory|get_property_ea_branch_entry|createSearchingPlaceholderForSale/.test(page + grants),
-  "page and grants: no dependency on Stage-only RPCs"
-);
+{
+  const prompts = [
+    ...page.matchAll(/promptJoinExistingChain\(\s*chainId,\s*\{([\s\S]*?)\},\s*(\w+)\s*\);/g),
+  ].map((m) => ({ carried: m[1], preserve: m[2] }));
+  const sale = prompts.filter((p) => /^\s*userId: user\.id,\s*address: selling\.address,/.test(p.carried));
+  const purchase = prompts.filter((p) => /^\s*userId: user\.id,\s*address: buying\.address,/.test(p.carried));
+  assert(
+    (page.match(/promptJoinExistingChain\(/g) ?? []).length === 3 &&
+      prompts.length === 2 &&
+      sale.length === 1 &&
+      sale[0].preserve === "false" &&
+      purchase.length === 1 &&
+      purchase[0].preserve === "propertyEstablished",
+    "page: only the purchase duplicate prompt can carry an established sale"
+  );
+}
+{
+  const startMoveSources = [
+    page,
+    grants,
+    read("lib/onboarding/startMoveOnwardPurchase.ts"),
+    read("lib/searchingPlaceholder.ts"),
+    read("lib/estateAgent/assignments.ts"),
+  ].join("\n");
+  const rpcNames = new Set([
+    ...[...startMoveSources.matchAll(/\.rpc\(\s*"(\w+)"/g)].map((m) => m[1]),
+    ...[...startMoveSources.matchAll(/_RPC =\s*"(\w+)"/g)].map((m) => m[1]),
+  ]);
+  const migrationsDir = join(ROOT, "supabase/migrations");
+  const migrations = readdirSync(migrationsDir)
+    .filter((file) => file.endsWith(".sql"))
+    .map((file) => read(`supabase/migrations/${file}`))
+    .join("\n");
+  const undefinedRpcs = [...rpcNames].filter(
+    (name) => !new RegExp(`create (?:or replace )?function public\\.${name}\\(`).test(migrations)
+  );
+  assert(
+    ["link_start_move_onward_purchase", "search_ea_branch_directory", "get_property_ea_branch_entry", "create_searching_placeholder_for_sale", "start_move_create_property"].every((name) =>
+      rpcNames.has(name)
+    ) && undefinedRpcs.length === 0,
+    `page and grants: every RPC used by Start Move is defined in supabase/migrations, none only in Stage proposals (undefined: ${undefinedRpcs.join(", ") || "none"})`
+  );
+}
 assert(
   /supabase\.rpc\("start_move_create_property", \{\s*p_chain_id: params\.chainId,\s*p_relationship_type: params\.relationshipType,\s*p_address: params\.address,\s*p_postcode: params\.postcode,\s*p_awaiting_buyer: params\.awaitingBuyer,\s*\}\)/.test(grants),
   "grants: RPC arguments match start_move_create_property(bigint, text, text, text, boolean)"
@@ -85,10 +119,16 @@ assert(
   /\.eq\("chain_id", params\.chainId\)\s*\.eq\("relationship_type", params\.relationshipType\)\s*\.eq\("is_searching", false\)\s*\.eq\("address", params\.address\.trim\(\)\)\s*\.eq\("postcode", params\.postcode\.trim\(\)\)/.test(grants),
   "grants: read-back matches the chain, relationship, address and postcode that were requested"
 );
-assert(
-  /const \{ error: buyerReadyError \} = await supabase\s*\.from\("chain_nodes"\)[\s\S]*?if \(buyerReadyError\) \{\s*await fail\([\s\S]*?"buyer_ready_not_added"\s*\);\s*return;/.test(page),
-  "page: a failed buyer-ready step is reported, never skipped"
-);
+{
+  const block =
+    /const \{ error: buyerReadyError \} = await supabase\s*\.from\("chain_nodes"\)[\s\S]*?if \(buyerReadyError\) \{([\s\S]*?)\n\s*\}/.exec(page)?.[1] ?? "";
+  assert(
+    /setRecovery\(\{ chainId, reason: "buyer_ready_not_added" \}\);\s*return;$/.test(block) &&
+      !block.includes("cleanupOnboardingChain(") &&
+      !block.includes("fail("),
+    "page: a failed buyer-ready step is reported, never skipped, and never cleans up the committed purchase"
+  );
+}
 {
   const start = page.indexOf("onCancel={() => {");
   const handler = start < 0 ? "" : page.slice(start, page.indexOf("/>", start));

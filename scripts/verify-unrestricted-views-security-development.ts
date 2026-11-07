@@ -6,7 +6,9 @@
  * Usage:
  *   npx tsx scripts/verify-unrestricted-views-security-development.ts
  *   npx tsx scripts/verify-unrestricted-views-security-development.ts --execute
+ *   npx tsx scripts/verify-unrestricted-views-security-development.ts --static-only
  *
+ * --static-only: static migration checks only; reads no environment and makes no network calls.
  * Default: read-only — project guard + static migration checks + anon PostgREST probes.
  * --execute: synthetic fixtures, authenticated isolation probes, try/finally cleanup.
  *
@@ -43,6 +45,7 @@ const SERVICE_ROLE_ONLY_VIEWS = [
 ] as const;
 const SERVICE_ROLE_ONLY_VIEWS_MIGRATION =
   "20261006120000_operational_intelligence_refresh_queue.sql";
+const CHAIN_NODES_OWN_MIGRATION = "20261108140000_chain_nodes_own_view.sql";
 
 type NamedView = (typeof NAMED_VIEWS)[number];
 type TestResult = { name: string; pass: boolean; detail?: string };
@@ -232,7 +235,7 @@ function runStaticMigrationChecks(): void {
     chain_properties_participant:
       "supabase/migrations/20260725140000_chain_properties_participant_stage_entered_at.sql",
     ea_branch_directory:
-      "supabase/migrations/20261010120000_ea_branch_directory_search_eligibility.sql",
+      "supabase/migrations/20261108110000_ea_branch_directory_search_eligibility.sql",
     ea_operational_assignments:
       "supabase/migrations/20260612000000_phase7a_ea_originated_properties.sql",
   };
@@ -333,6 +336,54 @@ function runStaticMigrationChecks(): void {
     "agent_branch_property_summaries scopes via ea_branch_members + auth.uid()",
     summarySql.includes("bm.user_id = auth.uid()") &&
       summarySql.includes("ea_branch_members")
+  );
+
+  runChainNodesOwnStaticChecks();
+}
+
+function runChainNodesOwnStaticChecks(): void {
+  const sql = readProjectFile(join("supabase", "migrations", CHAIN_NODES_OWN_MIGRATION)).replace(/\r\n/g, "\n");
+  const executable = sql
+    .split("\n")
+    .map((line) => line.replace(/--.*$/, ""))
+    .join("\n");
+  const view =
+    /create view public\.chain_nodes_own\s+with \(security_invoker = false\)\s+as\s+select\s+([\s\S]*?)\s+from public\.chain_nodes cn\s+where\s+([\s\S]*?);/.exec(
+      executable
+    );
+  const columns = (view?.[1] ?? "").split(",").map((column) => column.trim());
+  const conditions = (view?.[2] ?? "").split(/\s+and\s+/).map((condition) => condition.trim());
+
+  record("chain_nodes_own: defined once, as a security_invoker=false view over public.chain_nodes", view !== null && (executable.match(/create (or replace )?view public\.chain_nodes_own\b/g) ?? []).length === 1);
+  record(
+    "chain_nodes_own: returns only id, chain_id, node_type, linked_property_id, user_id",
+    JSON.stringify(columns) === JSON.stringify(["cn.id", "cn.chain_id", "cn.node_type", "cn.linked_property_id", "cn.user_id"]),
+    columns.join(", ")
+  );
+  record(
+    "chain_nodes_own: rows require auth.uid() is not null, user_id = auth.uid() and is_chain_operational_viewer(chain_id), all ANDed",
+    JSON.stringify(conditions) ===
+      JSON.stringify(["auth.uid() is not null", "cn.user_id = auth.uid()", "public.is_chain_operational_viewer(cn.chain_id)"]) &&
+      !/\bor\b/i.test(view?.[2] ?? "or"),
+    conditions.join(" AND ")
+  );
+  record(
+    "chain_nodes_own: revokes all from public, anon and authenticated before granting",
+    executable.indexOf("revoke all on public.chain_nodes_own from public, anon, authenticated;") > -1 &&
+      executable.indexOf("revoke all on public.chain_nodes_own from public, anon, authenticated;") <
+        executable.indexOf("grant select on public.chain_nodes_own to authenticated;")
+  );
+  const grants = [...executable.matchAll(/grant\s+[^;]*\bon\s+(?:table\s+)?public\.chain_nodes_own\b[^;]*;/gi)].map((m) => m[0]);
+  record(
+    "chain_nodes_own: the only grant is SELECT to authenticated (no INSERT, UPDATE, DELETE, ALL, anon or public)",
+    JSON.stringify(grants) === JSON.stringify(["grant select on public.chain_nodes_own to authenticated;"]),
+    grants.join(" | ")
+  );
+  record(
+    "chain_nodes_own: postflight refuses anon SELECT and authenticated INSERT, UPDATE or DELETE",
+    ["'anon', 'public.chain_nodes_own', 'select'", "'authenticated', 'public.chain_nodes_own', 'insert'", "'authenticated', 'public.chain_nodes_own', 'update'", "'authenticated', 'public.chain_nodes_own', 'delete'"].every((probe) =>
+      executable.includes(`has_table_privilege(${probe})`)
+    ) && executable.includes("raise exception 'chain_nodes_own postflight: grants differ'")
   );
 }
 
@@ -1213,7 +1264,28 @@ async function runExecuteProbes(fixture: FixtureContext): Promise<void> {
   void homeownerC;
 }
 
+function reportResults(): void {
+  const failed = results.filter((r) => !r.pass);
+  console.log(
+    `\n${results.length - failed.length}/${results.length} checks passed\n`
+  );
+  if (failed.length > 0) {
+    console.log("Failures:");
+    for (const f of failed) {
+      console.log(` - ${f.name}${f.detail ? `: ${f.detail}` : ""}`);
+    }
+    process.exitCode = 1;
+  }
+}
+
 async function main() {
+  if (process.argv.includes("--static-only")) {
+    console.log("Unrestricted Views Security — static migration checks only (no environment, no database)\n");
+    runStaticMigrationChecks();
+    reportResults();
+    return;
+  }
+
   loadEnvLocal();
   const execute = process.argv.includes("--execute");
 
@@ -1259,17 +1331,7 @@ async function main() {
     }
   }
 
-  const failed = results.filter((r) => !r.pass);
-  console.log(
-    `\n${results.length - failed.length}/${results.length} checks passed\n`
-  );
-  if (failed.length > 0) {
-    console.log("Failures:");
-    for (const f of failed) {
-      console.log(` - ${f.name}${f.detail ? `: ${f.detail}` : ""}`);
-    }
-    process.exitCode = 1;
-  }
+  reportResults();
 }
 
 main().catch((error) => {

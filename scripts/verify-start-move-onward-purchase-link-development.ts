@@ -1,7 +1,7 @@
 /**
  * Start Move sale-to-onward-purchase link — live Development scenarios.
  *
- * Requires 20261010110000_link_start_move_onward_purchase.sql on Development.
+ * Requires 20261108100000_link_start_move_onward_purchase.sql on Development.
  *
  *   SM1 Start Move with an onward purchase (same client calls as the page) links
  *       sale -> purchase; topology is one segment; repeating the link is a no-op
@@ -17,7 +17,7 @@
  *       runs: the link is kept; the branch acting for the homeowner's sale cannot
  *       take the purchase's seller side (branch_acts_for_buyer); another branch
  *       passes that check and, as a verifier branch, is refused for directory
- *       eligibility (20261011090000)
+ *       eligibility (20261108120000)
  *
  * Usage (Development ONLY — bbbsxzxcjkmpqsfvmhbo):
  *   npx tsx scripts/verify-start-move-onward-purchase-link-development.ts --execute
@@ -463,7 +463,7 @@ async function runScenarios(ctx: Ctx) {
     topo5.segments.some((s) => s.propertyNodes.map((p) => p.id).join().includes(`${sale1},${purchase1}`))
   );
 
-  // Verifier branches are never directory-eligible (20261011090000), so EA A's
+  // Verifier branches are never directory-eligible (20261108120000), so EA A's
   // appointment on the sale is written by the service role, as one made while
   // the branch was eligible would be.
   const appointA = await rpc(owner.client, "assign_property_ea_branch", {
@@ -574,7 +574,7 @@ async function cleanupFixtures(ctx: Ctx): Promise<void> {
 
 async function main() {
   if (!process.argv.includes("--execute")) {
-    console.log("Live Development scenarios only. Re-run with --execute after applying 20261010110000.");
+    console.log("Live Development scenarios only. Re-run with --execute after applying 20261108100000.");
     return;
   }
 

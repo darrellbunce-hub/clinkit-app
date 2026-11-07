@@ -27,12 +27,47 @@ const DEPENDENT_FOLLOW_UP_MIGRATIONS = [
   "20261005180000_activities_select_property_chain_viewer.sql",
   "20261006120000_operational_intelligence_refresh_queue.sql",
   "20261008090000_buyer_ready_cached_activity_clock.sql",
-  "20261010090000_close_ea_self_connect_awaiting_property.sql",
-  "20261010110000_link_start_move_onward_purchase.sql",
-  "20261010120000_ea_branch_directory_search_eligibility.sql",
-  "20261011090000_assign_property_ea_branch_directory_eligibility.sql",
-  "20261011100000_set_property_ea_update_permission_directory_eligibility.sql",
+  "20261021100000_start_move_create_property_atomic.sql",
+  "20261108100000_link_start_move_onward_purchase.sql",
+  "20261108110000_ea_branch_directory_search_eligibility.sql",
+  "20261108120000_assign_property_ea_branch_directory_eligibility.sql",
+  "20261108130000_set_property_ea_update_permission_directory_eligibility.sql",
+  "20261108140000_chain_nodes_own_view.sql",
+  "20261108150000_close_ea_self_connect_awaiting_property.sql",
 ];
+
+// Reviewed Stage migrations re-versioned for the MoveLoop Production release.
+const RENUMBERED_RELEASE_MIGRATIONS = [
+  {
+    from: "20261010110000_link_start_move_onward_purchase.sql",
+    to: "20261108100000_link_start_move_onward_purchase.sql",
+    defines: ["create or replace function public.link_start_move_onward_purchase("],
+  },
+  {
+    from: "20261010120000_ea_branch_directory_search_eligibility.sql",
+    to: "20261108110000_ea_branch_directory_search_eligibility.sql",
+    defines: [
+      "create or replace view public.ea_branch_directory",
+      "create or replace function public.search_ea_branch_directory(",
+      "create or replace function public.get_property_ea_branch_entry(",
+    ],
+  },
+  {
+    from: "20261011090000_assign_property_ea_branch_directory_eligibility.sql",
+    to: "20261108120000_assign_property_ea_branch_directory_eligibility.sql",
+    defines: ["create or replace function public.assign_property_ea_branch("],
+  },
+  {
+    from: "20261011100000_set_property_ea_update_permission_directory_eligibility.sql",
+    to: "20261108130000_set_property_ea_update_permission_directory_eligibility.sql",
+    defines: ["create or replace function public.set_property_ea_update_permission("],
+  },
+  {
+    from: "20261010090000_close_ea_self_connect_awaiting_property.sql",
+    to: "20261108150000_close_ea_self_connect_awaiting_property.sql",
+    defines: ["create or replace function public.connect_ea_to_awaiting_property("],
+  },
+] as const;
 
 const HELPERS = [
   { name: "caller_owns_unshared_chain", args: "bigint" },
@@ -161,25 +196,67 @@ function main() {
       "migration version does not collide with another file"
     );
 
-    let changedHistorical: string[] | null = null;
+    let changedHistorical: { status: string; file: string }[] | null = null;
 
     try {
       changedHistorical = execFileSync(
         "git",
-        ["diff", "--name-only", "HEAD", "--", "supabase/migrations"],
+        ["diff", "--name-status", "--no-renames", "HEAD", "--", "supabase/migrations"],
         { cwd: ROOT, encoding: "utf8" }
       )
         .split("\n")
         .map((line) => line.trim())
-        .filter(Boolean);
+        .filter(Boolean)
+        .map((line) => {
+          const [status, path] = line.split(/\t/);
+          return { status, file: path.replace(/^supabase\/migrations\//, "") };
+        });
     } catch {
       changedHistorical = null;
     }
 
-    assert(
-      changedHistorical !== null && changedHistorical.length === 0,
-      "no tracked historical migration is modified (git diff HEAD)"
+    const unreviewed = (changedHistorical ?? []).filter(
+      ({ status, file }) =>
+        !(status === "D" && RENUMBERED_RELEASE_MIGRATIONS.some((r) => r.from === file))
     );
+    assert(
+      changedHistorical !== null && unreviewed.length === 0,
+      `no tracked historical migration is modified; the only changes are deletions of the reviewed renumbered release migrations (unreviewed: ${unreviewed.map((c) => `${c.status} ${c.file}`).join(", ") || "none"})`
+    );
+
+    const present = readdirSync(MIGRATIONS_DIR);
+    for (const { from, to, defines } of RENUMBERED_RELEASE_MIGRATIONS) {
+      const replacement = present.includes(to) ? read(`supabase/migrations/${to}`) : "";
+      assert(
+        !present.includes(from) && present.includes(to),
+        `${from} is replaced by ${to}, not applied twice`
+      );
+      assert(
+        defines.every((definition) => replacement.includes(definition)),
+        `${to} contains its expected definitions (${defines.join("; ")})`
+      );
+
+      let previous: string | null = null;
+      try {
+        previous = execFileSync("git", ["show", `HEAD:supabase/migrations/${from}`], {
+          cwd: ROOT,
+          encoding: "utf8",
+          stdio: ["ignore", "pipe", "ignore"],
+        }).replace(/\r\n/g, "\n");
+      } catch {
+        previous = null;
+      }
+      if (previous !== null) {
+        let renumbered = previous;
+        for (const r of RENUMBERED_RELEASE_MIGRATIONS) {
+          renumbered = renumbered.split(r.from.slice(0, 14)).join(r.to.slice(0, 14));
+        }
+        assert(
+          replacement === renumbered,
+          `${to} is ${from} from HEAD with only migration versions renumbered`
+        );
+      }
+    }
     assert(
       !/\b(create|drop|alter)\s+policy\b/i.test(migration),
       "migration does not change RLS policies"

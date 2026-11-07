@@ -1,7 +1,7 @@
 /**
  * Static checks for directory eligibility in Estate Agent appointment:
  *
- *   supabase/migrations/20261011090000_assign_property_ea_branch_directory_eligibility.sql
+ *   supabase/migrations/20261108120000_assign_property_ea_branch_directory_eligibility.sql
  *
  * assign_property_ea_branch must refuse a branch that is not in
  * ea_branch_directory (Rules 17.15 and 25.16) with the generic branch_not_found
@@ -18,8 +18,8 @@ import { join } from "path";
 
 const ROOT = join(import.meta.dirname, "..");
 const MIGRATIONS_DIR = "supabase/migrations";
-const FILE = "20261011090000_assign_property_ea_branch_directory_eligibility.sql";
-const PREVIOUS_LATEST = "20261010120000_ea_branch_directory_search_eligibility.sql";
+const FILE = "20261108120000_assign_property_ea_branch_directory_eligibility.sql";
+const PREVIOUS_LATEST = "20261108110000_ea_branch_directory_search_eligibility.sql";
 const M3 = "20261005120000_operational_authority_enforcement.sql";
 const DIRECTORY = PREVIOUS_LATEST;
 const SIGNATURE = "public.assign_property_ea_branch(bigint, uuid, boolean)";
@@ -159,7 +159,7 @@ function main() {
   // Eligibility source
   const directory = normalize(stripSqlComments(raw.get(DIRECTORY) ?? ""));
   record(
-    "Eligibility: ea_branch_directory (20261010120000) applies fixture, reserved-domain and entitlement rules",
+    "Eligibility: ea_branch_directory (20261108110000) applies fixture, reserved-domain and entitlement rules",
     directory.includes("create or replace view public.ea_branch_directory") &&
       directory.includes("from public.smoke_test_fixture_objects o") &&
       directory.includes("public.is_ea_branch_commercially_entitled(b.id)") &&
@@ -221,8 +221,8 @@ function main() {
       flat.includes("assign_property_ea_branch_directory_eligibility aborted: assign_property_ea_branch grants differ from 20261005120000")
   );
   record(
-    "Preflight: aborts unless ea_branch_directory is the 20261010120000 eligibility view",
-    flat.includes("assign_property_ea_branch_directory_eligibility aborted: ea_branch_directory is not the 20261010120000 eligibility view") &&
+    "Preflight: aborts unless ea_branch_directory is the 20261108110000 eligibility view",
+    flat.includes("assign_property_ea_branch_directory_eligibility aborted: ea_branch_directory is not the 20261108110000 eligibility view") &&
       flat.includes("v_viewdef not like '%is_ea_branch_commercially_entitled%'") &&
       flat.includes("v_viewdef not like '%smoke_test_fixture_objects%'")
   );

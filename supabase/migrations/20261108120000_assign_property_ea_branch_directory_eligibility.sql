@@ -1,7 +1,7 @@
 -- Estate Agent appointment: only a directory-eligible branch may be appointed.
 --
 -- assign_property_ea_branch (20261005120000) accepted any existing branch id.
--- Homeowner search (20261010120000) lists only eligible branches, but a caller
+-- Homeowner search (20261108110000) lists only eligible branches, but a caller
 -- supplying a branch id directly could still appoint an internal, smoke-test,
 -- development or fixture branch (Rule 17.15) or a branch that is not entitled
 -- (Rule 25.16: a branch may establish new Estate Agent relationships only
@@ -99,7 +99,7 @@ begin
          and a.atttypid = 'uuid'::regtype
      )
   then
-    raise exception 'assign_property_ea_branch_directory_eligibility aborted: ea_branch_directory is not the 20261010120000 eligibility view';
+    raise exception 'assign_property_ea_branch_directory_eligibility aborted: ea_branch_directory is not the 20261108110000 eligibility view';
   end if;
 
   perform set_config('moveloop.assign_property_ea_branch_acl', v_acl, false);

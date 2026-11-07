@@ -1,7 +1,7 @@
 /**
  * Static checks for directory eligibility in the Estate Agent delegation toggle:
  *
- *   supabase/migrations/20261011100000_set_property_ea_update_permission_directory_eligibility.sql
+ *   supabase/migrations/20261108130000_set_property_ea_update_permission_directory_eligibility.sql
  *
  * set_property_ea_update_permission must refuse to give delegated updates
  * (homeowner_only_updates true or null -> false) to an actively assigned branch
@@ -20,10 +20,10 @@ import { formatPropertyEaAssignmentError, formatPropertyEaDelegationError } from
 
 const ROOT = join(import.meta.dirname, "..");
 const MIGRATIONS_DIR = "supabase/migrations";
-const FILE = "20261011100000_set_property_ea_update_permission_directory_eligibility.sql";
-const PREVIOUS_LATEST = "20261011090000_assign_property_ea_branch_directory_eligibility.sql";
+const FILE = "20261108130000_set_property_ea_update_permission_directory_eligibility.sql";
+const PREVIOUS_LATEST = "20261108120000_assign_property_ea_branch_directory_eligibility.sql";
 const M3 = "20261005120000_operational_authority_enforcement.sql";
-const DIRECTORY = "20261010120000_ea_branch_directory_search_eligibility.sql";
+const DIRECTORY = "20261108110000_ea_branch_directory_search_eligibility.sql";
 const SIGNATURE = "public.set_property_ea_update_permission(bigint, boolean)";
 
 const LOCK =
@@ -87,7 +87,7 @@ function main() {
     latestDefiner("set_property_ea_update_permission")
   );
   record(
-    "Ordering: assign_property_ea_branch keeps its 20261011090000 definition",
+    "Ordering: assign_property_ea_branch keeps its 20261108120000 definition",
     latestDefiner("assign_property_ea_branch") === PREVIOUS_LATEST,
     latestDefiner("assign_property_ea_branch")
   );
@@ -146,7 +146,7 @@ function main() {
   // Eligibility source
   const directory = normalize(stripSqlComments(raw.get(DIRECTORY) ?? ""));
   record(
-    "Eligibility: ea_branch_directory (20261010120000) applies fixture, reserved-domain and entitlement rules",
+    "Eligibility: ea_branch_directory (20261108110000) applies fixture, reserved-domain and entitlement rules",
     directory.includes("create or replace view public.ea_branch_directory") &&
       directory.includes("from public.smoke_test_fixture_objects o") &&
       directory.includes("public.is_ea_branch_commercially_entitled(b.id)") &&
@@ -201,9 +201,9 @@ function main() {
       flat.includes("set_property_ea_update_permission_directory_eligibility aborted: set_property_ea_update_permission grants differ from 20261005120000")
   );
   record(
-    "Preflight: aborts unless 20261011090000 is applied and ea_branch_directory is the eligibility view",
-    flat.includes("aborted: 20261011090000 (assign_property_ea_branch directory eligibility) is not applied") &&
-      flat.includes("set_property_ea_update_permission_directory_eligibility aborted: ea_branch_directory is not the 20261010120000 eligibility view")
+    "Preflight: aborts unless 20261108120000 is applied and ea_branch_directory is the eligibility view",
+    flat.includes("aborted: 20261108120000 (assign_property_ea_branch directory eligibility) is not applied") &&
+      flat.includes("set_property_ea_update_permission_directory_eligibility aborted: ea_branch_directory is not the 20261108110000 eligibility view")
   );
   record(
     "Preflight/postflight: the function ACL is captured before and compared after",

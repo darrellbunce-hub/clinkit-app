@@ -1,7 +1,7 @@
 /**
  * Estate Agent branch directory search and eligibility — offline checks.
  *
- * Covers 20261010120000_ea_branch_directory_search_eligibility.sql and the
+ * Covers 20261108110000_ea_branch_directory_search_eligibility.sql and the
  * homeowner search client:
  *   - the directory view lists only eligible branches (Rule 17.15 fixture and
  *     test exclusion; Rule 25.16 per-branch entitlement) and keeps its shape
@@ -16,8 +16,8 @@ import { existsSync, readdirSync, readFileSync } from "fs";
 import { join } from "path";
 
 const ROOT = join(__dirname, "..");
-const MIGRATION = "20261010120000_ea_branch_directory_search_eligibility.sql";
-const PREVIOUS = "20261010110000_link_start_move_onward_purchase.sql";
+const MIGRATION = "20261108110000_ea_branch_directory_search_eligibility.sql";
+const PREVIOUS = "20261108100000_link_start_move_onward_purchase.sql";
 
 type TestResult = { name: string; pass: boolean; detail?: string };
 const results: TestResult[] = [];
