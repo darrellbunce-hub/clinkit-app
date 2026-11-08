@@ -7,8 +7,15 @@
  *   npx tsx scripts/verify-ea-billing-checkout-idempotency-development.ts --execute
  *
  * Attempt model: stripe_checkout_session_id holds `attempt:{uuid}` while Stripe
- * create is in-flight; Stripe Idempotency-Key embeds that uuid. Real `cs_…` id
- * replaces the marker after success. Expired/abandoned sessions rotate attempts.
+ * create is in-flight; Stripe Idempotency-Key embeds that uuid and the Checkout
+ * offer. Real `cs_…` id replaces the marker after success. Expired/abandoned
+ * sessions rotate attempts; a completed session returns checkout_processing.
+ *
+ * --execute writes Development fixtures (user, company, branch, subscription rows,
+ * audit events) and Stripe test-mode objects (Customer, Checkout Sessions, three
+ * short trial Subscriptions for the Stripe-evidence and duplicate-guard checks).
+ * All are cleaned up or left cancelled. Refuses non-test Stripe keys.
+ * DUP1 needs migration 20261108160000 (billing_reconcile_required) applied.
  */
 import { randomUUID } from "crypto";
 import { existsSync, readFileSync } from "fs";
@@ -160,6 +167,55 @@ function runStatic() {
       checkoutSrc.includes("checkout_unavailable")
   );
   record(
+    "Checkout uses standard price only (no founding reservation)",
+    checkoutSrc.includes("config.standardPriceId") &&
+      !checkoutSrc.includes("foundingPriceId") &&
+      !checkoutSrc.includes("reserve_ea_founding_slot") &&
+      !routeSrc.includes("acceptStandardPricing")
+  );
+  record(
+    "Checkout trial: card required, 30 days, cancel without payment method",
+    checkoutSrc.includes('payment_method_collection: "always"') &&
+      checkoutSrc.includes("trial_period_days: trialPeriodDays") &&
+      checkoutSrc.includes("EA_TRIAL_PERIOD_DAYS") &&
+      checkoutSrc.includes('missing_payment_method: "cancel"')
+  );
+  record(
+    "One trial per branch: database and Stripe subscription evidence",
+    checkoutSrc.includes('.not("stripe_subscription_id", "is", null)') &&
+      checkoutSrc.includes("stripe.subscriptions.list") &&
+      checkoutSrc.includes('status: "all"') &&
+      checkoutSrc.includes("decideCheckoutFromSubscriptionHistory") &&
+      checkoutSrc.includes("subscription_check_unavailable")
+  );
+  record(
+    "Duplicate guard: billable Stripe subscription blocks any new Checkout (409)",
+    checkoutSrc.includes('error: "stripe_subscription_exists"') &&
+      checkoutSrc.search(/stripeSubscriptions = await loadStripeSubscriptionHistory\(/) <
+        checkoutSrc.indexOf("checkoutSessionMatchesOffer(existingSession, offer)") &&
+      !checkoutSrc.includes("stripe.subscriptions.cancel")
+  );
+  record(
+    "Completed Checkout returns checkout_processing in both reuse paths",
+    (checkoutSrc.match(/status === "complete"/g) ?? []).length >= 2 &&
+      checkoutSrc.includes('error: "checkout_processing"') &&
+      checkoutSrc.includes("status: 409")
+  );
+  record(
+    "Session id write is conditional on the in-flight marker",
+    checkoutSrc.includes('.eq("stripe_status", "checkout_pending")') &&
+      checkoutSrc.includes("stripe_checkout_session_id.eq.")
+  );
+  record(
+    "Offer is part of the Stripe idempotency key",
+    checkoutSrc.includes("-${input.offer}-")
+  );
+  record(
+    "TEST10/11/12 route rejects client trial fields",
+    routeSrc.includes('"trialPeriodDays"') &&
+      routeSrc.includes('"trial_period_days"')
+  );
+  record(
     "No new Checkout-attempt table required",
     !existsSync(
       join(
@@ -181,8 +237,18 @@ async function runExecute() {
   );
   const { getStripeClient } = await import("../lib/billing/stripeClient");
 
+  if (
+    process.env.STRIPE_API_MODE !== "test" ||
+    !process.env.STRIPE_SECRET_KEY?.startsWith("sk_test_")
+  ) {
+    throw new Error("Refusing: Stripe test mode (sk_test_) required");
+  }
+  const standardPriceId = process.env.STRIPE_EA_STANDARD_PRICE_ID?.trim();
+  if (!standardPriceId) throw new Error("STRIPE_EA_STANDARD_PRICE_ID required");
+
   const admin = serviceClient();
   const stripe = getStripeClient();
+  const createdStripeSubscriptionIds: string[] = [];
 
   const stamp = Date.now().toString(36);
   const domain = `cidem-${stamp}.billing-checkout.test`;
@@ -194,6 +260,13 @@ async function runExecute() {
   const createdSessionIds: string[] = [];
 
   const cleanup = async () => {
+    for (const id of createdStripeSubscriptionIds) {
+      try {
+        await stripe.subscriptions.cancel(id);
+      } catch {
+        /* already cancelled */
+      }
+    }
     for (const id of createdSessionIds) {
       try {
         if (!id.startsWith("attempt:")) {
@@ -256,7 +329,6 @@ async function runExecute() {
     if (!authz.ok) throw new Error(authz.error);
 
     const first = await createEaBranchCheckoutSession({
-      userClient: client,
       context: authz.context,
     });
     record(
@@ -265,6 +337,11 @@ async function runExecute() {
       JSON.stringify(first)
     );
     if (!first.ok) throw new Error(first.error);
+    record(
+      "TRIAL1 new branch receives standard tier with 30-day trial",
+      first.pricingTier === "standard" && first.trialPeriodDays === 30,
+      JSON.stringify(first)
+    );
 
     const { data: afterFirst } = await admin
       .from("ea_branch_subscriptions")
@@ -274,6 +351,28 @@ async function runExecute() {
       .single();
     const session1 = afterFirst?.stripe_checkout_session_id as string;
     if (session1) createdSessionIds.push(session1);
+
+    if (session1) {
+      const stripeSession = await stripe.checkout.sessions.retrieve(session1, {
+        expand: ["line_items"],
+      });
+      record(
+        "TRIAL2 Stripe session: standard price only, card required, trial offer",
+        stripeSession.mode === "subscription" &&
+          stripeSession.payment_method_collection === "always" &&
+          stripeSession.metadata?.keynetic_checkout_offer ===
+            "standard_trial_30d" &&
+          stripeSession.metadata?.keynetic_pricing_tier === "standard" &&
+          stripeSession.line_items?.data.length === 1 &&
+          stripeSession.line_items.data[0]?.price?.id === standardPriceId,
+        JSON.stringify({
+          mode: stripeSession.mode,
+          pmc: stripeSession.payment_method_collection,
+          metadata: stripeSession.metadata,
+          prices: stripeSession.line_items?.data.map((l) => l.price?.id),
+        })
+      );
+    }
 
     const { data: startEvent } = await admin
       .from("ea_subscription_events")
@@ -287,7 +386,6 @@ async function runExecute() {
       ?.checkout_attempt_id;
 
     const second = await createEaBranchCheckoutSession({
-      userClient: client,
       context: authz.context,
     });
     record(
@@ -303,11 +401,9 @@ async function runExecute() {
 
     const [c1, c2] = await Promise.all([
       createEaBranchCheckoutSession({
-        userClient: client,
         context: authz.context,
       }),
       createEaBranchCheckoutSession({
-        userClient: client,
         context: authz.context,
       }),
     ]);
@@ -326,22 +422,26 @@ async function runExecute() {
       .eq("branch_id", branchId)
       .in("state", ["reserved", "confirmed"]);
     record(
-      "TEST2 no duplicate founding slot for branch",
-      (ledger?.length ?? 0) <= 1,
+      "TEST2 new Checkout never reserves a founding slot",
+      (ledger?.length ?? 0) === 0,
       JSON.stringify(ledger)
+    );
+    const { data: openRows } = await admin
+      .from("ea_branch_subscriptions")
+      .select("id")
+      .eq("branch_id", branchId)
+      .is("ended_at", null);
+    record(
+      "TEST2 repeated/concurrent Subscribe keeps one open subscription row",
+      (openRows?.length ?? 0) === 1,
+      JSON.stringify(openRows)
     );
 
     // TEST 3 — simulate lost response: restore attempt marker, clear real session id
     if (!attemptId1) {
       record("TEST3 lost-response retry recovers same logical attempt", false, "missing attempt id");
     } else {
-      const expiresUnix = (
-        startEvent?.metadata as { checkout_expires_at_unix?: number | null }
-      )?.checkout_expires_at_unix;
-      const marker =
-        typeof expiresUnix === "number"
-          ? `attempt:${attemptId1}:${expiresUnix}`
-          : `attempt:${attemptId1}`;
+      const marker = `attempt:${attemptId1}`;
       await admin
         .from("ea_branch_subscriptions")
         .update({
@@ -352,7 +452,6 @@ async function runExecute() {
         .is("ended_at", null);
 
       const recovered = await createEaBranchCheckoutSession({
-        userClient: client,
         context: authz.context,
       });
       const { data: afterLoss } = await admin
@@ -390,7 +489,6 @@ async function runExecute() {
       .is("ended_at", null);
 
     const afterExpire = await createEaBranchCheckoutSession({
-      userClient: client,
       context: authz.context,
     });
     const { data: afterExpireRow } = await admin
@@ -427,87 +525,16 @@ async function runExecute() {
       JSON.stringify({ session1, session2, attemptId1, attemptId2 })
     );
     record(
-      "TEST6/7 new attempt re-evaluates founding/price",
+      "TEST6/7 new attempt stays standard with trial (no subscription yet)",
       afterExpire.ok === true &&
-        (afterExpire.pricingTier === "founding" ||
-          afterExpire.pricingTier === "standard"),
+        afterExpire.pricingTier === "standard" &&
+        afterExpire.trialPeriodDays === 30,
       JSON.stringify(afterExpire)
     );
 
-    // TEST 8 — cohort full path (or skip if founding still open)
-    if (session2) {
-      try {
-        await stripe.checkout.sessions.expire(session2);
-      } catch {
-        /* ignore */
-      }
-      await admin
-        .from("ea_branch_subscriptions")
-        .update({
-          stripe_checkout_session_id: null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("branch_id", branchId)
-        .is("ended_at", null);
-    }
-    await admin
-      .from("ea_founding_slot_ledger")
-      .update({
-        state: "released",
-        released_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq("branch_id", branchId)
-      .eq("state", "reserved");
-
-    const { data: avail } = await admin.rpc("get_ea_founding_availability");
-    if (avail?.cohort_secured === true || Number(avail?.available_count) === 0) {
-      const needAccept = await createEaBranchCheckoutSession({
-        userClient: client,
-        context: authz.context,
-      });
-      record(
-        "TEST8 cohort full does not create £99 without acceptance",
-        needAccept.ok === false && needAccept.error === "founding_just_secured",
-        JSON.stringify(needAccept)
-      );
-      const standard = await createEaBranchCheckoutSession({
-        userClient: client,
-        context: authz.context,
-        acceptStandardPricing: true,
-      });
-      if (standard.ok && standard.ok) {
-        const { data: stdRow } = await admin
-          .from("ea_branch_subscriptions")
-          .select("stripe_checkout_session_id")
-          .eq("branch_id", branchId)
-          .is("ended_at", null)
-          .single();
-        if (stdRow?.stripe_checkout_session_id) {
-          createdSessionIds.push(stdRow.stripe_checkout_session_id as string);
-        }
-      }
-      record(
-        "TEST8 £129 Checkout after conscious acceptance",
-        standard.ok === true &&
-          standard.ok &&
-          standard.pricingTier === "standard",
-        JSON.stringify(standard)
-      );
-    } else {
-      record(
-        "TEST8 cohort full does not create £99 without acceptance",
-        true,
-        "cohort not full — founding still available"
-      );
-      record(
-        "TEST8 £129 Checkout after conscious acceptance",
-        true,
-        "skipped — founding places still available"
-      );
-    }
-
-    // TEST 14 — unusable/completed session not reused
+    // TEST 14 — expired or unknown session is not reused (completed sessions
+    // return checkout_processing; see static check — Checkout cannot be
+    // completed headlessly)
     const { data: openRow } = await admin
       .from("ea_branch_subscriptions")
       .select("stripe_checkout_session_id")
@@ -532,9 +559,7 @@ async function runExecute() {
       .is("ended_at", null);
 
     const afterCompleted = await createEaBranchCheckoutSession({
-      userClient: client,
       context: authz.context,
-      acceptStandardPricing: true,
     });
     const { data: afterCompletedRow } = await admin
       .from("ea_branch_subscriptions")
@@ -548,7 +573,7 @@ async function runExecute() {
       );
     }
     record(
-      "TEST14 completed/unusable Checkout is not reused as active attempt",
+      "TEST14 expired/unknown Checkout is not reused as active attempt",
       afterCompleted.ok === true &&
         afterCompletedRow?.stripe_checkout_session_id !== prior,
       JSON.stringify({ afterCompleted, afterCompletedRow, prior })
@@ -564,9 +589,7 @@ async function runExecute() {
       .eq("branch_id", branchId)
       .is("ended_at", null);
     const retryable = await createEaBranchCheckoutSession({
-      userClient: client,
       context: authz.context,
-      acceptStandardPricing: true,
     });
     record(
       "TEST15 after cleared attempt state, Subscribe is retryable",
@@ -583,6 +606,244 @@ async function runExecute() {
       if (r?.stripe_checkout_session_id) {
         createdSessionIds.push(r.stripe_checkout_session_id as string);
       }
+    }
+
+    const latestSessionId = async (): Promise<string | null> => {
+      const { data } = await admin
+        .from("ea_branch_subscriptions")
+        .select("stripe_checkout_session_id")
+        .eq("branch_id", branchId)
+        .is("ended_at", null)
+        .single();
+      const id = (data?.stripe_checkout_session_id as string | null) ?? null;
+      if (id && !id.startsWith("attempt:")) createdSessionIds.push(id);
+      return id;
+    };
+    const { data: branchRow } = await admin
+      .from("ea_branches")
+      .select("stripe_customer_id")
+      .eq("id", branchId)
+      .single();
+    const branchCustomerId = branchRow?.stripe_customer_id as string | null;
+
+    // TRIAL3 — database evidence: an ended subscription with a linked Stripe id
+    // means no second trial (even with no Stripe history on this Customer).
+    const fixtureStripeSubId = `sub_fixture_ended_${stamp}`;
+    const { data: endedFixture, error: endedFixtureError } = await admin
+      .from("ea_branch_subscriptions")
+      .insert({
+        branch_id: branchId,
+        stripe_customer_id: branchCustomerId,
+        stripe_subscription_id: fixtureStripeSubId,
+        pricing_tier: "standard",
+        amount_gbp_minor: 12900,
+        currency: "gbp",
+        stripe_status: "canceled",
+        entitlement_status: "ended",
+        ended_at: new Date().toISOString(),
+      })
+      .select("id")
+      .single();
+    if (endedFixtureError || !endedFixture) {
+      record(
+        "TRIAL3 ended subscription (database evidence) prevents a second trial",
+        false,
+        endedFixtureError?.message ?? "fixture insert failed"
+      );
+    } else {
+      const sessionBeforeDbCheck = await latestSessionId();
+      const afterEnded = await createEaBranchCheckoutSession({
+        context: authz.context,
+      });
+      const sessionAfterDbCheck = await latestSessionId();
+      record(
+        "TRIAL3 ended subscription (database evidence) prevents a second trial",
+        afterEnded.ok === true &&
+          afterEnded.pricingTier === "standard" &&
+          afterEnded.trialPeriodDays === null,
+        JSON.stringify(afterEnded)
+      );
+      record(
+        "TRIAL4 open trial Checkout is replaced when the offer changes",
+        !!sessionAfterDbCheck &&
+          sessionAfterDbCheck !== sessionBeforeDbCheck,
+        JSON.stringify({ sessionBeforeDbCheck, sessionAfterDbCheck })
+      );
+      await admin
+        .from("ea_branch_subscriptions")
+        .delete()
+        .eq("id", endedFixture.id as string);
+    }
+
+    // TRIAL5 — Stripe evidence: a subscription that exists only in Stripe
+    // (webhook never linked it) still prevents a second trial.
+    if (!branchCustomerId) {
+      record(
+        "TRIAL5 Stripe-only subscription history prevents a second trial",
+        false,
+        "branch has no Stripe Customer"
+      );
+    } else {
+      const restored = await createEaBranchCheckoutSession({
+        context: authz.context,
+      });
+      record(
+        "TRIAL5 precondition: trial offered again once database fixture is removed",
+        restored.ok === true && restored.trialPeriodDays === 30,
+        JSON.stringify(restored)
+      );
+      await latestSessionId();
+
+      const stripeOnly = await stripe.subscriptions.create({
+        customer: branchCustomerId,
+        items: [{ price: standardPriceId }],
+        trial_period_days: 1,
+        trial_settings: { end_behavior: { missing_payment_method: "cancel" } },
+        metadata: {
+          keynetic_env: "test",
+          verifier: "checkout-idempotency-stripe-evidence",
+        },
+      });
+      createdStripeSubscriptionIds.push(stripeOnly.id);
+      await stripe.subscriptions.cancel(stripeOnly.id);
+
+      const afterStripeOnly = await createEaBranchCheckoutSession({
+        context: authz.context,
+      });
+      await latestSessionId();
+      record(
+        "TRIAL5 Stripe-only (cancelled) subscription history prevents a second trial",
+        afterStripeOnly.ok === true &&
+          afterStripeOnly.pricingTier === "standard" &&
+          afterStripeOnly.trialPeriodDays === null,
+        JSON.stringify(afterStripeOnly)
+      );
+
+      // DUP1 — a live (trialing) Stripe subscription the database does not know
+      // about blocks any new Checkout, is reported for reconciliation, and is
+      // never cancelled by Checkout. No keynetic_branch_id metadata, so the
+      // Development webhook ignores it (branch_unresolved).
+      const sessionBeforeDup = await latestSessionId();
+      const liveUnlinked = await stripe.subscriptions.create({
+        customer: branchCustomerId,
+        items: [{ price: standardPriceId }],
+        trial_period_days: 1,
+        trial_settings: { end_behavior: { missing_payment_method: "cancel" } },
+        metadata: {
+          keynetic_env: "test",
+          verifier: "checkout-idempotency-duplicate-guard",
+        },
+      });
+      createdStripeSubscriptionIds.push(liveUnlinked.id);
+
+      const blocked = await createEaBranchCheckoutSession({
+        context: authz.context,
+      });
+      const sessionAfterDup = await latestSessionId();
+      record(
+        "DUP1 live Stripe subscription unknown to the database blocks Checkout (409 stripe_subscription_exists)",
+        blocked.ok === false &&
+          blocked.error === "stripe_subscription_exists" &&
+          blocked.status === 409,
+        JSON.stringify(blocked)
+      );
+      record(
+        "DUP1 no new Checkout session is created while blocked",
+        sessionAfterDup === sessionBeforeDup,
+        JSON.stringify({ sessionBeforeDup, sessionAfterDup })
+      );
+      if (sessionBeforeDup && !sessionBeforeDup.startsWith("attempt:")) {
+        const outstanding = await stripe.checkout.sessions.retrieve(
+          sessionBeforeDup
+        );
+        record(
+          "DUP1 the branch's outstanding open Checkout session is expired",
+          outstanding.status === "expired",
+          outstanding.status ?? "unknown"
+        );
+      }
+      const { data: reconcileEvents } = await admin
+        .from("ea_subscription_events")
+        .select("metadata")
+        .eq("branch_id", branchId)
+        .eq("event_type", "billing_reconcile_required");
+      record(
+        "DUP1 discrepancy recorded as billing_reconcile_required (requires migration 20261108160000)",
+        (reconcileEvents ?? []).some(
+          (e) =>
+            (e.metadata as { primary_stripe_subscription_id?: string })
+              ?.primary_stripe_subscription_id === liveUnlinked.id
+        ),
+        JSON.stringify(reconcileEvents?.length ?? 0)
+      );
+      const stillLive = await stripe.subscriptions.retrieve(liveUnlinked.id);
+      record(
+        "DUP1 Checkout did not cancel or modify the existing Stripe subscription",
+        stillLive.status === "trialing" && !stillLive.cancel_at_period_end,
+        stillLive.status
+      );
+
+      await createEaBranchCheckoutSession({ context: authz.context });
+      const { data: reconcileAfterRepeat } = await admin
+        .from("ea_subscription_events")
+        .select("id")
+        .eq("branch_id", branchId)
+        .eq("event_type", "billing_reconcile_required");
+      record(
+        "DUP1 repeated blocked attempts are deduped (one reconcile event per day)",
+        (reconcileAfterRepeat?.length ?? 0) <= 1,
+        String(reconcileAfterRepeat?.length ?? 0)
+      );
+
+      await stripe.subscriptions.cancel(liveUnlinked.id);
+      const afterCancelled = await createEaBranchCheckoutSession({
+        context: authz.context,
+      });
+      await latestSessionId();
+      record(
+        "DUP2 once the Stripe subscription is cancelled, paid Checkout is allowed without a trial",
+        afterCancelled.ok === true && afterCancelled.trialPeriodDays === null,
+        JSON.stringify(afterCancelled)
+      );
+
+      // DUP3 — delayed webhook: Stripe already has the subscription created by
+      // this row's own Checkout, the row is still checkout_pending.
+      const { data: pendingRow } = await admin
+        .from("ea_branch_subscriptions")
+        .select("id, stripe_status")
+        .eq("branch_id", branchId)
+        .is("ended_at", null)
+        .single();
+      const ownPending = await stripe.subscriptions.create({
+        customer: branchCustomerId,
+        items: [{ price: standardPriceId }],
+        trial_period_days: 1,
+        trial_settings: { end_behavior: { missing_payment_method: "cancel" } },
+        metadata: {
+          keynetic_env: "test",
+          keynetic_subscription_id: pendingRow!.id as string,
+          verifier: "checkout-idempotency-delayed-webhook",
+        },
+      });
+      createdStripeSubscriptionIds.push(ownPending.id);
+      const sessionBeforeDelayed = await latestSessionId();
+      const delayed = await createEaBranchCheckoutSession({
+        context: authz.context,
+      });
+      const sessionAfterDelayed = await latestSessionId();
+      record(
+        "DUP3 delayed webhook for this row's own subscription returns checkout_processing",
+        pendingRow?.stripe_status === "checkout_pending" &&
+          delayed.ok === false &&
+          delayed.error === "checkout_processing",
+        JSON.stringify({ pendingStatus: pendingRow?.stripe_status, delayed })
+      );
+      record(
+        "DUP3 no replacement Checkout session while the subscription is being confirmed",
+        sessionAfterDelayed === sessionBeforeDelayed,
+        JSON.stringify({ sessionBeforeDelayed, sessionAfterDelayed })
+      );
+      await stripe.subscriptions.cancel(ownPending.id);
     }
 
     const rogue = await client

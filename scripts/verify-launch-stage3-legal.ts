@@ -248,9 +248,14 @@ assertExcludes(
   "billing is not yet live"
 );
 assertIncludes(
-  "EA landing founding offer price present",
+  "EA landing standard price present",
   eaLanding,
-  "£99/month"
+  "£129"
+);
+assertIncludes(
+  "EA landing free trial terms present",
+  eaLanding,
+  "EA_TRIAL_TERMS_COPY"
 );
 
 // Chain Intelligence — timing_v1 model (Stage 3.5; penalty-from-85 retired)

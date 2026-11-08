@@ -101,10 +101,22 @@ export function getSampleEaSubscriptionConfirmationParams(): EaSubscriptionConfi
     recipientName: EMAIL_SAMPLE_DATA.estateAgentName,
     branchName: EMAIL_SAMPLE_DATA.branchName,
     manageBillingUrl: SAMPLE_BILLING_LINK,
+    planLabel: "Standard",
+    priceLabel: EA_STANDARD_MONTHLY_LABEL,
+    nextBillingDateLabel: "18 September 2026",
+    isFounding: false,
+    isTrialing: true,
+  };
+}
+
+/** Historical founding subscriptions only — no longer offered to new branches. */
+export function getSampleFoundingSubscriptionConfirmationParams(): EaSubscriptionConfirmationEmailParams {
+  return {
+    ...getSampleEaSubscriptionConfirmationParams(),
     planLabel: "Founding",
     priceLabel: EA_FOUNDING_MONTHLY_LABEL,
-    nextBillingDateLabel: "18 September 2026",
     isFounding: true,
+    isTrialing: false,
   };
 }
 
@@ -145,16 +157,24 @@ export function getSampleEaSubscriptionCancelledParams(): EaSubscriptionCancelle
     branchName: EMAIL_SAMPLE_DATA.branchName,
     manageBillingUrl: SAMPLE_BILLING_LINK,
     accessEndsAtLabel: "18 September 2026",
+    isFounding: false,
+    isTrialing: true,
+  };
+}
+
+/** Historical founding subscriptions only — no longer offered to new branches. */
+export function getSampleFoundingSubscriptionCancelledParams(): EaSubscriptionCancelledEmailParams {
+  return {
+    ...getSampleEaSubscriptionCancelledParams(),
     isFounding: true,
+    isTrialing: false,
   };
 }
 
 export function getSampleStandardSubscriptionConfirmationParams(): EaSubscriptionConfirmationEmailParams {
   return {
     ...getSampleEaSubscriptionConfirmationParams(),
-    planLabel: "Standard",
-    priceLabel: EA_STANDARD_MONTHLY_LABEL,
-    isFounding: false,
+    isTrialing: false,
   };
 }
 

@@ -164,6 +164,7 @@ function runStatic() {
     oldestFailedAgeMinutes: null,
     staleProcessingCount: 0,
     foundingExceptionCount: 0,
+    reconcileRequiredCount: 0,
     lastProcessedAt: new Date().toISOString(),
   };
   record(
@@ -206,6 +207,17 @@ function runStatic() {
   );
 
   record(
+    "TEST5b Stripe/database reconcile-required is a warning incident",
+    evaluateBillingIncidents({
+      ...healthyCounts,
+      reconcileRequiredCount: 1,
+    }).some(
+      (i) => i.key === "billing_reconcile_required" && i.severity === "warning"
+    ) &&
+      healthSrc.includes('.eq("event_type", "billing_reconcile_required")')
+  );
+
+  record(
     "TEST6/7 normal payment failure & cancellation are not system alert signals",
     healthSrc.includes("Deliberately NOT alerted") &&
       healthSrc.includes("invoice.payment_failed") &&
@@ -221,6 +233,7 @@ function runStatic() {
       oldestFailedAgeMinutes: 20,
       staleProcessingCount: 0,
       foundingExceptionCount: 0,
+      reconcileRequiredCount: 0,
       lastProcessedAt: null,
     },
     incidents: [

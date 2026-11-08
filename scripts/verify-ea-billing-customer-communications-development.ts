@@ -32,8 +32,8 @@ import {
   EA_STANDARD_MONTHLY_LABEL,
 } from "../lib/billing/eaBranchPricing";
 import {
-  getSampleEaSubscriptionCancelledParams,
-  getSampleEaSubscriptionConfirmationParams,
+  getSampleFoundingSubscriptionCancelledParams,
+  getSampleFoundingSubscriptionConfirmationParams,
   getSampleStandardSubscriptionConfirmationParams,
 } from "../lib/communications/sampleData";
 
@@ -145,9 +145,9 @@ async function runStatic() {
     record(`Template registered: ${id}`, registry.includes(`"${id}"`));
   }
 
-  const foundingConfirm = getSampleEaSubscriptionConfirmationParams();
+  const foundingConfirm = getSampleFoundingSubscriptionConfirmationParams();
   const standardConfirm = getSampleStandardSubscriptionConfirmationParams();
-  const cancelFounding = getSampleEaSubscriptionCancelledParams();
+  const cancelFounding = getSampleFoundingSubscriptionCancelledParams();
 
   record(
     "TEST11/14 founding confirmation sample uses £99/month",

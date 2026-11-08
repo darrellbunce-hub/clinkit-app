@@ -27,6 +27,10 @@ import EaMarketingShell from "@/components/estate-agents/EaMarketingShell";
 import CollectionPointNotice from "@/components/legal/CollectionPointNotice";
 import LegalAcceptanceFields from "@/components/legal/LegalAcceptanceFields";
 import { mapAuthSignUpError } from "@/lib/auth/authErrors";
+import {
+  EA_TRIAL_OFFER_SUMMARY,
+  EA_TRIAL_TERMS_COPY,
+} from "@/lib/billing/eaBranchPricing";
 import { validateNewPassword } from "@/lib/auth/passwordPolicy";
 import { ROUTES } from "@/lib/auth/routes";
 import { validateBusinessEmail } from "@/lib/businessEmail";
@@ -287,6 +291,12 @@ function EstateAgentSignupContent() {
               ? `Create your account to join ${inviteCompanyName}.`
               : "Create your agency account using your work email address."}
           </p>
+
+          {!inviteToken ? (
+            <p className="mt-3 text-sm text-slate-600 leading-relaxed">
+              {EA_TRIAL_OFFER_SUMMARY}. {EA_TRIAL_TERMS_COPY}
+            </p>
+          ) : null}
 
           <form
             onSubmit={handleSubmit}

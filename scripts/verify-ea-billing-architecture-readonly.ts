@@ -13,6 +13,9 @@ import {
   EA_FOUNDING_BRANCH_LIMIT,
   EA_FOUNDING_BRANCH_MONTHLY_GBP_MINOR,
   EA_STANDARD_BRANCH_MONTHLY_GBP_MINOR,
+  EA_TRIAL_OFFER_SUMMARY,
+  EA_TRIAL_PERIOD_DAYS,
+  EA_TRIAL_TERMS_COPY,
 } from "../lib/billing/eaBranchPricing";
 import { EA_BILLING_ENTITLEMENT_ENFORCEMENT_ENABLED } from "../lib/billing/eaBranchEntitlement";
 
@@ -69,10 +72,31 @@ function main() {
     EA_BILLING_ENTITLEMENT_ENFORCEMENT_ENABLED === false
   );
 
+  record(
+    "Trial constants: 30 days, standard £129/month",
+    EA_TRIAL_PERIOD_DAYS === 30 &&
+      EA_TRIAL_OFFER_SUMMARY.includes("£129/month") &&
+      EA_TRIAL_TERMS_COPY.includes("card is required")
+  );
+
   const landing = read("components/estate-agents/EaLandingPage.tsx");
   record(
-    "Active marketing £99 founding / £129 standard",
-    landing.includes("£99") && landing.includes("£129/month")
+    "Active marketing: 30-day trial then £129, no £99 founding offer",
+    landing.includes("£129") &&
+      landing.includes("EA_TRIAL_TERMS_COPY") &&
+      !landing.includes("£99") &&
+      !/first 20/i.test(landing)
+  );
+
+  const checkout = read("lib/billing/eaCheckout.ts");
+  record(
+    "Checkout: standard price only with card-required 30-day trial",
+    checkout.includes("config.standardPriceId") &&
+      !checkout.includes("foundingPriceId") &&
+      !checkout.includes("reserve_ea_founding_slot") &&
+      checkout.includes('payment_method_collection: "always"') &&
+      checkout.includes("trial_period_days: trialPeriodDays") &&
+      checkout.includes('missing_payment_method: "cancel"')
   );
 
   const keys = loadEnvLocalKeys().filter((k) => /stripe/i.test(k));

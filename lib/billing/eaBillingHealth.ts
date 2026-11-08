@@ -14,6 +14,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  * - One failed event older than FAILED_MIN_AGE → WARNING
  * - processing older than STALE_PROCESSING (≫ P0 300s lease) → CRITICAL
  * - founding_reconcile_exception in lookback → CRITICAL (immediate)
+ * - billing_reconcile_required in lookback → WARNING (Stripe has a billable
+ *   subscription the database does not reflect; Checkout was refused)
  * - Re-alert cooldown: DEDUPE_COOLDOWN after last alert for same incident_key
  *
  * Deliberately NOT alerted: normal invoice.payment_failed, cancellations,
@@ -31,6 +33,8 @@ export const EA_BILLING_OPS_THRESHOLDS = {
   staleProcessingMinutes: 10,
   /** Lookback for founding reconcile exceptions. */
   foundingExceptionLookbackHours: 72,
+  /** Lookback for Stripe/database subscription discrepancies found at Checkout. */
+  reconcileRequiredLookbackHours: 72,
   /** Do not re-email the same open incident within this window. */
   dedupeCooldownHours: 6,
   /** Scan window for failed webhook rows. */
@@ -42,13 +46,15 @@ export type BillingOpsSeverity = "critical" | "warning";
 export type BillingOpsIncidentKey =
   | "webhook_failures"
   | "stale_processing"
-  | "founding_reconcile_exception";
+  | "founding_reconcile_exception"
+  | "billing_reconcile_required";
 
 export type BillingHealthCounts = {
   failedWebhookCount: number;
   oldestFailedAgeMinutes: number | null;
   staleProcessingCount: number;
   foundingExceptionCount: number;
+  reconcileRequiredCount: number;
   lastProcessedAt: string | null;
 };
 
@@ -121,6 +127,18 @@ export function evaluateBillingIncidents(
       detail: {
         foundingExceptionCount: counts.foundingExceptionCount,
         lookbackHours: thresholds.foundingExceptionLookbackHours,
+      },
+    });
+  }
+
+  if (counts.reconcileRequiredCount > 0) {
+    incidents.push({
+      key: "billing_reconcile_required",
+      severity: "warning",
+      title: "Stripe subscription not reflected in Keynetic (Checkout refused)",
+      detail: {
+        reconcileRequiredCount: counts.reconcileRequiredCount,
+        lookbackHours: thresholds.reconcileRequiredLookbackHours,
       },
     });
   }
@@ -234,6 +252,21 @@ export async function collectBillingHealthCounts(
     .gte("created_at", foundingSince);
   const { count: foundingMetaCount } = await foundingMetaQuery;
 
+  const reconcileSince = new Date(
+    nowMs - thresholds.reconcileRequiredLookbackHours * 60 * 60 * 1000
+  ).toISOString();
+  let reconcileQuery = admin
+    .from("ea_subscription_events")
+    .select("id", { count: "exact", head: true })
+    .eq("event_type", "billing_reconcile_required")
+    .gte("created_at", reconcileSince);
+  if (options?.fixtureFoundingVerifierTag) {
+    reconcileQuery = reconcileQuery.contains("metadata", {
+      verifier: options.fixtureFoundingVerifierTag,
+    });
+  }
+  const { count: reconcileCount } = await reconcileQuery;
+
   let lastProcessedQuery = admin
     .from("stripe_webhook_events")
     .select("processed_at")
@@ -254,6 +287,7 @@ export async function collectBillingHealthCounts(
     staleProcessingCount: staleCount ?? 0,
     foundingExceptionCount:
       (foundingCount ?? 0) + (foundingMetaCount ?? 0),
+    reconcileRequiredCount: reconcileCount ?? 0,
     lastProcessedAt:
       (lastProcessed?.processed_at as string | null | undefined) ?? null,
   };
@@ -295,6 +329,7 @@ export function toPublicBillingHealthReport(snapshot: BillingHealthSnapshot): {
   failedEvents: number;
   stuckProcessing: number;
   reconciliationExceptions: number;
+  reconcileRequired: number;
   oldestFailedAgeMinutes: number | null;
   lastSuccessfulWebhook: string | null;
   openIncidentKeys: BillingOpsIncidentKey[];
@@ -307,6 +342,7 @@ export function toPublicBillingHealthReport(snapshot: BillingHealthSnapshot): {
     failedEvents: snapshot.counts.failedWebhookCount,
     stuckProcessing: snapshot.counts.staleProcessingCount,
     reconciliationExceptions: snapshot.counts.foundingExceptionCount,
+    reconcileRequired: snapshot.counts.reconcileRequiredCount,
     oldestFailedAgeMinutes: snapshot.counts.oldestFailedAgeMinutes,
     lastSuccessfulWebhook: snapshot.counts.lastProcessedAt,
     openIncidentKeys: snapshot.incidents.map((i) => i.key),

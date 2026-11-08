@@ -132,6 +132,8 @@ export type EaSubscriptionConfirmationEmailParams =
     priceLabel: string;
     nextBillingDateLabel: string | null;
     isFounding: boolean;
+    /** Subscription is in its free trial; nextBillingDateLabel is the first payment date. */
+    isTrialing?: boolean;
   };
 
 export type EaPaymentFailedEmailParams = EaBillingEmailCommonParams & {
@@ -149,6 +151,7 @@ export type EaGraceFinalWarningEmailParams = EaBillingEmailCommonParams & {
 export type EaSubscriptionCancelledEmailParams = EaBillingEmailCommonParams & {
   accessEndsAtLabel: string;
   isFounding: boolean;
+  isTrialing?: boolean;
 };
 
 export type EmailTemplateId =

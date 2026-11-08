@@ -8,8 +8,6 @@ export const runtime = "nodejs";
 
 type Body = {
   branchId?: string;
-  /** Conscious acceptance of £129 after founding is unavailable. */
-  acceptStandardPricing?: boolean;
 };
 
 export async function POST(request: Request) {
@@ -39,6 +37,8 @@ export async function POST(request: Request) {
       "idempotency_key",
       "checkoutAttemptKey",
       "checkoutAttemptId",
+      "trialPeriodDays",
+      "trial_period_days",
     ];
     for (const key of forbidden) {
       if (key in (body as Record<string, unknown>)) {
@@ -70,9 +70,7 @@ export async function POST(request: Request) {
     }
 
     const result = await createEaBranchCheckoutSession({
-      userClient: supabase,
       context: authz.context,
-      acceptStandardPricing: body.acceptStandardPricing === true,
     });
 
     if (!result.ok) {
@@ -90,7 +88,7 @@ export async function POST(request: Request) {
       ok: true,
       url: result.url,
       pricingTier: result.pricingTier,
-      reservationExpiresAt: result.reservationExpiresAt ?? null,
+      trialPeriodDays: result.trialPeriodDays,
     });
   } catch {
     return NextResponse.json(

@@ -10,7 +10,8 @@ export type StripeApiMode = "test" | "live";
 export type StripeServerConfig = {
   secretKey: string;
   apiMode: StripeApiMode;
-  foundingPriceId: string;
+  /** Historical founding price. Optional: only used to reconcile existing founding subscriptions. */
+  foundingPriceId: string | null;
   standardPriceId: string;
   webhookSecret: string | null;
   webhookConfigured: boolean;
@@ -50,9 +51,10 @@ export function getStripeServerConfig(): StripeServerConfig {
     throw new Error("Live Stripe mode is only allowed in production deployments");
   }
 
-  const foundingPriceId = requireEnv("STRIPE_EA_FOUNDING_PRICE_ID");
   const standardPriceId = requireEnv("STRIPE_EA_STANDARD_PRICE_ID");
-  if (foundingPriceId === standardPriceId) {
+  const foundingPriceId =
+    process.env.STRIPE_EA_FOUNDING_PRICE_ID?.trim() || null;
+  if (foundingPriceId && foundingPriceId === standardPriceId) {
     throw new Error("Founding and standard Stripe price IDs must differ");
   }
 
@@ -73,11 +75,9 @@ export function getStripeServerConfig(): StripeServerConfig {
   };
 }
 
-export function getStripePriceIdForTier(
-  tier: "founding" | "standard"
-): string {
-  const config = getStripeServerConfig();
-  return tier === "founding"
-    ? config.foundingPriceId
-    : config.standardPriceId;
+export function isFoundingStripePriceId(
+  config: Pick<StripeServerConfig, "foundingPriceId">,
+  priceId: string | null | undefined
+): boolean {
+  return !!config.foundingPriceId && !!priceId && priceId === config.foundingPriceId;
 }

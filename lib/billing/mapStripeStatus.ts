@@ -114,6 +114,26 @@ export function mapStripeSubscriptionToKeynetic(input: {
   }
 }
 
+export type WebhookAuditEventType =
+  | "subscription_expired"
+  | "payment_failed"
+  | "cancellation_scheduled";
+
+/**
+ * Lifecycle audit row for one reconciled subscription state. A status alone
+ * never implies a payment: payment_succeeded is recorded only from a paid,
+ * non-zero invoice (keyed by invoice id), and trial start separately as
+ * trial_started (once per Stripe subscription).
+ */
+export function webhookAuditEventFor(
+  mapped: MappedBillingState
+): WebhookAuditEventType | null {
+  if (mapped.ended) return "subscription_expired";
+  if (mapped.enterGrace) return "payment_failed";
+  if (mapped.cancelAtPeriodEnd) return "cancellation_scheduled";
+  return null;
+}
+
 export function computeGraceEndsAt(
   from: Date = new Date(),
   days = EA_PAYMENT_FAILURE_GRACE_DAYS

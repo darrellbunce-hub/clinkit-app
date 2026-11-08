@@ -1,5 +1,12 @@
 /**
- * Development verifier — founding £99 slot / Checkout / reservation race (P1).
+ * Development verifier — historical founding £99 slots (P1) and their
+ * interaction with the 30-day trial Checkout.
+ *
+ * Founding is closed to new subscriptions: Checkout never reserves or confirms a
+ * slot and always offers the standard price. The founding ledger RPCs and the
+ * webhook confirm/exception paths are still exercised here because existing
+ * founding subscriptions keep reconciling through them. TEST13/TEST16 need
+ * STRIPE_EA_FOUNDING_PRICE_ID set (historical price identification).
  *
  * Target: Development ONLY — bbbsxzxcjkmpqsfvmhbo
  *
@@ -145,20 +152,31 @@ function runStatic() {
     "utf8"
   );
   record(
-    "Checkout sets founding expires_at to reservation window",
-    checkoutSrc.includes("expires_at") &&
-      checkoutSrc.includes("EA_FOUNDING_RESERVATION_SECONDS") &&
-      checkoutSrc.includes('pricing.tier === "founding"')
+    "Checkout never reserves or prices founding for new subscriptions",
+    !checkoutSrc.includes("reserve_ea_founding_slot") &&
+      !checkoutSrc.includes("EA_FOUNDING_RESERVATION_SECONDS") &&
+      !checkoutSrc.includes("acceptStandardPricing") &&
+      !checkoutSrc.includes("foundingPriceId") &&
+      checkoutSrc.includes("config.standardPriceId") &&
+      checkoutSrc.includes('NEW_SUBSCRIPTION_TIER: EaPricingTier = "standard"')
   );
   record(
-    "Checkout refuses stale founding session reuse",
-    checkoutSrc.includes("branchHasActiveFoundingReservation") &&
-      checkoutSrc.includes("expireOpenCheckoutSession")
+    "Checkout expires stale sessions from older pricing (incl. founding)",
+    checkoutSrc.includes("checkoutSessionMatchesOffer") &&
+      checkoutSrc.includes("expireBranchCheckoutSession(")
   );
   record(
-    "Checkout requires conscious standard acceptance when cohort full",
-    checkoutSrc.includes("founding_just_secured") &&
-      checkoutSrc.includes("acceptStandardPricing")
+    "Checkout applies the 30-day card-required trial",
+    checkoutSrc.includes('payment_method_collection: "always"') &&
+      checkoutSrc.includes("trial_period_days: trialPeriodDays") &&
+      checkoutSrc.includes('missing_payment_method: "cancel"')
+  );
+  record(
+    "Historical founding subscriptions: founding history denies a trial and live founding blocks Checkout",
+    checkoutSrc.includes("branchHasDatabaseSubscriptionHistory") &&
+      checkoutSrc.includes('.not("stripe_subscription_id", "is", null)') &&
+      checkoutSrc.includes("decideCheckoutFromSubscriptionHistory") &&
+      checkoutSrc.includes('error: "stripe_subscription_exists"')
   );
 
   const webhookSrc = readFileSync(
@@ -174,6 +192,15 @@ function runStatic() {
   record(
     "Exception path does not auto-rebill at £129",
     webhookSrc.includes("no_auto_refund_no_standard_rebill")
+  );
+  record(
+    "Webhook identifies founding price only when the optional price id is set",
+    webhookSrc.includes("isFoundingStripePriceId(config, priceId)") &&
+      !webhookSrc.includes("priceId === config.foundingPriceId")
+  );
+  record(
+    "Webhook still reads historical keynetic_pricing_tier=founding metadata",
+    webhookSrc.includes('meta.keynetic_pricing_tier === "founding"')
   );
 
   const availSrc = readFileSync(
@@ -213,8 +240,19 @@ function runStatic() {
     foundingOfferOpen: true,
     reservationSeconds: 1800,
   });
+  // TEST17–19 cover the legacy availability helper only; no customer-facing
+  // page renders it since founding closed to new subscriptions.
+  const landingSrc = readFileSync(
+    join(process.cwd(), "components/estate-agents/EaLandingPage.tsx"),
+    "utf8"
+  );
   record(
-    "TEST17 UI: 19/20 shows founding available (not 0 remaining)",
+    "Marketing no longer renders founding availability",
+    !landingSrc.includes("EaFoundingPublicDisplay") &&
+      !landingSrc.includes("£99")
+  );
+  record(
+    "TEST17 legacy helper: 19/20 shows founding available (not 0 remaining)",
     available.mode === "founding_available" &&
       available.placesRemaining === 19 &&
       available.priceLabel === "founding"
@@ -231,7 +269,7 @@ function runStatic() {
     reservationSeconds: 1800,
   });
   record(
-    "TEST17 UI: 20/20 shows founding secured milestone (not 0 remaining)",
+    "TEST17 legacy helper: 20/20 shows founding secured milestone (not 0 remaining)",
     secured.mode === "founding_secured" &&
       secured.headline.includes("secured") &&
       secured.priceLabel === "standard"
@@ -597,18 +635,20 @@ async function runExecute() {
       JSON.stringify(confirmExpired.data)
     );
 
-    // TEST 6 / 7 — Checkout reuse + re-evaluate (Stripe Sandbox)
+    // TEST 6 / 7 — even with a live founding reservation, new Checkout is the
+    // standard trial and never consumes the reservation (Stripe Sandbox).
     const stripeKey = process.env.STRIPE_SECRET_KEY?.trim();
     const foundingPrice = process.env.STRIPE_EA_FOUNDING_PRICE_ID?.trim();
     const standardPrice = process.env.STRIPE_EA_STANDARD_PRICE_ID?.trim();
-    if (!stripeKey || !foundingPrice || !standardPrice) {
+    if (!stripeKey || !standardPrice) {
       record(
         "TEST6/7 Stripe Checkout path skipped (missing Sandbox env)",
         false,
-        "STRIPE_SECRET_KEY / price IDs required"
+        "STRIPE_SECRET_KEY / STRIPE_EA_STANDARD_PRICE_ID required"
       );
+    } else if (!stripeKey.startsWith("sk_test_")) {
+      throw new Error("Refusing: Stripe test mode (sk_test_) required");
     } else {
-      // Fresh reservation for B then Checkout
       const reserveB2 = await bClient.rpc("reserve_ea_founding_slot", {
         p_branch_id: bBranchId,
         p_reservation_seconds: EA_FOUNDING_RESERVATION_SECONDS,
@@ -632,73 +672,63 @@ async function runExecute() {
         .eq("id", subB.id);
 
       const firstCheckout = await createEaBranchCheckoutSession({
-        userClient: bClient,
         context: authzB.context,
       });
       record(
-        "TEST6 founding Checkout created while reservation active",
+        "TEST6 Checkout with an active founding reservation is standard + 30-day trial",
         firstCheckout.ok === true &&
-          firstCheckout.ok &&
-          firstCheckout.pricingTier === "founding",
+          firstCheckout.pricingTier === "standard" &&
+          firstCheckout.trialPeriodDays === 30,
         JSON.stringify(firstCheckout)
       );
 
-      const firstUrl =
-        firstCheckout.ok === true ? firstCheckout.url : null;
-
-      // Expire reservation; leave Checkout session id on row
-      await admin
+      const { data: ledgerAfterCheckout } = await admin
         .from("ea_founding_slot_ledger")
-        .update({
-          reservation_expires_at: new Date(Date.now() - 60_000).toISOString(),
-        })
+        .select("state")
         .eq("branch_id", bBranchId)
-        .eq("state", "reserved");
+        .in("state", ["reserved", "confirmed"]);
+      record(
+        "TEST6 Checkout neither confirms nor adds founding reservations",
+        reserveB2.data?.ok !== true ||
+          ((ledgerAfterCheckout ?? []).every((r) => r.state === "reserved") &&
+            (ledgerAfterCheckout ?? []).length <= 1),
+        JSON.stringify(ledgerAfterCheckout)
+      );
 
-      const reuse = await createEaBranchCheckoutSession({
-        userClient: bClient,
+      const { data: openB } = await admin
+        .from("ea_branch_subscriptions")
+        .select("pricing_tier, founding_slot_number, amount_gbp_minor, stripe_checkout_session_id")
+        .eq("branch_id", bBranchId)
+        .is("ended_at", null)
+        .maybeSingle();
+      record(
+        "TEST7 open Checkout row is standard £129 with no founding slot",
+        openB?.pricing_tier === "standard" &&
+          openB.founding_slot_number == null &&
+          openB.amount_gbp_minor === 12900,
+        JSON.stringify(openB)
+      );
+
+      const repeat = await createEaBranchCheckoutSession({
         context: authzB.context,
       });
       record(
-        "TEST6 expired reservation cannot reuse old £99 Checkout",
-        !(
-          reuse.ok === true &&
-          firstUrl &&
-          reuse.url === firstUrl &&
-          reuse.pricingTier === "founding"
-        ),
-        JSON.stringify({ firstUrl, reuse })
+        "TEST7 repeated Checkout reuses the same standard trial session",
+        firstCheckout.ok === true &&
+          repeat.ok === true &&
+          repeat.url === firstCheckout.url,
+        JSON.stringify({ first: firstCheckout, repeat })
       );
 
-      // After expiry, new attempt should re-reserve or require standard accept
-      if (reuse.ok === true) {
-        record(
-          "TEST7 new Checkout after expiry re-evaluates availability",
-          reuse.pricingTier === "founding" || reuse.pricingTier === "standard",
-          JSON.stringify(reuse)
-        );
-      } else {
-        record(
-          "TEST7 new Checkout after expiry re-evaluates availability",
-          reuse.error === "founding_just_secured" ||
-            reuse.error === "founding_unavailable",
-          JSON.stringify(reuse)
-        );
-        const accepted = await createEaBranchCheckoutSession({
-          userClient: bClient,
-          context: authzB.context,
-          acceptStandardPricing: true,
-        });
-        record(
-          "TEST7 conscious £129 Checkout after founding unavailable",
-          accepted.ok === true &&
-            accepted.ok &&
-            accepted.pricingTier === "standard",
-          JSON.stringify(accepted)
-        );
+      const sessionB = openB?.stripe_checkout_session_id as string | null;
+      if (sessionB && !sessionB.startsWith("attempt:")) {
+        try {
+          const { getStripeClient } = await import("../lib/billing/stripeClient");
+          await getStripeClient().checkout.sessions.expire(sessionB);
+        } catch {
+          /* already expired */
+        }
       }
-
-      void reserveB2;
     }
 
     // TEST 10 — same-company independent eligibility
@@ -1021,40 +1051,25 @@ async function runExecute() {
       .is("ended_at", null);
 
     const authzC = await requireEaBranchBillingOwner(cClient, cUser, cBranchId);
-    if (authzC.ok && cohortFull && stripeKey) {
-      const denied = await createEaBranchCheckoutSession({
-        userClient: cClient,
-        context: authzC.context,
-      });
-      record(
-        "TEST8 cohort full does not create £99 Checkout",
-        denied.ok === false && denied.error === "founding_just_secured",
-        JSON.stringify(denied)
-      );
+    if (authzC.ok && stripeKey) {
       const standard = await createEaBranchCheckoutSession({
-        userClient: cClient,
         context: authzC.context,
-        acceptStandardPricing: true,
       });
       record(
-        "TEST8 new branch receives £129 after conscious accept",
-        standard.ok === true &&
-          standard.ok &&
-          standard.pricingTier === "standard",
+        "TEST8 founding cohort state never blocks or prices Checkout (standard only)",
+        standard.ok === true && standard.pricingTier === "standard",
+        JSON.stringify({ standard, cohortFull })
+      );
+      record(
+        "TEST8 no founding acceptance step remains",
+        !(standard.ok === false && /founding/.test(standard.error)),
         JSON.stringify(standard)
       );
     } else {
       record(
-        "TEST8 cohort full does not create £99 Checkout",
-        cohortFull,
+        "TEST8 founding cohort state never blocks or prices Checkout (standard only)",
+        false,
         JSON.stringify({ fullAvail, authzC, hasStripe: !!stripeKey })
-      );
-      record(
-        "TEST8 new branch receives £129 after conscious accept",
-        cohortFull && !!stripeKey === false
-          ? false
-          : cohortFull,
-        "requires Stripe env + filled cohort"
       );
     }
 

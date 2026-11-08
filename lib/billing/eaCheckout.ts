@@ -7,26 +7,42 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AuthorisedBranchContext } from "@/lib/billing/eaBillingAuth";
 import {
   amountGbpMinorForTier,
+  EA_TRIAL_PERIOD_DAYS,
   type EaPricingTier,
 } from "@/lib/billing/eaBranchPricing";
 import { resolveEffectiveEntitlementStatus } from "@/lib/billing/eaBranchSubscription";
-import { EA_FOUNDING_RESERVATION_SECONDS } from "@/lib/billing/eaFoundingAvailabilityShared";
-import { getStripeClient } from "@/lib/billing/stripeClient";
 import {
-  getStripePriceIdForTier,
-  getStripeServerConfig,
-} from "@/lib/billing/stripeServerConfig";
+  expireBranchCheckoutSession,
+  expireOutstandingCheckoutSessions,
+  type OutstandingSessionReport,
+} from "@/lib/billing/eaCheckoutSessionExpiry";
+import {
+  blockedCheckoutResponse,
+  decideCheckoutFromSubscriptionHistory,
+  type StripeSubscriptionSummary,
+} from "@/lib/billing/eaCheckoutSubscriptionGuard";
+import { getStripeClient } from "@/lib/billing/stripeClient";
+import { getStripeServerConfig } from "@/lib/billing/stripeServerConfig";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/serviceRole";
 
 /** In-flight Checkout create marker stored in stripe_checkout_session_id until Stripe returns. */
 const ATTEMPT_MARKER_PREFIX = "attempt:" as const;
+
+/** New subscriptions are always standard; founding is historical only. */
+const NEW_SUBSCRIPTION_TIER: EaPricingTier = "standard";
+
+/**
+ * Checkout offer stamped into session metadata. An open session is only reused
+ * when its offer matches, so sessions created under older pricing are never resumed.
+ */
+type CheckoutOffer = "standard_trial_30d" | "standard_no_trial";
 
 export type CheckoutCreateResult =
   | {
       ok: true;
       url: string;
       pricingTier: EaPricingTier;
-      reservationExpiresAt?: string | null;
+      trialPeriodDays: number | null;
     }
   | {
       ok: false;
@@ -34,15 +50,6 @@ export type CheckoutCreateResult =
       status: number;
       message?: string;
     };
-
-type PricingSelection =
-  | {
-      ok: true;
-      tier: EaPricingTier;
-      foundingSlot: number | null;
-      reservationExpiresAt: string | null;
-    }
-  | { ok: false; error: string; status: number; message?: string };
 
 type OpenSubscriptionRow = {
   id: string;
@@ -53,6 +60,7 @@ type OpenSubscriptionRow = {
   grace_ends_at: string | null;
   ended_at: string | null;
   stripe_price_id: string | null;
+  stripe_subscription_id: string | null;
 };
 
 function isAttemptMarker(sessionId: string | null | undefined): boolean {
@@ -61,7 +69,7 @@ function isAttemptMarker(sessionId: string | null | undefined): boolean {
 
 type AttemptMarker = {
   attemptId: string;
-  /** Fixed expires_at for founding Checkout — must not change on idempotent retry. */
+  /** Legacy founding Checkout expiry; still parsed from markers written before the trial offer. */
   expiresAtUnix: number | null;
 };
 
@@ -91,11 +99,165 @@ function buildCheckoutAttemptKey(input: {
   branchId: string;
   subscriptionId: string;
   tier: EaPricingTier;
+  offer: CheckoutOffer;
   attemptId: string;
 }): string {
   // Stripe retains idempotency keys ≥24h. Attempt id scopes one logical create;
   // rotated only for a legitimate new attempt (not on every HTTP retry).
-  return `ea-checkout-${input.branchId}-${input.subscriptionId}-${input.tier}-${input.attemptId}`;
+  // The offer is part of the key so an attempt started under older Checkout
+  // parameters can never collide with a trial-configured create.
+  return `ea-checkout-${input.branchId}-${input.subscriptionId}-${input.tier}-${input.offer}-${input.attemptId}`;
+}
+
+function checkoutSessionMatchesOffer(
+  session: { metadata?: Record<string, string> | null },
+  offer: CheckoutOffer
+): boolean {
+  return session.metadata?.keynetic_checkout_offer === offer;
+}
+
+const CHECKOUT_PROCESSING_MESSAGE =
+  "Your Checkout is complete and we're confirming your subscription with Stripe. This usually takes a few seconds — please refresh shortly.";
+
+const SUBSCRIPTION_CHECK_UNAVAILABLE_MESSAGE =
+  "We couldn't confirm your subscription history with Stripe. Please try again in a moment.";
+
+const CHECKOUT_SESSION_EXPIRY_FAILED_MESSAGE =
+  "We couldn't close an earlier Checkout for this branch with Stripe, so a new one can't be started. Please try again shortly or contact support.";
+
+const STRIPE_SUBSCRIPTION_EXISTS_MESSAGE =
+  "This branch already has a subscription with Stripe, so a new one can't be started. Please use Manage billing or contact support and we'll sort it out.";
+
+function checkoutProcessingResult(): CheckoutCreateResult {
+  return {
+    ok: false,
+    error: "checkout_processing",
+    status: 409,
+    message: CHECKOUT_PROCESSING_MESSAGE,
+  };
+}
+
+function isStripeResourceMissing(error: unknown): boolean {
+  return (
+    !!error &&
+    typeof error === "object" &&
+    (error as { code?: unknown }).code === "resource_missing"
+  );
+}
+
+/**
+ * Lists every subscription (all statuses, all pages) on the branch's own
+ * server-managed Stripe Customer. Throws on any Stripe error so callers fail
+ * closed: no Checkout is created when history cannot be established.
+ */
+async function loadStripeSubscriptionHistory(
+  stripe: ReturnType<typeof getStripeClient>,
+  branchStripeCustomerId: string
+): Promise<StripeSubscriptionSummary[]> {
+  const subscriptions: StripeSubscriptionSummary[] = [];
+  for await (const subscription of stripe.subscriptions.list({
+    customer: branchStripeCustomerId,
+    status: "all",
+    limit: 100,
+  })) {
+    subscriptions.push({
+      id: subscription.id,
+      status: subscription.status,
+      metadataSubscriptionRowId:
+        subscription.metadata?.keynetic_subscription_id || null,
+      metadataBranchId: subscription.metadata?.keynetic_branch_id || null,
+    });
+  }
+  return subscriptions;
+}
+
+/**
+ * Database evidence for one-trial-per-branch: any row (open or ended, any tier)
+ * that was ever linked to a Stripe subscription. Rows are never deleted.
+ */
+async function branchHasDatabaseSubscriptionHistory(
+  admin: SupabaseClient,
+  branchId: string
+): Promise<boolean> {
+  const { data, error } = await admin
+    .from("ea_branch_subscriptions")
+    .select("id")
+    .eq("branch_id", branchId)
+    .not("stripe_subscription_id", "is", null)
+    .limit(1);
+  if (error) {
+    throw new Error("subscription_history_unavailable");
+  }
+  return (data ?? []).length > 0;
+}
+
+/**
+ * Stripe holds a billable subscription the database does not reflect. Checkout is
+ * refused; this records what ops need to reconcile (never cancels anything).
+ * Deduped per Stripe subscription per day so repeated clicks do not flood alerts.
+ */
+async function reportStripeSubscriptionConflict(
+  admin: SupabaseClient,
+  input: {
+    branchId: string;
+    openRow: OpenSubscriptionRow | null;
+    blocking: StripeSubscriptionSummary[];
+    reason:
+      | "stripe_subscription_exists_without_matching_db_row"
+      | "outstanding_checkout_session_expiry_failed";
+    outstandingSessions: OutstandingSessionReport;
+  }
+): Promise<void> {
+  const primary = input.blocking[0]!;
+  const details = {
+    reason: input.reason,
+    outstanding_checkout_sessions: input.outstandingSessions,
+    stripe_subscriptions: input.blocking.map((s) => ({
+      stripe_subscription_id: s.id,
+      stripe_status: s.status,
+      metadata_subscription_row_id: s.metadataSubscriptionRowId,
+      metadata_branch_matches:
+        s.metadataBranchId === null ? null : s.metadataBranchId === input.branchId,
+    })),
+    db_open_row_id: input.openRow?.id ?? null,
+    db_open_row_stripe_status: input.openRow?.stripe_status ?? null,
+    db_open_row_entitlement_status: input.openRow?.entitlement_status ?? null,
+    db_open_row_stripe_subscription_id:
+      input.openRow?.stripe_subscription_id ?? null,
+  };
+
+  console.error("[billing-reconcile] Checkout blocked: Stripe subscription exists", {
+    branch_id: input.branchId,
+    ...details,
+  });
+
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const { data: recent, error: recentError } = await admin
+    .from("ea_subscription_events")
+    .select("id")
+    .eq("branch_id", input.branchId)
+    .eq("event_type", "billing_reconcile_required")
+    .contains("metadata", { primary_stripe_subscription_id: primary.id })
+    .gte("created_at", since)
+    .limit(1);
+  if (!recentError && (recent ?? []).length > 0) return;
+
+  const { error } = await admin.from("ea_subscription_events").insert({
+    branch_id: input.branchId,
+    subscription_id: input.openRow?.id ?? null,
+    event_type: "billing_reconcile_required",
+    actor_source: "system",
+    metadata: { primary_stripe_subscription_id: primary.id, ...details },
+  });
+  if (error) {
+    console.error("[billing-audit] ea_subscription_events insert failed", {
+      event_type: "billing_reconcile_required",
+      branch_id: input.branchId,
+      stripe_subscription_id: primary.id,
+      code: error.code ?? null,
+      message: error.message,
+    });
+  }
 }
 
 async function ensureBranchStripeCustomer(
@@ -150,124 +312,6 @@ async function ensureBranchStripeCustomer(
     .eq("id", context.branchId);
 
   return customer.id;
-}
-
-async function branchHasActiveFoundingReservation(
-  admin: SupabaseClient,
-  branchId: string
-): Promise<{ active: boolean; expiresAt: string | null; slot: number | null }> {
-  const { data } = await admin
-    .from("ea_founding_slot_ledger")
-    .select("slot_number, reservation_expires_at, state")
-    .eq("branch_id", branchId)
-    .eq("state", "reserved")
-    .gt("reservation_expires_at", new Date().toISOString())
-    .maybeSingle();
-
-  if (!data) {
-    return { active: false, expiresAt: null, slot: null };
-  }
-
-  return {
-    active: true,
-    expiresAt: (data.reservation_expires_at as string) ?? null,
-    slot: typeof data.slot_number === "number" ? data.slot_number : null,
-  };
-}
-
-async function expireOpenCheckoutSession(
-  stripe: ReturnType<typeof getStripeClient>,
-  sessionId: string | null | undefined
-): Promise<void> {
-  if (!sessionId || isAttemptMarker(sessionId)) return;
-  try {
-    const existing = await stripe.checkout.sessions.retrieve(sessionId);
-    if (existing.status === "open") {
-      await stripe.checkout.sessions.expire(sessionId);
-    }
-  } catch {
-    /* ignore — session may already be expired/complete */
-  }
-}
-
-async function selectPricingTier(input: {
-  userClient: SupabaseClient;
-  branchId: string;
-  acceptStandardPricing: boolean;
-}): Promise<PricingSelection> {
-  const { userClient, branchId, acceptStandardPricing } = input;
-
-  const reserve = await userClient.rpc("reserve_ea_founding_slot", {
-    p_branch_id: branchId,
-    p_reservation_seconds: EA_FOUNDING_RESERVATION_SECONDS,
-  });
-
-  if (
-    reserve.data?.ok === true &&
-    reserve.data.state === "confirmed" &&
-    typeof reserve.data.slot_number === "number"
-  ) {
-    return {
-      ok: true,
-      tier: "founding",
-      foundingSlot: reserve.data.slot_number as number,
-      reservationExpiresAt: null,
-    };
-  }
-
-  if (
-    reserve.data?.ok === true &&
-    typeof reserve.data.slot_number === "number"
-  ) {
-    return {
-      ok: true,
-      tier: "founding",
-      foundingSlot: reserve.data.slot_number as number,
-      reservationExpiresAt:
-        typeof reserve.data.reservation_expires_at === "string"
-          ? reserve.data.reservation_expires_at
-          : null,
-    };
-  }
-
-  if (reserve.data?.error === "founding_cohort_full") {
-    if (!acceptStandardPricing) {
-      return {
-        ok: false,
-        error: "founding_just_secured",
-        status: 409,
-        message:
-          "The final founding place has just been secured. MoveLoop is now £129/month. Confirm to continue at the standard price.",
-      };
-    }
-    return {
-      ok: true,
-      tier: "standard",
-      foundingSlot: null,
-      reservationExpiresAt: null,
-    };
-  }
-
-  if (reserve.error) {
-    return { ok: false, error: "founding_reservation_failed", status: 500 };
-  }
-
-  if (!acceptStandardPricing) {
-    return {
-      ok: false,
-      error: "founding_unavailable",
-      status: 409,
-      message:
-        "Founding pricing is not available for this branch right now. Confirm to continue at £129/month.",
-    };
-  }
-
-  return {
-    ok: true,
-    tier: "standard",
-    foundingSlot: null,
-    reservationExpiresAt: null,
-  };
 }
 
 /**
@@ -328,18 +372,14 @@ async function claimCheckoutAttemptMarker(input: {
 }
 
 export async function createEaBranchCheckoutSession(input: {
-  userClient: SupabaseClient;
   context: AuthorisedBranchContext;
-  /** Customer consciously accepts £129 after founding is unavailable. */
-  acceptStandardPricing?: boolean;
 }): Promise<CheckoutCreateResult> {
-  const { userClient, context } = input;
-  const acceptStandardPricing = input.acceptStandardPricing === true;
+  const { context } = input;
   const admin = createServiceRoleSupabaseClient();
   const config = getStripeServerConfig();
   const stripe = getStripeClient();
 
-  // Defence in depth: smoke-test fixture branches must never enter Checkout / founding.
+  // Defence in depth: smoke-test fixture branches must never enter Checkout.
   const { data: isSmokeBranch } = await admin.rpc("is_smoke_test_ea_branch", {
     p_branch_id: context.branchId,
   });
@@ -356,7 +396,7 @@ export async function createEaBranchCheckoutSession(input: {
   const { data: openSub } = await admin
     .from("ea_branch_subscriptions")
     .select(
-      "id, stripe_status, entitlement_status, stripe_checkout_session_id, pricing_tier, grace_ends_at, ended_at, stripe_price_id"
+      "id, stripe_status, entitlement_status, stripe_checkout_session_id, pricing_tier, grace_ends_at, ended_at, stripe_price_id, stripe_subscription_id"
     )
     .eq("branch_id", context.branchId)
     .is("ended_at", null)
@@ -389,7 +429,7 @@ export async function createEaBranchCheckoutSession(input: {
     const { data: refreshed } = await admin
       .from("ea_branch_subscriptions")
       .select(
-        "id, stripe_status, entitlement_status, stripe_checkout_session_id, pricing_tier, grace_ends_at, ended_at, stripe_price_id"
+        "id, stripe_status, entitlement_status, stripe_checkout_session_id, pricing_tier, grace_ends_at, ended_at, stripe_price_id, stripe_subscription_id"
       )
       .eq("id", activeOpen.id as string)
       .maybeSingle();
@@ -425,114 +465,193 @@ export async function createEaBranchCheckoutSession(input: {
     }
   }
 
-  let forceNewAttempt = false;
-
-  // Reuse open Checkout only while still valid for the reserved founding hold.
-  if (
+  // A completed Checkout whose webhook has not landed yet must not start another
+  // subscription: keep its session id and report that confirmation is in progress.
+  let existingSession: Awaited<
+    ReturnType<typeof stripe.checkout.sessions.retrieve>
+  > | null = null;
+  const pendingSessionId =
     activeOpen?.stripe_status === "checkout_pending" &&
     activeOpen.stripe_checkout_session_id &&
     !isAttemptMarker(activeOpen.stripe_checkout_session_id)
-  ) {
-    try {
-      const existing = await stripe.checkout.sessions.retrieve(
-        activeOpen.stripe_checkout_session_id as string
-      );
-      const tier =
-        (activeOpen.pricing_tier as EaPricingTier) ?? "standard";
-      const sessionOpen = existing.status === "open" && !!existing.url;
-      const sessionNotExpired =
-        !existing.expires_at || existing.expires_at * 1000 > Date.now();
+      ? (activeOpen.stripe_checkout_session_id as string)
+      : null;
 
-      if (sessionOpen && sessionNotExpired) {
-        if (tier === "founding") {
-          const hold = await branchHasActiveFoundingReservation(
-            admin,
-            context.branchId
-          );
-          if (hold.active && existing.url) {
-            return {
-              ok: true,
-              url: existing.url,
-              pricingTier: "founding",
-              reservationExpiresAt: hold.expiresAt,
-            };
-          }
-          await expireOpenCheckoutSession(
-            stripe,
-            activeOpen.stripe_checkout_session_id as string
-          );
-          await admin
-            .from("ea_branch_subscriptions")
-            .update({
-              stripe_checkout_session_id: null,
-              updated_at: new Date().toISOString(),
-            })
-            .eq("id", activeOpen.id as string);
-          activeOpen = {
-            ...activeOpen,
-            stripe_checkout_session_id: null,
-          };
-          forceNewAttempt = true;
-        } else if (existing.url) {
-          return {
-            ok: true,
-            url: existing.url,
-            pricingTier: "standard",
-          };
-        }
-      } else {
-        if (existing.status === "open") {
-          await expireOpenCheckoutSession(
-            stripe,
-            activeOpen.stripe_checkout_session_id as string
-          );
-        }
-        await admin
-          .from("ea_branch_subscriptions")
-          .update({
-            stripe_checkout_session_id: null,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", activeOpen.id as string);
-        activeOpen = {
-          ...activeOpen,
-          stripe_checkout_session_id: null,
+  if (pendingSessionId) {
+    try {
+      existingSession = await stripe.checkout.sessions.retrieve(
+        pendingSessionId
+      );
+    } catch (error) {
+      if (!isStripeResourceMissing(error)) {
+        return {
+          ok: false,
+          error: "checkout_unavailable",
+          status: 503,
+          message: "Checkout could not be started. Please try again.",
         };
-        forceNewAttempt = true;
       }
-    } catch {
-      await admin
-        .from("ea_branch_subscriptions")
-        .update({
-          stripe_checkout_session_id: null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", activeOpen.id as string);
-      activeOpen = {
-        ...activeOpen,
-        stripe_checkout_session_id: null,
-      };
-      forceNewAttempt = true;
+    }
+    if (existingSession?.status === "complete") {
+      return checkoutProcessingResult();
     }
   }
 
-  const pricing = await selectPricingTier({
-    userClient,
-    branchId: context.branchId,
-    acceptStandardPricing,
-  });
-  if (!pricing.ok) {
+  const customerId = await ensureBranchStripeCustomer(admin, context);
+
+  // Stripe is checked before any Checkout is created or reused, so a database row
+  // that wrongly shows ended (or no row at all) can never lead to a second
+  // subscription. Any Stripe or database error fails closed.
+  let stripeSubscriptions: StripeSubscriptionSummary[];
+  let databaseHistory: boolean;
+  try {
+    stripeSubscriptions = await loadStripeSubscriptionHistory(
+      stripe,
+      customerId
+    );
+    databaseHistory = await branchHasDatabaseSubscriptionHistory(
+      admin,
+      context.branchId
+    );
+  } catch {
     return {
       ok: false,
-      error: pricing.error,
-      status: pricing.status,
-      message: pricing.message,
+      error: "subscription_check_unavailable",
+      status: 503,
+      message: SUBSCRIPTION_CHECK_UNAVAILABLE_MESSAGE,
     };
   }
 
-  const customerId = await ensureBranchStripeCustomer(admin, context);
-  const priceId = getStripePriceIdForTier(pricing.tier);
-  const amount = amountGbpMinorForTier(pricing.tier);
+  const decision = decideCheckoutFromSubscriptionHistory({
+    stripeSubscriptions,
+    databaseHistory,
+    openRow: activeOpen,
+  });
+  if (decision.kind === "checkout_processing") {
+    return checkoutProcessingResult();
+  }
+  if (decision.kind === "blocked") {
+    const outstanding = await expireOutstandingCheckoutSessions(
+      stripe,
+      { branchId: context.branchId, customerId },
+      { storedSession: existingSession }
+    );
+    const response = blockedCheckoutResponse({
+      outcomes: outstanding.sessions.map((s) => s.outcome),
+      listingFailed: outstanding.listing_failed,
+    });
+    const expiryFailed = response === "checkout_session_expiry_failed";
+
+    if (decision.reportConflict || expiryFailed) {
+      await reportStripeSubscriptionConflict(admin, {
+        branchId: context.branchId,
+        openRow: activeOpen,
+        blocking: decision.blocking,
+        reason: expiryFailed
+          ? "outstanding_checkout_session_expiry_failed"
+          : "stripe_subscription_exists_without_matching_db_row",
+        outstandingSessions: outstanding,
+      });
+    }
+    if (expiryFailed) {
+      return {
+        ok: false,
+        error: "checkout_session_expiry_failed",
+        status: 503,
+        message: CHECKOUT_SESSION_EXPIRY_FAILED_MESSAGE,
+      };
+    }
+    if (response === "checkout_processing") {
+      return checkoutProcessingResult();
+    }
+    return {
+      ok: false,
+      error: "stripe_subscription_exists",
+      status: 409,
+      message: STRIPE_SUBSCRIPTION_EXISTS_MESSAGE,
+    };
+  }
+
+  const trialEligible = decision.trialEligible;
+  const offer: CheckoutOffer = trialEligible
+    ? "standard_trial_30d"
+    : "standard_no_trial";
+  const trialPeriodDays = trialEligible ? EA_TRIAL_PERIOD_DAYS : null;
+  const tier = NEW_SUBSCRIPTION_TIER;
+
+  let forceNewAttempt = false;
+
+  // Reuse an open Checkout only when it was created for the current offer;
+  // sessions from older pricing (including founding) are expired and replaced.
+  if (activeOpen && pendingSessionId) {
+    const sessionOpen =
+      existingSession?.status === "open" && !!existingSession.url;
+    const sessionNotExpired =
+      !existingSession?.expires_at ||
+      existingSession.expires_at * 1000 > Date.now();
+
+    if (
+      existingSession &&
+      sessionOpen &&
+      sessionNotExpired &&
+      activeOpen.pricing_tier === tier &&
+      checkoutSessionMatchesOffer(existingSession, offer) &&
+      existingSession.url
+    ) {
+      return {
+        ok: true,
+        url: existingSession.url,
+        pricingTier: tier,
+        trialPeriodDays,
+      };
+    }
+
+    // A replaced session must be confirmed expired before a new one exists,
+    // otherwise both could be paid and create two subscriptions.
+    if (existingSession) {
+      const outcome = await expireBranchCheckoutSession(
+        stripe,
+        existingSession,
+        { branchId: context.branchId, customerId }
+      );
+      if (outcome === "completed") {
+        return checkoutProcessingResult();
+      }
+      if (outcome === "failed" || outcome === "foreign") {
+        if (outcome === "foreign") {
+          console.error(
+            "[billing-checkout] stored Checkout session does not belong to this branch",
+            {
+              branch_id: context.branchId,
+              checkout_session_id: existingSession.id,
+            }
+          );
+        }
+        return {
+          ok: false,
+          error: "checkout_session_expiry_failed",
+          status: 503,
+          message: CHECKOUT_SESSION_EXPIRY_FAILED_MESSAGE,
+        };
+      }
+    }
+    await admin
+      .from("ea_branch_subscriptions")
+      .update({
+        stripe_checkout_session_id: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", activeOpen.id as string)
+      .eq("stripe_checkout_session_id", pendingSessionId);
+    activeOpen = {
+      ...activeOpen,
+      stripe_checkout_session_id: null,
+    };
+    forceNewAttempt = true;
+  }
+
+  const priceId = config.standardPriceId;
+  const amount = amountGbpMinorForTier(tier);
 
   let subscriptionId = activeOpen?.id as string | undefined;
 
@@ -542,9 +661,9 @@ export async function createEaBranchCheckoutSession(input: {
       .insert({
         branch_id: context.branchId,
         stripe_customer_id: customerId,
-        pricing_tier: pricing.tier,
+        pricing_tier: tier,
         amount_gbp_minor: amount,
-        founding_slot_number: pricing.foundingSlot,
+        founding_slot_number: null,
         stripe_status: "checkout_pending",
         entitlement_status: "none",
         currency: "gbp",
@@ -567,10 +686,11 @@ export async function createEaBranchCheckoutSession(input: {
         ...(activeOpen ?? {
           stripe_status: "checkout_pending",
           entitlement_status: "none",
-          pricing_tier: pricing.tier,
+          pricing_tier: tier,
           grace_ends_at: null,
           ended_at: null,
           stripe_price_id: null,
+          stripe_subscription_id: null,
         }),
         id: raced.id as string,
         stripe_checkout_session_id:
@@ -580,9 +700,9 @@ export async function createEaBranchCheckoutSession(input: {
         .from("ea_branch_subscriptions")
         .update({
           stripe_customer_id: customerId,
-          pricing_tier: pricing.tier,
+          pricing_tier: tier,
           amount_gbp_minor: amount,
-          founding_slot_number: pricing.foundingSlot,
+          founding_slot_number: null,
           stripe_status: "checkout_pending",
           entitlement_status: "none",
           updated_at: new Date().toISOString(),
@@ -596,25 +716,41 @@ export async function createEaBranchCheckoutSession(input: {
         entitlement_status: "none",
         stripe_checkout_session_id:
           (inserted.stripe_checkout_session_id as string | null) ?? null,
-        pricing_tier: pricing.tier,
+        pricing_tier: tier,
         grace_ends_at: null,
         ended_at: null,
         stripe_price_id: null,
+        stripe_subscription_id: null,
       };
     }
   } else {
-    await admin
+    // Conditional on the status read above so a webhook that has just linked
+    // the Stripe subscription (e.g. trialing) is never overwritten.
+    let resetQuery = admin
       .from("ea_branch_subscriptions")
       .update({
         stripe_customer_id: customerId,
-        pricing_tier: pricing.tier,
+        pricing_tier: tier,
         amount_gbp_minor: amount,
-        founding_slot_number: pricing.foundingSlot,
+        founding_slot_number: null,
         stripe_status: "checkout_pending",
         entitlement_status: "none",
         updated_at: new Date().toISOString(),
       })
-      .eq("id", subscriptionId);
+      .eq("id", subscriptionId)
+      .is("ended_at", null);
+    resetQuery = activeOpen?.stripe_status
+      ? resetQuery.eq("stripe_status", activeOpen.stripe_status)
+      : resetQuery.is("stripe_status", null);
+    const { data: reset, error: resetError } = await resetQuery
+      .select("id")
+      .maybeSingle();
+    if (resetError) {
+      return { ok: false, error: "subscription_update_failed", status: 500 };
+    }
+    if (!reset) {
+      return checkoutProcessingResult();
+    }
   }
 
   // Reload before create — another request may have finished Checkout.
@@ -628,38 +764,38 @@ export async function createEaBranchCheckoutSession(input: {
     (beforeCreate?.stripe_checkout_session_id as string | null) ?? null;
 
   if (beforeSessionId && !isAttemptMarker(beforeSessionId)) {
+    let existing: Awaited<
+      ReturnType<typeof stripe.checkout.sessions.retrieve>
+    > | null = null;
     try {
-      const existing = await stripe.checkout.sessions.retrieve(beforeSessionId);
-      if (
-        existing.status === "open" &&
-        existing.url &&
-        (!existing.expires_at || existing.expires_at * 1000 > Date.now())
-      ) {
-        const tier =
-          (beforeCreate?.pricing_tier as EaPricingTier) ?? pricing.tier;
-        if (tier === "founding") {
-          const hold = await branchHasActiveFoundingReservation(
-            admin,
-            context.branchId
-          );
-          if (hold.active) {
-            return {
-              ok: true,
-              url: existing.url,
-              pricingTier: "founding",
-              reservationExpiresAt: hold.expiresAt,
-            };
-          }
-        } else {
-          return {
-            ok: true,
-            url: existing.url,
-            pricingTier: "standard",
-          };
-        }
+      existing = await stripe.checkout.sessions.retrieve(beforeSessionId);
+    } catch (error) {
+      if (!isStripeResourceMissing(error)) {
+        return {
+          ok: false,
+          error: "checkout_unavailable",
+          status: 503,
+          message: "Checkout could not be started. Please try again.",
+        };
       }
-    } catch {
-      /* fall through */
+    }
+    if (existing?.status === "complete") {
+      return checkoutProcessingResult();
+    }
+    if (
+      existing &&
+      existing.status === "open" &&
+      existing.url &&
+      (!existing.expires_at || existing.expires_at * 1000 > Date.now()) &&
+      ((beforeCreate?.pricing_tier as EaPricingTier | null) ?? tier) === tier &&
+      checkoutSessionMatchesOffer(existing, offer)
+    ) {
+      return {
+        ok: true,
+        url: existing.url,
+        pricingTier: tier,
+        trialPeriodDays,
+      };
     }
   }
 
@@ -667,37 +803,29 @@ export async function createEaBranchCheckoutSession(input: {
   if (
     isAttemptMarker(beforeSessionId) &&
     activeOpen?.pricing_tier &&
-    activeOpen.pricing_tier !== pricing.tier
+    activeOpen.pricing_tier !== tier
   ) {
     forceNewAttempt = true;
   }
-
-  const plannedExpiresAtUnix =
-    pricing.tier === "founding"
-      ? Math.floor(Date.now() / 1000) + EA_FOUNDING_RESERVATION_SECONDS
-      : null;
 
   const attemptMarker = await claimCheckoutAttemptMarker({
     admin,
     subscriptionId: subscriptionId!,
     existingSessionId: beforeSessionId,
     forceNewAttempt,
-    expiresAtUnix: plannedExpiresAtUnix,
+    expiresAtUnix: null,
   });
 
   const attemptKey = buildCheckoutAttemptKey({
     branchId: context.branchId,
     subscriptionId: subscriptionId!,
-    tier: pricing.tier,
+    tier,
+    offer,
     attemptId: attemptMarker.attemptId,
   });
 
   const successUrl = `${config.appUrl}/account?billing=success&branch=${context.branchId}#subscription`;
   const cancelUrl = `${config.appUrl}/account?billing=cancelled&branch=${context.branchId}#subscription`;
-
-  // Must match the first create for this attempt (Stripe idempotency param equality).
-  const expiresAtUnix =
-    attemptMarker.expiresAtUnix ?? plannedExpiresAtUnix;
 
   const sessionCreateParams: Parameters<
     typeof stripe.checkout.sessions.create
@@ -706,13 +834,15 @@ export async function createEaBranchCheckoutSession(input: {
     customer: customerId,
     client_reference_id: context.branchId,
     line_items: [{ price: priceId, quantity: 1 }],
+    payment_method_collection: "always",
     success_url: successUrl,
     cancel_url: cancelUrl,
     metadata: {
       keynetic_company_id: context.companyId,
       keynetic_branch_id: context.branchId,
       keynetic_subscription_id: subscriptionId!,
-      keynetic_pricing_tier: pricing.tier,
+      keynetic_pricing_tier: tier,
+      keynetic_checkout_offer: offer,
       keynetic_env: config.apiMode,
     },
     subscription_data: {
@@ -720,15 +850,20 @@ export async function createEaBranchCheckoutSession(input: {
         keynetic_company_id: context.companyId,
         keynetic_branch_id: context.branchId,
         keynetic_subscription_id: subscriptionId!,
-        keynetic_pricing_tier: pricing.tier,
+        keynetic_pricing_tier: tier,
+        keynetic_checkout_offer: offer,
         keynetic_env: config.apiMode,
       },
+      ...(trialPeriodDays != null
+        ? {
+            trial_period_days: trialPeriodDays,
+            trial_settings: {
+              end_behavior: { missing_payment_method: "cancel" as const },
+            },
+          }
+        : {}),
     },
   };
-
-  if (pricing.tier === "founding" && expiresAtUnix != null) {
-    sessionCreateParams.expires_at = expiresAtUnix;
-  }
 
   let session;
   try {
@@ -767,37 +902,84 @@ export async function createEaBranchCheckoutSession(input: {
     return { ok: false, error: "checkout_session_url_missing", status: 500 };
   }
 
-  await admin
+  // Only replace our own in-flight marker (or the same session from a concurrent
+  // duplicate request). If a webhook linked a subscription meanwhile, or another
+  // attempt superseded ours, the new session must not stay usable.
+  const { data: stored, error: storeError } = await admin
     .from("ea_branch_subscriptions")
     .update({
       stripe_checkout_session_id: session.id,
       stripe_price_id: priceId,
       updated_at: new Date().toISOString(),
     })
-    .eq("id", subscriptionId!);
+    .eq("id", subscriptionId!)
+    .is("ended_at", null)
+    .eq("stripe_status", "checkout_pending")
+    .or(
+      `stripe_checkout_session_id.eq."${formatAttemptMarker(attemptMarker)}",stripe_checkout_session_id.eq."${session.id}"`
+    )
+    .select("id")
+    .maybeSingle();
 
-  await admin.from("ea_subscription_events").insert({
-    branch_id: context.branchId,
-    subscription_id: subscriptionId!,
-    event_type: "subscription_started",
-    actor_source: "user",
-    metadata: {
-      checkout_session_id: session.id,
-      pricing_tier: pricing.tier,
-      reservation_expires_at: pricing.reservationExpiresAt,
-      checkout_expires_at:
-        pricing.tier === "founding" && expiresAtUnix != null
-          ? new Date(expiresAtUnix * 1000).toISOString()
-          : null,
-      checkout_attempt_id: attemptMarker.attemptId,
-      checkout_expires_at_unix: expiresAtUnix,
-    },
-  });
+  if (storeError) {
+    return {
+      ok: false,
+      error: "checkout_unavailable",
+      status: 503,
+      message: "Checkout could not be started. Please try again.",
+    };
+  }
+  if (!stored) {
+    await expireBranchCheckoutSession(stripe, session, {
+      branchId: context.branchId,
+      customerId,
+    });
+    const { data: current } = await admin
+      .from("ea_branch_subscriptions")
+      .select("stripe_status")
+      .eq("id", subscriptionId!)
+      .maybeSingle();
+    if (current?.stripe_status && current.stripe_status !== "checkout_pending") {
+      return checkoutProcessingResult();
+    }
+    return {
+      ok: false,
+      error: "checkout_unavailable",
+      status: 503,
+      message: "Checkout could not be started. Please try again.",
+    };
+  }
+
+  const { error: startedEventError } = await admin
+    .from("ea_subscription_events")
+    .insert({
+      branch_id: context.branchId,
+      subscription_id: subscriptionId!,
+      event_type: "subscription_started",
+      actor_source: "user",
+      metadata: {
+        checkout_session_id: session.id,
+        pricing_tier: tier,
+        checkout_offer: offer,
+        trial_period_days: trialPeriodDays,
+        checkout_attempt_id: attemptMarker.attemptId,
+      },
+    });
+  if (startedEventError) {
+    // The Checkout session is already live; the audit gap is logged, not fatal.
+    console.error("[billing-audit] ea_subscription_events insert failed", {
+      event_type: "subscription_started",
+      branch_id: context.branchId,
+      subscription_row_id: subscriptionId!,
+      code: startedEventError.code ?? null,
+      message: startedEventError.message,
+    });
+  }
 
   return {
     ok: true,
     url: session.url,
-    pricingTier: pricing.tier,
-    reservationExpiresAt: pricing.reservationExpiresAt,
+    pricingTier: tier,
+    trialPeriodDays,
   };
 }

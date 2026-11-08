@@ -25,6 +25,7 @@ import { MARKETING_SECTION_TITLE_CLASS } from "@/components/mobileStandards";
 import {
   EA_STANDARD_DAILY_LABEL,
   EA_STANDARD_MONTHLY_LABEL,
+  EA_TRIAL_HEADLINE,
 } from "@/lib/marketing/eaPricing";
 import { ROUTES } from "@/lib/auth/routes";
 import {
@@ -550,7 +551,8 @@ export default function HomePage() {
               </Link>
 
               <p className="mt-4 text-sm text-slate-500">
-                Founding branch pricing is available on our estate agent pages.
+                {EA_TRIAL_HEADLINE} for new branches · card required to start ·
+                then {EA_STANDARD_MONTHLY_LABEL} per branch.
               </p>
             </div>
           </div>

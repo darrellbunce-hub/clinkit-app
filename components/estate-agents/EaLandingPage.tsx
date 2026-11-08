@@ -40,12 +40,13 @@ import {
   SECTION_BG_CLASS,
   SECTION_CONTENT_CLASS,
 } from "@/lib/theme/themeTokens";
-import type { EaFoundingPublicDisplay } from "@/lib/billing/eaFoundingAvailabilityShared";
-import { EA_STANDARD_MONTHLY_LABEL } from "@/lib/billing/eaBranchPricing";
-
-export type EaLandingPageProps = {
-  foundingDisplay?: EaFoundingPublicDisplay | null;
-};
+import {
+  EA_STANDARD_MONTHLY_LABEL,
+  EA_TRIAL_HEADLINE,
+  EA_TRIAL_OFFER_SUMMARY,
+  EA_TRIAL_PERIOD_DAYS,
+  EA_TRIAL_TERMS_COPY,
+} from "@/lib/billing/eaBranchPricing";
 
 const outcomes = [
   {
@@ -120,7 +121,7 @@ const pricingFeatures = [
   "Collaborate with homeowners already on MoveLoop",
   "Command Centre & operational workspace",
   "Delegated updates with audit trail",
-  "Founding price locked while subscription stays active",
+  `${EA_TRIAL_PERIOD_DAYS}-day free trial for new branches`,
 ];
 
 const comingSoon = [
@@ -168,8 +169,8 @@ const faqs = [
     text: "Yes. Unlimited team members are included. Owners invite negotiators and progressors to share the same Command Centre and operational workspace.",
   },
   {
-    title: "What does the founding branch offer include?",
-    text: "The Professional founding offer is £99/month (normally £129/month), limited to the first 20 paying branches. Founding branches lock in £99/month for the duration of that branch's continuous subscription. A founding place is permanently consumed when secured and is not returned if the subscription later ends. Founding status is not transferable.",
+    title: "How does the free trial work?",
+    text: `New branches get ${EA_TRIAL_PERIOD_DAYS} days free. A payment card is required to start the trial, but you won't be charged during it. After ${EA_TRIAL_PERIOD_DAYS} days your branch subscription continues automatically at ${EA_STANDARD_MONTHLY_LABEL}. If you cancel before the trial ends, the paid subscription does not continue and you are not charged.`,
   },
   {
     title: "Do homeowners need to pay?",
@@ -177,7 +178,7 @@ const faqs = [
   },
   {
     title: "When does billing start?",
-    text: "After your branch is registered, an authorised branch owner can start a monthly subscription through Stripe Checkout from the account subscription section. MoveLoop may use Stripe test (Sandbox) mode during development and staging before Production charging is enabled. Founding rates apply only while founding places remain available under the first-20 offer.",
+    text: `After your branch is registered, an authorised branch owner can start the ${EA_TRIAL_PERIOD_DAYS}-day free trial through Stripe Checkout from the account subscription section. Your first payment of ${EA_STANDARD_MONTHLY_LABEL} is taken when the trial ends, and monthly after that, unless you cancel before the trial ends. MoveLoop may use Stripe test (Sandbox) mode during development and staging before Production charging is enabled.`,
   },
   {
     title: "Does the whole chain need to be connected?",
@@ -220,22 +221,7 @@ function SectionIntro({
   );
 }
 
-export default function EaLandingPage({
-  foundingDisplay = null,
-}: EaLandingPageProps) {
-  const display =
-    foundingDisplay ??
-    ({
-      mode: "founding_available",
-      priceLabel: "founding",
-      placesRemaining: 20,
-      headline: "£99/month — Founding Member Price",
-      detail:
-        "Founding places are limited to the first 20 branches. Your place is secured when you start Checkout — not by viewing this page.",
-    } satisfies EaFoundingPublicDisplay);
-
-  const isSecured = display.mode === "founding_secured";
-  const showFoundingPrice = display.priceLabel === "founding";
+export default function EaLandingPage() {
   return (
     <>
       {/* Hero */}
@@ -331,7 +317,7 @@ export default function EaLandingPage({
                   href={ROUTES.estateAgentSignup}
                   className={`${BTN_ACCENT_CLASS} hover:scale-[1.02] px-8 py-5 text-lg text-center inline-flex items-center justify-center gap-2`}
                 >
-                  Start your founding branch
+                  Start your {EA_TRIAL_PERIOD_DAYS}-day free trial
                   <ArrowRight className="h-5 w-5" />
                 </Link>
 
@@ -528,26 +514,14 @@ export default function EaLandingPage({
         <div className={SECTION_CONTENT_CLASS}>
           <SectionIntro
             eyebrow="Pricing"
-            title={
-              isSecured
-                ? "Professional — Branch Subscription"
-                : "Professional — Founding Branch Offer"
-            }
-            description={
-              isSecured
-                ? "Collaborate on moves you start or moves your clients invite you to — with clear per-branch pricing."
-                : "Register your branch to collaborate on moves you start or moves your clients invite you to — with founding pricing locked while your subscription stays active."
-            }
+            title="Professional — Branch Subscription"
+            description={`Register your branch to collaborate on moves you start or moves your clients invite you to — ${EA_TRIAL_OFFER_SUMMARY}.`}
           />
 
           <div className="mt-16 max-w-3xl mx-auto">
             <div className="relative overflow-hidden rounded-3xl border-2 border-brand-primary bg-surface-card p-8 md:p-10 shadow-xl shadow-brand-primary/10">
               <div className="absolute top-0 right-0 rounded-bl-2xl bg-brand-primary px-4 py-2 text-sm font-semibold text-brand-on-primary">
-                {isSecured
-                  ? "Founding places secured"
-                  : display.mode === "founding_securing"
-                    ? "Being secured"
-                    : "First 20 branches"}
+                {EA_TRIAL_HEADLINE}
               </div>
 
               <p className="text-sm font-semibold uppercase tracking-wide text-brand-primary">
@@ -556,37 +530,22 @@ export default function EaLandingPage({
 
               <div className="mt-4 flex flex-wrap items-end gap-3">
                 <p className="text-5xl md:text-6xl font-bold text-slate-900">
-                  {showFoundingPrice ? "£99" : "£129"}
+                  £129
                 </p>
                 <p className="pb-2 text-lg text-slate-500">/ month</p>
               </div>
 
-              {showFoundingPrice ? (
-                <p className="mt-2 text-slate-500">
-                  <span className="line-through">{EA_STANDARD_MONTHLY_LABEL}</span>{" "}
-                  founding branch rate
-                </p>
-              ) : (
-                <p className="mt-2 text-slate-500">
-                  Per branch · billed monthly
-                </p>
-              )}
+              <p className="mt-2 text-slate-500">
+                Per branch · billed monthly after your free trial
+              </p>
 
               <p className="mt-4 text-base font-semibold text-slate-900">
-                {display.headline}
+                {EA_TRIAL_OFFER_SUMMARY}
               </p>
 
               <p className="mt-3 text-slate-600 leading-relaxed">
-                {display.detail}
+                {EA_TRIAL_TERMS_COPY}
               </p>
-
-              {display.mode === "founding_available" ? (
-                <p className="mt-4 text-sm font-medium text-brand-primary">
-                  {display.placesRemaining === 1
-                    ? "1 founding place remaining"
-                    : `${display.placesRemaining} founding places remaining`}
-                </p>
-              ) : null}
 
               <ul className="mt-8 grid gap-3 sm:grid-cols-2">
                 {pricingFeatures.map((feature) => (
@@ -626,7 +585,7 @@ export default function EaLandingPage({
           <SectionIntro
             eyebrow="Roadmap"
             title="Coming soon for growing agency groups"
-            description="The founding branch offer unlocks today's operational workspace. These capabilities are on the roadmap for agencies scaling beyond a single branch."
+            description="The Professional branch subscription unlocks today's operational workspace. These capabilities are on the roadmap for agencies scaling beyond a single branch."
           />
 
           <div className="mt-16 grid gap-6 md:grid-cols-2">
@@ -700,9 +659,9 @@ export default function EaLandingPage({
           </h2>
 
           <p className="mt-8 text-xl text-slate-600 leading-relaxed max-w-3xl mx-auto">
-            Join MoveLoop as a founding branch and be prepared whether your
-            team introduces a property or a client invites you in. Connected
-            participants share one chain view on MoveLoop.
+            Register your branch and be prepared whether your team introduces
+            a property or a client invites you in. Connected participants
+            share one chain view on MoveLoop.
           </p>
 
           <div className="mt-12 flex flex-col sm:flex-row justify-center gap-4">
@@ -710,7 +669,7 @@ export default function EaLandingPage({
               href={ROUTES.estateAgentSignup}
               className={`${BTN_PRIMARY_CLASS} hover:scale-[1.02] transition-all duration-300 px-8 py-5 text-lg`}
             >
-              Start your founding branch
+              Start your {EA_TRIAL_PERIOD_DAYS}-day free trial
             </Link>
 
             <Link
@@ -722,8 +681,8 @@ export default function EaLandingPage({
           </div>
 
           <p className="mt-6 text-sm text-slate-500">
-            £99/month founding offer (first 20 branches) · Homeowners start
-            free · Your CRM stays in place
+            {EA_TRIAL_OFFER_SUMMARY} · Card required to start · Homeowners
+            start free · Your CRM stays in place
           </p>
         </div>
       </section>

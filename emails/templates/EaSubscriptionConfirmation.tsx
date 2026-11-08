@@ -7,6 +7,9 @@ import type { EaSubscriptionConfirmationEmailParams } from "@/lib/communications
 export function getEaSubscriptionConfirmationSubject(
   props: EaSubscriptionConfirmationEmailParams
 ): string {
+  if (props.isTrialing) {
+    return "Your MoveLoop free trial has started";
+  }
   return props.isFounding
     ? "Your MoveLoop founding subscription is active"
     : "Your MoveLoop subscription is active";
@@ -15,6 +18,46 @@ export function getEaSubscriptionConfirmationSubject(
 export default function EaSubscriptionConfirmationEmail(
   props: EaSubscriptionConfirmationEmailParams
 ) {
+  if (props.isTrialing) {
+    return (
+      <BillingEmailShell
+        preview="Your MoveLoop free trial has started"
+        title="Free trial started"
+        footerReason="You received this email because a MoveLoop Estate Agent free trial was started for your branch."
+        manageBillingUrl={props.manageBillingUrl}
+      >
+        <BillingEmailParagraph>
+          Hi{props.recipientName ? ` ${props.recipientName}` : ""}, your MoveLoop
+          free trial for <strong>{props.branchName}</strong> has started.
+          You won&apos;t be charged during the trial.
+        </BillingEmailParagraph>
+
+        <BillingEmailParagraph>
+          Plan: <strong>{props.planLabel}</strong>
+          <br />
+          Price after trial: <strong>{props.priceLabel}</strong>
+          <br />
+          Billing: <strong>Monthly</strong>
+          {props.nextBillingDateLabel ? (
+            <>
+              <br />
+              Trial ends and first payment due:{" "}
+              <strong>{props.nextBillingDateLabel}</strong>
+            </>
+          ) : null}
+        </BillingEmailParagraph>
+
+        <BillingEmailParagraph>
+          When the trial ends, your subscription continues automatically and the
+          card you provided is charged {props.priceLabel}, then monthly until
+          you cancel. If you cancel before the trial ends, the paid subscription
+          does not continue and you are not charged. You can manage billing from
+          your MoveLoop account at any time.
+        </BillingEmailParagraph>
+      </BillingEmailShell>
+    );
+  }
+
   return (
     <BillingEmailShell
       preview="Your MoveLoop branch subscription is active"

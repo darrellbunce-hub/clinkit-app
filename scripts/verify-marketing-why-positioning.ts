@@ -126,9 +126,9 @@ assertIncludes(
   "EA_STANDARD_DAILY_LABEL"
 );
 assertIncludes(
-  "Founding pricing not removed from EA reference",
+  "Free trial offer referenced on homepage EA pricing",
   homepage,
-  "Founding branch pricing"
+  "EA_TRIAL_HEADLINE"
 );
 
 const aboutPage = readProjectFile("app/about/page.tsx");

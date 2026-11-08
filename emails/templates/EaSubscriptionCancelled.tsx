@@ -13,7 +13,11 @@ export default function EaSubscriptionCancelledEmail(
 ) {
   return (
     <BillingEmailShell
-      preview="Your MoveLoop subscription will end at the close of the current billing period"
+      preview={
+        props.isTrialing
+          ? "Your MoveLoop subscription will end when your free trial ends"
+          : "Your MoveLoop subscription will end at the close of the current billing period"
+      }
       title="Cancellation confirmed"
       footerReason="You received this email because a MoveLoop Estate Agent subscription cancellation was scheduled for your branch."
       manageBillingUrl={props.manageBillingUrl}
@@ -23,12 +27,22 @@ export default function EaSubscriptionCancelledEmail(
         received your cancellation for <strong>{props.branchName}</strong>.
       </BillingEmailParagraph>
 
-      <BillingEmailParagraph>
-        Your subscription remains active until{" "}
-        <strong>{props.accessEndsAtLabel}</strong>. Recurring billing will stop
-        after that date. You can manage or reverse the cancellation before then
-        from Manage billing (Stripe Customer Portal), where Stripe permits it.
-      </BillingEmailParagraph>
+      {props.isTrialing ? (
+        <BillingEmailParagraph>
+          Your free trial continues until{" "}
+          <strong>{props.accessEndsAtLabel}</strong>, then the subscription
+          ends. You will not be charged. You can manage or reverse the
+          cancellation before then from Manage billing (Stripe Customer
+          Portal), where Stripe permits it.
+        </BillingEmailParagraph>
+      ) : (
+        <BillingEmailParagraph>
+          Your subscription remains active until{" "}
+          <strong>{props.accessEndsAtLabel}</strong>. Recurring billing will stop
+          after that date. You can manage or reverse the cancellation before then
+          from Manage billing (Stripe Customer Portal), where Stripe permits it.
+        </BillingEmailParagraph>
+      )}
 
       {props.isFounding ? (
         <BillingEmailParagraph>

@@ -33,6 +33,9 @@ export type BillingEmailTransitionContext = {
   pricingTier: "founding" | "standard";
   amountGbpMinor: number;
   currentPeriodEnd: string | null;
+  /** Stripe status is trialing: no payment has been taken yet. */
+  isTrialing: boolean;
+  trialEndsAt: string | null;
   graceEndsAt: string | null;
   becameEntitled: boolean;
   enteredGrace: boolean;
@@ -54,6 +57,7 @@ function formatEnGbDate(value: string | null | undefined): string | null {
     day: "numeric",
     month: "long",
     year: "numeric",
+    timeZone: "Europe/London",
   });
 }
 
@@ -280,8 +284,13 @@ export async function dispatchBillingCustomerEmailsForTransition(
             ...common,
             planLabel,
             priceLabel,
-            nextBillingDateLabel: formatEnGbDate(transition.currentPeriodEnd),
+            nextBillingDateLabel: formatEnGbDate(
+              transition.isTrialing
+                ? transition.trialEndsAt
+                : transition.currentPeriodEnd
+            ),
             isFounding,
+            isTrialing: transition.isTrialing,
           }),
       });
     }
@@ -329,6 +338,7 @@ export async function dispatchBillingCustomerEmailsForTransition(
               formatEnGbDate(transition.currentPeriodEnd) ??
               "the end of the current billing period",
             isFounding,
+            isTrialing: transition.isTrialing,
           }),
       });
     }

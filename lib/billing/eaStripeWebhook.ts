@@ -11,14 +11,56 @@ import { dispatchBillingCustomerEmailsForTransition } from "@/lib/billing/eaBill
 import {
   computeGraceEndsAt,
   mapStripeSubscriptionToKeynetic,
+  webhookAuditEventFor,
 } from "@/lib/billing/mapStripeStatus";
+import {
+  expireOutstandingCheckoutSessions,
+  type CheckoutSessionsClient,
+  type OutstandingSessionReport,
+} from "@/lib/billing/eaCheckoutSessionExpiry";
+import {
+  CHECKOUT_BLOCKING_STRIPE_STATUSES,
+  postLinkSessionReconcileReason,
+} from "@/lib/billing/eaCheckoutSubscriptionGuard";
+import {
+  decideSubscriptionAssociation,
+  TERMINAL_STRIPE_SUBSCRIPTION_STATUSES,
+} from "@/lib/billing/eaSubscriptionAssociation";
 import { getStripeClient } from "@/lib/billing/stripeClient";
-import { getStripeServerConfig } from "@/lib/billing/stripeServerConfig";
+import {
+  getStripeServerConfig,
+  isFoundingStripePriceId,
+} from "@/lib/billing/stripeServerConfig";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/serviceRole";
 
 function unixToIso(seconds: number | null | undefined): string | null {
   if (!seconds) return null;
   return new Date(seconds * 1000).toISOString();
+}
+
+/**
+ * Newer Stripe API versions expose billing periods only on subscription items;
+ * older webhook payloads still carry them on the subscription itself.
+ */
+function subscriptionPeriodUnix(
+  subscription: Stripe.Subscription,
+  field: "current_period_start" | "current_period_end"
+): number | null {
+  const legacy = (
+    subscription as Stripe.Subscription & {
+      current_period_start?: number;
+      current_period_end?: number;
+    }
+  )[field];
+  if (typeof legacy === "number") return legacy;
+  const item = subscription.items?.data?.[0] as
+    | (Stripe.SubscriptionItem & {
+        current_period_start?: number;
+        current_period_end?: number;
+      })
+    | undefined;
+  const fromItem = item?.[field];
+  return typeof fromItem === "number" ? fromItem : null;
 }
 
 function getInvoiceSubscriptionId(invoice: Stripe.Invoice): string | null {
@@ -309,12 +351,10 @@ async function reconcileStripeSubscription(
   }
 
   const periodStart = unixToIso(
-    (subscription as Stripe.Subscription & { current_period_start?: number })
-      .current_period_start
+    subscriptionPeriodUnix(subscription, "current_period_start")
   );
   const periodEnd = unixToIso(
-    (subscription as Stripe.Subscription & { current_period_end?: number })
-      .current_period_end
+    subscriptionPeriodUnix(subscription, "current_period_end")
   );
   const periodEndDate = periodEnd ? new Date(periodEnd) : null;
   const mapped = mapStripeSubscriptionToKeynetic({
@@ -327,27 +367,81 @@ async function reconcileStripeSubscription(
   const chronologyIso = chronologyAt.toISOString();
 
   // Load existing row for out-of-order guard (by row id when known, including ended).
+  const rowColumns =
+    "id, stripe_subscription_id, stripe_object_updated_at, entitlement_status, grace_ends_at, pricing_tier, founding_slot_number, ended_at, cancel_at_period_end";
   let existingQuery = admin
     .from("ea_branch_subscriptions")
-    .select(
-      "id, stripe_object_updated_at, entitlement_status, grace_ends_at, pricing_tier, founding_slot_number, ended_at, cancel_at_period_end"
-    )
+    .select(rowColumns)
     .eq("branch_id", branchId)
     .is("ended_at", null);
 
   if (rowId) {
     existingQuery = admin
       .from("ea_branch_subscriptions")
-      .select(
-        "id, stripe_object_updated_at, entitlement_status, grace_ends_at, pricing_tier, founding_slot_number, ended_at, cancel_at_period_end"
-      )
-      .eq("id", rowId);
+      .select(rowColumns)
+      .eq("id", rowId)
+      .eq("branch_id", branchId);
   }
 
   const { data: existing } = await existingQuery.maybeSingle();
   if (!existing) {
     return { applied: false, reason: "subscription_row_missing" };
   }
+
+  // Never silently re-point a row (or the branch) at a different subscription.
+  const rowLinkedId = (existing.stripe_subscription_id as string | null) ?? null;
+  let otherOpenRow: { id: string } | null = null;
+  if (
+    existing.ended_at &&
+    !TERMINAL_STRIPE_SUBSCRIPTION_STATUSES.has(subscription.status)
+  ) {
+    const { data: openRow, error: openRowError } = await admin
+      .from("ea_branch_subscriptions")
+      .select("id")
+      .eq("branch_id", branchId)
+      .is("ended_at", null)
+      .neq("id", existing.id as string)
+      .maybeSingle();
+    if (openRowError) throw openRowError;
+    otherOpenRow = openRow ? { id: openRow.id as string } : null;
+  }
+
+  const associationInput = {
+    rowStripeSubscriptionId: rowLinkedId,
+    incomingStripeSubscriptionId: subscription.id,
+    incomingStatus: subscription.status,
+    rowIsConfirmedFounding:
+      existing.pricing_tier === "founding" && existing.founding_slot_number != null,
+    otherOpenRow,
+  };
+  let association = decideSubscriptionAssociation(associationInput);
+  let previousLinkedStatus: string | null | undefined;
+  if (association.kind === "lookup_previous") {
+    previousLinkedStatus = await retrieveStripeSubscriptionStatus(rowLinkedId!);
+    association = decideSubscriptionAssociation({
+      ...associationInput,
+      previousLinkedStatus,
+    });
+  }
+  if (association.kind === "ignore_superseded") {
+    return { applied: false, reason: "superseded_subscription" };
+  }
+  if (association.kind === "conflict") {
+    await recordWebhookAssociationConflict(admin, {
+      branchId,
+      subscriptionRowId: existing.id as string,
+      reason: association.reason,
+      existingStripeSubscriptionId: rowLinkedId,
+      existingStripeStatus: previousLinkedStatus ?? null,
+      incomingStripeSubscriptionId: subscription.id,
+      incomingStripeStatus: subscription.status,
+      otherOpenRowId: otherOpenRow?.id ?? null,
+      chronologyIso,
+    });
+    return { applied: false, reason: "association_conflict" };
+  }
+  const replacedStripeSubscriptionId =
+    association.kind === "replace_terminal" ? rowLinkedId : null;
 
   if (existing.stripe_object_updated_at) {
     const known = new Date(existing.stripe_object_updated_at as string).getTime();
@@ -380,8 +474,9 @@ async function reconcileStripeSubscription(
     foundingSlotNumber = null;
   }
 
+  const isFoundingPrice = isFoundingStripePriceId(config, priceId);
   const looksFoundingAttempt =
-    priceId === config.foundingPriceId ||
+    isFoundingPrice ||
     ids.pricingTier === "founding" ||
     existing.pricing_tier === "founding";
 
@@ -401,7 +496,7 @@ async function reconcileStripeSubscription(
         typeof confirmData.slot_number === "number"
           ? confirmData.slot_number
           : foundingSlotNumber;
-    } else if (priceId === config.foundingPriceId) {
+    } else if (isFoundingPrice) {
       await handleFoundingConfirmException(admin, {
         branchId,
         subscriptionRowId: existing.id as string,
@@ -416,7 +511,7 @@ async function reconcileStripeSubscription(
       pricingTier = "standard";
       foundingSlotNumber = null;
     }
-  } else if (priceId === config.foundingPriceId && !options.confirmFounding) {
+  } else if (isFoundingPrice && !options.confirmFounding) {
     if (pricingTier !== "founding" || !foundingSlotNumber) {
       pricingTier =
         (existing.pricing_tier as EaPricingTier | null) === "founding" &&
@@ -490,10 +585,15 @@ async function reconcileStripeSubscription(
   const legacyPeriodEndWatermark =
     knownMs !== null && knownMs > Date.now() + 60 * 60 * 1000;
 
+  // Compare-and-swap on the association read above: a concurrent webhook that
+  // linked a different subscription makes this write match no row.
   let write = admin
     .from("ea_branch_subscriptions")
     .update(patch)
     .eq("id", existing.id);
+  write = rowLinkedId
+    ? write.eq("stripe_subscription_id", rowLinkedId)
+    : write.is("stripe_subscription_id", null);
 
   if (!legacyPeriodEndWatermark) {
     write = write.or(
@@ -509,6 +609,18 @@ async function reconcileStripeSubscription(
     throw updateError;
   }
   if (!updated) {
+    const { data: current, error: currentError } = await admin
+      .from("ea_branch_subscriptions")
+      .select("stripe_subscription_id")
+      .eq("id", existing.id)
+      .maybeSingle();
+    if (currentError) throw currentError;
+    const currentLinked =
+      (current?.stripe_subscription_id as string | null | undefined) ?? null;
+    if (currentLinked !== rowLinkedId) {
+      // Retry re-evaluates the association against the new link.
+      throw new Error("subscription_association_changed");
+    }
     return { applied: false, reason: "stale_or_concurrent_lost" };
   }
 
@@ -519,28 +631,6 @@ async function reconcileStripeSubscription(
       .eq("id", branchId)
       .is("stripe_customer_id", null);
   }
-
-  const eventType =
-    mapped.ended
-      ? "subscription_expired"
-      : mapped.enterGrace
-        ? "payment_failed"
-        : mapped.cancelAtPeriodEnd
-          ? "cancellation_scheduled"
-          : "payment_succeeded";
-
-  await admin.from("ea_subscription_events").insert({
-    branch_id: branchId,
-    subscription_id: existing.id,
-    event_type: eventType,
-    actor_source: "webhook",
-    metadata: {
-      stripe_subscription_id: subscription.id,
-      stripe_status: subscription.status,
-      pricing_tier: pricingTier,
-      event_chronology_at: chronologyIso,
-    },
-  });
 
   const becameEntitled =
     previousEntitlement !== "entitled" &&
@@ -564,6 +654,8 @@ async function reconcileStripeSubscription(
       pricingTier,
       amountGbpMinor: amountGbpMinorForTier(pricingTier),
       currentPeriodEnd: periodEnd,
+      isTrialing: mapped.stripeStatus === "trialing",
+      trialEndsAt: unixToIso(subscription.trial_end) ?? periodEnd,
       graceEndsAt,
       becameEntitled,
       enteredGrace,
@@ -572,7 +664,347 @@ async function reconcileStripeSubscription(
     });
   }
 
+  // Audit rows come last: a failed insert throws, failing the webhook event
+  // (billing-health alert + Stripe retry). The retry sees the row already
+  // updated, so emails keyed on the transition must have been sent before this.
+  const auditMetadata = {
+    stripe_subscription_id: subscription.id,
+    stripe_status: subscription.status,
+    pricing_tier: pricingTier,
+    event_chronology_at: chronologyIso,
+    ...(replacedStripeSubscriptionId
+      ? { replaced_stripe_subscription_id: replacedStripeSubscriptionId }
+      : {}),
+  };
+
+  const isTrialing = mapped.stripeStatus === "trialing" && !mapped.ended;
+  if (isTrialing) {
+    await recordTrialStartedOnce(admin, {
+      branchId,
+      subscriptionRowId: existing.id as string,
+      metadata: {
+        ...auditMetadata,
+        trial_end: unixToIso(subscription.trial_end),
+      },
+    });
+  }
+
+  if (replacedStripeSubscriptionId) {
+    await insertSubscriptionAuditEvent(admin, {
+      branch_id: branchId,
+      subscription_id: existing.id,
+      event_type: "resubscribed",
+      actor_source: "webhook",
+      metadata: auditMetadata,
+    });
+  }
+
+  const eventType = webhookAuditEventFor(mapped);
+  if (eventType) {
+    await insertSubscriptionAuditEvent(admin, {
+      branch_id: branchId,
+      subscription_id: existing.id,
+      event_type: eventType,
+      actor_source: "webhook",
+      metadata: auditMetadata,
+    });
+  }
+
   return { applied: true };
+}
+
+/** Stripe status of a subscription; null when Stripe reports it missing. Other errors throw (retry). */
+async function retrieveStripeSubscriptionStatus(
+  stripeSubscriptionId: string
+): Promise<string | null> {
+  try {
+    const subscription = await getStripeClient().subscriptions.retrieve(
+      stripeSubscriptionId
+    );
+    return subscription.status;
+  } catch (error) {
+    if (
+      error &&
+      typeof error === "object" &&
+      (error as { code?: unknown }).code === "resource_missing"
+    ) {
+      return null;
+    }
+    throw error;
+  }
+}
+
+/**
+ * The incoming subscription cannot be linked without overwriting another
+ * association. Nothing is written to the subscription row and no Stripe
+ * subscription is touched; ops reconcile from this event (billing health alerts
+ * on billing_reconcile_required). Deduped per incoming subscription and reason
+ * per day; an insert failure throws so the webhook fails and is retried.
+ */
+async function recordWebhookAssociationConflict(
+  admin: SupabaseClient,
+  input: {
+    branchId: string;
+    subscriptionRowId: string;
+    reason: string;
+    existingStripeSubscriptionId: string | null;
+    existingStripeStatus: string | null;
+    incomingStripeSubscriptionId: string;
+    incomingStripeStatus: string;
+    otherOpenRowId: string | null;
+    chronologyIso: string;
+  }
+): Promise<void> {
+  const metadata = {
+    reason: "webhook_subscription_association_conflict",
+    conflict: input.reason,
+    stripe_subscription_id: input.incomingStripeSubscriptionId,
+    incoming_stripe_subscription_id: input.incomingStripeSubscriptionId,
+    incoming_stripe_status: input.incomingStripeStatus,
+    existing_stripe_subscription_id: input.existingStripeSubscriptionId,
+    existing_stripe_status: input.existingStripeStatus,
+    subscription_row_id: input.subscriptionRowId,
+    other_open_row_id: input.otherOpenRowId,
+    event_chronology_at: input.chronologyIso,
+  };
+  console.error("[billing-reconcile] webhook subscription association conflict", {
+    branch_id: input.branchId,
+    ...metadata,
+  });
+
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const { data: recent, error: recentError } = await admin
+    .from("ea_subscription_events")
+    .select("id")
+    .eq("branch_id", input.branchId)
+    .eq("event_type", "billing_reconcile_required")
+    .contains("metadata", {
+      incoming_stripe_subscription_id: input.incomingStripeSubscriptionId,
+      conflict: input.reason,
+    })
+    .gte("created_at", since)
+    .limit(1);
+  if (!recentError && (recent ?? []).length > 0) return;
+
+  await insertSubscriptionAuditEvent(admin, {
+    branch_id: input.branchId,
+    subscription_id: input.subscriptionRowId,
+    event_type: "billing_reconcile_required",
+    actor_source: "webhook",
+    metadata,
+  });
+}
+
+/**
+ * Two Checkout requests can both pass the Stripe subscription check before
+ * either subscription exists. Once a live subscription is linked to an open
+ * branch row, every other open Checkout session on the same Customer and
+ * branch is expired so it can no longer be paid. The session behind the linked
+ * subscription is never touched, nor is any subscription.
+ *
+ * Driven by database state rather than the reconcile outcome, so retries and
+ * later events repeat it; expired sessions are no longer listed, which makes it
+ * idempotent. Subscriptions not linked to a row (association conflicts) are
+ * skipped. Stripe failures do not fail the event: they record
+ * billing_reconcile_required (deduped per subscription and reason per day); a
+ * failed insert throws so the event is retried.
+ */
+export async function expireOtherCheckoutSessionsAfterLink(
+  admin: SupabaseClient,
+  stripe: CheckoutSessionsClient,
+  subscription: Stripe.Subscription,
+  options: { completedCheckoutSessionId?: string | null; eventChronologyAt: Date }
+): Promise<OutstandingSessionReport | null> {
+  if (!CHECKOUT_BLOCKING_STRIPE_STATUSES.has(subscription.status)) return null;
+  const envMeta = subscription.metadata?.keynetic_env;
+  if (envMeta && envMeta !== getStripeServerConfig().apiMode) return null;
+  const customerId =
+    typeof subscription.customer === "string"
+      ? subscription.customer
+      : subscription.customer?.id;
+  if (!customerId) return null;
+
+  const { data: linkedRow, error: linkedError } = await admin
+    .from("ea_branch_subscriptions")
+    .select("id, branch_id")
+    .eq("stripe_subscription_id", subscription.id)
+    .is("ended_at", null)
+    .maybeSingle();
+  if (linkedError) throw linkedError;
+  if (!linkedRow) return null;
+  const branchId = linkedRow.branch_id as string;
+
+  const report = await expireOutstandingCheckoutSessions(
+    stripe,
+    { branchId, customerId },
+    {
+      linked: {
+        stripeSubscriptionId: subscription.id,
+        checkoutSessionId: options.completedCheckoutSessionId ?? null,
+      },
+      logPrefix: "[billing-webhook]",
+    }
+  );
+  const reason = postLinkSessionReconcileReason({
+    outcomes: report.sessions.map((s) => s.outcome),
+    listingFailed: report.listing_failed,
+  });
+  if (!reason) return report;
+
+  const metadata = {
+    reason,
+    stripe_subscription_id: subscription.id,
+    subscription_row_id: linkedRow.id as string,
+    completed_checkout_session_id: options.completedCheckoutSessionId ?? null,
+    outstanding_checkout_sessions: report,
+    event_chronology_at: options.eventChronologyAt.toISOString(),
+  };
+  console.error("[billing-reconcile] other Checkout sessions not closed after link", {
+    branch_id: branchId,
+    ...metadata,
+  });
+
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const { data: recent, error: recentError } = await admin
+    .from("ea_subscription_events")
+    .select("id")
+    .eq("branch_id", branchId)
+    .eq("event_type", "billing_reconcile_required")
+    .contains("metadata", { reason, stripe_subscription_id: subscription.id })
+    .gte("created_at", since)
+    .limit(1);
+  if (!recentError && (recent ?? []).length > 0) return report;
+
+  await insertSubscriptionAuditEvent(admin, {
+    branch_id: branchId,
+    subscription_id: linkedRow.id as string,
+    event_type: "billing_reconcile_required",
+    actor_source: "webhook",
+    metadata,
+  });
+  return report;
+}
+
+/**
+ * payment_succeeded comes only from a paid invoice with a non-zero amount (the
+ * trial's £0 invoice is excluded), independent of subscription status or
+ * chronology. Deduped by Stripe invoice id: lookup first, and the partial
+ * unique index ea_subscription_events_payment_invoice_once_idx (migration
+ * 20261108170000) as the guarantee.
+ */
+export async function recordInvoicePaymentSucceeded(
+  admin: SupabaseClient,
+  invoice: Stripe.Invoice,
+  subscription: Stripe.Subscription
+): Promise<void> {
+  if (!invoice.id || !(invoice.amount_paid > 0)) return;
+  const envMeta = subscription.metadata?.keynetic_env;
+  if (envMeta && envMeta !== getStripeServerConfig().apiMode) return;
+
+  const { data: linkedRow, error: linkedError } = await admin
+    .from("ea_branch_subscriptions")
+    .select("id, branch_id")
+    .eq("stripe_subscription_id", subscription.id)
+    .maybeSingle();
+  if (linkedError) throw linkedError;
+
+  const branchId =
+    (linkedRow?.branch_id as string | undefined) ??
+    resolveBranchIds(subscription).branchId;
+  if (!branchId) return;
+
+  const { data: recorded, error: lookupError } = await admin
+    .from("ea_subscription_events")
+    .select("id")
+    .eq("event_type", "payment_succeeded")
+    .contains("metadata", { stripe_invoice_id: invoice.id })
+    .limit(1);
+  if (!lookupError && (recorded ?? []).length > 0) return;
+
+  await insertSubscriptionAuditEvent(
+    admin,
+    {
+      branch_id: branchId,
+      subscription_id: (linkedRow?.id as string | undefined) ?? null,
+      event_type: "payment_succeeded",
+      actor_source: "webhook",
+      metadata: {
+        stripe_invoice_id: invoice.id,
+        stripe_subscription_id: subscription.id,
+        amount_paid: invoice.amount_paid,
+        currency: invoice.currency,
+        billing_reason: invoice.billing_reason ?? null,
+        linked_to_subscription_row: !!linkedRow,
+      },
+    },
+    { uniqueViolationMeansRecorded: true }
+  );
+}
+
+type SubscriptionAuditEventRow = {
+  branch_id: string;
+  subscription_id: string | null;
+  event_type: string;
+  actor_source: "webhook";
+  metadata: Record<string, unknown>;
+};
+
+async function insertSubscriptionAuditEvent(
+  admin: SupabaseClient,
+  row: SubscriptionAuditEventRow,
+  options?: { uniqueViolationMeansRecorded?: boolean }
+): Promise<void> {
+  const { error } = await admin.from("ea_subscription_events").insert(row);
+  if (!error) return;
+  if (options?.uniqueViolationMeansRecorded && error.code === "23505") return;
+  console.error("[billing-audit] ea_subscription_events insert failed", {
+    event_type: row.event_type,
+    branch_id: row.branch_id,
+    subscription_row_id: row.subscription_id,
+    stripe_subscription_id: row.metadata.stripe_subscription_id ?? null,
+    code: error.code ?? null,
+    message: error.message,
+  });
+  throw new Error(
+    `audit_event_insert_failed:${row.event_type}:${error.code ?? "unknown"}`
+  );
+}
+
+/**
+ * Exactly once per Stripe subscription, whichever trialing webhook arrives first
+ * (checkout.session.completed, customer.subscription.created/updated, the £0
+ * invoice.paid). The unique index ea_subscription_events_trial_started_once_idx
+ * is the guarantee; the lookup only avoids a failing insert on every update.
+ */
+async function recordTrialStartedOnce(
+  admin: SupabaseClient,
+  input: {
+    branchId: string;
+    subscriptionRowId: string;
+    metadata: Record<string, unknown> & { stripe_subscription_id: string };
+  }
+): Promise<void> {
+  const { data: recorded, error: lookupError } = await admin
+    .from("ea_subscription_events")
+    .select("id")
+    .eq("event_type", "trial_started")
+    .contains("metadata", {
+      stripe_subscription_id: input.metadata.stripe_subscription_id,
+    })
+    .limit(1);
+  if (!lookupError && (recorded ?? []).length > 0) return;
+
+  await insertSubscriptionAuditEvent(
+    admin,
+    {
+      branch_id: input.branchId,
+      subscription_id: input.subscriptionRowId,
+      event_type: "trial_started",
+      actor_source: "webhook",
+      metadata: input.metadata,
+    },
+    { uniqueViolationMeansRecorded: true }
+  );
 }
 
 /**
@@ -709,7 +1141,7 @@ export async function processStripeWebhookEvent(
             : session.subscription?.id;
         if (!subId) break;
         const chronologyAt = stripeEventChronologyAt(event);
-        const subscription = await loadSubscription(subId);
+        let subscription = await loadSubscription(subId);
         // Attach metadata from session if subscription missing keys
         if (!subscription.metadata?.keynetic_branch_id && session.metadata) {
           const stripe = getStripeClient();
@@ -719,27 +1151,35 @@ export async function processStripeWebhookEvent(
               ...session.metadata,
             },
           });
-          const refreshed = await loadSubscription(subId);
-          await reconcileStripeSubscription(admin, refreshed, {
-            confirmFounding: refreshed.status === "active",
-            eventChronologyAt: chronologyAt,
-          });
-        } else {
-          await reconcileStripeSubscription(admin, subscription, {
-            confirmFounding: subscription.status === "active",
-            eventChronologyAt: chronologyAt,
-          });
+          subscription = await loadSubscription(subId);
         }
+        await reconcileStripeSubscription(admin, subscription, {
+          confirmFounding: subscription.status === "active",
+          eventChronologyAt: chronologyAt,
+        });
+        await expireOtherCheckoutSessionsAfterLink(
+          admin,
+          getStripeClient(),
+          subscription,
+          { completedCheckoutSessionId: session.id, eventChronologyAt: chronologyAt }
+        );
         break;
       }
       case "customer.subscription.created":
       case "customer.subscription.updated": {
         const subscription = event.data.object as Stripe.Subscription;
+        const chronologyAt = stripeEventChronologyAt(event);
         await reconcileStripeSubscription(admin, subscription, {
           confirmFounding: subscription.status === "active",
           fromPaymentFailure: subscription.status === "past_due",
-          eventChronologyAt: stripeEventChronologyAt(event),
+          eventChronologyAt: chronologyAt,
         });
+        await expireOtherCheckoutSessionsAfterLink(
+          admin,
+          getStripeClient(),
+          subscription,
+          { eventChronologyAt: chronologyAt }
+        );
         break;
       }
       case "customer.subscription.deleted": {
@@ -766,6 +1206,7 @@ export async function processStripeWebhookEvent(
           confirmFounding: true,
           eventChronologyAt: stripeEventChronologyAt(event),
         });
+        await recordInvoicePaymentSucceeded(admin, invoice, subscription);
         break;
       }
       case "invoice.payment_failed": {

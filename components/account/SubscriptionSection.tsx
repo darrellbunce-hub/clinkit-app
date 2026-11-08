@@ -9,6 +9,10 @@ import {
 import {
   EA_FOUNDING_MONTHLY_LABEL,
   EA_STANDARD_MONTHLY_LABEL,
+  EA_TRIAL_HEADLINE,
+  EA_TRIAL_PERIOD_DAYS,
+  EA_TRIAL_REPEAT_COPY,
+  EA_TRIAL_TERMS_COPY,
   formatGbpMinorAsMonthlyLabel,
 } from "@/lib/billing/eaBranchPricing";
 import type { EaBranchSubscriptionSummary } from "@/lib/billing/eaBranchSubscription";
@@ -42,8 +46,7 @@ function describeSummary(summary: EaBranchSubscriptionSummary | null): {
   if (!summary?.ok || !summary.has_subscription) {
     return {
       title: "No subscription",
-      detail:
-        "Subscribe to MoveLoop for this Branch when you are ready. Recurring monthly billing is handled through Stripe. This environment may use Stripe test (Sandbox) mode before Production charging is enabled.",
+      detail: `Start your ${EA_TRIAL_PERIOD_DAYS}-day free trial for this Branch when you are ready. Recurring monthly billing is handled through Stripe. This environment may use Stripe test (Sandbox) mode before Production charging is enabled.`,
       tone: "neutral",
     };
   }
@@ -60,7 +63,7 @@ function describeSummary(summary: EaBranchSubscriptionSummary | null): {
 
   if (summary.stripe_status === "checkout_pending") {
     return {
-      title: "Payment confirmation pending",
+      title: "Subscription confirmation pending",
       detail:
         "If you completed Checkout, we are confirming your subscription from Stripe. This page will update shortly.",
       tone: "warning",
@@ -97,6 +100,26 @@ function describeSummary(summary: EaBranchSubscriptionSummary | null): {
       title: "Subscription ended",
       detail: "This branch no longer has an active MoveLoop subscription.",
       tone: "neutral",
+    };
+  }
+
+  if (summary.stripe_status === "trialing") {
+    const trialEnds = formatDate(summary.current_period_end ?? null);
+    if (summary.cancel_at_period_end) {
+      return {
+        title: "Free trial — cancellation scheduled",
+        detail: trialEnds
+          ? `Your free trial continues until ${trialEnds}, then the subscription ends. You will not be charged.`
+          : "Your free trial continues until the end of the trial, then the subscription ends. You will not be charged.",
+        tone: "warning",
+      };
+    }
+    return {
+      title: `Free trial — ${EA_TRIAL_HEADLINE}`,
+      detail: trialEnds
+        ? `Your free trial ends on ${trialEnds}. Your subscription then continues at ${priceLabel} unless you cancel before the trial ends.`
+        : `Your subscription continues at ${priceLabel} after the free trial unless you cancel before the trial ends.`,
+      tone: "success",
     };
   }
 
@@ -153,6 +176,7 @@ export default function SubscriptionSection({
   const [isActing, setIsActing] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [notice, setNotice] = useState("");
+  const [isConfirmingCheckout, setIsConfirmingCheckout] = useState(false);
 
   const reload = useCallback(async () => {
     setErrorMessage("");
@@ -185,8 +209,9 @@ export default function SubscriptionSection({
     const params = new URLSearchParams(window.location.search);
     const billing = params.get("billing");
     if (billing === "success") {
+      setIsConfirmingCheckout(true);
       setNotice(
-        "Payment received — we're confirming your subscription. This usually takes a few seconds."
+        "Checkout complete — we're confirming your subscription. This usually takes a few seconds."
       );
     } else if (billing === "cancelled") {
       setNotice(
@@ -199,7 +224,10 @@ export default function SubscriptionSection({
       const timer = window.setInterval(() => {
         void reload();
       }, 4000);
-      const stop = window.setTimeout(() => window.clearInterval(timer), 30000);
+      const stop = window.setTimeout(() => {
+        window.clearInterval(timer);
+        setIsConfirmingCheckout(false);
+      }, 30000);
       return () => {
         window.clearInterval(timer);
         window.clearTimeout(stop);
@@ -207,7 +235,7 @@ export default function SubscriptionSection({
     }
   }, [reload]);
 
-  async function startCheckout(acceptStandardPricing = false) {
+  async function startCheckout() {
     if (!branchId || !isOwner) return;
     setIsActing(true);
     setErrorMessage("");
@@ -215,58 +243,36 @@ export default function SubscriptionSection({
       const response = await fetch("/api/billing/ea/checkout-session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          branchId,
-          ...(acceptStandardPricing ? { acceptStandardPricing: true } : {}),
-        }),
+        body: JSON.stringify({ branchId }),
       });
       const payload = (await response.json()) as {
         ok?: boolean;
         url?: string;
         error?: string;
         message?: string;
-        pricingTier?: string;
-        reservationExpiresAt?: string | null;
       };
-      if (
-        response.status === 409 &&
-        (payload.error === "founding_just_secured" ||
-          payload.error === "founding_unavailable")
-      ) {
-        const proceed = window.confirm(
+      if (payload.error === "checkout_processing") {
+        setNotice(
           payload.message ??
-            "Founding places have been secured. Continue at £129/month?"
+            "Your Checkout is complete and we're confirming your subscription with Stripe. This usually takes a few seconds — please refresh shortly."
         );
-        if (!proceed) {
-          setNotice(
-            payload.message ??
-              "Founding pricing is no longer available. You can subscribe at £129/month when ready."
-          );
-          setIsActing(false);
-          return;
-        }
-        await startCheckout(true);
+        setIsActing(false);
+        void reload();
         return;
       }
       if (!response.ok || !payload.ok || !payload.url) {
         setErrorMessage(
           payload.error === "already_subscribed"
             ? "This branch already has an active subscription."
-            : "Unable to start Checkout right now. Please try again."
+            : (payload.error === "subscription_check_unavailable" ||
+                  payload.error === "stripe_subscription_exists" ||
+                  payload.error === "checkout_session_expiry_failed") &&
+                payload.message
+              ? payload.message
+              : "Unable to start Checkout right now. Please try again."
         );
         setIsActing(false);
         return;
-      }
-      if (
-        payload.pricingTier === "founding" &&
-        payload.reservationExpiresAt
-      ) {
-        const until = new Date(payload.reservationExpiresAt);
-        if (!Number.isNaN(until.getTime())) {
-          setNotice(
-            `Your £99 founding place is reserved until ${until.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}. Complete Checkout before then.`
-          );
-        }
       }
       window.location.href = payload.url;
     } catch {
@@ -307,8 +313,11 @@ export default function SubscriptionSection({
   }
 
   const view = describeSummary(summary);
+  const confirmingCompletedCheckout =
+    isConfirmingCheckout && summary?.stripe_status === "checkout_pending";
   const canSubscribe =
     isOwner &&
+    !confirmingCompletedCheckout &&
     (!summary?.has_subscription ||
       summary.entitlement_status === "ended" ||
       summary.stripe_status === "checkout_pending" ||
@@ -359,11 +368,11 @@ export default function SubscriptionSection({
             {view.detail}
           </p>
           <p className="mt-3 text-xs text-slate-500">
-            Founding {EA_FOUNDING_MONTHLY_LABEL} for the first 20 Branches ·
-            Standard {EA_STANDARD_MONTHLY_LABEL} thereafter. Price is set at
-            Checkout. Founding places are secured only when reservation succeeds
-            and are not returned if a founding subscription later ends.
-            Cancellation takes effect at period end via Manage subscription.
+            {summary?.has_subscription && summary.entitlement_status === "ended"
+              ? EA_TRIAL_REPEAT_COPY
+              : EA_TRIAL_TERMS_COPY}{" "}
+            Cancellation takes effect at the end of the trial or current billing
+            period via Manage subscription.
           </p>
 
           <div className="mt-5 flex flex-wrap gap-3">
@@ -378,8 +387,15 @@ export default function SubscriptionSection({
                   ? "Resubscribe"
                   : summary?.stripe_status === "checkout_pending"
                     ? "Continue checkout"
-                    : "Subscribe"}
+                    : summary?.has_subscription
+                      ? "Subscribe"
+                      : "Start free trial"}
               </button>
+            ) : null}
+            {confirmingCompletedCheckout ? (
+              <p className="text-sm text-slate-600" role="status">
+                Confirming your subscription with Stripe…
+              </p>
             ) : null}
             {canManage ? (
               <button

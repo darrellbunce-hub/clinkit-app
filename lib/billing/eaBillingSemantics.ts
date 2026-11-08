@@ -18,10 +18,19 @@
  * ---------------
  * active → past_due → entitlement grace → recover to entitled OR end if unrecovered.
  *
+ * Free trial
+ * ----------
+ * New branches: Checkout collects a card, trialing (entitled, no charge) for 30 days,
+ * then active at the standard price. No payment method at trial end → Stripe cancels.
+ * One trial per branch; resubscription is billed immediately.
+ *
  * Resubscription
  * --------------
  * End open subscription (ended_at set) then insert a new open row.
  * Unique partial index enforces one open subscription per branch.
+ *
+ * Founding tier is historical: no new founding Checkout or reservations; existing
+ * founding subscriptions still reconcile via confirm_ea_founding_slot.
  */
 
 export const EA_BILLING_STAGE = 2 as const;
@@ -35,8 +44,11 @@ export const EA_BILLING_SEMANTICS = {
   paymentFailureMode: "grace_then_end",
   paymentFailureGraceDays: 7,
   graceExpiryAuthority: "lazy_read_time_effective_status",
-  foundingReservationSeconds: 1800,
-  foundingCheckoutAlignedToReservation: true,
+  newSubscriptionTier: "standard",
+  trialPeriodDays: 30,
+  trialPaymentMethodCollection: "always",
+  trialMissingPaymentMethodBehavior: "cancel",
+  trialOncePerBranch: true,
   foundingWebhookAuthority: "confirm_ea_founding_slot",
   webhookChronologyAuthority: "stripe_event_created",
   webhookStaleGuardField: "stripe_object_updated_at",

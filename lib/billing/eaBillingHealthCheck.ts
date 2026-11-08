@@ -69,6 +69,7 @@ function buildAlertBody(
     `- Failed webhook events: ${snapshot.counts.failedWebhookCount}`,
     `- Stuck processing: ${snapshot.counts.staleProcessingCount}`,
     `- Founding reconcile exceptions: ${snapshot.counts.foundingExceptionCount}`,
+    `- Stripe/database reconcile required: ${snapshot.counts.reconcileRequiredCount}`,
     `- Oldest failed age (minutes): ${snapshot.counts.oldestFailedAgeMinutes ?? "n/a"}`,
     `- Last successful webhook: ${snapshot.counts.lastProcessedAt ?? "n/a"}`,
     "",
