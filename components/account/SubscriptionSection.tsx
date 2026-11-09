@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   accountAlertErrorClassName,
@@ -26,6 +26,50 @@ import { supabase } from "@/lib/supabase";
 type SubscriptionSectionProps = {
   userId: string;
 };
+
+/** Query parameters Stripe Checkout appends to the account return URL. */
+const CHECKOUT_RETURN_PARAMS = ["billing", "branch"] as const;
+
+export function readCheckoutReturn(search: string): {
+  billing: string | null;
+  branchId: string | null;
+} {
+  const params = new URLSearchParams(search);
+  return { billing: params.get("billing"), branchId: params.get("branch") };
+}
+
+/**
+ * A returning Checkout is confirmed only once a successfully loaded summary
+ * shows the branch's open subscription row past checkout_pending. Failed or
+ * missing summaries, a missing return branch ID, other branches and ended rows
+ * never count.
+ */
+export function isCheckoutReturnConfirmed(
+  summary: EaBranchSubscriptionSummary | null,
+  expectedBranchId: string | null
+): boolean {
+  if (!summary || summary.ok !== true || summary.has_subscription !== true) {
+    return false;
+  }
+  if (!expectedBranchId || summary.branch_id !== expectedBranchId) return false;
+  const status = summary.stripe_status;
+  if (!status || status === "checkout_pending") return false;
+  if (summary.ended_at || summary.entitlement_status === "ended") return false;
+  return true;
+}
+
+/**
+ * Relative URL with the Checkout return parameters removed (path, other query
+ * parameters and hash kept), or null when there is nothing to remove.
+ */
+export function urlWithoutCheckoutReturnParams(href: string): string | null {
+  const url = new URL(href);
+  if (!CHECKOUT_RETURN_PARAMS.some((name) => url.searchParams.has(name))) {
+    return null;
+  }
+  for (const name of CHECKOUT_RETURN_PARAMS) url.searchParams.delete(name);
+  return `${url.pathname}${url.search}${url.hash}`;
+}
 
 function formatDate(value: string | null | undefined): string | null {
   if (!value) return null;
@@ -177,6 +221,11 @@ export default function SubscriptionSection({
   const [errorMessage, setErrorMessage] = useState("");
   const [notice, setNotice] = useState("");
   const [isConfirmingCheckout, setIsConfirmingCheckout] = useState(false);
+  /** Set while returning from a successful Checkout that is not yet confirmed. */
+  const checkoutReturnRef = useRef<{ branchId: string | null } | null>(null);
+  const checkoutPollRef = useRef<{ interval: number; timeout: number } | null>(
+    null
+  );
 
   const reload = useCallback(async () => {
     setErrorMessage("");
@@ -201,14 +250,36 @@ export default function SubscriptionSection({
     const { data } = await supabase.rpc("get_ea_branch_subscription_summary", {
       p_branch_id: context.branch.id,
     });
-    setSummary((data as EaBranchSubscriptionSummary) ?? null);
+    const loaded = (data as EaBranchSubscriptionSummary) ?? null;
+    setSummary(loaded);
     setIsLoading(false);
+
+    const checkoutReturn = checkoutReturnRef.current;
+    if (
+      checkoutReturn &&
+      isCheckoutReturnConfirmed(loaded, checkoutReturn.branchId)
+    ) {
+      checkoutReturnRef.current = null;
+      if (checkoutPollRef.current) {
+        window.clearInterval(checkoutPollRef.current.interval);
+        window.clearTimeout(checkoutPollRef.current.timeout);
+        checkoutPollRef.current = null;
+      }
+      setIsConfirmingCheckout(false);
+      setNotice("");
+      const cleaned = urlWithoutCheckoutReturnParams(window.location.href);
+      if (cleaned) {
+        window.history.replaceState(window.history.state, "", cleaned);
+      }
+    }
   }, [userId]);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const billing = params.get("billing");
+    const { billing, branchId: returnBranchId } = readCheckoutReturn(
+      window.location.search
+    );
     if (billing === "success") {
+      checkoutReturnRef.current = { branchId: returnBranchId };
       setIsConfirmingCheckout(true);
       setNotice(
         "Checkout complete — we're confirming your subscription. This usually takes a few seconds."
@@ -226,11 +297,14 @@ export default function SubscriptionSection({
       }, 4000);
       const stop = window.setTimeout(() => {
         window.clearInterval(timer);
+        checkoutPollRef.current = null;
         setIsConfirmingCheckout(false);
       }, 30000);
+      checkoutPollRef.current = { interval: timer, timeout: stop };
       return () => {
         window.clearInterval(timer);
         window.clearTimeout(stop);
+        checkoutPollRef.current = null;
       };
     }
   }, [reload]);
