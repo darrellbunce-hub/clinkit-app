@@ -191,6 +191,14 @@ Test mode → Settings → Billing → Customer portal:
 | Payment problem → grace | `invoice.payment_failed` / `past_due` |
 | Ended | `customer.subscription.deleted` or canceled after period end / grace exhausted |
 
+### Scheduled cancellation
+
+A cancellation is pending when a non-terminal subscription has `cancel_at_period_end = true` **or** a `cancel_at` later than the event (the Customer Portal sends `cancel_at` with `cancel_at_period_end = false`). It takes effect at `cancel_at`, else `current_period_end`; entitlement continues until `customer.subscription.deleted`. Terminal statuses keep the `cancel_at_period_end`-only mapping.
+
+- Row: `cancel_at_period_end = true` while pending; `cancelled_at` = Stripe `canceled_at` (kept across repeated updates). Both clear on reversal.
+- Email: one per subscription and effective date (dispatch key), attempted on every update while pending.
+- Audit: one `cancellation_scheduled` per subscription and effective date; its primary key is derived from both, so retries and concurrent deliveries collapse to one row.
+
 ## Additive migration
 
 `20260729210000_billing_stage2_checkout_grace_foundation.sql`

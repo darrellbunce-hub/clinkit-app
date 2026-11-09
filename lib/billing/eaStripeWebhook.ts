@@ -1,5 +1,7 @@
 import "server-only";
 
+import { createHash } from "crypto";
+
 import type Stripe from "stripe";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -9,8 +11,10 @@ import {
 } from "@/lib/billing/eaBranchPricing";
 import { dispatchBillingCustomerEmailsForTransition } from "@/lib/billing/eaBillingCustomerEmails";
 import {
+  cancelledAtForRow,
   computeGraceEndsAt,
   mapStripeSubscriptionToKeynetic,
+  stripeCancellationSchedule,
   webhookAuditEventFor,
 } from "@/lib/billing/mapStripeStatus";
 import {
@@ -357,18 +361,24 @@ async function reconcileStripeSubscription(
     subscriptionPeriodUnix(subscription, "current_period_end")
   );
   const periodEndDate = periodEnd ? new Date(periodEnd) : null;
+  const chronologyAt = options.eventChronologyAt;
+  const chronologyIso = chronologyAt.toISOString();
+  const cancellation = stripeCancellationSchedule({
+    stripeStatus: subscription.status,
+    cancelAtPeriodEnd: subscription.cancel_at_period_end,
+    cancelAtUnix: subscription.cancel_at,
+    currentPeriodEnd: periodEndDate,
+    at: chronologyAt,
+  });
   const mapped = mapStripeSubscriptionToKeynetic({
     stripeStatus: subscription.status,
-    cancelAtPeriodEnd: !!subscription.cancel_at_period_end,
+    cancelAtPeriodEnd: cancellation.scheduled,
     currentPeriodEnd: periodEndDate,
   });
 
-  const chronologyAt = options.eventChronologyAt;
-  const chronologyIso = chronologyAt.toISOString();
-
   // Load existing row for out-of-order guard (by row id when known, including ended).
   const rowColumns =
-    "id, stripe_subscription_id, stripe_object_updated_at, entitlement_status, grace_ends_at, pricing_tier, founding_slot_number, ended_at, cancel_at_period_end";
+    "id, stripe_subscription_id, stripe_object_updated_at, entitlement_status, grace_ends_at, pricing_tier, founding_slot_number, ended_at, cancel_at_period_end, cancelled_at";
   let existingQuery = admin
     .from("ea_branch_subscriptions")
     .select(rowColumns)
@@ -526,7 +536,6 @@ async function reconcileStripeSubscription(
   }
 
   const previousEntitlement = existing.entitlement_status as string | null;
-  const previousCancelAtPeriodEnd = Boolean(existing.cancel_at_period_end);
 
   let graceEndsAt: string | null = (existing.grace_ends_at as string) ?? null;
   if (options.fromPaymentFailure || mapped.enterGrace) {
@@ -556,9 +565,12 @@ async function reconcileStripeSubscription(
     current_period_start: periodStart,
     current_period_end: periodEnd,
     cancel_at_period_end: mapped.cancelAtPeriodEnd,
-    cancelled_at: mapped.cancelAtPeriodEnd
-      ? new Date().toISOString()
-      : null,
+    cancelled_at: cancelledAtForRow({
+      scheduled: mapped.cancelAtPeriodEnd && !mapped.ended,
+      ended: mapped.ended,
+      stripeCanceledAtUnix: subscription.canceled_at,
+      existingCancelledAt: (existing.cancelled_at as string | null) ?? null,
+    }),
     grace_ends_at: graceEndsAt,
     stripe_checkout_session_id: null,
     stripe_status_updated_at: new Date().toISOString(),
@@ -640,11 +652,14 @@ async function reconcileStripeSubscription(
     previousEntitlement !== "grace" &&
     mapped.entitlementStatus === "grace" &&
     Boolean(graceEndsAt);
-  // Only treat as new cancellation when cancel_at_period_end flips false → true.
-  const cancellationScheduled =
-    !previousCancelAtPeriodEnd &&
-    mapped.cancelAtPeriodEnd &&
-    Boolean(periodEnd);
+  // Sent whenever a cancellation is pending, not only on the false → true flip,
+  // so a retry after a failed send still delivers it; the dispatch key
+  // (subscription + effective end) keeps it to one email per schedule.
+  const cancellationEndsAt =
+    mapped.cancelAtPeriodEnd && !mapped.ended && cancellation.endsAt
+      ? cancellation.endsAt.toISOString()
+      : null;
+  const cancellationScheduled = cancellationEndsAt !== null;
 
   if (becameEntitled || enteredGrace || cancellationScheduled) {
     await dispatchBillingCustomerEmailsForTransition(admin, {
@@ -660,6 +675,7 @@ async function reconcileStripeSubscription(
       becameEntitled,
       enteredGrace,
       cancellationScheduled,
+      cancellationEndsAt,
       invoiceId: options.invoiceId ?? null,
     });
   }
@@ -700,7 +716,19 @@ async function reconcileStripeSubscription(
   }
 
   const eventType = webhookAuditEventFor(mapped);
-  if (eventType) {
+  if (eventType === "cancellation_scheduled") {
+    await recordCancellationScheduledOnce(admin, {
+      branchId,
+      subscriptionRowId: existing.id as string,
+      cancellationEndsAt,
+      metadata: {
+        ...auditMetadata,
+        cancel_at: unixToIso(subscription.cancel_at),
+        cancel_at_period_end: !!subscription.cancel_at_period_end,
+        canceled_at: unixToIso(subscription.canceled_at),
+      },
+    });
+  } else if (eventType) {
     await insertSubscriptionAuditEvent(admin, {
       branch_id: branchId,
       subscription_id: existing.id,
@@ -942,6 +970,7 @@ export async function recordInvoicePaymentSucceeded(
 }
 
 type SubscriptionAuditEventRow = {
+  id?: string;
   branch_id: string;
   subscription_id: string | null;
   event_type: string;
@@ -967,6 +996,60 @@ async function insertSubscriptionAuditEvent(
   });
   throw new Error(
     `audit_event_insert_failed:${row.event_type}:${error.code ?? "unknown"}`
+  );
+}
+
+/** Stable UUID (version 8, name-based) for an idempotent audit row. */
+export function deterministicAuditEventId(name: string): string {
+  const bytes = createHash("sha256").update(name).digest().subarray(0, 16);
+  bytes[6] = (bytes[6]! & 0x0f) | 0x80;
+  bytes[8] = (bytes[8]! & 0x3f) | 0x80;
+  const hex = bytes.toString("hex");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+export function cancellationScheduledAuditEventId(
+  stripeSubscriptionId: string,
+  cancellationEndsAt: string | null
+): string {
+  return deterministicAuditEventId(
+    `cancellation_scheduled:${stripeSubscriptionId}:${cancellationEndsAt ?? "period_end_unknown"}`
+  );
+}
+
+/**
+ * Exactly once per Stripe subscription and cancellation effective date, on
+ * every delivery that sees the cancellation pending (not only the first), so a
+ * retry after a failed insert still records it. The primary key is derived
+ * from the subscription and date: repeats and concurrent deliveries hit the
+ * primary key and count as recorded, without a lookup or a migration.
+ */
+async function recordCancellationScheduledOnce(
+  admin: SupabaseClient,
+  input: {
+    branchId: string;
+    subscriptionRowId: string;
+    cancellationEndsAt: string | null;
+    metadata: Record<string, unknown> & { stripe_subscription_id: string };
+  }
+): Promise<void> {
+  await insertSubscriptionAuditEvent(
+    admin,
+    {
+      id: cancellationScheduledAuditEventId(
+        input.metadata.stripe_subscription_id,
+        input.cancellationEndsAt
+      ),
+      branch_id: input.branchId,
+      subscription_id: input.subscriptionRowId,
+      event_type: "cancellation_scheduled",
+      actor_source: "webhook",
+      metadata: {
+        ...input.metadata,
+        cancellation_effective_at: input.cancellationEndsAt,
+      },
+    },
+    { uniqueViolationMeansRecorded: true }
   );
 }
 

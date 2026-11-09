@@ -2,8 +2,81 @@ import type {
   EaEntitlementStatus,
   EaStripeSubscriptionStatus,
 } from "@/lib/billing/eaBranchSubscription";
+import { TERMINAL_STRIPE_SUBSCRIPTION_STATUSES } from "@/lib/billing/eaSubscriptionAssociation";
 
 export const EA_PAYMENT_FAILURE_GRACE_DAYS = 7 as const;
+
+export type StripeCancellationSchedule = {
+  /** A cancellation is pending; stored as cancel_at_period_end. */
+  scheduled: boolean;
+  /** When the pending cancellation takes effect; null when none is pending. */
+  endsAt: Date | null;
+};
+
+/**
+ * Stripe schedules a cancellation either with cancel_at_period_end or with a
+ * cancel_at timestamp (the Customer Portal uses cancel_at, leaving
+ * cancel_at_period_end false). cancel_at counts only while it is later than
+ * the event, so a replayed event keeps the meaning it had when sent. Terminal
+ * statuses keep the cancel_at_period_end-only mapping.
+ */
+export function stripeCancellationSchedule(input: {
+  stripeStatus: string;
+  cancelAtPeriodEnd: boolean | null | undefined;
+  cancelAtUnix: number | null | undefined;
+  currentPeriodEnd: Date | null;
+  at: Date;
+}): StripeCancellationSchedule {
+  const cancelAt =
+    typeof input.cancelAtUnix === "number" && input.cancelAtUnix > 0
+      ? new Date(input.cancelAtUnix * 1000)
+      : null;
+  const futureCancelAt =
+    cancelAt && cancelAt.getTime() > input.at.getTime() ? cancelAt : null;
+
+  if (TERMINAL_STRIPE_SUBSCRIPTION_STATUSES.has(input.stripeStatus)) {
+    return input.cancelAtPeriodEnd
+      ? { scheduled: true, endsAt: input.currentPeriodEnd }
+      : { scheduled: false, endsAt: null };
+  }
+  if (input.cancelAtPeriodEnd) {
+    return { scheduled: true, endsAt: futureCancelAt ?? input.currentPeriodEnd };
+  }
+  if (futureCancelAt) {
+    return { scheduled: true, endsAt: futureCancelAt };
+  }
+  return { scheduled: false, endsAt: null };
+}
+
+/**
+ * Row cancelled_at: when the cancellation was requested. Stripe's canceled_at
+ * wins; otherwise an already-recorded time is kept so repeated updates do not
+ * move it. A pending cancellation without either falls back to now; a reversal
+ * (no pending cancellation, not ended) clears it.
+ */
+export function cancelledAtForRow(input: {
+  scheduled: boolean;
+  ended: boolean;
+  stripeCanceledAtUnix: number | null | undefined;
+  existingCancelledAt: string | null;
+  now?: Date;
+}): string | null {
+  const fromStripe =
+    typeof input.stripeCanceledAtUnix === "number" && input.stripeCanceledAtUnix > 0
+      ? new Date(input.stripeCanceledAtUnix * 1000).toISOString()
+      : null;
+  if (input.scheduled) {
+    return (
+      fromStripe ??
+      input.existingCancelledAt ??
+      (input.now ?? new Date()).toISOString()
+    );
+  }
+  if (input.ended) {
+    return fromStripe ?? input.existingCancelledAt;
+  }
+  return null;
+}
 
 export type MappedBillingState = {
   stripeStatus: EaStripeSubscriptionStatus;

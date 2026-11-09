@@ -40,6 +40,8 @@ export type BillingEmailTransitionContext = {
   becameEntitled: boolean;
   enteredGrace: boolean;
   cancellationScheduled: boolean;
+  /** When the pending cancellation takes effect (Stripe cancel_at); defaults to currentPeriodEnd. */
+  cancellationEndsAt?: string | null;
   invoiceId?: string | null;
 };
 
@@ -316,13 +318,12 @@ export async function dispatchBillingCustomerEmailsForTransition(
       });
     }
 
-    if (
-      transition.cancellationScheduled &&
-      transition.currentPeriodEnd
-    ) {
+    const cancellationEndsAt =
+      transition.cancellationEndsAt ?? transition.currentPeriodEnd;
+    if (transition.cancellationScheduled && cancellationEndsAt) {
       const dispatchKey = billingCancellationDispatchKey(
         transition.stripeSubscriptionId,
-        transition.currentPeriodEnd
+        cancellationEndsAt
       );
       await claimAndSend(admin, {
         dispatchKey,
@@ -335,7 +336,7 @@ export async function dispatchBillingCustomerEmailsForTransition(
           sendEaSubscriptionCancelled({
             ...common,
             accessEndsAtLabel:
-              formatEnGbDate(transition.currentPeriodEnd) ??
+              formatEnGbDate(cancellationEndsAt) ??
               "the end of the current billing period",
             isFounding,
             isTrialing: transition.isTrialing,
