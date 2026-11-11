@@ -141,6 +141,7 @@ async function runStatic() {
     "ea-grace-reminder",
     "ea-grace-final-warning",
     "ea-subscription-cancelled",
+    "ea-subscription-cancellation-reversed",
   ]) {
     record(`Template registered: ${id}`, registry.includes(`"${id}"`));
   }
@@ -202,7 +203,9 @@ async function runStatic() {
       }) === "invoice:in_1:payment_failed" &&
       billingGraceMidDispatchKey(subId, graceAt).includes("grace_mid") &&
       billingGraceFinalDispatchKey(subId, graceAt).includes("grace_final") &&
-      billingCancellationDispatchKey(subId, graceAt).includes("cancellation")
+      billingCancellationDispatchKey(subId, graceAt, null).includes("cancellation") &&
+      billingCancellationDispatchKey(subId, graceAt, "2026-08-19T12:00:00.000Z") !==
+        billingCancellationDispatchKey(subId, graceAt, null)
   );
 
   const graceStart = new Date("2026-08-19T12:00:00.000Z");

@@ -71,6 +71,41 @@ export function urlWithoutCheckoutReturnParams(href: string): string | null {
   return `${url.pathname}${url.search}${url.hash}`;
 }
 
+/**
+ * Follow-up summary loads after returning from the Stripe billing portal
+ * (`?billing=portal`), measured from the return. The webhook usually lands
+ * before the first load; these cover a slow one and stop once the status
+ * changes.
+ */
+export const PORTAL_RETURN_REFRESH_DELAYS_MS = [3000, 8000, 15000] as const;
+
+/** Minimum gap between refreshes triggered by the tab becoming visible again. */
+export const VISIBILITY_REFRESH_MIN_INTERVAL_MS = 30000;
+
+/** The summary fields the displayed status depends on. */
+export function subscriptionStatusFingerprint(
+  summary: EaBranchSubscriptionSummary | null
+): string {
+  if (!summary?.ok || !summary.has_subscription) return "none";
+  return JSON.stringify([
+    summary.stripe_status ?? null,
+    summary.entitlement_status ?? null,
+    summary.cancel_at_period_end ?? null,
+    summary.current_period_end ?? null,
+    summary.grace_ends_at ?? null,
+    summary.ended_at ?? null,
+    summary.pricing_tier ?? null,
+  ]);
+}
+
+export function isRefreshDue(
+  lastLoadedAt: number | null,
+  now: number,
+  minIntervalMs: number
+): boolean {
+  return lastLoadedAt === null || now - lastLoadedAt >= minIntervalMs;
+}
+
 function formatDate(value: string | null | undefined): string | null {
   if (!value) return null;
   const date = new Date(value);
@@ -82,7 +117,7 @@ function formatDate(value: string | null | undefined): string | null {
   });
 }
 
-function describeSummary(summary: EaBranchSubscriptionSummary | null): {
+export function describeSummary(summary: EaBranchSubscriptionSummary | null): {
   title: string;
   detail: string;
   tone: "neutral" | "success" | "warning" | "danger";
@@ -226,14 +261,16 @@ export default function SubscriptionSection({
   const checkoutPollRef = useRef<{ interval: number; timeout: number } | null>(
     null
   );
+  const lastLoadedAtRef = useRef<number | null>(null);
 
-  const reload = useCallback(async () => {
+  const reload = useCallback(async (): Promise<EaBranchSubscriptionSummary | null> => {
     setErrorMessage("");
+    lastLoadedAtRef.current = Date.now();
     const context = await loadAgentHomeContext(supabase, userId);
     if (!context) {
       setErrorMessage("Unable to load your branch for billing.");
       setIsLoading(false);
-      return;
+      return null;
     }
 
     setBranchId(context.branch.id);
@@ -272,6 +309,7 @@ export default function SubscriptionSection({
         window.history.replaceState(window.history.state, "", cleaned);
       }
     }
+    return loaded;
   }, [userId]);
 
   useEffect(() => {
@@ -289,6 +327,40 @@ export default function SubscriptionSection({
         "Checkout was cancelled. No subscription was created. You can try again when ready."
       );
     }
+    if (billing === "portal") {
+      const cleaned = urlWithoutCheckoutReturnParams(window.location.href);
+      if (cleaned) {
+        window.history.replaceState(window.history.state, "", cleaned);
+      }
+      let cancelled = false;
+      const timers: number[] = [];
+      const stopFollowUps = () => {
+        cancelled = true;
+        for (const timer of timers) window.clearTimeout(timer);
+      };
+      void reload().then((initial) => {
+        if (cancelled) return;
+        const initialFingerprint = subscriptionStatusFingerprint(initial);
+        const startedAt = Date.now();
+        for (const delay of PORTAL_RETURN_REFRESH_DELAYS_MS) {
+          timers.push(
+            window.setTimeout(() => {
+              if (cancelled) return;
+              void reload().then((latest) => {
+                if (
+                  latest?.ok &&
+                  subscriptionStatusFingerprint(latest) !== initialFingerprint
+                ) {
+                  stopFollowUps();
+                }
+              });
+            }, Math.max(0, delay - (Date.now() - startedAt)))
+          );
+        }
+      });
+      return stopFollowUps;
+    }
+
     void reload();
 
     if (billing === "success") {
@@ -307,6 +379,34 @@ export default function SubscriptionSection({
         checkoutPollRef.current = null;
       };
     }
+  }, [reload]);
+
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      if (
+        document.visibilityState === "visible" &&
+        isRefreshDue(
+          lastLoadedAtRef.current,
+          Date.now(),
+          VISIBILITY_REFRESH_MIN_INTERVAL_MS
+        )
+      ) {
+        void reload();
+      }
+    };
+    // Back from the Stripe portal can restore this page from the back/forward
+    // cache with the pre-redirect state (buttons disabled, old status).
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (!event.persisted) return;
+      setIsActing(false);
+      void reload();
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("pageshow", onPageShow);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("pageshow", onPageShow);
+    };
   }, [reload]);
 
   async function startCheckout() {

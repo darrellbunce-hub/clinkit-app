@@ -154,6 +154,16 @@ export type EaSubscriptionCancelledEmailParams = EaBillingEmailCommonParams & {
   isTrialing?: boolean;
 };
 
+export type EaSubscriptionCancellationReversedEmailParams =
+  EaBillingEmailCommonParams & {
+    planLabel: string;
+    priceLabel: string;
+    /** Trial end (first payment) when trialing, else the next renewal date. */
+    nextBillingDateLabel: string | null;
+    isFounding: boolean;
+    isTrialing?: boolean;
+  };
+
 export type EmailTemplateId =
   | "homeowner-invitation"
   | "estate-agent-invitation"
@@ -165,7 +175,8 @@ export type EmailTemplateId =
   | "ea-payment-failed"
   | "ea-grace-reminder"
   | "ea-grace-final-warning"
-  | "ea-subscription-cancelled";
+  | "ea-subscription-cancelled"
+  | "ea-subscription-cancellation-reversed";
 
 export type FutureEmailTemplateId =
   | "chain-update"

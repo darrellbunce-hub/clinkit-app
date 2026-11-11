@@ -11,6 +11,7 @@ import {
   renderEaGraceFinalWarning,
   renderEaGraceReminder,
   renderEaPaymentFailed,
+  renderEaSubscriptionCancellationReversed,
   renderEaSubscriptionCancelled,
   renderEaSubscriptionConfirmation,
   renderEstateAgentInvitation,
@@ -26,6 +27,7 @@ import type {
   EaGraceFinalWarningEmailParams,
   EaGraceReminderEmailParams,
   EaPaymentFailedEmailParams,
+  EaSubscriptionCancellationReversedEmailParams,
   EaSubscriptionCancelledEmailParams,
   EaSubscriptionConfirmationEmailParams,
   EmailEventMetadata,
@@ -332,5 +334,21 @@ export async function sendEaSubscriptionCancelled(
       text: rendered.text,
     },
     { template: "ea-subscription-cancelled", metadata }
+  );
+}
+
+export async function sendEaSubscriptionCancellationReversed(
+  params: EaSubscriptionCancellationReversedEmailParams,
+  metadata?: EmailEventMetadata
+): Promise<SendEmailResult> {
+  const rendered = await renderEaSubscriptionCancellationReversed(params);
+  return deliverEmail(
+    {
+      to: params.to,
+      subject: rendered.subject,
+      html: rendered.html,
+      text: rendered.text,
+    },
+    { template: "ea-subscription-cancellation-reversed", metadata }
   );
 }

@@ -7,7 +7,9 @@ import {
 } from "@/lib/billing/eaBranchPricing";
 import {
   billingCancellationDispatchKey,
+  billingCancellationReversedDispatchKey,
   billingConfirmationDispatchKey,
+  billingLegacyCancellationDispatchKey,
   billingGraceFinalDispatchKey,
   billingGraceMidDispatchKey,
   billingPaymentFailedDispatchKey,
@@ -21,6 +23,7 @@ import {
   sendEaGraceFinalWarning,
   sendEaGraceReminder,
   sendEaPaymentFailed,
+  sendEaSubscriptionCancellationReversed,
   sendEaSubscriptionCancelled,
   sendEaSubscriptionConfirmation,
 } from "@/lib/communications/email";
@@ -42,8 +45,42 @@ export type BillingEmailTransitionContext = {
   cancellationScheduled: boolean;
   /** When the pending cancellation takes effect (Stripe cancel_at); defaults to currentPeriodEnd. */
   cancellationEndsAt?: string | null;
+  /** Stripe canceled_at (ISO) identifying this cancellation request; null for legacy/unknown. */
+  cancellationRequestedAt?: string | null;
+  /** Set when this event withdrew a scheduled cancellation (from previous_attributes). */
+  cancellationReversal?: { requestId: string } | null;
   invoiceId?: string | null;
 };
+
+/**
+ * Cancellation emails sent before request-scoped keys used the legacy key
+ * (subscription + end date only). If that legacy dispatch was created at or
+ * after this request's canceled_at, it already covered this request.
+ */
+async function legacyCancellationDispatchCoversRequest(
+  admin: SupabaseClient,
+  stripeSubscriptionId: string,
+  cancellationEndsAt: string,
+  requestedAt: string
+): Promise<boolean> {
+  const { data, error } = await admin
+    .from("billing_customer_email_dispatches")
+    .select("status, created_at")
+    .eq(
+      "dispatch_key",
+      billingLegacyCancellationDispatchKey(stripeSubscriptionId, cancellationEndsAt)
+    )
+    .maybeSingle();
+  if (error) {
+    throw new Error("legacy_cancellation_dispatch_lookup_failed");
+  }
+  if (!data) return false;
+  const row = data as { status?: string | null; created_at?: string | null };
+  if (row.status !== "sent" && row.status !== "claimed") return false;
+  const createdAt = row.created_at ? Date.parse(row.created_at) : NaN;
+  const requested = Date.parse(requestedAt);
+  return Number.isFinite(createdAt) && Number.isFinite(requested) && createdAt >= requested;
+}
 
 type ClaimResult =
   | { action: "claimed" | "reclaimed" }
@@ -321,23 +358,70 @@ export async function dispatchBillingCustomerEmailsForTransition(
     const cancellationEndsAt =
       transition.cancellationEndsAt ?? transition.currentPeriodEnd;
     if (transition.cancellationScheduled && cancellationEndsAt) {
-      const dispatchKey = billingCancellationDispatchKey(
+      const requestedAt = transition.cancellationRequestedAt ?? null;
+      const coveredByLegacy =
+        requestedAt !== null &&
+        (await legacyCancellationDispatchCoversRequest(
+          admin,
+          transition.stripeSubscriptionId,
+          cancellationEndsAt,
+          requestedAt
+        ));
+      if (!coveredByLegacy) {
+        const dispatchKey = billingCancellationDispatchKey(
+          transition.stripeSubscriptionId,
+          cancellationEndsAt,
+          requestedAt
+        );
+        await claimAndSend(admin, {
+          dispatchKey,
+          template: "ea-subscription-cancelled",
+          branchId: transition.branchId,
+          subscriptionId: transition.subscriptionRowId,
+          recipientEmail: owner.email,
+          metadata: {
+            kind: "cancellation",
+            cancellation_effective_at: cancellationEndsAt,
+            canceled_at: requestedAt,
+          },
+          send: () =>
+            sendEaSubscriptionCancelled({
+              ...common,
+              accessEndsAtLabel:
+                formatEnGbDate(cancellationEndsAt) ??
+                "the end of the current billing period",
+              isFounding,
+              isTrialing: transition.isTrialing,
+            }),
+        });
+      }
+    }
+
+    if (transition.cancellationReversal && !transition.cancellationScheduled) {
+      const dispatchKey = billingCancellationReversedDispatchKey(
         transition.stripeSubscriptionId,
-        cancellationEndsAt
+        transition.cancellationReversal.requestId
       );
       await claimAndSend(admin, {
         dispatchKey,
-        template: "ea-subscription-cancelled",
+        template: "ea-subscription-cancellation-reversed",
         branchId: transition.branchId,
         subscriptionId: transition.subscriptionRowId,
         recipientEmail: owner.email,
-        metadata: { kind: "cancellation" },
+        metadata: {
+          kind: "cancellation_reversed",
+          reversed_request_id: transition.cancellationReversal.requestId,
+        },
         send: () =>
-          sendEaSubscriptionCancelled({
+          sendEaSubscriptionCancellationReversed({
             ...common,
-            accessEndsAtLabel:
-              formatEnGbDate(cancellationEndsAt) ??
-              "the end of the current billing period",
+            planLabel,
+            priceLabel,
+            nextBillingDateLabel: formatEnGbDate(
+              transition.isTrialing
+                ? transition.trialEndsAt
+                : transition.currentPeriodEnd
+            ),
             isFounding,
             isTrialing: transition.isTrialing,
           }),

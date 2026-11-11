@@ -25,7 +25,7 @@ export async function createEaBillingPortalSession(
   try {
     const session = await stripe.billingPortal.sessions.create({
       customer: context.branchStripeCustomerId,
-      return_url: `${config.appUrl}/account#subscription`,
+      return_url: `${config.appUrl}/account?billing=portal#subscription`,
     });
 
     if (!session.url) {

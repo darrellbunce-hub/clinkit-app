@@ -176,12 +176,22 @@ async function main() {
   );
   const confirmedBlockAt = reloadBody.indexOf("isCheckoutReturnConfirmed(loaded");
   const confirmedBlock = reloadBody.slice(confirmedBlockAt);
+  // The billing-portal return (?billing=portal) strips its own parameter; it is
+  // the only other URL write allowed.
+  const portalBlockStart = src.indexOf('if (billing === "portal") {');
+  const portalBlock =
+    portalBlockStart === -1
+      ? ""
+      : src.slice(portalBlockStart, src.indexOf("return stopFollowUps;", portalBlockStart));
+  const replaceCount = (s: string) => (s.match(/window\.history\.replaceState\(/g) ?? []).length;
   record(
     "WIRING banner cleared and URL replaced only inside the confirmed branch, after the summary loads",
     confirmedBlockAt > reloadBody.indexOf("setSummary(loaded)") &&
       confirmedBlock.includes('setNotice("")') &&
       confirmedBlock.includes("window.history.replaceState(") &&
-      (src.match(/window\.history\.replaceState\(/g) ?? []).length === 1 &&
+      replaceCount(confirmedBlock) === 1 &&
+      replaceCount(src) - replaceCount(portalBlock) === 1 &&
+      replaceCount(portalBlock) <= 1 &&
       (src.match(/setNotice\(""\)/g) ?? []).length === 1
   );
   record(

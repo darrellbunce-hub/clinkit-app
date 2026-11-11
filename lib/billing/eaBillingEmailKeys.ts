@@ -9,6 +9,7 @@ export const EA_BILLING_EMAIL_TEMPLATES = [
   "ea-grace-reminder",
   "ea-grace-final-warning",
   "ea-subscription-cancelled",
+  "ea-subscription-cancellation-reversed",
 ] as const;
 
 export type EaBillingEmailTemplateId =
@@ -51,11 +52,41 @@ export function billingGraceFinalDispatchKey(
   return `subscription:${stripeSubscriptionId}:grace_final:${graceEndsAt}`;
 }
 
-export function billingCancellationDispatchKey(
+/**
+ * Before cancellation requests were told apart, one key covered every
+ * cancellation ending on the same date. Kept for recognising emails already
+ * sent under it, and as the key when Stripe gives no canceled_at.
+ */
+export function billingLegacyCancellationDispatchKey(
   stripeSubscriptionId: string,
   effectiveEndDate: string
 ): string {
   return `subscription:${stripeSubscriptionId}:cancellation:${effectiveEndDate}`;
+}
+
+/**
+ * One email per cancellation request: subscription, effective end and Stripe
+ * canceled_at, so cancelling again after a reversal (same end date) is a new
+ * email while repeat deliveries of one request are not.
+ */
+export function billingCancellationDispatchKey(
+  stripeSubscriptionId: string,
+  effectiveEndDate: string,
+  requestedAt: string | null
+): string {
+  const legacy = billingLegacyCancellationDispatchKey(
+    stripeSubscriptionId,
+    effectiveEndDate
+  );
+  return requestedAt ? `${legacy}:requested:${requestedAt}` : legacy;
+}
+
+/** One email per withdrawn cancellation request (its canceled_at, else its cancel_at). */
+export function billingCancellationReversedDispatchKey(
+  stripeSubscriptionId: string,
+  reversedRequestId: string
+): string {
+  return `subscription:${stripeSubscriptionId}:cancellation_reversed:${reversedRequestId}`;
 }
 
 export function isGraceMidReminderDue(input: {

@@ -5,6 +5,7 @@ import type {
   EaGraceFinalWarningEmailParams,
   EaGraceReminderEmailParams,
   EaPaymentFailedEmailParams,
+  EaSubscriptionCancellationReversedEmailParams,
   EaSubscriptionCancelledEmailParams,
   EaSubscriptionConfirmationEmailParams,
   EstateAgentInvitationEmailParams,
@@ -157,6 +158,20 @@ export function getSampleEaSubscriptionCancelledParams(): EaSubscriptionCancelle
     branchName: EMAIL_SAMPLE_DATA.branchName,
     manageBillingUrl: SAMPLE_BILLING_LINK,
     accessEndsAtLabel: "18 September 2026",
+    isFounding: false,
+    isTrialing: true,
+  };
+}
+
+export function getSampleEaSubscriptionCancellationReversedParams(): EaSubscriptionCancellationReversedEmailParams {
+  return {
+    to: "owner@northgate-estates.example",
+    recipientName: EMAIL_SAMPLE_DATA.estateAgentName,
+    branchName: EMAIL_SAMPLE_DATA.branchName,
+    manageBillingUrl: SAMPLE_BILLING_LINK,
+    planLabel: "Standard",
+    priceLabel: EA_STANDARD_MONTHLY_LABEL,
+    nextBillingDateLabel: "18 September 2026",
     isFounding: false,
     isTrialing: true,
   };

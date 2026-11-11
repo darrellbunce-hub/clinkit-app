@@ -1,6 +1,7 @@
 /**
  * LOCAL verifier — Stripe scheduled cancellation (cancel_at / cancel_at_period_end),
- * cancelled_at, cancellation email and cancellation_scheduled audit idempotency.
+ * cancelled_at, cancellation email and cancellation_scheduled audit idempotency,
+ * cancellation reversal (previous_attributes) and re-cancellation after a reversal.
  *
  * Usage:
  *   npx tsx scripts/verify-ea-billing-cancellation-schedule-local.ts
@@ -87,6 +88,7 @@ moduleWithLoad._load = function patchedLoad(
       sendEaGraceReminder: emailSender("grace_reminder"),
       sendEaGraceFinalWarning: emailSender("grace_final"),
       sendEaSubscriptionCancelled: emailSender("cancelled"),
+      sendEaSubscriptionCancellationReversed: emailSender("reversed"),
     };
   }
   return originalLoad(request, parent, isMain);
@@ -96,7 +98,7 @@ process.env.STRIPE_API_MODE = "test";
 process.env.STRIPE_SECRET_KEY = "sk_test_local_verifier_placeholder";
 process.env.STRIPE_EA_STANDARD_PRICE_ID = "price_standard_local";
 process.env.NEXT_PUBLIC_APP_URL = "http://localhost:3000";
-delete process.env.STRIPE_EA_FOUNDING_PRICE_ID;
+process.env.STRIPE_EA_FOUNDING_PRICE_ID = "price_founding_local";
 
 type TestResult = { name: string; pass: boolean; detail?: string };
 const results: TestResult[] = [];
@@ -186,6 +188,16 @@ class FakeDb {
     if (name === "complete_billing_customer_email_dispatch") {
       this.dispatches.set(args.p_dispatch_key as string, args.p_status as string);
       return { data: { ok: true }, error: null };
+    }
+    if (name === "confirm_ea_founding_slot") {
+      const row = this.rows("ea_branch_subscriptions").find((r) => r.id === args.p_subscription_id);
+      if (row?.pricing_tier === "founding" && typeof row.founding_slot_number === "number") {
+        return {
+          data: { ok: true, slot_number: row.founding_slot_number, already_confirmed: true },
+          error: null,
+        };
+      }
+      return { data: { ok: false, error: "no_founding_slot" }, error: null };
     }
     return { data: null, error: { message: `unexpected_rpc:${name}` } };
   }
@@ -353,15 +365,31 @@ function event(
   id: string,
   type: string,
   created: number,
-  object: Stripe.Subscription
+  object: Stripe.Subscription,
+  previousAttributes?: Row
 ): Stripe.Event {
-  return { id, type, created, data: { object } } as unknown as Stripe.Event;
+  return {
+    id,
+    type,
+    created,
+    data: previousAttributes ? { object, previous_attributes: previousAttributes } : { object },
+  } as unknown as Stripe.Event;
 }
 
 const subRow = (db: FakeDb) => db.rows("ea_branch_subscriptions")[0]!;
 const audits = (db: FakeDb, type: string) =>
   db.rows("ea_subscription_events").filter((e) => e.event_type === type);
 const cancellationEmails = () => sentEmails.filter((e) => e.template === "cancelled");
+const reversalEmails = () => sentEmails.filter((e) => e.template === "reversed");
+
+/** Customer Portal "Don't cancel": Stripe clears all three; previous_attributes holds the old values. */
+const portalReversalPrevious = { cancel_at: CANCEL_AT, canceled_at: CANCELED_AT };
+const CANCELED_AT_2 = EVENT_AT + 600; // second request after the reversal
+const legacyCancellationKey = (endsAt: number) => `subscription:${SUB}:cancellation:${iso(endsAt)}`;
+const cancellationKey = (endsAt: number, canceledAt: number) =>
+  `${legacyCancellationKey(endsAt)}:requested:${iso(canceledAt)}`;
+const reversalKey = (canceledAt: number) =>
+  `subscription:${SUB}:cancellation_reversed:${iso(canceledAt)}`;
 
 async function runPureRules() {
   console.log("\n--- Cancellation schedule interpretation (pure) ---\n");
@@ -449,27 +477,82 @@ async function runPureRules() {
       cancelledAtForRow({ scheduled: false, ended: true, stripeCanceledAtUnix: null, existingCancelledAt: null, now }) === null
   );
 
-  const { cancellationScheduledAuditEventId } = await import("../lib/billing/eaStripeWebhook");
-  const idA = cancellationScheduledAuditEventId(SUB, iso(CANCEL_AT));
+  const { cancellationScheduledAuditEventId, cancellationReversedAuditEventId } = await import(
+    "../lib/billing/eaStripeWebhook"
+  );
+  const uuidV8 = /^[0-9a-f]{8}-[0-9a-f]{4}-8[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+  const idA = cancellationScheduledAuditEventId(SUB, iso(CANCEL_AT), iso(CANCELED_AT));
   record(
-    "AUDIT id is a stable UUID per subscription and effective date",
-    /^[0-9a-f]{8}-[0-9a-f]{4}-8[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(idA) &&
-      idA === cancellationScheduledAuditEventId(SUB, iso(CANCEL_AT)) &&
-      idA !== cancellationScheduledAuditEventId(SUB, iso(CANCEL_AT + 86400)) &&
-      idA !== cancellationScheduledAuditEventId("sub_other", iso(CANCEL_AT)),
+    "AUDIT id is a stable UUID per subscription, effective date and canceled_at",
+    uuidV8.test(idA) &&
+      idA === cancellationScheduledAuditEventId(SUB, iso(CANCEL_AT), iso(CANCELED_AT)) &&
+      idA !== cancellationScheduledAuditEventId(SUB, iso(CANCEL_AT + 86400), iso(CANCELED_AT)) &&
+      idA !== cancellationScheduledAuditEventId("sub_other", iso(CANCEL_AT), iso(CANCELED_AT)) &&
+      idA !== cancellationScheduledAuditEventId(SUB, iso(CANCEL_AT), iso(CANCELED_AT_2)),
     idA
+  );
+  record(
+    "AUDIT id without canceled_at is the original subscription + date id",
+    cancellationScheduledAuditEventId(SUB, iso(CANCEL_AT), null) !== idA &&
+      uuidV8.test(cancellationScheduledAuditEventId(SUB, iso(CANCEL_AT), null))
+  );
+  const revA = cancellationReversedAuditEventId(SUB, iso(CANCELED_AT));
+  record(
+    "AUDIT reversal id is a stable UUID per subscription and withdrawn request",
+    uuidV8.test(revA) &&
+      revA === cancellationReversedAuditEventId(SUB, iso(CANCELED_AT)) &&
+      revA !== cancellationReversedAuditEventId(SUB, iso(CANCELED_AT_2)) &&
+      revA !== idA
+  );
+
+  const { stripeCancellationReversal } = await import("../lib/billing/mapStripeStatus");
+  const reversal = (
+    previous: Row | null,
+    overrides: { stripeStatus?: string; ended?: boolean; nowScheduled?: boolean; current?: number | null } = {}
+  ) =>
+    stripeCancellationReversal({
+      stripeStatus: overrides.stripeStatus ?? "trialing",
+      ended: overrides.ended ?? false,
+      nowScheduled: overrides.nowScheduled ?? false,
+      previous,
+      currentCanceledAtUnix: overrides.current ?? null,
+    });
+  const portalRev = reversal(portalReversalPrevious);
+  record(
+    "REVERSAL_RULE previous cancel_at + canceled_at, now unscheduled, is a reversal of that request",
+    portalRev?.canceledAtUnix === CANCELED_AT && portalRev?.cancelAtUnix === CANCEL_AT,
+    JSON.stringify(portalRev)
+  );
+  record(
+    "REVERSAL_RULE previous cancel_at_period_end=true is a reversal",
+    reversal({ cancel_at_period_end: true, canceled_at: CANCELED_AT }, { stripeStatus: "active" })
+      ?.canceledAtUnix === CANCELED_AT
+  );
+  record(
+    "REVERSAL_RULE no previous_attributes, unrelated attributes, or previously unscheduled is not a reversal",
+    reversal(null) === null &&
+      reversal({ trial_end: TRIAL_END }) === null &&
+      reversal({ cancel_at: null, cancel_at_period_end: false }) === null
+  );
+  record(
+    "REVERSAL_RULE still scheduled (date changed), ended or terminal is not a reversal",
+    reversal(portalReversalPrevious, { nowScheduled: true }) === null &&
+      reversal(portalReversalPrevious, { ended: true }) === null &&
+      reversal(portalReversalPrevious, { stripeStatus: "canceled" }) === null
   );
 }
 
 async function runWebhookFlows() {
-  const { processStripeWebhookEvent, cancellationScheduledAuditEventId } = await import(
-    "../lib/billing/eaStripeWebhook"
-  );
+  const {
+    processStripeWebhookEvent,
+    cancellationScheduledAuditEventId,
+    cancellationReversedAuditEventId,
+  } = await import("../lib/billing/eaStripeWebhook");
   if (!stubsLoaded.serviceRole || !stubsLoaded.stripeClient || !stubsLoaded.email) {
     throw new Error(`module stubs not applied: ${JSON.stringify(stubsLoaded)}`);
   }
-  const expectedKey = `subscription:${SUB}:cancellation:${iso(CANCEL_AT)}`;
-  const expectedAuditId = cancellationScheduledAuditEventId(SUB, iso(CANCEL_AT));
+  const expectedKey = cancellationKey(CANCEL_AT, CANCELED_AT);
+  const expectedAuditId = cancellationScheduledAuditEventId(SUB, iso(CANCEL_AT), iso(CANCELED_AT));
 
   console.log("\n--- Portal cancellation (cancel_at, cancel_at_period_end=false) ---\n");
   {
@@ -542,7 +625,13 @@ async function runWebhookFlows() {
     );
 
     await processStripeWebhookEvent(
-      event("evt_reverse", "customer.subscription.updated", EVENT_AT + 3, subscription())
+      event(
+        "evt_reverse",
+        "customer.subscription.updated",
+        EVENT_AT + 3,
+        subscription(),
+        portalReversalPrevious
+      )
     );
     const reversed = subRow(db);
     record(
@@ -554,7 +643,7 @@ async function runWebhookFlows() {
       JSON.stringify(reversed)
     );
     record(
-      "REVERSAL adds no cancellation email or audit row",
+      "REVERSAL adds no cancellation email or cancellation_scheduled audit row",
       audits(db, "cancellation_scheduled").length === 1 && cancellationEmails().length === 1
     );
 
@@ -616,7 +705,7 @@ async function runWebhookFlows() {
       "PERIOD_END one email (dated by current_period_end) and one audit row across repeats",
       emails.length === 1 &&
         emails[0]!.args.isTrialing === false &&
-        db.dispatches.get(`subscription:${SUB}:cancellation:${iso(TRIAL_END)}`) === "sent" &&
+        db.dispatches.get(cancellationKey(TRIAL_END, CANCELED_AT)) === "sent" &&
         audits(db, "cancellation_scheduled").length === 1
     );
   }
@@ -725,6 +814,392 @@ async function runWebhookFlows() {
         audits(db, "cancellation_scheduled").length === 0 &&
         audits(db, "subscription_expired").length === 1,
       JSON.stringify(row)
+    );
+  }
+
+  const expectedReversalAuditId = cancellationReversedAuditEventId(SUB, iso(CANCELED_AT));
+
+  console.log("\n--- Reversal and re-cancellation lifecycle (trial) ---\n");
+  {
+    const db = freshDb();
+    currentDb = db;
+    sentEmails.length = 0;
+    await processStripeWebhookEvent(
+      event("evt_life_cancel", "customer.subscription.updated", EVENT_AT, subscription(portalCancellation))
+    );
+    const reversalEvent = event(
+      "evt_life_reverse",
+      "customer.subscription.updated",
+      EVENT_AT + 10,
+      subscription(),
+      portalReversalPrevious
+    );
+    const r = await processStripeWebhookEvent(reversalEvent);
+    const row = subRow(db);
+    record(
+      "LIFECYCLE reversal clears cancel_at_period_end and cancelled_at",
+      r.ok === true && row.cancel_at_period_end === false && row.cancelled_at === null,
+      JSON.stringify({ r, row })
+    );
+    record(
+      "LIFECYCLE reversal keeps the trial entitled (no ended_at, still trialing)",
+      row.entitlement_status === "entitled" && row.stripe_status === "trialing" && row.ended_at === null
+    );
+    const rev = audits(db, "cancellation_reversed");
+    record(
+      "LIFECYCLE exactly one cancellation_reversed audit row with the deterministic id",
+      rev.length === 1 &&
+        rev[0]!.id === expectedReversalAuditId &&
+        (rev[0]!.metadata as Row).reversed_canceled_at === iso(CANCELED_AT) &&
+        (rev[0]!.metadata as Row).reversed_cancel_at === iso(CANCEL_AT),
+      JSON.stringify(rev)
+    );
+    const revEmails = reversalEmails();
+    record(
+      "LIFECYCLE exactly one reversal email (trial copy, first payment date, standard price)",
+      revEmails.length === 1 &&
+        db.dispatches.get(reversalKey(CANCELED_AT)) === "sent" &&
+        revEmails[0]!.args.isTrialing === true &&
+        revEmails[0]!.args.isFounding === false &&
+        revEmails[0]!.args.priceLabel === "£129/month" &&
+        typeof revEmails[0]!.args.nextBillingDateLabel === "string",
+      JSON.stringify({ revEmails, dispatches: [...db.dispatches] })
+    );
+
+    const resend = await processStripeWebhookEvent(reversalEvent);
+    await processStripeWebhookEvent(
+      event(
+        "evt_life_reverse_dup",
+        "customer.subscription.updated",
+        EVENT_AT + 11,
+        subscription(),
+        portalReversalPrevious
+      )
+    );
+    record(
+      "LIFECYCLE duplicate reversal deliveries (same id, and a new id with the same payload) add nothing",
+      resend.duplicate === true &&
+        audits(db, "cancellation_reversed").length === 1 &&
+        reversalEmails().length === 1 &&
+        cancellationEmails().length === 1
+    );
+    await processStripeWebhookEvent(
+      event("evt_life_unrelated", "customer.subscription.updated", EVENT_AT + 12, subscription(), {
+        metadata: {},
+      })
+    );
+    record(
+      "LIFECYCLE an unrelated later update is not treated as a reversal",
+      audits(db, "cancellation_reversed").length === 1 && reversalEmails().length === 1
+    );
+
+    const recancel = { cancel_at: CANCEL_AT, canceled_at: CANCELED_AT_2 };
+    await processStripeWebhookEvent(
+      event(
+        "evt_life_recancel",
+        "customer.subscription.updated",
+        CANCELED_AT_2 + 1,
+        subscription(recancel),
+        { cancel_at: null, canceled_at: null }
+      )
+    );
+    const scheduled = audits(db, "cancellation_scheduled");
+    record(
+      "LIFECYCLE re-cancellation (same end date, new canceled_at) records a new audit row",
+      scheduled.length === 2 &&
+        scheduled.some(
+          (a) => a.id === cancellationScheduledAuditEventId(SUB, iso(CANCEL_AT), iso(CANCELED_AT_2))
+        ) &&
+        subRow(db).cancel_at_period_end === true &&
+        subRow(db).cancelled_at === iso(CANCELED_AT_2),
+      JSON.stringify(scheduled)
+    );
+    record(
+      "LIFECYCLE re-cancellation sends a new cancellation email under a new key",
+      cancellationEmails().length === 2 &&
+        db.dispatches.get(cancellationKey(CANCEL_AT, CANCELED_AT)) === "sent" &&
+        db.dispatches.get(cancellationKey(CANCEL_AT, CANCELED_AT_2)) === "sent",
+      JSON.stringify([...db.dispatches])
+    );
+    await processStripeWebhookEvent(
+      event("evt_life_recancel_dup", "customer.subscription.updated", CANCELED_AT_2 + 2, subscription(recancel))
+    );
+    await processStripeWebhookEvent(
+      event(
+        "evt_life_recancel_dup2",
+        "customer.subscription.updated",
+        CANCELED_AT_2 + 3,
+        subscription(recancel),
+        { cancel_at: null, canceled_at: null }
+      )
+    );
+    record(
+      "LIFECYCLE duplicate re-cancellation deliveries add no audit row or email",
+      audits(db, "cancellation_scheduled").length === 2 &&
+        cancellationEmails().length === 2 &&
+        reversalEmails().length === 1
+    );
+
+    await processStripeWebhookEvent(
+      event(
+        "evt_life_reverse_2",
+        "customer.subscription.updated",
+        CANCELED_AT_2 + 10,
+        subscription(),
+        recancel
+      )
+    );
+    record(
+      "LIFECYCLE a second reversal (of the new request) gets its own audit row and email",
+      audits(db, "cancellation_reversed").length === 2 &&
+        reversalEmails().length === 2 &&
+        db.dispatches.get(reversalKey(CANCELED_AT_2)) === "sent"
+    );
+  }
+
+  console.log("\n--- Reversal retry safety: audit insert fails after the row update ---\n");
+  {
+    const db = freshDb();
+    currentDb = db;
+    sentEmails.length = 0;
+    await processStripeWebhookEvent(
+      event("evt_rr_cancel", "customer.subscription.updated", EVENT_AT, subscription(portalCancellation))
+    );
+    db.failNextAuditInsert = "cancellation_reversed";
+    const reversalEvent = event(
+      "evt_rr_reverse",
+      "customer.subscription.updated",
+      EVENT_AT + 10,
+      subscription(),
+      portalReversalPrevious
+    );
+    const failed = await processStripeWebhookEvent(reversalEvent);
+    record(
+      "REVERSAL_RETRY first attempt fails after the row was cleared",
+      failed.ok === false &&
+        subRow(db).cancel_at_period_end === false &&
+        audits(db, "cancellation_reversed").length === 0,
+      JSON.stringify(failed)
+    );
+    const retried = await processStripeWebhookEvent(reversalEvent);
+    record(
+      "REVERSAL_RETRY retry re-detects the reversal from previous_attributes: one audit row, one email",
+      retried.ok === true &&
+        audits(db, "cancellation_reversed").length === 1 &&
+        reversalEmails().length === 1,
+      JSON.stringify({ retried, audits: audits(db, "cancellation_reversed").length })
+    );
+  }
+
+  console.log("\n--- Paid active subscription reversal ---\n");
+  {
+    const db = freshDb({ stripe_status: "active" });
+    currentDb = db;
+    sentEmails.length = 0;
+    const paid = { status: "active", trial_end: null };
+    await processStripeWebhookEvent(
+      event(
+        "evt_paid_cancel",
+        "customer.subscription.updated",
+        EVENT_AT,
+        subscription({ ...paid, cancel_at_period_end: true, cancel_at: TRIAL_END, canceled_at: CANCELED_AT })
+      )
+    );
+    await processStripeWebhookEvent(
+      event("evt_paid_reverse", "customer.subscription.updated", EVENT_AT + 10, subscription(paid), {
+        cancel_at: TRIAL_END,
+        cancel_at_period_end: true,
+        canceled_at: CANCELED_AT,
+      })
+    );
+    const row = subRow(db);
+    const revEmails = reversalEmails();
+    record(
+      "PAID reversal clears the flags and stays active/entitled",
+      row.cancel_at_period_end === false &&
+        row.cancelled_at === null &&
+        row.stripe_status === "active" &&
+        row.entitlement_status === "entitled",
+      JSON.stringify(row)
+    );
+    record(
+      "PAID one reversal audit row and one email with renewal copy (not trialing)",
+      audits(db, "cancellation_reversed").length === 1 &&
+        revEmails.length === 1 &&
+        revEmails[0]!.args.isTrialing === false &&
+        typeof revEmails[0]!.args.nextBillingDateLabel === "string" &&
+        cancellationEmails().length === 1,
+      JSON.stringify(revEmails)
+    );
+  }
+
+  console.log("\n--- Records created before request-scoped keys (Stage history) ---\n");
+  {
+    const legacyAuditId = cancellationScheduledAuditEventId(SUB, iso(CANCEL_AT), null);
+    const db = freshDb({ cancel_at_period_end: true, cancelled_at: iso(CANCELED_AT) });
+    db.rows("ea_subscription_events").push({
+      id: legacyAuditId,
+      branch_id: BRANCH,
+      subscription_id: ROW,
+      event_type: "cancellation_scheduled",
+      actor_source: "webhook",
+      created_at: iso(EVENT_AT + 1),
+      metadata: { stripe_subscription_id: SUB, canceled_at: iso(CANCELED_AT), cancel_at: iso(CANCEL_AT) },
+    });
+    db.rows("billing_customer_email_dispatches").push({
+      dispatch_key: legacyCancellationKey(CANCEL_AT),
+      status: "sent",
+      created_at: iso(EVENT_AT + 2),
+    });
+    db.dispatches.set(legacyCancellationKey(CANCEL_AT), "sent");
+    currentDb = db;
+    sentEmails.length = 0;
+    await processStripeWebhookEvent(
+      event("evt_legacy_repeat", "customer.subscription.updated", EVENT_AT + 5, subscription(portalCancellation))
+    );
+    record(
+      "LEGACY a redelivery of the already-recorded request adds no audit row or email",
+      audits(db, "cancellation_scheduled").length === 1 &&
+        cancellationEmails().length === 0 &&
+        !db.dispatches.has(cancellationKey(CANCEL_AT, CANCELED_AT)),
+      JSON.stringify({ audits: audits(db, "cancellation_scheduled"), dispatches: [...db.dispatches] })
+    );
+    record(
+      "LEGACY existing audit and dispatch records are left untouched",
+      audits(db, "cancellation_scheduled")[0]!.id === legacyAuditId &&
+        db.rows("billing_customer_email_dispatches")[0]!.status === "sent" &&
+        db.rows("billing_customer_email_dispatches")[0]!.created_at === iso(EVENT_AT + 2)
+    );
+    await processStripeWebhookEvent(
+      event("evt_legacy_reverse", "customer.subscription.updated", EVENT_AT + 10, subscription(), portalReversalPrevious)
+    );
+    record(
+      "LEGACY reversal of the earlier request records one reversal row and email",
+      audits(db, "cancellation_reversed").length === 1 && reversalEmails().length === 1
+    );
+    await processStripeWebhookEvent(
+      event(
+        "evt_legacy_recancel",
+        "customer.subscription.updated",
+        CANCELED_AT_2 + 1,
+        subscription({ cancel_at: CANCEL_AT, canceled_at: CANCELED_AT_2 }),
+        { cancel_at: null, canceled_at: null }
+      )
+    );
+    record(
+      "LEGACY a new request after the reversal (same end date) gets a new audit row and email",
+      audits(db, "cancellation_scheduled").length === 2 &&
+        cancellationEmails().length === 1 &&
+        db.dispatches.get(cancellationKey(CANCEL_AT, CANCELED_AT_2)) === "sent"
+    );
+  }
+  {
+    // Production-format rows: random audit id, no canceled_at in metadata.
+    const db = freshDb({ cancel_at_period_end: true, cancelled_at: iso(CANCELED_AT) });
+    db.rows("ea_subscription_events").push({
+      id: "random-legacy-audit",
+      branch_id: BRANCH,
+      subscription_id: ROW,
+      event_type: "cancellation_scheduled",
+      actor_source: "webhook",
+      created_at: iso(EVENT_AT + 1),
+      metadata: { stripe_subscription_id: SUB },
+    });
+    db.rows("billing_customer_email_dispatches").push({
+      dispatch_key: legacyCancellationKey(CANCEL_AT),
+      status: "sent",
+      created_at: iso(EVENT_AT + 1),
+    });
+    currentDb = db;
+    sentEmails.length = 0;
+    await processStripeWebhookEvent(
+      event("evt_legacy_prod", "customer.subscription.updated", EVENT_AT + 5, subscription(portalCancellation))
+    );
+    record(
+      "LEGACY rows without canceled_at, created after the request, also cover it",
+      audits(db, "cancellation_scheduled").length === 1 && cancellationEmails().length === 0
+    );
+  }
+  {
+    // Pending request already recorded; this update omits canceled_at and the
+    // row stores it in Postgres text form.
+    const db = freshDb({
+      cancel_at_period_end: true,
+      cancelled_at: iso(CANCELED_AT).replace(".000Z", "+00:00"),
+    });
+    currentDb = db;
+    sentEmails.length = 0;
+    await processStripeWebhookEvent(
+      event("evt_no_canceled_at", "customer.subscription.updated", EVENT_AT + 5, subscription({ cancel_at: CANCEL_AT }))
+    );
+    record(
+      "REQUEST without canceled_at in the payload uses the recorded cancelled_at (normalised) as the request",
+      db.dispatches.get(expectedKey) === "sent" &&
+        audits(db, "cancellation_scheduled").length === 1 &&
+        audits(db, "cancellation_scheduled")[0]!.id === expectedAuditId,
+      JSON.stringify([...db.dispatches])
+    );
+  }
+
+  console.log("\n--- Historical £99 founding subscription ---\n");
+  {
+    const db = freshDb({
+      stripe_status: "active",
+      stripe_price_id: "price_founding_local",
+      pricing_tier: "founding",
+      founding_slot_number: 7,
+      amount_gbp_minor: 9900,
+    });
+    currentDb = db;
+    sentEmails.length = 0;
+    const founding = {
+      status: "active",
+      trial_end: null,
+      items: {
+        data: [
+          {
+            price: { id: "price_founding_local" },
+            current_period_start: PERIOD_START,
+            current_period_end: TRIAL_END,
+          },
+        ],
+      },
+    };
+    await processStripeWebhookEvent(
+      event(
+        "evt_founding_cancel",
+        "customer.subscription.updated",
+        EVENT_AT,
+        subscription({ ...founding, cancel_at_period_end: true, canceled_at: CANCELED_AT })
+      )
+    );
+    const scheduledRow = { ...subRow(db) };
+    await processStripeWebhookEvent(
+      event("evt_founding_reverse", "customer.subscription.updated", EVENT_AT + 10, subscription(founding), {
+        cancel_at_period_end: true,
+        canceled_at: CANCELED_AT,
+      })
+    );
+    const row = subRow(db);
+    record(
+      "FOUNDING cancellation and reversal keep tier, slot and £99 amount",
+      scheduledRow.pricing_tier === "founding" &&
+        scheduledRow.founding_slot_number === 7 &&
+        row.pricing_tier === "founding" &&
+        row.founding_slot_number === 7 &&
+        row.amount_gbp_minor === 9900 &&
+        row.cancel_at_period_end === false &&
+        row.entitlement_status === "entitled",
+      JSON.stringify({ scheduledRow, row })
+    );
+    const revEmails = reversalEmails();
+    record(
+      "FOUNDING reversal email keeps founding copy and £99/month",
+      revEmails.length === 1 &&
+        revEmails[0]!.args.isFounding === true &&
+        revEmails[0]!.args.priceLabel === "£99/month" &&
+        audits(db, "cancellation_reversed").length === 1,
+      JSON.stringify(revEmails)
     );
   }
 }

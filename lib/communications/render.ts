@@ -35,12 +35,16 @@ import EaGraceFinalWarningEmail, {
 import EaSubscriptionCancelledEmail, {
   getEaSubscriptionCancelledSubject,
 } from "@/emails/templates/EaSubscriptionCancelled";
+import EaSubscriptionCancellationReversedEmail, {
+  getEaSubscriptionCancellationReversedSubject,
+} from "@/emails/templates/EaSubscriptionCancellationReversed";
 import {
   getSampleClaimSuccessfulParams,
   getSampleDormancyWarningParams,
   getSampleEaGraceFinalWarningParams,
   getSampleEaGraceReminderParams,
   getSampleEaPaymentFailedParams,
+  getSampleEaSubscriptionCancellationReversedParams,
   getSampleEaSubscriptionCancelledParams,
   getSampleEaSubscriptionConfirmationParams,
   getSampleEstateAgentInvitationParams,
@@ -53,6 +57,7 @@ import type {
   EaGraceFinalWarningEmailParams,
   EaGraceReminderEmailParams,
   EaPaymentFailedEmailParams,
+  EaSubscriptionCancellationReversedEmailParams,
   EaSubscriptionCancelledEmailParams,
   EaSubscriptionConfirmationEmailParams,
 } from "@/lib/communications/types";
@@ -176,6 +181,15 @@ export async function renderEaSubscriptionCancelled(
   );
 }
 
+export async function renderEaSubscriptionCancellationReversed(
+  props: EaSubscriptionCancellationReversedEmailParams = getSampleEaSubscriptionCancellationReversedParams()
+): Promise<RenderedEmail> {
+  return renderEmailTemplate(
+    EaSubscriptionCancellationReversedEmail(props),
+    getEaSubscriptionCancellationReversedSubject()
+  );
+}
+
 export async function renderEmailTemplateById(
   templateId: EmailTemplateId
 ): Promise<RenderedEmail> {
@@ -202,6 +216,8 @@ export async function renderEmailTemplateById(
       return renderEaGraceFinalWarning();
     case "ea-subscription-cancelled":
       return renderEaSubscriptionCancelled();
+    case "ea-subscription-cancellation-reversed":
+      return renderEaSubscriptionCancellationReversed();
     default:
       throw new Error(`Unknown email template: ${templateId satisfies never}`);
   }

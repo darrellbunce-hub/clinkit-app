@@ -14,8 +14,11 @@ import {
   cancelledAtForRow,
   computeGraceEndsAt,
   mapStripeSubscriptionToKeynetic,
+  stripeCancellationReversal,
   stripeCancellationSchedule,
   webhookAuditEventFor,
+  type StripeCancellationPreviousAttributes,
+  type StripeCancellationReversal,
 } from "@/lib/billing/mapStripeStatus";
 import {
   expireOutstandingCheckoutSessions,
@@ -40,6 +43,13 @@ import { createServiceRoleSupabaseClient } from "@/lib/supabase/serviceRole";
 function unixToIso(seconds: number | null | undefined): string | null {
   if (!seconds) return null;
   return new Date(seconds * 1000).toISOString();
+}
+
+/** Database timestamps ("…+00:00") in the toISOString form used in keys and ids. */
+function normaliseIso(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const time = Date.parse(value);
+  return Number.isFinite(time) ? new Date(time).toISOString() : null;
 }
 
 /**
@@ -326,6 +336,8 @@ async function reconcileStripeSubscription(
     eventChronologyAt: Date;
     /** Optional invoice id for payment-failed email idempotency. */
     invoiceId?: string | null;
+    /** event.data.previous_attributes of customer.subscription.updated (reversal detection). */
+    previousAttributes?: StripeCancellationPreviousAttributes | null;
   }
 ): Promise<{ applied: boolean; reason?: string }> {
   const config = getStripeServerConfig();
@@ -654,14 +666,32 @@ async function reconcileStripeSubscription(
     Boolean(graceEndsAt);
   // Sent whenever a cancellation is pending, not only on the false → true flip,
   // so a retry after a failed send still delivers it; the dispatch key
-  // (subscription + effective end) keeps it to one email per schedule.
+  // (subscription + effective end + Stripe canceled_at) keeps it to one email
+  // per cancellation request.
   const cancellationEndsAt =
     mapped.cancelAtPeriodEnd && !mapped.ended && cancellation.endsAt
       ? cancellation.endsAt.toISOString()
       : null;
   const cancellationScheduled = cancellationEndsAt !== null;
+  // Identifies the request: Stripe canceled_at, else the one already recorded
+  // on the row (an update for the same pending request without canceled_at).
+  const cancellationRequestedAt =
+    mapped.cancelAtPeriodEnd && !mapped.ended
+      ? (unixToIso(subscription.canceled_at) ??
+        normaliseIso(existing.cancelled_at as string | null))
+      : null;
+  // Detected from this event's previous_attributes (not the stored row), so a
+  // retry of the same event re-detects it after the row was already updated.
+  const reversal = stripeCancellationReversal({
+    stripeStatus: subscription.status,
+    ended: mapped.ended,
+    nowScheduled: cancellation.scheduled,
+    previous: options.previousAttributes,
+    currentCanceledAtUnix: subscription.canceled_at,
+  });
+  const reversalRequestId = reversal ? cancellationReversalRequestId(reversal) : null;
 
-  if (becameEntitled || enteredGrace || cancellationScheduled) {
+  if (becameEntitled || enteredGrace || cancellationScheduled || reversalRequestId) {
     await dispatchBillingCustomerEmailsForTransition(admin, {
       branchId,
       subscriptionRowId: existing.id as string,
@@ -676,6 +706,10 @@ async function reconcileStripeSubscription(
       enteredGrace,
       cancellationScheduled,
       cancellationEndsAt,
+      cancellationRequestedAt,
+      cancellationReversal: reversalRequestId
+        ? { requestId: reversalRequestId }
+        : null,
       invoiceId: options.invoiceId ?? null,
     });
   }
@@ -721,6 +755,7 @@ async function reconcileStripeSubscription(
       branchId,
       subscriptionRowId: existing.id as string,
       cancellationEndsAt,
+      cancellationRequestedAt,
       metadata: {
         ...auditMetadata,
         cancel_at: unixToIso(subscription.cancel_at),
@@ -738,7 +773,38 @@ async function reconcileStripeSubscription(
     });
   }
 
+  if (reversal && reversalRequestId) {
+    await insertSubscriptionAuditEvent(
+      admin,
+      {
+        id: cancellationReversedAuditEventId(subscription.id, reversalRequestId),
+        branch_id: branchId,
+        subscription_id: existing.id,
+        event_type: "cancellation_reversed",
+        actor_source: "webhook",
+        metadata: {
+          ...auditMetadata,
+          reversed_request_id: reversalRequestId,
+          reversed_canceled_at: unixToIso(reversal.canceledAtUnix),
+          reversed_cancel_at: unixToIso(reversal.cancelAtUnix),
+        },
+      },
+      { uniqueViolationMeansRecorded: true }
+    );
+  }
+
   return { applied: true };
+}
+
+/**
+ * Identifies the cancellation request a reversal withdrew: Stripe canceled_at
+ * when known (same value the cancellation's audit id and email key use).
+ */
+function cancellationReversalRequestId(reversal: StripeCancellationReversal): string {
+  const canceledAt = unixToIso(reversal.canceledAtUnix);
+  if (canceledAt) return canceledAt;
+  const cancelAt = unixToIso(reversal.cancelAtUnix);
+  return cancelAt ? `cancel_at:${cancelAt}` : "unknown";
 }
 
 /** Stripe status of a subscription; null when Stripe reports it missing. Other errors throw (retry). */
@@ -1008,21 +1074,71 @@ export function deterministicAuditEventId(name: string): string {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
+/**
+ * Without canceled_at this is the original (subscription + date) id, which
+ * rows recorded before request-scoped ids also use.
+ */
 export function cancellationScheduledAuditEventId(
   stripeSubscriptionId: string,
-  cancellationEndsAt: string | null
+  cancellationEndsAt: string | null,
+  canceledAt: string | null
+): string {
+  const base = `cancellation_scheduled:${stripeSubscriptionId}:${cancellationEndsAt ?? "period_end_unknown"}`;
+  return deterministicAuditEventId(
+    canceledAt ? `${base}:requested:${canceledAt}` : base
+  );
+}
+
+export function cancellationReversedAuditEventId(
+  stripeSubscriptionId: string,
+  reversedRequestId: string
 ): string {
   return deterministicAuditEventId(
-    `cancellation_scheduled:${stripeSubscriptionId}:${cancellationEndsAt ?? "period_end_unknown"}`
+    `cancellation_reversed:${stripeSubscriptionId}:${reversedRequestId}`
   );
 }
 
 /**
- * Exactly once per Stripe subscription and cancellation effective date, on
- * every delivery that sees the cancellation pending (not only the first), so a
- * retry after a failed insert still records it. The primary key is derived
- * from the subscription and date: repeats and concurrent deliveries hit the
- * primary key and count as recorded, without a lookup or a migration.
+ * True when a cancellation_scheduled row recorded before request-scoped ids
+ * already covers this request: same canceled_at in its metadata, or (with no
+ * canceled_at recorded) created at or after this request's canceled_at.
+ */
+async function legacyCancellationAuditCoversRequest(
+  admin: SupabaseClient,
+  stripeSubscriptionId: string,
+  canceledAt: string
+): Promise<boolean> {
+  const { data, error } = await admin
+    .from("ea_subscription_events")
+    .select("id, created_at, metadata")
+    .eq("event_type", "cancellation_scheduled")
+    .contains("metadata", { stripe_subscription_id: stripeSubscriptionId });
+  if (error) {
+    throw new Error(
+      `audit_event_lookup_failed:cancellation_scheduled:${error.code ?? "unknown"}`
+    );
+  }
+  const requested = Date.parse(canceledAt);
+  return ((data ?? []) as {
+    created_at?: string | null;
+    metadata?: Record<string, unknown> | null;
+  }[]).some((row) => {
+    const recorded = row.metadata?.canceled_at;
+    if (typeof recorded === "string" && recorded) {
+      return Date.parse(recorded) === requested;
+    }
+    const createdAt = row.created_at ? Date.parse(row.created_at) : NaN;
+    return Number.isFinite(createdAt) && createdAt >= requested;
+  });
+}
+
+/**
+ * Exactly once per cancellation request (Stripe subscription, effective date
+ * and canceled_at), on every delivery that sees the cancellation pending (not
+ * only the first), so a retry after a failed insert still records it. The
+ * primary key is derived from the request: repeats and concurrent deliveries
+ * hit the primary key and count as recorded, without a migration. A new
+ * request after a reversal has a new canceled_at, so it gets its own row.
  */
 async function recordCancellationScheduledOnce(
   admin: SupabaseClient,
@@ -1030,15 +1146,27 @@ async function recordCancellationScheduledOnce(
     branchId: string;
     subscriptionRowId: string;
     cancellationEndsAt: string | null;
+    cancellationRequestedAt: string | null;
     metadata: Record<string, unknown> & { stripe_subscription_id: string };
   }
 ): Promise<void> {
+  if (
+    input.cancellationRequestedAt &&
+    (await legacyCancellationAuditCoversRequest(
+      admin,
+      input.metadata.stripe_subscription_id,
+      input.cancellationRequestedAt
+    ))
+  ) {
+    return;
+  }
   await insertSubscriptionAuditEvent(
     admin,
     {
       id: cancellationScheduledAuditEventId(
         input.metadata.stripe_subscription_id,
-        input.cancellationEndsAt
+        input.cancellationEndsAt,
+        input.cancellationRequestedAt
       ),
       branch_id: input.branchId,
       subscription_id: input.subscriptionRowId,
@@ -1256,6 +1384,8 @@ export async function processStripeWebhookEvent(
           confirmFounding: subscription.status === "active",
           fromPaymentFailure: subscription.status === "past_due",
           eventChronologyAt: chronologyAt,
+          previousAttributes: (event.data.previous_attributes ??
+            null) as StripeCancellationPreviousAttributes | null,
         });
         await expireOtherCheckoutSessionsAfterLink(
           admin,

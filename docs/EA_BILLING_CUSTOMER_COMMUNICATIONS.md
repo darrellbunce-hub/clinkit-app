@@ -12,7 +12,8 @@ Keynetic transactional emails (Resend):
 2. `ea-payment-failed` — enter 7-day grace (BL-01)
 3. `ea-grace-reminder` — mid-grace (~day 3–4)
 4. `ea-grace-final-warning` — ≤48h before grace end
-5. `ea-subscription-cancelled` — first `cancel_at_period_end` transition
+5. `ea-subscription-cancelled` — once per cancellation request (Stripe `cancel_at_period_end` or a future `cancel_at`). Key: `subscription:<sub>:cancellation:<effective end>:requested:<Stripe canceled_at>`; a new request after a withdrawal (new `canceled_at`) gets a new email even for the same end date. Emails sent under the earlier key (`subscription:<sub>:cancellation:<effective end>`) at or after the request's `canceled_at` count as already sent.
+6. `ea-subscription-cancellation-reversed` — once per withdrawn cancellation request, detected from the `customer.subscription.updated` event's `previous_attributes`. Key: `subscription:<sub>:cancellation_reversed:<withdrawn request's canceled_at>`.
 
 **Not** sent by Keynetic: routine monthly successful-payment emails.  
 **Stripe Dashboard (Production):** enable Customer receipt / invoice emails before live charging — **Required before public charging**.

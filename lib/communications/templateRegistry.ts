@@ -88,7 +88,15 @@ export const EMAIL_TEMPLATE_REGISTRY: EmailTemplateDefinition[] = [
     id: "ea-subscription-cancelled",
     title: "EA Subscription Cancelled",
     description:
-      "Transactional — sent when cancellation is first scheduled for period end.",
+      "Transactional — sent once per cancellation request when cancellation is scheduled for period end.",
+    category: "transactional",
+    available: true,
+  },
+  {
+    id: "ea-subscription-cancellation-reversed",
+    title: "EA Subscription Cancellation Withdrawn",
+    description:
+      "Transactional — sent once when a scheduled cancellation is withdrawn and the subscription continues.",
     category: "transactional",
     available: true,
   },

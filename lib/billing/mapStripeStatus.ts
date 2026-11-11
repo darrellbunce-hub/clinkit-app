@@ -48,6 +48,53 @@ export function stripeCancellationSchedule(input: {
   return { scheduled: false, endsAt: null };
 }
 
+/** Cancellation fields as they appear in a Stripe event's previous_attributes. */
+export type StripeCancellationPreviousAttributes = {
+  cancel_at?: number | null;
+  cancel_at_period_end?: boolean | null;
+  canceled_at?: number | null;
+};
+
+export type StripeCancellationReversal = {
+  /** canceled_at of the cancellation request that was withdrawn. */
+  canceledAtUnix: number | null;
+  /** cancel_at it would have taken effect at. */
+  cancelAtUnix: number | null;
+};
+
+/**
+ * A withdrawn cancellation, read from the event itself (previous_attributes
+ * held a pending cancellation; the subscription now has none) rather than from
+ * the database row, so every delivery and retry of the event reaches the same
+ * answer. Terminal or ended subscriptions are never reversals.
+ */
+export function stripeCancellationReversal(input: {
+  stripeStatus: string;
+  ended: boolean;
+  nowScheduled: boolean;
+  previous: StripeCancellationPreviousAttributes | null | undefined;
+  currentCanceledAtUnix: number | null | undefined;
+}): StripeCancellationReversal | null {
+  const previous = input.previous;
+  if (!previous || input.nowScheduled || input.ended) return null;
+  if (TERMINAL_STRIPE_SUBSCRIPTION_STATUSES.has(input.stripeStatus)) return null;
+
+  const previousCancelAt =
+    typeof previous.cancel_at === "number" && previous.cancel_at > 0
+      ? previous.cancel_at
+      : null;
+  if (previousCancelAt === null && previous.cancel_at_period_end !== true) {
+    return null;
+  }
+
+  const canceledAt =
+    "canceled_at" in previous ? previous.canceled_at : input.currentCanceledAtUnix;
+  return {
+    canceledAtUnix: typeof canceledAt === "number" && canceledAt > 0 ? canceledAt : null,
+    cancelAtUnix: previousCancelAt,
+  };
+}
+
 /**
  * Row cancelled_at: when the cancellation was requested. Stripe's canceled_at
  * wins; otherwise an already-recorded time is kept so repeated updates do not

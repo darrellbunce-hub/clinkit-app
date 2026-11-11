@@ -196,8 +196,23 @@ Test mode → Settings → Billing → Customer portal:
 A cancellation is pending when a non-terminal subscription has `cancel_at_period_end = true` **or** a `cancel_at` later than the event (the Customer Portal sends `cancel_at` with `cancel_at_period_end = false`). It takes effect at `cancel_at`, else `current_period_end`; entitlement continues until `customer.subscription.deleted`. Terminal statuses keep the `cancel_at_period_end`-only mapping.
 
 - Row: `cancel_at_period_end = true` while pending; `cancelled_at` = Stripe `canceled_at` (kept across repeated updates). Both clear on reversal.
-- Email: one per subscription and effective date (dispatch key), attempted on every update while pending.
-- Audit: one `cancellation_scheduled` per subscription and effective date; its primary key is derived from both, so retries and concurrent deliveries collapse to one row.
+- A cancellation **request** is identified by subscription, effective date and Stripe `canceled_at`. Withdrawing and cancelling again gives a new `canceled_at`, so it is a new request even with the same effective date.
+- Email: one per request (dispatch key includes `canceled_at`), attempted on every update while pending.
+- Audit: one `cancellation_scheduled` per request; its primary key is derived from the request, so retries and concurrent deliveries collapse to one row.
+- Earlier records: rows and emails recorded before request-scoped keys (key/id from subscription + effective date only) are left untouched and count as covering a request when their metadata `canceled_at` matches, or (no `canceled_at` recorded) they were created at or after the request's `canceled_at`.
+
+### Cancellation reversal
+
+Detected from the `customer.subscription.updated` event's `previous_attributes` (a previous `cancel_at` or `cancel_at_period_end = true`) while the subscription is no longer pending cancellation and not terminal. It is not inferred from the stored row, so a retry of the same event re-detects it after the row was already updated.
+
+- Row: `cancel_at_period_end = false`, `cancelled_at = null`; entitlement unchanged.
+- Audit: one `cancellation_reversed` per withdrawn request; primary key derived from subscription + withdrawn `canceled_at`.
+- Email: `ea-subscription-cancellation-reversed`, one per withdrawn request (dispatch key `subscription:<sub>:cancellation_reversed:<canceled_at>`).
+- A reversal event older than the row's `stripe_object_updated_at` is skipped as stale like any other update (no audit row or email).
+
+### Account page after the billing portal
+
+The portal returns to `/account?billing=portal#subscription`. The page removes the parameter, loads the summary, then re-checks at most three times (3 s, 8 s, 15 s) and stops as soon as the displayed status changes. Becoming visible again (at most every 30 s) or a back/forward-cache restore also reloads it.
 
 ## Additive migration
 
