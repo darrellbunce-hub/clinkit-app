@@ -24,6 +24,10 @@ const POLICY_LINK_TARGETS: ReadonlyArray<{
     href: LEGAL_ROUTES.dataProtection,
   },
   {
+    label: "MoveLoop Data Protection & Platform Terms",
+    href: LEGAL_ROUTES.dataProtection,
+  },
+  {
     label: "Privacy Policy",
     href: LEGAL_ROUTES.privacy,
   },

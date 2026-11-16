@@ -10,9 +10,7 @@ export function getEaSubscriptionConfirmationSubject(
   if (props.isTrialing) {
     return "Your MoveLoop free trial has started";
   }
-  return props.isFounding
-    ? "Your MoveLoop founding subscription is active"
-    : "Your MoveLoop subscription is active";
+  return "Your MoveLoop subscription is active";
 }
 
 export default function EaSubscriptionConfirmationEmail(
@@ -88,21 +86,6 @@ export default function EaSubscriptionConfirmationEmail(
         Your subscription renews automatically each month until you cancel.
         You can manage billing from your MoveLoop account at any time.
       </BillingEmailParagraph>
-
-      {props.isFounding ? (
-        <>
-          <BillingEmailParagraph>
-            Congratulations — you have secured a founding place at the founding
-            monthly price.
-          </BillingEmailParagraph>
-          <BillingEmailParagraph>
-            Founding status remains while this branch continuously maintains its
-            subscription. If you cancel, founding status ends permanently for
-            this branch and cannot be restored if you subscribe again later. A
-            cancelled founding place is not offered to another estate agent.
-          </BillingEmailParagraph>
-        </>
-      ) : null}
     </BillingEmailShell>
   );
 }

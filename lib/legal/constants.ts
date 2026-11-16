@@ -1,7 +1,12 @@
 /** Public privacy contact — not admin@. */
-export const PRIVACY_EMAIL = "privacy@keynetic.co.uk";
+export const PRIVACY_EMAIL = "privacy@moveloop.co.uk";
 
 export const PRIVACY_MAILTO = `mailto:${PRIVACY_EMAIL}`;
+
+/** Public general support contact. */
+export const SUPPORT_EMAIL = "support@moveloop.co.uk";
+
+export const SUPPORT_MAILTO = `mailto:${SUPPORT_EMAIL}`;
 
 /**
  * Stable version identifiers for acceptance audit records.

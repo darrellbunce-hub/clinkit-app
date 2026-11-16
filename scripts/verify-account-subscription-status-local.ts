@@ -102,7 +102,7 @@ async function main() {
       !reversedPaid.detail.includes("Cancels"),
     JSON.stringify({ scheduledPaid, reversedPaid })
   );
-  const reversedFounding = describeSummary(
+  const legacyFoundingRow = describeSummary(
     summary({
       stripe_status: "active",
       pricing_tier: "founding",
@@ -111,10 +111,10 @@ async function main() {
     })
   );
   record(
-    "STATUS historical £99 founding subscription after reversal keeps founding price copy",
-    reversedFounding.title === "Active — Founding £99/month" &&
-      reversedFounding.detail.includes("Founding price remains"),
-    JSON.stringify(reversedFounding)
+    "STATUS dormant founding-tier rows still display as Standard using amount",
+    legacyFoundingRow.title === "Active — Standard £99/month" &&
+      !legacyFoundingRow.detail.toLowerCase().includes("founding"),
+    JSON.stringify(legacyFoundingRow)
   );
 
   const before = subscriptionStatusFingerprint(

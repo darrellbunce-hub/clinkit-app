@@ -62,10 +62,11 @@ function main() {
   );
 
   record(
-    "Pricing constants £99 / £129 / limit 20",
-    EA_FOUNDING_BRANCH_MONTHLY_GBP_MINOR === 9900 &&
-      EA_STANDARD_BRANCH_MONTHLY_GBP_MINOR === 12900 &&
-      EA_FOUNDING_BRANCH_LIMIT === 20
+    "Active pricing is £129; dormant founding schema constants remain unused",
+    EA_STANDARD_BRANCH_MONTHLY_GBP_MINOR === 12900 &&
+      EA_FOUNDING_BRANCH_MONTHLY_GBP_MINOR === 9900 &&
+      EA_FOUNDING_BRANCH_LIMIT === 20 &&
+      EA_TRIAL_OFFER_SUMMARY.includes("including VAT")
   );
   record(
     "Entitlement enforcement disabled",
@@ -81,8 +82,9 @@ function main() {
 
   const landing = read("components/estate-agents/EaLandingPage.tsx");
   record(
-    "Active marketing: 30-day trial then £129, no £99 founding offer",
+    "Active marketing: 30-day trial then £129 including VAT, no £99 founding offer",
     landing.includes("£129") &&
+      landing.includes("including VAT") &&
       landing.includes("EA_TRIAL_TERMS_COPY") &&
       !landing.includes("£99") &&
       !/first 20/i.test(landing)

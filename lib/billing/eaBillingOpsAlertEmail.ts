@@ -5,7 +5,7 @@ import type { BillingOpsSeverity } from "@/lib/billing/eaBillingHealth";
 
 /**
  * Ops alert destination — must be configured per environment.
- * Suggested Day 1 mailbox: admin@keynetic.co.uk (do not hard-code personal addresses).
+ * Suggested Day 1 mailbox: an internal MoveLoop ops address (do not hard-code personal addresses).
  */
 export function getBillingOpsAlertEmail(): string | null {
   const configured = process.env.BILLING_OPS_ALERT_EMAIL?.trim();

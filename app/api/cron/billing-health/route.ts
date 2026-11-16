@@ -17,7 +17,7 @@ export const maxDuration = 60;
  *
  * Configure in vercel.json (e.g. every 30 minutes) and set:
  *   CRON_SECRET
- *   BILLING_OPS_ALERT_EMAIL (ops mailbox, e.g. admin@keynetic.co.uk)
+ *   BILLING_OPS_ALERT_EMAIL (internal MoveLoop ops mailbox)
  */
 export async function GET(request: Request) {
   const authorization = request.headers.get("authorization");

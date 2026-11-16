@@ -536,7 +536,7 @@ export default function EaLandingPage() {
               </div>
 
               <p className="mt-2 text-slate-500">
-                Per branch · billed monthly after your free trial
+                Per branch · including VAT · billed monthly after your free trial
               </p>
 
               <p className="mt-4 text-base font-semibold text-slate-900">
@@ -741,7 +741,7 @@ export default function EaLandingPage() {
           <LegalFooterLinks className="mt-10 text-slate-400" />
 
           <p className="mt-10 text-sm text-slate-500">
-            © {new Date().getFullYear()} Keynetic. Collaboration that
+            © {new Date().getFullYear()} MoveLoop. Collaboration that
             begins from either side.
           </p>
         </div>

@@ -27,15 +27,8 @@ import {
   isGraceFinalWarningDue,
   isGraceMidReminderDue,
 } from "../lib/billing/eaBillingEmailKeys";
-import {
-  EA_FOUNDING_MONTHLY_LABEL,
-  EA_STANDARD_MONTHLY_LABEL,
-} from "../lib/billing/eaBranchPricing";
-import {
-  getSampleFoundingSubscriptionCancelledParams,
-  getSampleFoundingSubscriptionConfirmationParams,
-  getSampleStandardSubscriptionConfirmationParams,
-} from "../lib/communications/sampleData";
+import { EA_STANDARD_MONTHLY_LABEL } from "../lib/billing/eaBranchPricing";
+import { getSampleStandardSubscriptionConfirmationParams } from "../lib/communications/sampleData";
 
 const DEVELOPMENT_SUPABASE_PROJECT_REF = "bbbsxzxcjkmpqsfvmhbo";
 const MIGRATION =
@@ -146,36 +139,23 @@ async function runStatic() {
     record(`Template registered: ${id}`, registry.includes(`"${id}"`));
   }
 
-  const foundingConfirm = getSampleFoundingSubscriptionConfirmationParams();
   const standardConfirm = getSampleStandardSubscriptionConfirmationParams();
-  const cancelFounding = getSampleFoundingSubscriptionCancelledParams();
 
   record(
-    "TEST11/14 founding confirmation sample uses £99/month",
-    foundingConfirm.isFounding &&
-      foundingConfirm.priceLabel === EA_FOUNDING_MONTHLY_LABEL
-  );
-  record(
     "TEST13 standard confirmation sample uses £129/month",
-    !standardConfirm.isFounding &&
-      standardConfirm.priceLabel === EA_STANDARD_MONTHLY_LABEL
-  );
-  record(
-    "TEST12 founding cancellation sample has permanent-loss copy path",
-    cancelFounding.isFounding
+    standardConfirm.priceLabel === EA_STANDARD_MONTHLY_LABEL &&
+      !standardConfirm.isTrialing
   );
 
   const confirmTpl = read("emails/templates/EaSubscriptionConfirmation.tsx");
   const cancelTpl = read("emails/templates/EaSubscriptionCancelled.tsx");
+  const reversedTpl = read(
+    "emails/templates/EaSubscriptionCancellationReversed.tsx"
+  );
   const failTpl = read("emails/templates/EaPaymentFailed.tsx");
   record(
-    "TEST11 founding confirmation template mentions founding place",
-    confirmTpl.toLowerCase().includes("founding")
-  );
-  record(
-    "TEST12 founding cancellation template mentions permanent end",
-    cancelTpl.includes("permanently ends") ||
-      cancelTpl.includes("cannot be restored")
+    "Billing email templates have no founding offer copy",
+    !/founding/i.test(confirmTpl + cancelTpl + reversedTpl)
   );
   record(
     "TEST15 no VAT claim in billing email templates",
@@ -233,8 +213,10 @@ async function runStatic() {
   const terms = read("docs/legal-source/TERMS_OF_SERVICE_V1.0.md");
   record(
     "Terms of Service source present for billing communications",
-    terms.includes("Keynetic Terms of Service") &&
-      terms.includes("Version:** 1.0")
+    terms.includes("MoveLoop Terms of Service") &&
+      terms.includes("Version:** 1.0") &&
+      terms.includes("£129 per month, including VAT") &&
+      !/founding subscription/i.test(terms)
   );
 }
 

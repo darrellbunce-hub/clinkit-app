@@ -15,16 +15,15 @@ import type {
 } from "@/lib/communications/types";
 import { buildDormancyWarningPropertyUrl } from "@/lib/communications/dormancyWarningLinks";
 import {
-  EA_FOUNDING_MONTHLY_LABEL,
   EA_STANDARD_MONTHLY_LABEL,
 } from "@/lib/billing/eaBranchPricing";
 
 const SAMPLE_INVITATION_LINK =
-  "https://app.keynetic.co.uk/claim?token=sample-invitation-token";
+  "https://www.moveloop.co.uk/claim?token=sample-invitation-token";
 const SAMPLE_RESET_LINK =
-  "https://app.keynetic.co.uk/auth/confirm?token=sample-reset-token";
-const SAMPLE_DASHBOARD_LINK = "https://app.keynetic.co.uk/dashboard";
-const SAMPLE_BILLING_LINK = "https://app.keynetic.co.uk/account#subscription";
+  "https://www.moveloop.co.uk/auth/confirm?token=sample-reset-token";
+const SAMPLE_DASHBOARD_LINK = "https://www.moveloop.co.uk/dashboard";
+const SAMPLE_BILLING_LINK = "https://www.moveloop.co.uk/account#subscription";
 
 export const EMAIL_SAMPLE_DATA = {
   propertyAddress: "42 Maple Grove, Bristol BS8 4LN",
@@ -105,19 +104,7 @@ export function getSampleEaSubscriptionConfirmationParams(): EaSubscriptionConfi
     planLabel: "Standard",
     priceLabel: EA_STANDARD_MONTHLY_LABEL,
     nextBillingDateLabel: "18 September 2026",
-    isFounding: false,
     isTrialing: true,
-  };
-}
-
-/** Historical founding subscriptions only — no longer offered to new branches. */
-export function getSampleFoundingSubscriptionConfirmationParams(): EaSubscriptionConfirmationEmailParams {
-  return {
-    ...getSampleEaSubscriptionConfirmationParams(),
-    planLabel: "Founding",
-    priceLabel: EA_FOUNDING_MONTHLY_LABEL,
-    isFounding: true,
-    isTrialing: false,
   };
 }
 
@@ -158,7 +145,6 @@ export function getSampleEaSubscriptionCancelledParams(): EaSubscriptionCancelle
     branchName: EMAIL_SAMPLE_DATA.branchName,
     manageBillingUrl: SAMPLE_BILLING_LINK,
     accessEndsAtLabel: "18 September 2026",
-    isFounding: false,
     isTrialing: true,
   };
 }
@@ -172,17 +158,7 @@ export function getSampleEaSubscriptionCancellationReversedParams(): EaSubscript
     planLabel: "Standard",
     priceLabel: EA_STANDARD_MONTHLY_LABEL,
     nextBillingDateLabel: "18 September 2026",
-    isFounding: false,
     isTrialing: true,
-  };
-}
-
-/** Historical founding subscriptions only — no longer offered to new branches. */
-export function getSampleFoundingSubscriptionCancelledParams(): EaSubscriptionCancelledEmailParams {
-  return {
-    ...getSampleEaSubscriptionCancelledParams(),
-    isFounding: true,
-    isTrialing: false,
   };
 }
 
@@ -195,13 +171,11 @@ export function getSampleStandardSubscriptionConfirmationParams(): EaSubscriptio
 
 export function getSampleLogoUrls() {
   return {
-    iconTeal: buildAbsoluteAssetUrl("/logos/keynetic-icon-teal.png"),
-    wordmarkTeal: buildAbsoluteAssetUrl(
-      "/logos/keynetic-wordmark-teal-v2.png"
-    ),
-    iconWhite: buildAbsoluteAssetUrl("/logos/keynetic-icon-white.png"),
+    iconTeal: buildAbsoluteAssetUrl("/logos/MoveLoop%20Logo.png"),
+    wordmarkTeal: buildAbsoluteAssetUrl("/logos/MoveLoop%20Logo.png"),
+    iconWhite: buildAbsoluteAssetUrl("/logos/MoveLoop%20Logo%20White.png"),
     wordmarkWhite: buildAbsoluteAssetUrl(
-      "/logos/keynetic-wordmark-white-v2.png"
+      "/logos/MoveLoop%20Logo%20White.png"
     ),
   };
 }

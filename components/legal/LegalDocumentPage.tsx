@@ -6,6 +6,8 @@ import {
   LEGAL_NAV_ITEMS,
   PRIVACY_EMAIL,
   PRIVACY_MAILTO,
+  SUPPORT_EMAIL,
+  SUPPORT_MAILTO,
 } from "@/lib/legal/constants";
 import {
   FOOTER_BG_CLASS,
@@ -36,7 +38,15 @@ export function LegalDocumentPage({ markdown }: LegalDocumentPageProps) {
         </nav>
 
         <p className="mb-8 text-sm text-slate-600">
-          Privacy contact:{" "}
+          Support:{" "}
+          <a
+            href={SUPPORT_MAILTO}
+            className="font-medium text-slate-900 underline underline-offset-2"
+          >
+            {SUPPORT_EMAIL}
+          </a>
+          {" · "}
+          Privacy:{" "}
           <a
             href={PRIVACY_MAILTO}
             className="font-medium text-slate-900 underline underline-offset-2"
@@ -81,6 +91,14 @@ export function LegalFooterLinks({
 
       {showPrivacyEmail ? (
         <p className="mt-4 text-sm">
+          Support:{" "}
+          <a
+            href={SUPPORT_MAILTO}
+            className="underline underline-offset-2 hover:text-white transition"
+          >
+            {SUPPORT_EMAIL}
+          </a>
+          {" · "}
           Privacy:{" "}
           <a
             href={PRIVACY_MAILTO}

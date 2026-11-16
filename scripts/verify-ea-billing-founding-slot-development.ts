@@ -184,23 +184,16 @@ function runStatic() {
     "utf8"
   );
   record(
-    "Webhook founding authority is confirm_ea_founding_slot",
-    webhookSrc.includes("confirm_ea_founding_slot") &&
-      webhookSrc.includes("handleFoundingConfirmException") &&
-      webhookSrc.includes("Never manufacture founding")
+    "Webhook no longer confirms or exceptions founding subscriptions",
+    !webhookSrc.includes('admin.rpc("confirm_ea_founding_slot"') &&
+      !webhookSrc.includes("handleFoundingConfirmException") &&
+      !webhookSrc.includes("isFoundingStripePriceId") &&
+      webhookSrc.includes('const pricingTier: EaPricingTier = "standard"')
   );
   record(
-    "Exception path does not auto-rebill at £129",
-    webhookSrc.includes("no_auto_refund_no_standard_rebill")
-  );
-  record(
-    "Webhook identifies founding price only when the optional price id is set",
-    webhookSrc.includes("isFoundingStripePriceId(config, priceId)") &&
-      !webhookSrc.includes("priceId === config.foundingPriceId")
-  );
-  record(
-    "Webhook still reads historical keynetic_pricing_tier=founding metadata",
-    webhookSrc.includes('meta.keynetic_pricing_tier === "founding"')
+    "Webhook ignores founding metadata for pricing_tier resolution",
+    !webhookSrc.includes('meta.keynetic_pricing_tier === "founding"') &&
+      webhookSrc.includes('meta.keynetic_pricing_tier === "standard"')
   );
 
   const availSrc = readFileSync(

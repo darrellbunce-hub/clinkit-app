@@ -297,9 +297,8 @@ export async function dispatchBillingCustomerEmailsForTransition(
     }
 
     const branchName = await loadBranchName(admin, transition.branchId);
-    const isFounding = transition.pricingTier === "founding";
     const priceLabel = formatGbpMinorAsMonthlyLabel(transition.amountGbpMinor);
-    const planLabel = isFounding ? "Founding" : "Standard";
+    const planLabel = "Standard";
     const common = {
       to: owner.email,
       recipientName: owner.name,
@@ -328,7 +327,6 @@ export async function dispatchBillingCustomerEmailsForTransition(
                 ? transition.trialEndsAt
                 : transition.currentPeriodEnd
             ),
-            isFounding,
             isTrialing: transition.isTrialing,
           }),
       });
@@ -390,7 +388,6 @@ export async function dispatchBillingCustomerEmailsForTransition(
               accessEndsAtLabel:
                 formatEnGbDate(cancellationEndsAt) ??
                 "the end of the current billing period",
-              isFounding,
               isTrialing: transition.isTrialing,
             }),
         });
@@ -422,7 +419,6 @@ export async function dispatchBillingCustomerEmailsForTransition(
                 ? transition.trialEndsAt
                 : transition.currentPeriodEnd
             ),
-            isFounding,
             isTrialing: transition.isTrialing,
           }),
       });

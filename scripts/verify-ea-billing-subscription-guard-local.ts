@@ -990,13 +990,16 @@ function runSourceChecks() {
 
   const reconcileStart = webhook.indexOf("async function reconcileStripeSubscription(");
   const conflictAt = webhook.indexOf("recordWebhookAssociationConflict(admin", reconcileStart);
-  const foundingConfirmAt = webhook.indexOf('admin.rpc("confirm_ea_founding_slot"', reconcileStart);
   const staleAt = webhook.indexOf('reason: "stale_event"', reconcileStart);
   record(
-    "WEBHOOK association check runs before the stale guard and founding confirmation",
-    conflictAt > reconcileStart &&
-      conflictAt < staleAt &&
-      conflictAt < foundingConfirmAt
+    "WEBHOOK association check runs before the stale guard",
+    conflictAt > reconcileStart && conflictAt < staleAt
+  );
+  record(
+    "WEBHOOK no longer confirms founding slots",
+    !webhook.includes('admin.rpc("confirm_ea_founding_slot"') &&
+      !webhook.includes("handleFoundingConfirmException") &&
+      !webhook.includes("isFoundingStripePriceId")
   );
   record(
     "WEBHOOK row write is compare-and-swap on the association; a lost race retries",

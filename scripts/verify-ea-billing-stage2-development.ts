@@ -205,9 +205,8 @@ function runStatic(): void {
     secret ? "prefix checked" : "missing"
   );
   record(
-    "Founding/standard price IDs configured (presence only)",
-    !!process.env.STRIPE_EA_FOUNDING_PRICE_ID?.trim() &&
-      !!process.env.STRIPE_EA_STANDARD_PRICE_ID?.trim()
+    "Standard price ID configured (presence only); founding price unused",
+    !!process.env.STRIPE_EA_STANDARD_PRICE_ID?.trim()
   );
   record(
     "STRIPE_WEBHOOK_SECRET presence reported without value",

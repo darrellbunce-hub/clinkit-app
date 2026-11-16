@@ -28,7 +28,7 @@ import { createServiceRoleSupabaseClient } from "@/lib/supabase/serviceRole";
 /** In-flight Checkout create marker stored in stripe_checkout_session_id until Stripe returns. */
 const ATTEMPT_MARKER_PREFIX = "attempt:" as const;
 
-/** New subscriptions are always standard; founding is historical only. */
+/** New subscriptions are always the standard £129 offer. */
 const NEW_SUBSCRIPTION_TIER: EaPricingTier = "standard";
 
 /**
@@ -69,7 +69,7 @@ function isAttemptMarker(sessionId: string | null | undefined): boolean {
 
 type AttemptMarker = {
   attemptId: string;
-  /** Legacy founding Checkout expiry; still parsed from markers written before the trial offer. */
+  /** Optional expiry unix from older attempt markers; still parsed for compatibility. */
   expiresAtUnix: number | null;
 };
 

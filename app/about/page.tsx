@@ -178,7 +178,7 @@ export default function AboutPage() {
           <LegalFooterLinks className="text-slate-400" />
 
           <div className="mt-10 pt-8 border-t border-slate-800 text-slate-500 text-sm">
-            © 2026 Keynetic. All rights reserved.
+            © 2026 MoveLoop. All rights reserved.
           </div>
         </div>
       </footer>

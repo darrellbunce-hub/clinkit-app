@@ -135,7 +135,7 @@ export function evaluateBillingIncidents(
     incidents.push({
       key: "billing_reconcile_required",
       severity: "warning",
-      title: "Stripe subscription not reflected in Keynetic (Checkout refused)",
+      title: "Stripe subscription not reflected in MoveLoop (Checkout refused)",
       detail: {
         reconcileRequiredCount: counts.reconcileRequiredCount,
         lookbackHours: thresholds.reconcileRequiredLookbackHours,

@@ -18,17 +18,19 @@
 | Customer (Day 1) | EA **branch** (`ea_branches.stripe_customer_id`) |
 | Customer (future org) | EA company field reserved — not Day 1 Portal/Checkout |
 | Subscription | EA branch |
-| New subscriptions | Standard £129/month only |
+| New subscriptions | Standard **£129/month including VAT** only |
 | Free trial | 30 days, card required at Checkout, no payment during the trial |
 | Trial conversion | Automatically £129/month at trial end unless cancelled before |
 | Trial end, no payment method | Stripe cancels the subscription (`missing_payment_method: cancel`) |
 | Trial limit | One trial per branch (see Trial eligibility) |
-| Founding | £99/month — **historical only**, closed to new subscriptions; existing founding subscriptions keep reconciling |
+| Founding | **Never launched — retired.** No £99 offer, no founding places, no grandfathered subscriptions. Schema/ledger artifacts may remain dormant until a separately approved cleanup. |
 | Cancel | `cancel_at_period_end` (during a trial: ends at trial end, no charge) |
 | Grace | 7 days after unrecovered payment failure (includes a failed first charge at trial end) |
 | Enforcement | `EA_BILLING_ENTITLEMENT_ENFORCEMENT_ENABLED = false` |
+| Support | `support@moveloop.co.uk` |
+| Privacy | `privacy@moveloop.co.uk` |
 
-**Legal commercial locks (Phase 2A):** [LAUNCH_LEGAL_FOUNDER_DECISIONS.md](./LAUNCH_LEGAL_FOUNDER_DECISIONS.md) — founding places are permanently consumed when secured (cancel does not reopen £99); non-transferable; cancel-at-period-end; no ordinary partial refund. The founding offer is now **closed** to new subscriptions. Terms of Service §12 and Privacy Policy wording about founding arrangements are pending legal review and have not been changed.
+**Commercial note:** [LAUNCH_LEGAL_FOUNDER_DECISIONS.md](./LAUNCH_LEGAL_FOUNDER_DECISIONS.md) is **superseded** and must not be treated as current guidance. Launch legal drafts live under `docs/legal-source/` and require legal review before publication.
 
 ## Flow
 
@@ -134,7 +136,7 @@ A webhook never silently re-points a subscription row (or the branch) at a diffe
 |---|---|
 | `STRIPE_SECRET_KEY` | Yes (Sandbox `sk_test_…`) |
 | `STRIPE_API_MODE` | Yes (`test`) |
-| `STRIPE_EA_FOUNDING_PRICE_ID` | Optional — historical founding identification only; keep it set wherever founding subscriptions may exist so founding prices are recognised even without metadata |
+| `STRIPE_EA_FOUNDING_PRICE_ID` | Unused — founding never launched; may remain in older env files but is ignored by application code |
 | `STRIPE_EA_STANDARD_PRICE_ID` | Yes — must be the £129 GBP monthly price; used for every new Checkout |
 | `STRIPE_WEBHOOK_SECRET` | Required for live webhook processing |
 | `NEXT_PUBLIC_APP_URL` | Recommended for success/cancel/return URLs |
@@ -359,17 +361,15 @@ Verifier: `scripts/verify-ea-billing-customer-communications-development.ts`
   `checkout_processing` until Stripe retries succeed (failed webhooks are
   alerted by billing health) or an operator reconciles.
 
-## Historical founding compatibility
+## Founding offer — never launched / retired
 
-- Founding rows (`pricing_tier = founding`, £99, confirmed `founding_slot_number`)
-  remain valid and keep reconciling via webhooks.
-- The webhook identifies founding by `STRIPE_EA_FOUNDING_PRICE_ID` (when set),
-  `keynetic_pricing_tier = founding` metadata or an existing founding row, and
-  confirms via the idempotent
-  `confirm_ea_founding_slot` (`already_confirmed` for existing places).
-- Founding RPCs, ledger and constraints are unchanged. Verifier:
-  `scripts/verify-ea-billing-founding-slot-development.ts` (historical tests
-  plus "new Checkout never reserves founding").
+- No customers subscribed under a founding offer. There are no grandfathered £99
+  subscriptions to preserve.
+- Active Checkout and webhooks reconcile the **standard** offer only and always
+  write `pricing_tier = standard` with `founding_slot_number = null`.
+- Database migrations, ledger table, founding RPCs and check constraints remain
+  in place as dormant schema until a separately approved cleanup migration.
+- Do not set or rely on `STRIPE_EA_FOUNDING_PRICE_ID` for Production.
 
 ## Stage 3 (not started)
 

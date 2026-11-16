@@ -58,12 +58,6 @@ export default function EaSubscriptionCancellationReversedEmail(
         </BillingEmailParagraph>
       )}
 
-      {props.isFounding ? (
-        <BillingEmailParagraph>
-          Your founding subscription and founding price continue unchanged.
-        </BillingEmailParagraph>
-      ) : null}
-
       <BillingEmailParagraph>
         You can manage billing from your MoveLoop account at any time.
       </BillingEmailParagraph>

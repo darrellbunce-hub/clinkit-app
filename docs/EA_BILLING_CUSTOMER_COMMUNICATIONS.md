@@ -6,7 +6,7 @@
 
 ## Scope (this phase)
 
-Keynetic transactional emails (Resend):
+MoveLoop transactional emails (Resend):
 
 1. `ea-subscription-confirmation` — first transition to entitled/active
 2. `ea-payment-failed` — enter 7-day grace (BL-01)
@@ -15,7 +15,7 @@ Keynetic transactional emails (Resend):
 5. `ea-subscription-cancelled` — once per cancellation request (Stripe `cancel_at_period_end` or a future `cancel_at`). Key: `subscription:<sub>:cancellation:<effective end>:requested:<Stripe canceled_at>`; a new request after a withdrawal (new `canceled_at`) gets a new email even for the same end date. Emails sent under the earlier key (`subscription:<sub>:cancellation:<effective end>`) at or after the request's `canceled_at` count as already sent.
 6. `ea-subscription-cancellation-reversed` — once per withdrawn cancellation request, detected from the `customer.subscription.updated` event's `previous_attributes`. Key: `subscription:<sub>:cancellation_reversed:<withdrawn request's canceled_at>`.
 
-**Not** sent by Keynetic: routine monthly successful-payment emails.  
+**Not** sent by MoveLoop: routine monthly successful-payment emails.  
 **Stripe Dashboard (Production):** enable Customer receipt / invoice emails before live charging — **Required before public charging**.
 
 ## Architecture

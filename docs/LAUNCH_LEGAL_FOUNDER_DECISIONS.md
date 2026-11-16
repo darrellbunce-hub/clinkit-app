@@ -1,11 +1,16 @@
-# Keynetic Launch Legal Founder Decisions
+# Launch Legal Founder Decisions — SUPERSEDED
 
-**Phase:** Legal / Policy Phase 2A  
-**Status:** Source of truth for locked legal/commercial decisions before Phase 2B Terms drafting  
-**Related:** [LAUNCH_LEGAL_DRAFT_REVIEW_REGISTER.md](./LAUNCH_LEGAL_DRAFT_REVIEW_REGISTER.md) · [LAUNCH_CONTENT_FOUNDER_DECISIONS.md](./LAUNCH_CONTENT_FOUNDER_DECISIONS.md) · [EA_BILLING_STAGE2_ARCHITECTURE.md](./EA_BILLING_STAGE2_ARCHITECTURE.md) · [KEYNETIC_TERMINOLOGY_REGISTER.md](./KEYNETIC_TERMINOLOGY_REGISTER.md)
+> **SUPERSEDED — NOT CURRENT COMMERCIAL GUIDANCE**  
+> The founding / £99 offer was never launched and has been retired.  
+> Current commercial model for MoveLoop Ltd: one Estate Agent subscription at **£129/month including VAT**, with a **30-day free trial**, card required upfront, automatic conversion at trial end.  
+> General support: `support@moveloop.co.uk`. Privacy: `privacy@moveloop.co.uk`.  
+> Keep this file only as historical decision record. Do not implement founding behaviour from it.
 
-Decisions in this register supersede conflicting provisional notes in older launch legal drafts where IDs collide.  
-Do **not** invent VAT treatment, liability caps, retention periods, or DPA conclusions here.
+**Phase:** Legal / Policy Phase 2A (historical)  
+**Status:** **Superseded** by the final MoveLoop Ltd launch commercial model  
+**Related:** [EA_BILLING_STAGE2_ARCHITECTURE.md](./EA_BILLING_STAGE2_ARCHITECTURE.md) · [docs/legal-source/TERMS_OF_SERVICE_V1.0.md](./legal-source/TERMS_OF_SERVICE_V1.0.md)
+
+The content below is retained for audit history only. It must not be treated as the source of truth for launch pricing, founding places, or Terms drafting.
 
 ---
 

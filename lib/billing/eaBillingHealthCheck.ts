@@ -59,7 +59,7 @@ function buildAlertBody(
   snapshot: BillingHealthSnapshot
 ): { subject: string; bodyText: string } {
   const severity = incident.severity.toUpperCase();
-  const subject = `[Keynetic Billing ${severity}] ${incident.title}`;
+  const subject = `[MoveLoop Billing ${severity}] ${incident.title}`;
   const lines = [
     `Severity: ${severity}`,
     `Incident: ${incident.key}`,
@@ -89,7 +89,7 @@ function buildRecoveryBody(incidentKey: string, checkedAt: string): {
   bodyText: string;
 } {
   return {
-    subject: `[Keynetic Billing RECOVERY] ${incidentKey} cleared`,
+    subject: `[MoveLoop Billing RECOVERY] ${incidentKey} cleared`,
     bodyText: [
       `Incident ${incidentKey} is no longer detected by the billing health check.`,
       `Checked at: ${checkedAt}`,

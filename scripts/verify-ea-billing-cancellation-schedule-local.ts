@@ -98,7 +98,6 @@ process.env.STRIPE_API_MODE = "test";
 process.env.STRIPE_SECRET_KEY = "sk_test_local_verifier_placeholder";
 process.env.STRIPE_EA_STANDARD_PRICE_ID = "price_standard_local";
 process.env.NEXT_PUBLIC_APP_URL = "http://localhost:3000";
-process.env.STRIPE_EA_FOUNDING_PRICE_ID = "price_founding_local";
 
 type TestResult = { name: string; pass: boolean; detail?: string };
 const results: TestResult[] = [];
@@ -860,7 +859,6 @@ async function runWebhookFlows() {
       revEmails.length === 1 &&
         db.dispatches.get(reversalKey(CANCELED_AT)) === "sent" &&
         revEmails[0]!.args.isTrialing === true &&
-        revEmails[0]!.args.isFounding === false &&
         revEmails[0]!.args.priceLabel === "£129/month" &&
         typeof revEmails[0]!.args.nextBillingDateLabel === "string",
       JSON.stringify({ revEmails, dispatches: [...db.dispatches] })
@@ -1141,7 +1139,7 @@ async function runWebhookFlows() {
     );
   }
 
-  console.log("\n--- Historical £99 founding subscription ---\n");
+  console.log("\n--- Legacy founding-priced payload is forced to standard ---\n");
   {
     const db = freshDb({
       stripe_status: "active",
@@ -1152,7 +1150,7 @@ async function runWebhookFlows() {
     });
     currentDb = db;
     sentEmails.length = 0;
-    const founding = {
+    const foundingPayload = {
       status: "active",
       trial_end: null,
       items: {
@@ -1170,34 +1168,44 @@ async function runWebhookFlows() {
         "evt_founding_cancel",
         "customer.subscription.updated",
         EVENT_AT,
-        subscription({ ...founding, cancel_at_period_end: true, canceled_at: CANCELED_AT })
+        subscription({
+          ...foundingPayload,
+          cancel_at_period_end: true,
+          canceled_at: CANCELED_AT,
+        })
       )
     );
     const scheduledRow = { ...subRow(db) };
     await processStripeWebhookEvent(
-      event("evt_founding_reverse", "customer.subscription.updated", EVENT_AT + 10, subscription(founding), {
-        cancel_at_period_end: true,
-        canceled_at: CANCELED_AT,
-      })
+      event(
+        "evt_founding_reverse",
+        "customer.subscription.updated",
+        EVENT_AT + 10,
+        subscription(foundingPayload),
+        {
+          cancel_at_period_end: true,
+          canceled_at: CANCELED_AT,
+        }
+      )
     );
     const row = subRow(db);
     record(
-      "FOUNDING cancellation and reversal keep tier, slot and £99 amount",
-      scheduledRow.pricing_tier === "founding" &&
-        scheduledRow.founding_slot_number === 7 &&
-        row.pricing_tier === "founding" &&
-        row.founding_slot_number === 7 &&
-        row.amount_gbp_minor === 9900 &&
+      "LEGACY founding-priced webhook writes standard tier with no slot",
+      scheduledRow.pricing_tier === "standard" &&
+        scheduledRow.founding_slot_number == null &&
+        scheduledRow.amount_gbp_minor === 12900 &&
+        row.pricing_tier === "standard" &&
+        row.founding_slot_number == null &&
+        row.amount_gbp_minor === 12900 &&
         row.cancel_at_period_end === false &&
         row.entitlement_status === "entitled",
       JSON.stringify({ scheduledRow, row })
     );
     const revEmails = reversalEmails();
     record(
-      "FOUNDING reversal email keeps founding copy and £99/month",
+      "LEGACY founding-priced reversal email uses standard £129/month copy",
       revEmails.length === 1 &&
-        revEmails[0]!.args.isFounding === true &&
-        revEmails[0]!.args.priceLabel === "£99/month" &&
+        revEmails[0]!.args.priceLabel === "£129/month" &&
         audits(db, "cancellation_reversed").length === 1,
       JSON.stringify(revEmails)
     );

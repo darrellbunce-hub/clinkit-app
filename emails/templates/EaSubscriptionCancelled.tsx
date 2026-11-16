@@ -43,14 +43,6 @@ export default function EaSubscriptionCancelledEmail(
           from Manage billing (Stripe Customer Portal), where Stripe permits it.
         </BillingEmailParagraph>
       )}
-
-      {props.isFounding ? (
-        <BillingEmailParagraph>
-          Because you have a founding subscription, cancelling permanently ends
-          your founding status. Your founding price cannot be restored if you
-          subscribe again in the future.
-        </BillingEmailParagraph>
-      ) : null}
     </BillingEmailShell>
   );
 }

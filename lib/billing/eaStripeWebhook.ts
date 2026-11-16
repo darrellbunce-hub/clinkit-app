@@ -34,10 +34,7 @@ import {
   TERMINAL_STRIPE_SUBSCRIPTION_STATUSES,
 } from "@/lib/billing/eaSubscriptionAssociation";
 import { getStripeClient } from "@/lib/billing/stripeClient";
-import {
-  getStripeServerConfig,
-  isFoundingStripePriceId,
-} from "@/lib/billing/stripeServerConfig";
+import { getStripeServerConfig } from "@/lib/billing/stripeServerConfig";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/serviceRole";
 
 function unixToIso(seconds: number | null | undefined): string | null {
@@ -313,11 +310,8 @@ function resolveBranchIds(subscription: Stripe.Subscription): {
   pricingTier: EaPricingTier | null;
 } {
   const meta = subscription.metadata || {};
-  const tier =
-    meta.keynetic_pricing_tier === "founding" ||
-    meta.keynetic_pricing_tier === "standard"
-      ? meta.keynetic_pricing_tier
-      : null;
+  // Active offer is standard only. Ignore any legacy founding metadata values.
+  const tier = meta.keynetic_pricing_tier === "standard" ? "standard" : null;
   return {
     branchId: meta.keynetic_branch_id || null,
     companyId: meta.keynetic_company_id || null,
@@ -330,7 +324,6 @@ async function reconcileStripeSubscription(
   admin: SupabaseClient,
   subscription: Stripe.Subscription,
   options: {
-    confirmFounding?: boolean;
     fromPaymentFailure?: boolean;
     /** Stripe event.created chronology — required for stale-event protection. */
     eventChronologyAt: Date;
@@ -480,72 +473,8 @@ async function reconcileStripeSubscription(
       ? subscription.items.data[0].price.id
       : null;
 
-  // Stripe Price ID proves what was charged — not Keynetic founding entitlement.
-  // Never manufacture founding solely from the £99 Price ID.
-  let pricingTier: EaPricingTier =
-    (existing.pricing_tier as EaPricingTier | null) ||
-    ids.pricingTier ||
-    "standard";
-  let foundingSlotNumber: number | null =
-    pricingTier === "founding"
-      ? ((existing.founding_slot_number as number | null) ?? null)
-      : null;
-
-  if (priceId === config.standardPriceId) {
-    pricingTier = "standard";
-    foundingSlotNumber = null;
-  }
-
-  const isFoundingPrice = isFoundingStripePriceId(config, priceId);
-  const looksFoundingAttempt =
-    isFoundingPrice ||
-    ids.pricingTier === "founding" ||
-    existing.pricing_tier === "founding";
-
-  if (
-    options.confirmFounding &&
-    mapped.entitlementStatus === "entitled" &&
-    looksFoundingAttempt
-  ) {
-    const { data: confirmData } = await admin.rpc("confirm_ea_founding_slot", {
-      p_branch_id: branchId,
-      p_subscription_id: existing.id,
-    });
-
-    if (confirmData?.ok === true) {
-      pricingTier = "founding";
-      foundingSlotNumber =
-        typeof confirmData.slot_number === "number"
-          ? confirmData.slot_number
-          : foundingSlotNumber;
-    } else if (isFoundingPrice) {
-      await handleFoundingConfirmException(admin, {
-        branchId,
-        subscriptionRowId: existing.id as string,
-        stripeSubscription: subscription,
-        confirmError:
-          typeof confirmData?.error === "string"
-            ? confirmData.error
-            : "confirm_failed",
-      });
-      return { applied: true, reason: "founding_exception" };
-    } else {
-      pricingTier = "standard";
-      foundingSlotNumber = null;
-    }
-  } else if (isFoundingPrice && !options.confirmFounding) {
-    if (pricingTier !== "founding" || !foundingSlotNumber) {
-      pricingTier =
-        (existing.pricing_tier as EaPricingTier | null) === "founding" &&
-        existing.founding_slot_number
-          ? "founding"
-          : "standard";
-      foundingSlotNumber =
-        pricingTier === "founding"
-          ? ((existing.founding_slot_number as number | null) ?? null)
-          : null;
-    }
-  }
+  // Launch offer is standard only. Founding was never launched and is not reconciled.
+  const pricingTier: EaPricingTier = "standard";
 
   const previousEntitlement = existing.entitlement_status as string | null;
 
@@ -589,7 +518,7 @@ async function reconcileStripeSubscription(
     stripe_object_updated_at: chronologyIso,
     pricing_tier: pricingTier,
     amount_gbp_minor: amountGbpMinorForTier(pricingTier),
-    founding_slot_number: foundingSlotNumber,
+    founding_slot_number: null,
     updated_at: new Date().toISOString(),
   };
 
@@ -1218,93 +1147,6 @@ async function recordTrialStartedOnce(
   );
 }
 
-/**
- * Exceptional path only: £99 charged in Stripe but founding cannot be confirmed.
- * Cancels the Stripe subscription (stops ongoing founding billing without entitlement).
- * Does NOT auto-refund and does NOT create a £129 subscription.
- */
-async function handleFoundingConfirmException(
-  admin: SupabaseClient,
-  input: {
-    branchId: string;
-    subscriptionRowId: string;
-    stripeSubscription: Stripe.Subscription;
-    confirmError: string;
-  }
-): Promise<void> {
-  const stripe = getStripeClient();
-  const { branchId, subscriptionRowId, stripeSubscription, confirmError } =
-    input;
-
-  try {
-    if (
-      stripeSubscription.status !== "canceled" &&
-      stripeSubscription.status !== "incomplete_expired"
-    ) {
-      await stripe.subscriptions.cancel(stripeSubscription.id);
-    }
-  } catch {
-    // Best-effort cancel; audit event still recorded for ops review.
-  }
-
-  await admin
-    .from("ea_branch_subscriptions")
-    .update({
-      stripe_subscription_id: stripeSubscription.id,
-      stripe_price_id:
-        typeof stripeSubscription.items.data[0]?.price?.id === "string"
-          ? stripeSubscription.items.data[0].price.id
-          : null,
-      stripe_status: "canceled",
-      entitlement_status: "ended",
-      ended_at: new Date().toISOString(),
-      pricing_tier: "standard",
-      amount_gbp_minor: amountGbpMinorForTier("standard"),
-      founding_slot_number: null,
-      stripe_checkout_session_id: null,
-      cancel_at_period_end: false,
-      cancelled_at: new Date().toISOString(),
-      stripe_status_updated_at: new Date().toISOString(),
-      stripe_object_updated_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", subscriptionRowId);
-
-  const { error: exceptionEventError } = await admin
-    .from("ea_subscription_events")
-    .insert({
-      branch_id: branchId,
-      subscription_id: subscriptionRowId,
-      event_type: "founding_reconcile_exception",
-      actor_source: "webhook",
-      metadata: {
-        stripe_subscription_id: stripeSubscription.id,
-        confirm_error: confirmError,
-        action:
-          "canceled_stripe_subscription_no_auto_refund_no_standard_rebill",
-        note: "Manual ops review may issue an exceptional refund if appropriate.",
-      },
-    });
-
-  if (exceptionEventError) {
-    // Forward-safe if migration adding founding_reconcile_exception is not applied yet.
-    await admin.from("ea_subscription_events").insert({
-      branch_id: branchId,
-      subscription_id: subscriptionRowId,
-      event_type: "entitlement_changed",
-      actor_source: "webhook",
-      metadata: {
-        stripe_subscription_id: stripeSubscription.id,
-        confirm_error: confirmError,
-        founding_reconcile_exception: true,
-        action:
-          "canceled_stripe_subscription_no_auto_refund_no_standard_rebill",
-        note: "Manual ops review may issue an exceptional refund if appropriate.",
-      },
-    });
-  }
-}
-
 async function loadSubscription(
   subscriptionId: string
 ): Promise<Stripe.Subscription> {
@@ -1365,7 +1207,6 @@ export async function processStripeWebhookEvent(
           subscription = await loadSubscription(subId);
         }
         await reconcileStripeSubscription(admin, subscription, {
-          confirmFounding: subscription.status === "active",
           eventChronologyAt: chronologyAt,
         });
         await expireOtherCheckoutSessionsAfterLink(
@@ -1381,7 +1222,6 @@ export async function processStripeWebhookEvent(
         const subscription = event.data.object as Stripe.Subscription;
         const chronologyAt = stripeEventChronologyAt(event);
         await reconcileStripeSubscription(admin, subscription, {
-          confirmFounding: subscription.status === "active",
           fromPaymentFailure: subscription.status === "past_due",
           eventChronologyAt: chronologyAt,
           previousAttributes: (event.data.previous_attributes ??
@@ -1416,7 +1256,6 @@ export async function processStripeWebhookEvent(
         if (!subId) break;
         const subscription = await loadSubscription(subId);
         await reconcileStripeSubscription(admin, subscription, {
-          confirmFounding: true,
           eventChronologyAt: stripeEventChronologyAt(event),
         });
         await recordInvoicePaymentSucceeded(admin, invoice, subscription);
