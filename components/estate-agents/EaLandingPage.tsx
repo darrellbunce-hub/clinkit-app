@@ -536,7 +536,7 @@ export default function EaLandingPage() {
               </div>
 
               <p className="mt-2 text-slate-500">
-                Per branch · including VAT · billed monthly after your free trial
+                Per branch · billed monthly after your free trial
               </p>
 
               <p className="mt-4 text-base font-semibold text-slate-900">

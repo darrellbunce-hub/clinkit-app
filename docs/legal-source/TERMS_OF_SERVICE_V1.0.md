@@ -184,7 +184,7 @@ MoveLoop Ltd offers one Estate Agent branch subscription.
 
 Unless otherwise stated at the time of purchase:
 
-* the subscription price is **£129 per month, including VAT**, per branch;  
+* the subscription price is **£129 per month** per branch;  
 * new eligible branches receive a **30-day free trial**;  
 * a payment card is required to start the free trial;  
 * no charge is taken during the free trial;  
@@ -192,7 +192,7 @@ Unless otherwise stated at the time of purchase:
 * if a payment method is not available at the end of the free trial, the subscription ends and you are not charged;  
 * the free trial is available once per branch; a later resubscription for the same branch is billed at the standard monthly price from the start;  
 * after any free trial, subscriptions are billed monthly and renew automatically unless cancelled;  
-* subscription prices and applicable taxes are displayed before purchase; and  
+* subscription prices are displayed before purchase; and  
 * payment is processed using the payment method made available by MoveLoop.
 
 The contractual price applicable to your subscription is the price confirmed when you subscribe or subsequently agree to a pricing change.

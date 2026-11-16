@@ -215,7 +215,8 @@ async function runStatic() {
     "Terms of Service source present for billing communications",
     terms.includes("MoveLoop Terms of Service") &&
       terms.includes("Version:** 1.0") &&
-      terms.includes("£129 per month, including VAT") &&
+      terms.includes("£129 per month") &&
+      !/including vat/i.test(terms) &&
       !/founding subscription/i.test(terms)
   );
 }

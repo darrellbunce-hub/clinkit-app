@@ -2,7 +2,7 @@
 
 > **SUPERSEDED — NOT CURRENT COMMERCIAL GUIDANCE**  
 > The founding / £99 offer was never launched and has been retired.  
-> Current commercial model for MoveLoop Ltd: one Estate Agent subscription at **£129/month including VAT**, with a **30-day free trial**, card required upfront, automatic conversion at trial end.  
+> Current commercial model for MoveLoop Ltd: one Estate Agent subscription at **£129/month**, with a **30-day free trial**, card required upfront, automatic conversion at trial end. Do not claim VAT-inclusive pricing or invent VAT registration status.  
 > General support: `support@moveloop.co.uk`. Privacy: `privacy@moveloop.co.uk`.  
 > Keep this file only as historical decision record. Do not implement founding behaviour from it.
 

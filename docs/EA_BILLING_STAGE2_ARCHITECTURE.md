@@ -18,7 +18,7 @@
 | Customer (Day 1) | EA **branch** (`ea_branches.stripe_customer_id`) |
 | Customer (future org) | EA company field reserved — not Day 1 Portal/Checkout |
 | Subscription | EA branch |
-| New subscriptions | Standard **£129/month including VAT** only |
+| New subscriptions | Standard **£129/month** only |
 | Free trial | 30 days, card required at Checkout, no payment during the trial |
 | Trial conversion | Automatically £129/month at trial end unless cancelled before |
 | Trial end, no payment method | Stripe cancels the subscription (`missing_payment_method: cancel`) |
