@@ -10,10 +10,7 @@ import EaMarketingShell from "@/components/estate-agents/EaMarketingShell";
 import CollectionPointNotice from "@/components/legal/CollectionPointNotice";
 import { AUTH_TITLE_CLASS } from "@/components/mobileStandards";
 import { ROUTES } from "@/lib/auth/routes";
-import {
-  completeEstateAgentOnboarding,
-  type EstateAgentOnboardingSummary,
-} from "@/lib/estateAgent/completeOnboarding";
+import { completeEstateAgentOnboarding } from "@/lib/estateAgent/completeOnboarding";
 import {
   fetchAuthenticatedProfileAccountFields,
 } from "@/lib/currentUserContext";
@@ -22,12 +19,12 @@ import { supabase } from "@/lib/supabase";
 const inputClassName =
   "mt-2 w-full border border-slate-300 text-base text-slate-900 rounded-2xl px-4 py-3 disabled:bg-slate-100";
 
-type OnboardingStep = 1 | 2 | "complete";
+type OnboardingStep = 1 | 2;
 
 const stepLabels = [
   "Company",
   "Branch",
-  "Confirm",
+  "Trial",
 ] as const;
 
 export default function EstateAgentOnboardingPage() {
@@ -47,10 +44,6 @@ export default function EstateAgentOnboardingPage() {
     useState("");
   const [emailDomain, setEmailDomain] =
     useState("");
-  const [completionSummary, setCompletionSummary] =
-    useState<EstateAgentOnboardingSummary | null>(
-      null
-    );
   const [errorMessage, setErrorMessage] =
     useState("");
   const [isLoading, setIsLoading] =
@@ -168,8 +161,9 @@ export default function EstateAgentOnboardingPage() {
         return;
       }
 
-      setCompletionSummary(result.summary);
-      setStep("complete");
+      // Company/branch are registered; trial Checkout is the next onboarding step.
+      window.location.href = `${ROUTES.estateAgentOnboardingBilling}?branch=${encodeURIComponent(result.summary.branchId)}`;
+      return;
     } catch (error) {
       setErrorMessage(
         error instanceof Error
@@ -181,14 +175,7 @@ export default function EstateAgentOnboardingPage() {
     }
   }
 
-  function handleContinueToAgentHome() {
-    window.location.href = ROUTES.agentHome;
-  }
-
-  const activeStepIndex =
-    step === "complete"
-      ? 3
-      : step;
+  const activeStepIndex = step;
 
   if (isLoading) {
     return (
@@ -256,313 +243,230 @@ export default function EstateAgentOnboardingPage() {
             })}
           </div>
 
-          {step === "complete" &&
-          completionSummary ? (
-            <>
-              <h1 className={`mt-8 ${AUTH_TITLE_CLASS}`}>
-                Agency setup complete
-              </h1>
+          <p className="mt-6 text-sm font-semibold uppercase tracking-wide text-slate-500">
+            Step {step} of 2
+          </p>
 
-              <p className="mt-2 text-slate-600">
-                Your company and first branch are
-                registered. Homeowners will be able
-                to find and assign this branch.
-              </p>
+          <h1 className={`mt-4 ${AUTH_TITLE_CLASS}`}>
+            {step === 1
+              ? "Company information"
+              : "First branch details"}
+          </h1>
 
-              <dl className="mt-8 space-y-4 rounded-2xl border border-green-200 bg-green-50 px-5 py-5">
-                <div>
-                  <dt className="text-sm font-medium text-slate-600">
-                    Company
-                  </dt>
-                  <dd className="mt-1 text-lg font-semibold text-slate-900">
-                    {
-                      completionSummary.companyName
-                    }
-                  </dd>
-                </div>
+          <p className="mt-2 text-slate-600">
+            {step === 1
+              ? "Enter your agency company name. After your first branch is registered, you will be offered a 30-day free trial."
+              : "Register the branch homeowners will assign to their properties. All fields are required. Next you will set up billing for this branch."}
+          </p>
 
-                <div>
-                  <dt className="text-sm font-medium text-slate-600">
-                    Branch
-                  </dt>
-                  <dd className="mt-1 text-lg font-semibold text-slate-900">
-                    {
-                      completionSummary.branchName
-                    }
-                  </dd>
-                </div>
+          {step === 1 ? (
+            <CollectionPointNotice
+              className="mt-4"
+              context="estate-agent"
+            />
+          ) : null}
 
-                <div>
-                  <dt className="text-sm font-medium text-slate-600">
-                    Town / city
-                  </dt>
-                  <dd className="mt-1 text-lg font-semibold text-slate-900">
-                    {
-                      completionSummary.townOrCity
-                    }
-                  </dd>
-                </div>
+          {step === 1 ? (
+            <form
+              onSubmit={handleCompanyStep}
+              className="mt-8 space-y-6"
+              noValidate
+            >
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-950">
+                <p className="font-semibold">
+                  Company, branch, then free trial
+                </p>
+                <p className="mt-1">
+                  After this step you must enter your
+                  branch name, town or city, and
+                  postcode. You will then be invited to
+                  start a 30-day free trial for the
+                  branch.
+                </p>
+              </div>
 
-                <div>
-                  <dt className="text-sm font-medium text-slate-600">
-                    Postcode
-                  </dt>
-                  <dd className="mt-1 text-lg font-semibold text-slate-900">
-                    {completionSummary.postcode}
-                  </dd>
-                </div>
-              </dl>
+              <div>
+                <label
+                  htmlFor="company-name"
+                  className="block text-sm font-medium text-slate-700"
+                >
+                  Company name
+                </label>
+
+                <input
+                  id="company-name"
+                  name="companyName"
+                  type="text"
+                  value={companyName}
+                  onChange={(event) =>
+                    setCompanyName(event.target.value)
+                  }
+                  disabled={isSubmitting}
+                  className={inputClassName}
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="business-email"
+                  className="block text-sm font-medium text-slate-700"
+                >
+                  Work email
+                </label>
+
+                <input
+                  id="business-email"
+                  type="email"
+                  value={businessEmail}
+                  readOnly
+                  className={`${inputClassName} bg-slate-50`}
+                />
+              </div>
+
+              {errorMessage && (
+                <p
+                  role="alert"
+                  className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800"
+                >
+                  {errorMessage}
+                </p>
+              )}
 
               <button
-                type="button"
-                onClick={
-                  handleContinueToAgentHome
-                }
-                className="mt-8 w-full bg-slate-900 text-white rounded-2xl py-4 font-semibold hover:bg-slate-800"
+                type="submit"
+                className="w-full bg-slate-900 text-white rounded-2xl py-4 font-semibold"
               >
-                Continue to agent dashboard
+                Continue to branch details
               </button>
-            </>
+            </form>
           ) : (
-            <>
-              <p className="mt-6 text-sm font-semibold uppercase tracking-wide text-slate-500">
-                Step {step} of 2
-              </p>
+            <form
+              onSubmit={handleBranchStep}
+              className="mt-8 space-y-6"
+              noValidate
+            >
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700">
+                <p className="font-semibold text-slate-900">
+                  Company
+                </p>
+                <p className="mt-1">{companyName}</p>
+              </div>
 
-              <h1 className={`mt-4 ${AUTH_TITLE_CLASS}`}>
-                {step === 1
-                  ? "Company information"
-                  : "First branch details"}
-              </h1>
+              <div>
+                <label
+                  htmlFor="branch-name"
+                  className="block text-sm font-medium text-slate-700"
+                >
+                  Branch name
+                </label>
 
-              <p className="mt-2 text-slate-600">
-                {step === 1
-                  ? "Enter your agency company name. Signup is not complete until you also register your first branch in the next step."
-                  : "Register the branch homeowners will assign to their properties. All fields are required."}
-              </p>
-
-              {step === 1 ? (
-                <CollectionPointNotice
-                  className="mt-4"
-                  context="estate-agent"
+                <input
+                  id="branch-name"
+                  name="branchName"
+                  type="text"
+                  value={branchName}
+                  onChange={(event) =>
+                    setBranchName(event.target.value)
+                  }
+                  disabled={isSubmitting}
+                  className={inputClassName}
+                  placeholder="e.g. High Street"
                 />
-              ) : null}
+              </div>
 
-              {step === 1 ? (
-                <form
-                  onSubmit={handleCompanyStep}
-                  className="mt-8 space-y-6"
-                  noValidate
+              <div>
+                <label
+                  htmlFor="town-or-city"
+                  className="block text-sm font-medium text-slate-700"
                 >
-                  <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-950">
-                    <p className="font-semibold">
-                      Two steps required
-                    </p>
-                    <p className="mt-1">
-                      After this step you must enter
-                      your branch name, town or city,
-                      and postcode. You cannot access
-                      the agent dashboard until both
-                      steps are finished.
-                    </p>
-                  </div>
+                  Town / city
+                </label>
 
-                  <div>
-                    <label
-                      htmlFor="company-name"
-                      className="block text-sm font-medium text-slate-700"
-                    >
-                      Company name
-                    </label>
+                <input
+                  id="town-or-city"
+                  name="townOrCity"
+                  type="text"
+                  value={townOrCity}
+                  onChange={(event) =>
+                    setTownOrCity(event.target.value)
+                  }
+                  disabled={isSubmitting}
+                  className={inputClassName}
+                  placeholder="e.g. Winchester"
+                />
+              </div>
 
-                    <input
-                      id="company-name"
-                      name="companyName"
-                      type="text"
-                      value={companyName}
-                      onChange={(event) =>
-                        setCompanyName(
-                          event.target.value
-                        )
-                      }
-                      disabled={isSubmitting}
-                      className={inputClassName}
-                    />
-                  </div>
-
-                  <div>
-                    <label
-                      htmlFor="business-email"
-                      className="block text-sm font-medium text-slate-700"
-                    >
-                      Work email
-                    </label>
-
-                    <input
-                      id="business-email"
-                      type="email"
-                      value={businessEmail}
-                      readOnly
-                      className={`${inputClassName} bg-slate-50`}
-                    />
-                  </div>
-
-                  {errorMessage && (
-                    <p
-                      role="alert"
-                      className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800"
-                    >
-                      {errorMessage}
-                    </p>
-                  )}
-
-                  <button
-                    type="submit"
-                    className="w-full bg-slate-900 text-white rounded-2xl py-4 font-semibold"
-                  >
-                    Continue to branch details
-                  </button>
-                </form>
-              ) : (
-                <form
-                  onSubmit={handleBranchStep}
-                  className="mt-8 space-y-6"
-                  noValidate
+              <div>
+                <label
+                  htmlFor="branch-postcode"
+                  className="block text-sm font-medium text-slate-700"
                 >
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700">
-                    <p className="font-semibold text-slate-900">
-                      Company
-                    </p>
-                    <p className="mt-1">
-                      {companyName}
-                    </p>
-                  </div>
+                  Postcode
+                </label>
 
-                  <div>
-                    <label
-                      htmlFor="branch-name"
-                      className="block text-sm font-medium text-slate-700"
-                    >
-                      Branch name
-                    </label>
+                <input
+                  id="branch-postcode"
+                  name="postcode"
+                  type="text"
+                  value={postcode}
+                  onChange={(event) =>
+                    setPostcode(event.target.value)
+                  }
+                  disabled={isSubmitting}
+                  className={inputClassName}
+                  placeholder="e.g. SO23 9GH"
+                />
+              </div>
 
-                    <input
-                      id="branch-name"
-                      name="branchName"
-                      type="text"
-                      value={branchName}
-                      onChange={(event) =>
-                        setBranchName(
-                          event.target.value
-                        )
-                      }
-                      disabled={isSubmitting}
-                      className={inputClassName}
-                      placeholder="e.g. High Street"
-                    />
-                  </div>
+              <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+                <input
+                  type="checkbox"
+                  checked={isHeadOffice}
+                  onChange={(event) =>
+                    setIsHeadOffice(event.target.checked)
+                  }
+                  disabled={isSubmitting}
+                  className="mt-1"
+                />
 
-                  <div>
-                    <label
-                      htmlFor="town-or-city"
-                      className="block text-sm font-medium text-slate-700"
-                    >
-                      Town / city
-                    </label>
+                <span className="text-sm text-slate-700">
+                  This branch is the head office
+                </span>
+              </label>
 
-                    <input
-                      id="town-or-city"
-                      name="townOrCity"
-                      type="text"
-                      value={townOrCity}
-                      onChange={(event) =>
-                        setTownOrCity(
-                          event.target.value
-                        )
-                      }
-                      disabled={isSubmitting}
-                      className={inputClassName}
-                      placeholder="e.g. Winchester"
-                    />
-                  </div>
-
-                  <div>
-                    <label
-                      htmlFor="branch-postcode"
-                      className="block text-sm font-medium text-slate-700"
-                    >
-                      Postcode
-                    </label>
-
-                    <input
-                      id="branch-postcode"
-                      name="postcode"
-                      type="text"
-                      value={postcode}
-                      onChange={(event) =>
-                        setPostcode(
-                          event.target.value
-                        )
-                      }
-                      disabled={isSubmitting}
-                      className={inputClassName}
-                      placeholder="e.g. SO23 9GH"
-                    />
-                  </div>
-
-                  <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                    <input
-                      type="checkbox"
-                      checked={isHeadOffice}
-                      onChange={(event) =>
-                        setIsHeadOffice(
-                          event.target.checked
-                        )
-                      }
-                      disabled={isSubmitting}
-                      className="mt-1"
-                    />
-
-                    <span className="text-sm text-slate-700">
-                      This branch is the head office
-                    </span>
-                  </label>
-
-                  {errorMessage && (
-                    <p
-                      role="alert"
-                      className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800"
-                    >
-                      {errorMessage}
-                    </p>
-                  )}
-
-                  <div className="flex flex-col gap-3 sm:flex-row">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setErrorMessage("");
-                        setStep(1);
-                      }}
-                      disabled={isSubmitting}
-                      className="w-full border border-slate-300 text-slate-900 rounded-2xl py-4 font-semibold disabled:bg-slate-100"
-                    >
-                      Back
-                    </button>
-
-                    <button
-                      type="submit"
-                      disabled={isSubmitting}
-                      className="w-full bg-slate-900 text-white rounded-2xl py-4 font-semibold disabled:bg-slate-400"
-                    >
-                      {isSubmitting
-                        ? "Registering branch..."
-                        : "Register branch and finish setup"}
-                    </button>
-                  </div>
-                </form>
+              {errorMessage && (
+                <p
+                  role="alert"
+                  className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800"
+                >
+                  {errorMessage}
+                </p>
               )}
-            </>
+
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setErrorMessage("");
+                    setStep(1);
+                  }}
+                  disabled={isSubmitting}
+                  className="w-full border border-slate-300 text-slate-900 rounded-2xl py-4 font-semibold disabled:bg-slate-100"
+                >
+                  Back
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="w-full bg-slate-900 text-white rounded-2xl py-4 font-semibold disabled:bg-slate-400"
+                >
+                  {isSubmitting
+                    ? "Registering branch..."
+                    : "Register branch and continue"}
+                </button>
+              </div>
+            </form>
           )}
         </div>
       </section>

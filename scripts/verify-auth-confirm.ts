@@ -52,6 +52,13 @@ assert(
 
 assert(
   resolveAuthConfirmDestination(
+    "/estate-agents/onboarding/billing"
+  ) === "/estate-agents/onboarding/billing",
+  "allows /estate-agents/onboarding/billing"
+);
+
+assert(
+  resolveAuthConfirmDestination(
     "https://evil.example/phish"
   ) === "/reset-password",
   "rejects absolute URLs"
@@ -142,8 +149,8 @@ assert(
 );
 
 assert(
-  AUTH_CONFIRM_ALLOWED_DESTINATIONS.length === 4,
-  "allow-list has four destinations"
+  AUTH_CONFIRM_ALLOWED_DESTINATIONS.length === 5,
+  "allow-list has five destinations"
 );
 
 assert(

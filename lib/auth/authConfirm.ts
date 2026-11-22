@@ -15,6 +15,7 @@ export const AUTH_CONFIRM_ALLOWED_DESTINATIONS = [
   ROUTES.homeownerDashboard,
   ROUTES.agentHome,
   ROUTES.estateAgentOnboarding,
+  ROUTES.estateAgentOnboardingBilling,
 ] as const;
 
 const AUTH_CONFIRM_STRIPPED_PARAMS = [

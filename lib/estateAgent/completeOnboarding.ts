@@ -21,6 +21,8 @@ export type EstateAgentOnboardingSummary = {
   branchName: string;
   townOrCity: string;
   postcode: string;
+  /** First branch id — used to start Stripe Checkout after onboarding. */
+  branchId: string;
 };
 
 export type CompleteEstateAgentOnboardingResult =
@@ -177,6 +179,7 @@ export async function completeEstateAgentOnboarding(
       branchName,
       townOrCity,
       postcode,
+      branchId: branch.id as string,
     },
   };
 }

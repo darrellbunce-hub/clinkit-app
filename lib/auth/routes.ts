@@ -23,6 +23,8 @@ export const ROUTES = {
   estateAgentMarketing: "/estate-agents",
   estateAgentPricing: "/estate-agents/pricing",
   estateAgentOnboarding: "/estate-agents/onboarding",
+  /** Post-onboarding trial Checkout for branch owners (Phase A). */
+  estateAgentOnboardingBilling: "/estate-agents/onboarding/billing",
   estateAgentJoin: "/estate-agents/join",
   agentHome: "/agent",
   agentOriginate: "/agent/originate",
@@ -198,13 +200,21 @@ export function isEstateAgentProtectedRoute(
   );
 }
 
+/**
+ * Company/branch setup only. The billing sub-route is for onboarded owners and
+ * uses completed-EA protection instead.
+ */
 export function isEstateAgentOnboardingRoute(
   pathname: string
 ): boolean {
-  return matchesPrefix(
-    pathname,
-    ROUTES.estateAgentOnboarding
-  );
+  const normalizedPath = normalizePathname(pathname);
+  if (
+    normalizedPath === ROUTES.estateAgentOnboardingBilling ||
+    normalizedPath.startsWith(`${ROUTES.estateAgentOnboardingBilling}/`)
+  ) {
+    return false;
+  }
+  return matchesPrefix(pathname, ROUTES.estateAgentOnboarding);
 }
 
 export function isAgentHomeRoute(

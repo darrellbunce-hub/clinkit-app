@@ -1,14 +1,31 @@
 import { NextResponse } from "next/server";
 
 import { requireEaBranchBillingOwner } from "@/lib/billing/eaBillingAuth";
-import { createEaBranchCheckoutSession } from "@/lib/billing/eaCheckout";
+import {
+  createEaBranchCheckoutSession,
+  type EaCheckoutReturnFlow,
+} from "@/lib/billing/eaCheckout";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
 type Body = {
   branchId?: string;
+  /** Allowlisted return destination only: "account" | "onboarding". */
+  returnFlow?: string;
 };
+
+function parseReturnFlow(
+  value: unknown
+): EaCheckoutReturnFlow | null {
+  if (value === undefined || value === null || value === "") {
+    return "account";
+  }
+  if (value === "account" || value === "onboarding") {
+    return value;
+  }
+  return null;
+}
 
 export async function POST(request: Request) {
   try {
@@ -17,6 +34,14 @@ export async function POST(request: Request) {
     if (!branchId) {
       return NextResponse.json(
         { ok: false, error: "branch_required" },
+        { status: 400 }
+      );
+    }
+
+    const returnFlow = parseReturnFlow(body.returnFlow);
+    if (!returnFlow) {
+      return NextResponse.json(
+        { ok: false, error: "invalid_return_flow" },
         { status: 400 }
       );
     }
@@ -39,6 +64,10 @@ export async function POST(request: Request) {
       "checkoutAttemptId",
       "trialPeriodDays",
       "trial_period_days",
+      "successUrl",
+      "cancelUrl",
+      "success_url",
+      "cancel_url",
     ];
     for (const key of forbidden) {
       if (key in (body as Record<string, unknown>)) {
@@ -71,6 +100,7 @@ export async function POST(request: Request) {
 
     const result = await createEaBranchCheckoutSession({
       context: authz.context,
+      returnFlow,
     });
 
     if (!result.ok) {

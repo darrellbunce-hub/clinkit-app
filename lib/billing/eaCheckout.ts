@@ -371,10 +371,17 @@ async function claimCheckoutAttemptMarker(input: {
   return { attemptId, expiresAtUnix };
 }
 
+/** Allowlisted Checkout return destinations — never accept free-form URLs. */
+export type EaCheckoutReturnFlow = "account" | "onboarding";
+
 export async function createEaBranchCheckoutSession(input: {
   context: AuthorisedBranchContext;
+  /** Where Stripe should return the browser after Checkout. Default: account. */
+  returnFlow?: EaCheckoutReturnFlow;
 }): Promise<CheckoutCreateResult> {
   const { context } = input;
+  const returnFlow: EaCheckoutReturnFlow =
+    input.returnFlow === "onboarding" ? "onboarding" : "account";
   const admin = createServiceRoleSupabaseClient();
   const config = getStripeServerConfig();
   const stripe = getStripeClient();
@@ -824,8 +831,14 @@ export async function createEaBranchCheckoutSession(input: {
     attemptId: attemptMarker.attemptId,
   });
 
-  const successUrl = `${config.appUrl}/account?billing=success&branch=${context.branchId}#subscription`;
-  const cancelUrl = `${config.appUrl}/account?billing=cancelled&branch=${context.branchId}#subscription`;
+  const successUrl =
+    returnFlow === "onboarding"
+      ? `${config.appUrl}/estate-agents/onboarding/billing?billing=success&branch=${context.branchId}`
+      : `${config.appUrl}/account?billing=success&branch=${context.branchId}#subscription`;
+  const cancelUrl =
+    returnFlow === "onboarding"
+      ? `${config.appUrl}/estate-agents/onboarding/billing?billing=cancelled&branch=${context.branchId}`
+      : `${config.appUrl}/account?billing=cancelled&branch=${context.branchId}#subscription`;
 
   const sessionCreateParams: Parameters<
     typeof stripe.checkout.sessions.create

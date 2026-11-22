@@ -102,6 +102,26 @@ function main() {
       checkout.includes('missing_payment_method: "cancel"')
   );
 
+  const onboardingBilling = read(
+    "app/estate-agents/onboarding/billing/page.tsx"
+  );
+  const checkoutRoute = read(
+    "app/api/billing/ea/checkout-session/route.ts"
+  );
+  record(
+    "Phase A: onboarding billing step reuses Checkout with allowlisted returnFlow",
+    existsSync(
+      join(ROOT, "app/estate-agents/onboarding/billing/page.tsx")
+    ) &&
+      onboardingBilling.includes('returnFlow: "onboarding"') &&
+      onboardingBilling.includes("Start my free trial") &&
+      checkout.includes('returnFlow === "onboarding"') &&
+      checkoutRoute.includes("invalid_return_flow") &&
+      !read("lib/billing/eaBranchEntitlement.ts").includes(
+        "EA_BILLING_ENTITLEMENT_ENFORCEMENT_ENABLED = true"
+      )
+  );
+
   const keys = loadEnvLocalKeys().filter((k) => /stripe/i.test(k));
   const allowed = new Set([
     "STRIPE_SECRET_KEY",
