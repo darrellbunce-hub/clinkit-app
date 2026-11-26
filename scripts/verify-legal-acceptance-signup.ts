@@ -155,9 +155,14 @@ assertIncludes(
   "isCreateAccountMode ? ("
 );
 assertIncludes(
-  "Homeowner signup activates create-account mode",
+  "Homeowner signup opens create-account mode from URL",
   homeownerSignup,
-  "setIsCreateAccountMode(true)"
+  "isHomeownerCreateAccountMode"
+);
+assertIncludes(
+  "Homeowner create-account deep link is supported",
+  homeownerSignup,
+  'setAuthMode("create")'
 );
 assertExcludes(
   "Homeowner login view does not always show legal acceptance",
@@ -280,11 +285,29 @@ assertExcludes(
 
 // Pending acceptance flush for email verification path
 const verifyEmail = readProjectFile("app/verify-email/page.tsx");
+const pendingLegal = readProjectFile(
+  "lib/legal/pendingLegalAcceptance.ts"
+);
 
 assertIncludes(
   "Verify email flushes pending acceptance",
   verifyEmail,
-  "flushPendingSignupLegalAcceptance"
+  "ensurePendingSignupLegalAcceptanceFlushed"
+);
+assertIncludes(
+  "Pending acceptance dual-writes sessionStorage",
+  pendingLegal,
+  "sessionStorage"
+);
+assertIncludes(
+  "Pending acceptance dual-writes localStorage for new-tab verify",
+  pendingLegal,
+  "localStorage"
+);
+assertIncludes(
+  "Pending acceptance has TTL",
+  pendingLegal,
+  "PENDING_SIGNUP_LEGAL_TTL_MS"
 );
 
 assert(

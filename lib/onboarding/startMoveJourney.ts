@@ -64,6 +64,12 @@ function hasAgreedSale(answers: StartMoveAnswers): boolean {
   return answers.selling === "yes" && answers.saleAgreed === "yes";
 }
 
+function isPreparingSaleNotYetAgreed(
+  answers: StartMoveAnswers
+): boolean {
+  return answers.selling === "yes" && answers.saleAgreed === "no";
+}
+
 /** Only answers on the path actually taken are read; stale ones are ignored. */
 export function resolveStartMovePlan(
   answers: StartMoveAnswers
@@ -72,9 +78,8 @@ export function resolveStartMovePlan(
 
   if (answers.selling === "yes") {
     if (answers.saleAgreed == null) return { kind: "incomplete" };
-    if (answers.saleAgreed === "no") {
-      return { kind: "stop", reason: "sale_not_agreed" };
-    }
+    // Sale not yet agreed is not a hard stop — continue to ask about buying
+    // so a purchase-only path remains available.
   }
 
   const sale = hasAgreedSale(answers);
@@ -82,16 +87,23 @@ export function resolveStartMovePlan(
   if (answers.buying == null) return { kind: "incomplete" };
 
   if (answers.buying === "no") {
-    return sale
-      ? {
-          kind: "move",
-          flags: {
-            notSelling: false,
-            notBuying: true,
-            searchingForProperty: false,
-          },
-        }
-      : { kind: "stop", reason: "nothing_to_add" };
+    if (sale) {
+      return {
+        kind: "move",
+        flags: {
+          notSelling: false,
+          notBuying: true,
+          searchingForProperty: false,
+        },
+      };
+    }
+
+    return {
+      kind: "stop",
+      reason: isPreparingSaleNotYetAgreed(answers)
+        ? "sale_not_agreed"
+        : "nothing_to_add",
+    };
   }
 
   if (answers.offerAccepted == null) return { kind: "incomplete" };
@@ -128,14 +140,15 @@ export function nextStartMoveStep(
     case "selling":
       return answers.selling === "yes" ? "saleAgreed" : "buying";
     case "saleAgreed":
-      return answers.saleAgreed === "yes"
-        ? "saleAddress"
-        : "stop_sale_not_agreed";
+      return answers.saleAgreed === "yes" ? "saleAddress" : "buying";
     case "saleAddress":
       return "buying";
     case "buying":
       if (answers.buying === "yes") return "offerAccepted";
-      return hasAgreedSale(answers) ? "review" : "stop_nothing_to_add";
+      if (hasAgreedSale(answers)) return "review";
+      return isPreparingSaleNotYetAgreed(answers)
+        ? "stop_sale_not_agreed"
+        : "stop_nothing_to_add";
     case "offerAccepted":
       if (answers.offerAccepted === "yes") return "purchaseAddress";
       return hasAgreedSale(answers) ? "review" : "stop_no_offer_accepted";

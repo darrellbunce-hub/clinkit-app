@@ -33,7 +33,7 @@ export function useEaMarketingNavLinks(): LightShellNavLink[] {
     },
     {
       href: ROUTES.estateAgentSignup,
-      label: "Sign Up",
+      label: "Create account",
       primary: true,
     },
   ];

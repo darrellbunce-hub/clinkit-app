@@ -33,6 +33,11 @@ import {
 } from "@/lib/billing/eaBranchPricing";
 import { validateNewPassword } from "@/lib/auth/passwordPolicy";
 import { ROUTES } from "@/lib/auth/routes";
+import {
+  buildSignupConfirmUrl,
+  buildVerifyEmailPathWithNext,
+} from "@/lib/auth/signupConfirm";
+import { resolveLoginNextDestination } from "@/lib/auth/redirects";
 import { validateBusinessEmail } from "@/lib/businessEmail";
 import {
   formatEaBranchInvitationError,
@@ -44,6 +49,7 @@ import { buildEstateAgentSignupAuthMetadata } from "@/lib/estateAgent/signupAuth
 import {
   LEGAL_DOCUMENT_VERSIONS,
   SIGNUP_LEGAL_ACCEPTANCE_ERROR,
+  SIGNUP_LEGAL_ACCEPTANCE_PERSIST_FAILED_MESSAGE,
 } from "@/lib/legal/constants";
 import {
   buildEstateAgentSignupLegalAcceptance,
@@ -197,6 +203,13 @@ function EstateAgentSignupContent() {
         acceptedAt
       );
 
+    const postAuthDestination = resolveLoginNextDestination(
+      inviteToken
+        ? `${ROUTES.estateAgentJoin}?token=${encodeURIComponent(inviteToken)}`
+        : ROUTES.estateAgentOnboarding,
+      ROUTES.estateAgentOnboarding
+    );
+
     try {
       const { data, error } = await supabase.auth.signUp({
         email: emailValidation.email,
@@ -204,6 +217,10 @@ function EstateAgentSignupContent() {
         options: {
           data: buildEstateAgentSignupAuthMetadata(
             trimmedContactName
+          ),
+          emailRedirectTo: buildSignupConfirmUrl(
+            window.location.origin,
+            postAuthDestination
           ),
         },
       });
@@ -229,8 +246,10 @@ function EstateAgentSignupContent() {
         );
 
       if (!legalRecord.ok) {
+        // Auth user exists; pending acceptance is queued for login retry.
+        // Do not create a profile or continue onboarding until durable.
         setErrorMessage(
-          "Your account was created but we could not record legal acceptance. Try signing in again."
+          SIGNUP_LEGAL_ACCEPTANCE_PERSIST_FAILED_MESSAGE
         );
 
         return;
@@ -244,9 +263,8 @@ function EstateAgentSignupContent() {
           email: emailValidation.email,
         });
 
-        window.location.href = inviteToken
-          ? `${ROUTES.estateAgentJoin}?token=${encodeURIComponent(inviteToken)}`
-          : "/verify-email";
+        window.location.href =
+          buildVerifyEmailPathWithNext(postAuthDestination);
 
         return;
       }
@@ -266,9 +284,7 @@ function EstateAgentSignupContent() {
         return;
       }
 
-      window.location.href = inviteToken
-        ? `${ROUTES.estateAgentJoin}?token=${encodeURIComponent(inviteToken)}`
-        : ROUTES.estateAgentOnboarding;
+      window.location.href = postAuthDestination;
     } catch (error) {
       setErrorMessage(
         error instanceof Error

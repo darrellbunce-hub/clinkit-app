@@ -1,10 +1,16 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import {
+  Suspense,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import EaMarketingShell from "@/components/estate-agents/EaMarketingShell";
+import SignupLegalAcceptanceRecoveryPanel from "@/components/legal/SignupLegalAcceptanceRecoveryPanel";
 import { AUTH_TITLE_CLASS } from "@/components/mobileStandards";
 import { ROUTES } from "@/lib/auth/routes";
 import { isEstateAgent } from "@/lib/accountType";
@@ -17,7 +23,7 @@ import {
 import { formatEaBranchMemberRoleLabel } from "@/lib/estateAgent/branchTeamPresentation";
 import { bootstrapAuthenticatedEstateAgentProfile } from "@/lib/estateAgent/flushPendingEstateAgentProfile";
 import { fetchAuthenticatedProfileAccountFields } from "@/lib/currentUserContext";
-import { flushPendingSignupLegalAcceptance } from "@/lib/legal/recordSignupLegalAcceptance";
+import { ensurePendingSignupLegalAcceptanceFlushed } from "@/lib/legal/recordSignupLegalAcceptance";
 import { supabase } from "@/lib/supabase";
 
 function JoinBranchContent() {
@@ -39,14 +45,21 @@ function JoinBranchContent() {
   const [isEstateAgentAccount, setIsEstateAgentAccount] =
     useState(false);
 
-  const [hasAttemptedAutoAccept, setHasAttemptedAutoAccept] =
+  const hasAttemptedAutoAcceptRef = useRef(false);
+  const [legalAcceptanceBlocked, setLegalAcceptanceBlocked] =
     useState(false);
+  const [legalBlockMode, setLegalBlockMode] = useState<
+    "expired" | "persist_failed" | null
+  >(null);
 
   useEffect(() => {
     async function loadJoinState() {
       setIsLoading(true);
       setPreviewError(null);
       setActionError(null);
+      setLegalAcceptanceBlocked(false);
+      setLegalBlockMode(null);
+      hasAttemptedAutoAcceptRef.current = false;
 
       if (!token) {
         setPreviewError("invitation_not_found");
@@ -81,7 +94,25 @@ function JoinBranchContent() {
           );
 
         if (profileBootstrap.ok) {
-          await flushPendingSignupLegalAcceptance(supabase);
+          const legalFlush =
+            await ensurePendingSignupLegalAcceptanceFlushed(
+              supabase
+            );
+
+          if (!legalFlush.ok) {
+            setLegalAcceptanceBlocked(true);
+            setLegalBlockMode(
+              legalFlush.disposition === "expired"
+                ? "expired"
+                : "persist_failed"
+            );
+            setActionError(
+              legalFlush.message ??
+                "We could not save your Terms of Service and Privacy Policy acceptance. Please try again."
+            );
+            setIsLoading(false);
+            return;
+          }
         }
 
         const profile =
@@ -107,25 +138,28 @@ function JoinBranchContent() {
       !preview ||
       !currentUserId ||
       !isEstateAgentAccount ||
+      legalAcceptanceBlocked ||
       isAccepting ||
-      hasAttemptedAutoAccept
+      hasAttemptedAutoAcceptRef.current
     ) {
       return;
     }
 
-    setHasAttemptedAutoAccept(true);
+    hasAttemptedAutoAcceptRef.current = true;
     void handleAcceptInvitation();
+    // Auto-accept once join prerequisites are ready; invitation handler is stable for this token.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional one-shot accept
   }, [
     token,
     preview,
     currentUserId,
     isEstateAgentAccount,
+    legalAcceptanceBlocked,
     isAccepting,
-    hasAttemptedAutoAccept,
   ]);
 
   async function handleAcceptInvitation() {
-    if (!token) {
+    if (!token || legalAcceptanceBlocked) {
       return;
     }
 
@@ -257,7 +291,17 @@ function JoinBranchContent() {
             </p>
           ) : null}
 
-          {currentUserId ? (
+          {legalAcceptanceBlocked && legalBlockMode ? (
+            <div className="mt-6">
+              <SignupLegalAcceptanceRecoveryPanel
+                mode={legalBlockMode}
+                message={actionError}
+                onCleared={() => {
+                  window.location.reload();
+                }}
+              />
+            </div>
+          ) : currentUserId ? (
             isEstateAgentAccount ? (
               <button
                 type="button"

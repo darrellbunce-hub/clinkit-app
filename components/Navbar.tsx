@@ -140,14 +140,14 @@ export default function Navbar() {
     </Link>
 
     <Link
-      href="/login"
+      href={ROUTES.homeownerLogin}
       className={`${NAV_LINK_DARK_CLASS} px-4 py-2`}
     >
       Log in
     </Link>
 
     <Link
-      href="/login"
+      href={ROUTES.homeownerCreateAccount}
       className={`${BTN_ACCENT_SM_CLASS} px-5 py-3`}
     >
       Create account
@@ -273,7 +273,7 @@ window.location.href = "/";
     </Link>
 
     <Link
-      href="/login"
+      href={ROUTES.homeownerLogin}
       className={`${NAV_LINK_DARK_CLASS} py-3 min-h-11 inline-flex items-center`}
       onClick={() =>
         setMobileMenuOpen(false)
@@ -283,7 +283,7 @@ window.location.href = "/";
     </Link>
 
     <Link
-      href="/login"
+      href={ROUTES.homeownerCreateAccount}
       className={`${BTN_ACCENT_SM_CLASS} px-5 py-5 text-center`}
       onClick={() =>
         setMobileMenuOpen(false)

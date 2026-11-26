@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import Logo from "@/components/Logo";
 import { LegalMarkdown } from "@/components/legal/LegalMarkdown";
 import { ROUTES } from "@/lib/auth/routes";
 import {
@@ -22,6 +23,16 @@ export function LegalDocumentPage({ markdown }: LegalDocumentPageProps) {
   return (
     <main className={PAGE_BG_CLASS}>
       <div className="mx-auto max-w-4xl px-6 py-12 md:py-16">
+        <header className="mb-10 flex flex-wrap items-center justify-between gap-4">
+          <Logo variant="light" href={ROUTES.home} />
+          <Link
+            href={ROUTES.home}
+            className="text-sm font-medium text-slate-600 underline underline-offset-2 hover:text-slate-900"
+          >
+            Back to MoveLoop
+          </Link>
+        </header>
+
         <nav aria-label="Legal documents" className="mb-10">
           <ul className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
             {LEGAL_NAV_ITEMS.map((item) => (

@@ -1,14 +1,21 @@
 import type { EmailOtpType } from "@supabase/supabase-js";
 
+import { resolveLoginNextDestination } from "@/lib/auth/redirects";
 import { ROUTES, normalizePathname } from "@/lib/auth/routes";
+import { buildPostSignupVerifiedPath } from "@/lib/auth/signupConfirm";
 
-/** OTP types accepted by /auth/confirm during Phase 1 (password recovery). */
+/** OTP types accepted by /auth/confirm for password recovery. */
 export const AUTH_CONFIRM_RECOVERY_TYPE =
   "recovery" satisfies EmailOtpType;
 
+/** OTP types accepted by /auth/confirm for signup email confirmation. */
+export const AUTH_CONFIRM_SIGNUP_TYPE =
+  "signup" satisfies EmailOtpType;
+
 /**
  * Internal destinations permitted for the `next` query parameter on
- * /auth/confirm. Reject everything else to prevent open redirects.
+ * /auth/confirm during password recovery. Reject everything else to
+ * prevent open redirects.
  */
 export const AUTH_CONFIRM_ALLOWED_DESTINATIONS = [
   ROUTES.resetPassword,
@@ -36,6 +43,8 @@ export type AuthConfirmFailureCode =
   | "reused"
   | "no_session"
   | "provider_error";
+
+export type AuthConfirmFlow = "recovery" | "signup";
 
 export function isAllowedAuthConfirmDestination(
   pathname: string
@@ -69,7 +78,8 @@ export function isAllowedAuthConfirmDestination(
 }
 
 /**
- * Resolve a safe post-confirmation path. Falls back to /reset-password.
+ * Resolve a safe post-confirmation path for password recovery.
+ * Falls back to /reset-password.
  */
 export function resolveAuthConfirmDestination(
   nextPath: string | null | undefined
@@ -85,10 +95,42 @@ export function resolveAuthConfirmDestination(
   return ROUTES.resetPassword;
 }
 
+/**
+ * Resolve the client bridge path after signup confirmation.
+ * Revalidates `next` as a safe internal destination.
+ */
+export function resolveSignupConfirmDestination(
+  nextPath: string | null | undefined
+): string {
+  return buildPostSignupVerifiedPath(
+    resolveLoginNextDestination(
+      nextPath,
+      ROUTES.homeownerDashboard
+    )
+  );
+}
+
 export function isAuthConfirmRecoveryType(
   type: string | null | undefined
 ): type is typeof AUTH_CONFIRM_RECOVERY_TYPE {
   return type === AUTH_CONFIRM_RECOVERY_TYPE;
+}
+
+export function isAuthConfirmSignupType(
+  type: string | null | undefined
+): type is typeof AUTH_CONFIRM_SIGNUP_TYPE {
+  return type === AUTH_CONFIRM_SIGNUP_TYPE;
+}
+
+export function isSupportedAuthConfirmType(
+  type: string | null | undefined
+): type is
+  | typeof AUTH_CONFIRM_RECOVERY_TYPE
+  | typeof AUTH_CONFIRM_SIGNUP_TYPE {
+  return (
+    isAuthConfirmRecoveryType(type) ||
+    isAuthConfirmSignupType(type)
+  );
 }
 
 /**
@@ -179,7 +221,7 @@ export function resolveAuthConfirmFailureCode(params: {
     return "missing_token";
   }
 
-  if (!isAuthConfirmRecoveryType(params.type)) {
+  if (!isSupportedAuthConfirmType(params.type)) {
     return "unsupported_type";
   }
 
@@ -230,4 +272,25 @@ export function stripAuthConfirmQueryParams(
   for (const param of AUTH_CONFIRM_STRIPPED_PARAMS) {
     url.searchParams.delete(param);
   }
+}
+
+/**
+ * Decide whether a PKCE `code` exchange without an explicit OTP type should
+ * follow the recovery success path or the signup verified bridge.
+ */
+export function resolveAuthConfirmCodeFlow(
+  nextPath: string | null | undefined
+): AuthConfirmFlow {
+  const normalized = normalizePathname(
+    (nextPath ?? "").trim() || ROUTES.resetPassword
+  );
+
+  if (
+    normalized === ROUTES.resetPassword ||
+    !nextPath?.trim()
+  ) {
+    return "recovery";
+  }
+
+  return "signup";
 }

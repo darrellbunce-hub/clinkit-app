@@ -36,6 +36,7 @@ import {
   clearJoinAddressHandoff,
   setJoinAddressHandoff,
 } from "@/lib/onboarding/joinAddressHandoff";
+import { buildHomeownerLoginHref } from "@/lib/auth/routes";
 import {
   EMPTY_START_MOVE_ANSWERS,
   findMissingStartMoveAddress,
@@ -428,11 +429,15 @@ export default function StartMovePage() {
         const {
           data: { user },
         } = await supabase.auth.getUser();
-    
+
         if (!user) {
-    
+          // Session missing/expired — recover via login, then return here.
+          router.replace(
+            buildHomeownerLoginHref({
+              next: "/start-move",
+            })
+          );
           return;
-    
         }
 
         if (
@@ -789,17 +794,19 @@ export default function StartMovePage() {
         return (
           <StopMessage title="It's a little early for MoveLoop">
             <p>
-              MoveLoop helps you keep track of your property move once your
-              sale has been agreed. If you&apos;re still preparing to sell or
-              your property hasn&apos;t sold yet, there&apos;s nothing you
-              need to add just now.
+              MoveLoop helps once your sale is agreed, or once an offer has
+              been accepted on a property you are buying. You said you are
+              preparing to sell but are not buying yet, so there is nothing to
+              add just now.
             </p>
             <p>
-              Come back when your sale has been agreed, and we&apos;ll help
-              you get your move connected.
+              Come back when your sale has been agreed, or when you have an
+              accepted offer on a purchase, and we&apos;ll help you get your
+              move connected.
             </p>
             <p className="font-semibold text-slate-900">
-              Your move starts here when your sale is agreed.
+              Your move starts here when your sale is agreed or your purchase
+              offer is accepted.
             </p>
           </StopMessage>
         );

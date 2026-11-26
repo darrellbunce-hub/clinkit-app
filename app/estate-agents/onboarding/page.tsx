@@ -7,6 +7,7 @@ import {
 } from "react";
 
 import EaMarketingShell from "@/components/estate-agents/EaMarketingShell";
+import SignupLegalAcceptanceRecoveryPanel from "@/components/legal/SignupLegalAcceptanceRecoveryPanel";
 import CollectionPointNotice from "@/components/legal/CollectionPointNotice";
 import { AUTH_TITLE_CLASS } from "@/components/mobileStandards";
 import { ROUTES } from "@/lib/auth/routes";
@@ -14,6 +15,10 @@ import { completeEstateAgentOnboarding } from "@/lib/estateAgent/completeOnboard
 import {
   fetchAuthenticatedProfileAccountFields,
 } from "@/lib/currentUserContext";
+import {
+  ensurePendingSignupLegalAcceptanceFlushed,
+  type EnsurePendingSignupLegalAcceptanceResult,
+} from "@/lib/legal/recordSignupLegalAcceptance";
 import { supabase } from "@/lib/supabase";
 
 const inputClassName =
@@ -50,6 +55,10 @@ export default function EstateAgentOnboardingPage() {
     useState(true);
   const [isSubmitting, setIsSubmitting] =
     useState(false);
+  const [legalBlock, setLegalBlock] =
+    useState<EnsurePendingSignupLegalAcceptanceResult | null>(
+      null
+    );
 
   useEffect(() => {
     async function loadOnboardingContext() {
@@ -63,6 +72,23 @@ export default function EstateAgentOnboardingPage() {
 
         return;
       }
+
+      const legalFlush =
+        await ensurePendingSignupLegalAcceptanceFlushed(
+          supabase
+        );
+
+      if (!legalFlush.ok) {
+        setLegalBlock(legalFlush);
+        setErrorMessage(
+          legalFlush.message ??
+            "We could not save your Terms of Service and Privacy Policy acceptance. Please try again."
+        );
+        setIsLoading(false);
+        return;
+      }
+
+      setLegalBlock(null);
 
       const profile =
         await fetchAuthenticatedProfileAccountFields(
@@ -141,6 +167,23 @@ export default function EstateAgentOnboardingPage() {
     setIsSubmitting(true);
 
     try {
+      const legalFlush =
+        await ensurePendingSignupLegalAcceptanceFlushed(
+          supabase
+        );
+
+      if (!legalFlush.ok) {
+        setLegalBlock(legalFlush);
+        setErrorMessage(
+          legalFlush.message ??
+            "We could not save your Terms of Service and Privacy Policy acceptance. Please try again."
+        );
+
+        return;
+      }
+
+      setLegalBlock(null);
+
       const result =
         await completeEstateAgentOnboarding(
           supabase,
@@ -183,6 +226,28 @@ export default function EstateAgentOnboardingPage() {
         <section className="max-w-xl mx-auto px-6 py-16">
           <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-8 text-center text-slate-600">
             Loading onboarding...
+          </div>
+        </section>
+      </EaMarketingShell>
+    );
+  }
+
+  if (legalBlock) {
+    return (
+      <EaMarketingShell>
+        <section className="max-w-xl mx-auto px-6 py-16">
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-8">
+            <SignupLegalAcceptanceRecoveryPanel
+              mode={
+                legalBlock.disposition === "expired"
+                  ? "expired"
+                  : "persist_failed"
+              }
+              message={legalBlock.message}
+              onCleared={() => {
+                window.location.reload();
+              }}
+            />
           </div>
         </section>
       </EaMarketingShell>

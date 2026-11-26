@@ -54,6 +54,15 @@ for (const [label, path] of surfaces) {
   assertUsesSharedPasswordGuidance(label, path);
 }
 
+const homeownerLoginSource = read("app/login/page.tsx");
+
+assert(
+  homeownerLoginSource.includes(
+    "showRequirements={isCreateAccountMode}"
+  ),
+  "Homeowner login must show password requirements only in create-account mode"
+);
+
 const checklistSource = read(
   "components/auth/PasswordRequirementsChecklist.tsx"
 );

@@ -1,12 +1,16 @@
 "use client";
 
 import {
+  Suspense,
   useRef,
   useState,
   type FormEvent,
 } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import {
+  useRouter,
+  useSearchParams,
+} from "next/navigation";
 
 import AuthEmailField from "@/components/auth/AuthEmailField";
 import AuthErrorAlert from "@/components/auth/AuthErrorAlert";
@@ -15,7 +19,6 @@ import AuthPasswordFieldWithRequirements from "@/components/auth/AuthPasswordFie
 import {
   AUTH_BUTTON_STACK_CLASS,
   AUTH_FORM_CLASS,
-  AUTH_FOOTER_LINK_CLASS,
   AUTH_INLINE_LINK_CLASS,
   AUTH_PRIMARY_BUTTON_CLASS,
   AUTH_SECONDARY_BUTTON_CLASS,
@@ -24,6 +27,7 @@ import {
 } from "@/components/auth/authStyles";
 import CollectionPointNotice from "@/components/legal/CollectionPointNotice";
 import LegalAcceptanceFields from "@/components/legal/LegalAcceptanceFields";
+import SignupLegalAcceptanceRecoveryPanel from "@/components/legal/SignupLegalAcceptanceRecoveryPanel";
 import { getAccountType, isEstateAgent } from "@/lib/accountType";
 import {
   mapAuthSignInError,
@@ -34,16 +38,25 @@ import {
   resolveLoginNextDestination,
   resolvePostLoginRedirect,
 } from "@/lib/auth/redirects";
-import { ROUTES } from "@/lib/auth/routes";
+import {
+  buildHomeownerLoginHref,
+  isHomeownerCreateAccountMode,
+  ROUTES,
+} from "@/lib/auth/routes";
+import {
+  buildSignupConfirmUrl,
+  buildVerifyEmailPathWithNext,
+} from "@/lib/auth/signupConfirm";
 import { fetchAuthenticatedProfileAccountFields } from "@/lib/currentUserContext";
 import { bootstrapAuthenticatedEstateAgentProfile } from "@/lib/estateAgent/flushPendingEstateAgentProfile";
 import {
   LEGAL_DOCUMENT_VERSIONS,
   SIGNUP_LEGAL_ACCEPTANCE_ERROR,
+  SIGNUP_LEGAL_ACCEPTANCE_PERSIST_FAILED_MESSAGE,
 } from "@/lib/legal/constants";
 import {
   buildHomeownerSignupLegalAcceptance,
-  flushPendingSignupLegalAcceptance,
+  ensurePendingSignupLegalAcceptanceFlushed,
   isSignupLegalAcceptanceComplete,
   persistSignupLegalAcceptanceAfterAuth,
 } from "@/lib/legal/recordSignupLegalAcceptance";
@@ -60,19 +73,92 @@ function readCredentials(form: HTMLFormElement) {
   };
 }
 
+function AuthLoadingCard({ message }: { message: string }) {
+  return (
+    <AuthPageShell>
+      <p className="text-center text-slate-600">{message}</p>
+    </AuthPageShell>
+  );
+}
+
 export default function LoginPage() {
+  return (
+    <Suspense fallback={<AuthLoadingCard message="Loading…" />}>
+      <LoginPageContent />
+    </Suspense>
+  );
+}
+
+function LoginPageContent() {
   const formRef = useRef<HTMLFormElement>(null);
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const isCreateAccountMode = isHomeownerCreateAccountMode(
+    searchParams.get("mode")
+  );
+  const nextParam = searchParams.get("next");
 
   const [errorMessage, setErrorMessage] = useState("");
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [isSigningUp, setIsSigningUp] = useState(false);
   const [passwordValue, setPasswordValue] = useState("");
-  const [isCreateAccountMode, setIsCreateAccountMode] =
-    useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [privacyAccepted, setPrivacyAccepted] =
     useState(false);
+  const [showExpiredLegalRecovery, setShowExpiredLegalRecovery] =
+    useState(false);
+
+  async function redirectAfterHomeownerAuth(
+    userId: string | undefined
+  ) {
+    let destination: string;
+
+    if (nextParam) {
+      destination = resolveLoginNextDestination(
+        nextParam,
+        ROUTES.homeownerDashboard
+      );
+    } else {
+      destination = ROUTES.homeownerDashboard;
+
+      if (userId) {
+        const profile =
+          await fetchAuthenticatedProfileAccountFields(
+            supabase,
+            userId
+          );
+
+        if (isEstateAgent(profile)) {
+          destination = resolvePostLoginRedirect(
+            profile ?? {
+              account_type: "estate_agent",
+              onboarding_completed_at: null,
+            }
+          );
+        } else {
+          destination =
+            await resolveHomeownerPostAuthDestination(
+              supabase,
+              getAccountType(profile)
+            );
+        }
+      }
+    }
+
+    window.location.href = destination;
+  }
+
+  function setAuthMode(mode: "login" | "create") {
+    setErrorMessage("");
+    router.replace(
+      buildHomeownerLoginHref({
+        mode,
+        next: nextParam,
+      }),
+      { scroll: false }
+    );
+  }
 
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -125,49 +211,25 @@ export default function LoginPage() {
         return;
       }
 
-      await flushPendingSignupLegalAcceptance(supabase);
-
-      const nextParam = new URLSearchParams(
-        window.location.search
-      ).get("next");
-
-      let destination: string;
-
-      if (nextParam) {
-        destination = resolveLoginNextDestination(
-          nextParam,
-          ROUTES.homeownerDashboard
+      const legalFlush =
+        await ensurePendingSignupLegalAcceptanceFlushed(
+          supabase
         );
-      } else {
-        const userId = result.data.user?.id;
 
-        destination = ROUTES.homeownerDashboard;
+      if (!legalFlush.ok) {
+        setShowExpiredLegalRecovery(
+          legalFlush.disposition === "expired"
+        );
+        setErrorMessage(
+          legalFlush.message ??
+            "We could not save your Terms of Service and Privacy Policy acceptance. Please try again."
+        );
 
-        if (userId) {
-          const profile =
-            await fetchAuthenticatedProfileAccountFields(
-              supabase,
-              userId
-            );
-
-          if (isEstateAgent(profile)) {
-            destination = resolvePostLoginRedirect(
-              profile ?? {
-                account_type: "estate_agent",
-                onboarding_completed_at: null,
-              }
-            );
-          } else {
-            destination =
-              await resolveHomeownerPostAuthDestination(
-                supabase,
-                getAccountType(profile)
-              );
-          }
-        }
+        return;
       }
 
-      window.location.href = destination;
+      setShowExpiredLegalRecovery(false);
+      await redirectAfterHomeownerAuth(result.data.user?.id);
     } catch (error) {
       setErrorMessage(
         error instanceof Error
@@ -179,12 +241,13 @@ export default function LoginPage() {
     }
   }
 
-  async function handleSignup() {
+  async function handleSignup(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
     if (!formRef.current) {
       return;
     }
 
-    setIsCreateAccountMode(true);
     setErrorMessage("");
 
     const { email, password } = readCredentials(formRef.current);
@@ -226,10 +289,21 @@ export default function LoginPage() {
       acceptedAt
     );
 
+    const safeNext = resolveLoginNextDestination(
+      nextParam,
+      ROUTES.homeownerDashboard
+    );
+
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          emailRedirectTo: buildSignupConfirmUrl(
+            window.location.origin,
+            safeNext
+          ),
+        },
       });
 
       if (error) {
@@ -247,14 +321,14 @@ export default function LoginPage() {
 
         if (!legalRecord.ok) {
           setErrorMessage(
-            "Your account was created but we could not record legal acceptance. Try signing in again."
+            SIGNUP_LEGAL_ACCEPTANCE_PERSIST_FAILED_MESSAGE
           );
 
           return;
         }
 
         if (!data.session) {
-          router.push("/verify-email");
+          router.push(buildVerifyEmailPathWithNext(safeNext));
 
           return;
         }
@@ -269,6 +343,11 @@ export default function LoginPage() {
           return;
         }
 
+        if (nextParam) {
+          router.push(safeNext);
+          return;
+        }
+
         const destination =
           await resolveHomeownerPostAuthDestination(
             supabase,
@@ -279,7 +358,7 @@ export default function LoginPage() {
         return;
       }
 
-      router.push(ROUTES.homeownerDashboard);
+      router.push(safeNext);
     } catch (error) {
       setErrorMessage(
         error instanceof Error
@@ -295,15 +374,21 @@ export default function LoginPage() {
 
   return (
     <AuthPageShell>
-      <h1 className={AUTH_TITLE_CLASS}>Log in</h1>
+      <h1 className={AUTH_TITLE_CLASS}>
+        {isCreateAccountMode ? "Create account" : "Log in"}
+      </h1>
 
       <p className={AUTH_SUBTITLE_CLASS}>
-        Access your property chain
+        {isCreateAccountMode
+          ? "Create your MoveLoop account"
+          : "Access your property chain"}
       </p>
 
       <form
         ref={formRef}
-        onSubmit={handleLogin}
+        onSubmit={
+          isCreateAccountMode ? handleSignup : handleLogin
+        }
         className={AUTH_FORM_CLASS}
         noValidate
       >
@@ -319,20 +404,42 @@ export default function LoginPage() {
           label="Password"
           password={passwordValue}
           onPasswordChange={setPasswordValue}
-          autoComplete="current-password"
+          autoComplete={
+            isCreateAccountMode
+              ? "new-password"
+              : "current-password"
+          }
           disabled={isBusy}
+          showRequirements={isCreateAccountMode}
           labelAccessory={
-            <Link
-              href={ROUTES.forgotPassword}
-              className={AUTH_INLINE_LINK_CLASS}
-            >
-              Forgot password?
-            </Link>
+            isCreateAccountMode ? null : (
+              <Link
+                href={ROUTES.forgotPassword}
+                className={AUTH_INLINE_LINK_CLASS}
+              >
+                Forgot password?
+              </Link>
+            )
           }
         />
 
         {errorMessage ? (
           <AuthErrorAlert message={errorMessage} />
+        ) : null}
+
+        {showExpiredLegalRecovery ? (
+          <SignupLegalAcceptanceRecoveryPanel
+            mode="expired"
+            message={null}
+            onCleared={() => {
+              void (async () => {
+                const {
+                  data: { user },
+                } = await supabase.auth.getUser();
+                await redirectAfterHomeownerAuth(user?.id);
+              })();
+            }}
+          />
         ) : null}
 
         {isCreateAccountMode ? (
@@ -347,24 +454,47 @@ export default function LoginPage() {
         ) : null}
 
         <div className={AUTH_BUTTON_STACK_CLASS}>
-          <button
-            type="submit"
-            disabled={isBusy}
-            className={AUTH_PRIMARY_BUTTON_CLASS}
-          >
-            {isLoggingIn ? "Signing in..." : "Log in"}
-          </button>
+          {isCreateAccountMode ? (
+            <>
+              <button
+                type="submit"
+                disabled={isBusy}
+                className={AUTH_PRIMARY_BUTTON_CLASS}
+              >
+                {isSigningUp
+                  ? "Creating account..."
+                  : "Create account"}
+              </button>
 
-          <button
-            type="button"
-            disabled={isBusy}
-            onClick={handleSignup}
-            className={AUTH_SECONDARY_BUTTON_CLASS}
-          >
-            {isSigningUp
-              ? "Creating account..."
-              : "Create account"}
-          </button>
+              <button
+                type="button"
+                disabled={isBusy}
+                onClick={() => setAuthMode("login")}
+                className={AUTH_SECONDARY_BUTTON_CLASS}
+              >
+                Log in
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="submit"
+                disabled={isBusy}
+                className={AUTH_PRIMARY_BUTTON_CLASS}
+              >
+                {isLoggingIn ? "Signing in..." : "Log in"}
+              </button>
+
+              <button
+                type="button"
+                disabled={isBusy}
+                onClick={() => setAuthMode("create")}
+                className={AUTH_SECONDARY_BUTTON_CLASS}
+              >
+                Create account
+              </button>
+            </>
+          )}
         </div>
       </form>
 

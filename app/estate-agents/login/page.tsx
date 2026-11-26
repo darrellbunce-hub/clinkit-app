@@ -24,6 +24,7 @@ import {
   AUTH_TITLE_CLASS,
 } from "@/components/auth/authStyles";
 import EaMarketingShell from "@/components/estate-agents/EaMarketingShell";
+import SignupLegalAcceptanceRecoveryPanel from "@/components/legal/SignupLegalAcceptanceRecoveryPanel";
 import { mapAuthSignInError } from "@/lib/auth/authErrors";
 import {
   resolveLoginNextDestination,
@@ -32,7 +33,7 @@ import {
 import { ROUTES } from "@/lib/auth/routes";
 import { fetchAuthenticatedProfileAccountFields } from "@/lib/currentUserContext";
 import { bootstrapAuthenticatedEstateAgentProfile } from "@/lib/estateAgent/flushPendingEstateAgentProfile";
-import { flushPendingSignupLegalAcceptance } from "@/lib/legal/recordSignupLegalAcceptance";
+import { ensurePendingSignupLegalAcceptanceFlushed } from "@/lib/legal/recordSignupLegalAcceptance";
 import { supabase } from "@/lib/supabase";
 
 function AuthLoadingCard({
@@ -70,6 +71,8 @@ function EstateAgentLoginContent() {
   const [isCheckingSession, setIsCheckingSession] =
     useState(true);
   const [passwordValue, setPasswordValue] = useState("");
+  const [showExpiredLegalRecovery, setShowExpiredLegalRecovery] =
+    useState(false);
 
   useEffect(() => {
     async function redirectIfAuthenticated() {
@@ -95,7 +98,25 @@ function EstateAgentLoginContent() {
         return;
       }
 
-      await flushPendingSignupLegalAcceptance(supabase);
+      const legalFlush =
+        await ensurePendingSignupLegalAcceptanceFlushed(
+          supabase
+        );
+
+      if (!legalFlush.ok) {
+        setIsCheckingSession(false);
+        setShowExpiredLegalRecovery(
+          legalFlush.disposition === "expired"
+        );
+        setErrorMessage(
+          legalFlush.message ??
+            "We could not save your Terms of Service and Privacy Policy acceptance. Please try again."
+        );
+
+        return;
+      }
+
+      setShowExpiredLegalRecovery(false);
 
       const profile =
         await fetchAuthenticatedProfileAccountFields(
@@ -173,7 +194,24 @@ function EstateAgentLoginContent() {
         return;
       }
 
-      await flushPendingSignupLegalAcceptance(supabase);
+      const legalFlush =
+        await ensurePendingSignupLegalAcceptanceFlushed(
+          supabase
+        );
+
+      if (!legalFlush.ok) {
+        setShowExpiredLegalRecovery(
+          legalFlush.disposition === "expired"
+        );
+        setErrorMessage(
+          legalFlush.message ??
+            "We could not save your Terms of Service and Privacy Policy acceptance. Please try again."
+        );
+
+        return;
+      }
+
+      setShowExpiredLegalRecovery(false);
 
       const profile =
         await fetchAuthenticatedProfileAccountFields(
@@ -249,6 +287,16 @@ function EstateAgentLoginContent() {
 
             {errorMessage ? (
               <AuthErrorAlert message={errorMessage} />
+            ) : null}
+
+            {showExpiredLegalRecovery ? (
+              <SignupLegalAcceptanceRecoveryPanel
+                mode="expired"
+                message={null}
+                onCleared={() => {
+                  window.location.reload();
+                }}
+              />
             ) : null}
 
             <button

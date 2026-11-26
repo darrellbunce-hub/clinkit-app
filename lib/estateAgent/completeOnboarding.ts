@@ -32,6 +32,69 @@ export type CompleteEstateAgentOnboardingResult =
     }
   | { success: false; error: string };
 
+type CompleteEstateAgentOnboardingRpc = {
+  ok?: boolean;
+  error?: string;
+  branch_id?: string;
+  company_name?: string;
+  branch_name?: string;
+  town_or_city?: string;
+  postcode?: string;
+};
+
+const DOMAIN_ALREADY_REGISTERED_MESSAGE =
+  "An agency with this email domain is already registered. Ask a branch owner at that agency to invite you to their branch.";
+
+export function mapCompleteEstateAgentOnboardingError(
+  code: string | null | undefined
+): string {
+  switch (code) {
+    case "not_authenticated":
+      return "Please log in to finish setting up your agency.";
+    case "profile_required":
+    case "estate_agent_account_required":
+      return "Your estate agent profile is missing. Sign out and sign up again with a business email.";
+    case "email_domain_required":
+      return "Your business email domain is missing from your profile. Sign out and sign up again with a business email.";
+    case "invalid_company_name":
+      return "Enter your company name to continue.";
+    case "invalid_branch_name":
+      return "Enter a branch name to continue.";
+    case "invalid_town_or_city":
+      return "Enter the branch town or city to continue.";
+    case "invalid_postcode":
+      return "Enter a valid UK postcode for this branch.";
+    case "domain_already_registered":
+      return DOMAIN_ALREADY_REGISTERED_MESSAGE;
+    case "profile_update_failed":
+      return "We could not finish onboarding. Nothing was saved, so you can try again.";
+    default:
+      return "Could not complete onboarding. Try again.";
+  }
+}
+
+/**
+ * Map a raised RPC exception. profile_update_failed aborts the transaction,
+ * so the user-facing copy must not say onboarding records were kept.
+ */
+export function mapCompleteEstateAgentOnboardingTransportError(
+  message: string | null | undefined
+): string {
+  const text = message?.trim() ?? "";
+
+  if (text.includes("profile_update_failed")) {
+    return mapCompleteEstateAgentOnboardingError(
+      "profile_update_failed"
+    );
+  }
+
+  return text || "Could not complete onboarding. Try again.";
+}
+
+/**
+ * Completes founder company/branch onboarding via an atomic RPC.
+ * Domain ownership is taken from profiles.email_domain server-side.
+ */
 export async function completeEstateAgentOnboarding(
   supabase: SupabaseClient,
   input: CompleteEstateAgentOnboardingInput
@@ -79,107 +142,76 @@ export async function completeEstateAgentOnboarding(
     };
   }
 
+  if (!emailDomain) {
+    return {
+      success: false,
+      error:
+        "Your business email domain is missing from your profile. Sign out and sign up again with a business email.",
+    };
+  }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user || user.id !== input.userId) {
+    return {
+      success: false,
+      error: mapCompleteEstateAgentOnboardingError("not_authenticated"),
+    };
+  }
+
   const regionCode =
     deriveRegionCodeFromPostcode(postcode);
 
-  const {
-    data: company,
-    error: companyError,
-  } = await supabase
-    .from("ea_companies")
-    .insert({
-      name: companyName,
-      email_domain: emailDomain,
-      created_by_user_id: input.userId,
-    })
-    .select("id")
-    .single();
-
-  if (companyError || !company) {
-    if (companyError?.code === "23505") {
-      return {
-        success: false,
-        error:
-          "An agency with this email domain is already registered. Ask a branch owner at that agency to invite you to their branch.",
-      };
+  // Profile-update failure raises and rolls back. A later retry is a new
+  // attempt: fresh insert, or resume only when a previously committed
+  // incomplete company still belongs to this user.
+  const { data, error } = await supabase.rpc(
+    "complete_estate_agent_onboarding",
+    {
+      p_company_name: companyName,
+      p_branch_name: branchName,
+      p_town_or_city: townOrCity,
+      p_postcode: postcode,
+      p_is_head_office: input.isHeadOffice,
+      p_region_code: regionCode,
     }
+  );
 
+  if (error) {
     return {
       success: false,
-      error:
-        companyError?.message ??
-        "Could not create your company.",
+      error: mapCompleteEstateAgentOnboardingTransportError(
+        error.message
+      ),
     };
   }
 
-  const {
-    data: branch,
-    error: branchError,
-  } = await supabase
-    .from("ea_branches")
-    .insert({
-      company_id: company.id,
-      name: branchName,
-      town_or_city: townOrCity,
-      postcode,
-      region_code: regionCode,
-      is_head_office: input.isHeadOffice,
-    })
-    .select("id")
-    .single();
+  const result = data as CompleteEstateAgentOnboardingRpc | null;
 
-  if (branchError || !branch) {
+  if (!result?.ok) {
     return {
       success: false,
-      error:
-        branchError?.message ??
-        "Could not create your first branch.",
+      error: mapCompleteEstateAgentOnboardingError(result?.error),
     };
   }
 
-  const { error: membershipError } =
-    await supabase
-      .from("ea_branch_members")
-      .insert({
-        branch_id: branch.id,
-        user_id: input.userId,
-        role: "branch_admin",
-      });
-
-  if (membershipError) {
+  if (!result.branch_id) {
     return {
       success: false,
-      error: membershipError.message,
-    };
-  }
-
-  const completedAt =
-    new Date().toISOString();
-
-  const { error: profileError } =
-    await supabase
-      .from("profiles")
-      .update({
-        onboarding_completed_at: completedAt,
-      })
-      .eq("id", input.userId)
-      .eq("account_type", "estate_agent");
-
-  if (profileError) {
-    return {
-      success: false,
-      error: profileError.message,
+      error: "Could not complete onboarding. Try again.",
     };
   }
 
   return {
     success: true,
     summary: {
-      companyName,
-      branchName,
-      townOrCity,
-      postcode,
-      branchId: branch.id as string,
+      companyName: result.company_name ?? companyName,
+      branchName: result.branch_name ?? branchName,
+      townOrCity: result.town_or_city ?? townOrCity,
+      postcode: result.postcode ?? postcode,
+      branchId: result.branch_id,
     },
   };
 }

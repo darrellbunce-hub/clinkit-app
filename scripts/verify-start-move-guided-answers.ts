@@ -72,9 +72,39 @@ type Expected =
 
 const OUTCOMES: { name: string; answers: StartMoveAnswers; expected: Expected }[] = [
   {
-    name: "Sale not agreed → stop",
-    answers: answers({ selling: "yes", saleAgreed: "no" }),
+    name: "Sale not agreed, not buying → stop sale_not_agreed",
+    answers: answers({
+      selling: "yes",
+      saleAgreed: "no",
+      buying: "no",
+    }),
     expected: { stop: "sale_not_agreed" },
+  },
+  {
+    name: "Sale not agreed, buying with accepted offer → purchase-only",
+    answers: answers({
+      selling: "yes",
+      saleAgreed: "no",
+      buying: "yes",
+      offerAccepted: "yes",
+    }),
+    expected: {
+      notSelling: true,
+      notBuying: false,
+      searchingForProperty: false,
+      sale: false,
+      purchase: true,
+    },
+  },
+  {
+    name: "Sale not agreed, buying without offer → stop no_offer_accepted",
+    answers: answers({
+      selling: "yes",
+      saleAgreed: "no",
+      buying: "yes",
+      offerAccepted: "no",
+    }),
+    expected: { stop: "no_offer_accepted" },
   },
   {
     name: "Not selling, not buying → stop",
@@ -294,12 +324,32 @@ assert(
   ).length > 0
 );
 assert(
-  "Steps: sale not agreed stops before any address",
-  walk(answers({ selling: "yes", saleAgreed: "no" }), [
+  "Steps: sale not agreed continues to buying before stop",
+  walk(answers({ selling: "yes", saleAgreed: "no", buying: "no" }), [
     "selling",
     "saleAgreed",
+    "buying",
     "stop_sale_not_agreed",
   ]).length > 0
+);
+assert(
+  "Steps: sale not agreed + accepted purchase reaches review",
+  walk(
+    answers({
+      selling: "yes",
+      saleAgreed: "no",
+      buying: "yes",
+      offerAccepted: "yes",
+    }),
+    [
+      "selling",
+      "saleAgreed",
+      "buying",
+      "offerAccepted",
+      "purchaseAddress",
+      "review",
+    ]
+  ).length > 0
 );
 assert(
   "Steps: not selling + not buying stops",
@@ -679,14 +729,14 @@ assert(
       )
   );
   assert(
-    "Join Chain: a failed onward conversion keeps the join (no return, no cleanup, no address logged)",
-    !/\breturn;/.test(convertBlock) &&
-      !convertBlock.includes("cleanup_abandoned_onboarding_chain") &&
+    "Join Chain: a failed onward conversion keeps membership and surfaces recovery (no cleanup, no address logged)",
+    !convertBlock.includes("cleanup_abandoned_onboarding_chain") &&
       /console\.error\(\s*"\[join-chain\] onward purchase not added:",\s*onwardPurchaseOutcome\s*\)/.test(
         convertBlock
       ) &&
       convertBlock.includes("classifyOnwardPurchaseConversion(convertResult)") &&
-      convertBlock.includes("alert(onwardPurchaseMessage)")
+      convertBlock.includes("showPartialSuccess({") &&
+      !convertBlock.includes("alert(onwardPurchaseMessage)")
   );
 
   const plan = joinChain.indexOf("planCarriedOnwardPurchase({");
@@ -703,14 +753,16 @@ assert(
 }
 assert(
   "Join Chain: one submission at a time; the guard resets unless the page is leaving",
-  /if \(joinInProgress\.current\) \{\s*return;\s*\}\s*joinInProgress\.current = true;\s*setIsJoining\(true\);/.test(
-    joinChain
-  ) &&
+  joinChain.includes("if (joinInProgress.current || partialSuccess)") &&
+    joinChain.includes("joinInProgress.current = true") &&
+    joinChain.includes("setIsJoining(true)") &&
     /finally \{\s*if \(!leavingAfterJoin\.current\) \{\s*joinInProgress\.current = false;\s*setIsJoining\(false\);/.test(
       joinChain
     ) &&
     /leavingAfterJoin\.current = true;\s*window\.location\.href =/.test(joinChain) &&
-    joinChain.includes("disabled={isJoining}")
+    joinChain.includes("disabled={isJoining}") &&
+    joinChain.includes("validateJoinChainInputs") &&
+    !joinChain.includes("alert(")
 );
 assert(
   "Join Chain: Change address clears the hand-over and keeps the Searching note visible",

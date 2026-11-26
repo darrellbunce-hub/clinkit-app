@@ -22,6 +22,7 @@ import {
   canEditProperty,
   canEditBuyerReady,
   OPERATIONAL_EDIT_DENIED_MESSAGE,
+  type PropertyMutationResult,
 } from "@/lib/propertyPermissions";
 import {
   validatePropertyStageTransition,
@@ -140,7 +141,7 @@ type ChainContextType = {
   updatePropertyStage: (
     propertyId: number,
     newStage: string
-  ) => Promise<void>;
+  ) => Promise<PropertyMutationResult>;
 
   addStructuredUpdate: (
     targetId: number,
@@ -161,7 +162,7 @@ type ChainContextType = {
   breakChainConnection: (
     propertyId: number,
     breakReason: string
-  ) => void;
+  ) => Promise<PropertyMutationResult>;
 
   recordChainCompletionDate: (
     chainId: number,
@@ -942,7 +943,7 @@ const [chains, setChains] =
 async function updatePropertyStage(
   propertyId: number,
   newStage: string
-) {
+): Promise<PropertyMutationResult> {
   const property =
 properties.find(
   (property) =>
@@ -958,20 +959,21 @@ if (
     getMutationContext()
   )
 ) {
-  alert(OPERATIONAL_EDIT_DENIED_MESSAGE);
-
-  return;
+  return {
+    ok: false,
+    message: OPERATIONAL_EDIT_DENIED_MESSAGE,
+  };
 }
 
 if (
   newStage === "searching" &&
   (property?.address || property?.postcode)
 ) {
-  alert(
-    "An agreed purchase cannot be changed back to searching."
-  );
-
-  return;
+  return {
+    ok: false,
+    message:
+      "An agreed purchase cannot be changed back to searching.",
+  };
 }
 
 const stageGateResult = validatePropertyStageTransition(
@@ -980,9 +982,10 @@ const stageGateResult = validatePropertyStageTransition(
 );
 
 if (!stageGateResult.ok) {
-  alert(stageGateResult.message);
-
-  return;
+  return {
+    ok: false,
+    message: stageGateResult.message,
+  };
 }
 
 const stageChanged = property?.stage !== newStage;
@@ -1010,12 +1013,18 @@ const stageEnteredAt = stageChanged
         "completion_date_agreed_requires_contracts_exchanged"
       )
     ) {
-      alert(
-        COMPLETION_DATE_AGREED_REQUIRES_CONTRACTS_EXCHANGED_MESSAGE
-      );
+      return {
+        ok: false,
+        message:
+          COMPLETION_DATE_AGREED_REQUIRES_CONTRACTS_EXCHANGED_MESSAGE,
+      };
     }
 
-    return;
+    return {
+      ok: false,
+      message:
+        "Could not update the property status. Please try again.",
+    };
   }
 
   const formattedUpdate =
@@ -1077,6 +1086,8 @@ const stageEnteredAt = stageChanged
     
       })
     );
+
+    return { ok: true };
     
     }
 
@@ -1543,7 +1554,7 @@ const resolveOperationalDelay = async (
 async function breakChainConnection(
   propertyId: number,
   breakReason: string
-) {
+): Promise<PropertyMutationResult> {
   const property =
   properties.find(
     (property) =>
@@ -1560,9 +1571,10 @@ if (
     getMutationContext()
   )
 ) {
-  alert(OPERATIONAL_EDIT_DENIED_MESSAGE);
-
-  return;
+  return {
+    ok: false,
+    message: OPERATIONAL_EDIT_DENIED_MESSAGE,
+  };
 }
   const { error } = await supabase.rpc(
     "break_chain_connection",
@@ -1574,8 +1586,10 @@ if (
 
   if (error) {
     console.error(error);
-    alert("Could not break the chain connection.");
-    return;
+    return {
+      ok: false,
+      message: "Could not disconnect this property from the chain.",
+    };
   }
 
   const updateMessage =
@@ -1685,6 +1699,8 @@ if (
   await refreshOperationalSummariesForChain(
     property.chainId
   );
+
+  return { ok: true };
 }
 
 async function recordChainCompletionDate(

@@ -111,8 +111,11 @@ export function getParticipationDelinkSuccessMessage(
   }
 }
 
-export const PARTICIPATION_DELINK_PANEL_TITLE = "Participation";
+export const PARTICIPATION_DELINK_PANEL_TITLE =
+  "Leave this transaction or manage participation";
 export const PARTICIPATION_DELINK_PANEL_DESCRIPTION =
-  "End your operational participation without deleting transaction history. " +
-  "Select a predefined reason — no personal notes are stored. " +
-  "All de-link actions are audited and chain participants may be notified.";
+  "Affects who participates on this property — for example leaving the transaction " +
+  "yourself, or removing an estate agent assignment. " +
+  "This is not the same as disconnecting the property from neighbouring chain links above. " +
+  "Transaction history is retained. Select a predefined reason — no personal notes are stored. " +
+  "Actions are audited and may appear in the activity timeline for chain participants.";

@@ -1,3 +1,4 @@
+import PendingSignupLegalAcceptanceGate from "@/components/legal/PendingSignupLegalAcceptanceGate";
 import { AppThemeShell } from "@/components/theme/AppThemeShell";
 import { ChainProvider } from "@/context/ChainContext";
 import type { Metadata } from "next";
@@ -39,7 +40,11 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col font-[family-name:var(--font-body)]">
         <AppThemeShell>
-          <ChainProvider>{children}</ChainProvider>
+          <ChainProvider>
+            <PendingSignupLegalAcceptanceGate>
+              {children}
+            </PendingSignupLegalAcceptanceGate>
+          </ChainProvider>
         </AppThemeShell>
       </body>
     </html>

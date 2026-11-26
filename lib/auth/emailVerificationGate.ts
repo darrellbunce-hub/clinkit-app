@@ -1,3 +1,4 @@
+import { resolveLoginNextDestination } from "@/lib/auth/redirects";
 import { ROUTES } from "@/lib/auth/routes";
 
 export const EMAIL_VERIFICATION_REQUIRED_ERROR =
@@ -58,8 +59,10 @@ export function buildVerifyEmailRedirectPath(
 
   url.searchParams.set("reason", reason);
 
-  if (nextPath?.trim()) {
-    url.searchParams.set("next", nextPath.trim());
+  const safeNext = resolveLoginNextDestination(nextPath, "");
+
+  if (safeNext) {
+    url.searchParams.set("next", safeNext);
   }
 
   return `${url.pathname}${url.search}`;

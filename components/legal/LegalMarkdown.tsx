@@ -37,12 +37,16 @@ const POLICY_LINK_TARGETS: ReadonlyArray<{
   },
 ];
 
-function unescapeMarkdownBrackets(value: string): string {
-  return value.replace(/\\([\[\]])/g, "$1");
+/**
+ * Unescape CommonMark punctuation escapes used in legal source headings
+ * and body text (e.g. `1\. Who we are`, `\[DATE\]`).
+ */
+function unescapeMarkdownText(value: string): string {
+  return value.replace(/\\([\\`*_{}\[\]()#+\-.!])/g, "$1");
 }
 
 function renderInline(text: string, keyPrefix: string): ReactNode[] {
-  const source = unescapeMarkdownBrackets(text);
+  const source = unescapeMarkdownText(text);
   const nodes: ReactNode[] = [];
   const pattern =
     /(\*\*[^*]+\*\*|`[^`]+`)/g;
@@ -180,7 +184,7 @@ function isBullet(line: string): boolean {
 }
 
 function stripHeadingMarkers(headingText: string): string {
-  return unescapeMarkdownBrackets(
+  return unescapeMarkdownText(
     headingText.replace(/^\*\*/, "").replace(/\*\*$/, "").trim()
   );
 }

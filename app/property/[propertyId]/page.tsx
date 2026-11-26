@@ -65,6 +65,9 @@ import { EstimatedCompletionWindowPanel } from "@/components/chainIntelligence/E
 import OperationalCompletionDatePanel from "@/components/OperationalCompletionDatePanel";
 import PropertyEstateAgentAssignment from "@/components/estate-agents/PropertyEstateAgentAssignment";
 import ParticipationDelinkPanel from "@/components/participation/ParticipationDelinkPanel";
+import DisconnectChainConfirmModal, {
+  type DisconnectChainBreakReason,
+} from "@/components/chain/DisconnectChainConfirmModal";
 import PropertyLifecycleDormancySection from "@/components/lifecycle/PropertyLifecycleDormancySection";
 import {
   mapToOperationalProperties,
@@ -112,6 +115,10 @@ export default function PropertyPage() {
   useState("");
   const [sectionFeedback, setSectionFeedback] =
   useState<SectionFeedback | null>(null);
+  const [isSavingStage, setIsSavingStage] =
+    useState(false);
+  const [isDisconnectModalOpen, setIsDisconnectModalOpen] =
+    useState(false);
 
   function showSectionFeedback(
     feedback: SectionFeedback
@@ -123,8 +130,6 @@ export default function PropertyPage() {
     }, 4000);
   }
 
-const [breakReason, setBreakReason] =
-    useState("");
   const params = useParams();
   const propertyId = Number(
     Array.isArray(params.propertyId)
@@ -675,11 +680,10 @@ async function handleReportDelay() {
     }
 
     async function handlePropertyStageUpdate() {
-
-      if (!currentProperty) {
+      if (!currentProperty || isSavingStage) {
         return;
       }
-    
+
       if (
         currentProperty.stage === draftStage
       ) {
@@ -698,7 +702,6 @@ async function handleReportDelay() {
         });
 
         return;
-
       }
 
       if (
@@ -715,21 +718,52 @@ async function handleReportDelay() {
 
         return;
       }
-    
-      await updatePropertyStage(
+
+      setIsSavingStage(true);
+
+      try {
+        const result = await updatePropertyStage(
+          currentProperty.id,
+          draftStage
+        );
+
+        if (!result.ok) {
+          showSectionFeedback({
+            section: "status",
+            variant: "warning",
+            message: result.message,
+          });
+          return;
+        }
+
+        showSectionFeedback({
+          section: "status",
+          variant: "success",
+          message: getOperationalUpdateSuccessMessage(
+            accountType,
+            "property_stage"
+          ),
+        });
+      } finally {
+        setIsSavingStage(false);
+      }
+    }
+
+    async function handleConfirmDisconnectFromChain(
+      breakReason: DisconnectChainBreakReason
+    ) {
+      if (!currentProperty || !canEdit) {
+        return {
+          ok: false as const,
+          message:
+            "You do not have permission to disconnect this property from the chain.",
+        };
+      }
+
+      return breakChainConnection(
         currentProperty.id,
-        draftStage
+        breakReason
       );
-    
-      showSectionFeedback({
-        section: "status",
-        variant: "success",
-        message: getOperationalUpdateSuccessMessage(
-          accountType,
-          "property_stage"
-        ),
-      });
-    
     }
   const workspaceTitle = getOperationalWorkspaceTitle({
     surface: "property",
@@ -1127,11 +1161,17 @@ async function handleReportDelay() {
           </select>
           {renderSectionAlert("status")}
           <button
-  onClick={handlePropertyStageUpdate}
-  className={`mt-4 ${BTN_PRIMARY_CLASS} rounded-xl px-6 py-3`}
->
-  Submit Status Update
-</button>
+            type="button"
+            onClick={() => {
+              void handlePropertyStageUpdate();
+            }}
+            disabled={isSavingStage || !draftStage}
+            className={`mt-4 ${BTN_PRIMARY_CLASS} rounded-xl px-6 py-3 disabled:cursor-not-allowed disabled:opacity-50`}
+          >
+            {isSavingStage
+              ? "Saving status…"
+              : "Submit Status Update"}
+          </button>
         </div>
 
         {/* Structured Updates — Flag / Resolve Delay */}
@@ -1205,63 +1245,47 @@ async function handleReportDelay() {
           )}
 
         </div>
-{/* Disconnect from chain */}
-<div className={`mt-8 bg-white rounded-3xl shadow-sm border border-red-200 ${CARD_PADDING_CLASS}`}>
+{/* Chain connection — disconnect property links */}
+<div className={`mt-8 bg-white rounded-3xl shadow-sm border border-slate-200 ${CARD_PADDING_CLASS}`}>
 
-  <h2 className="text-3xl font-bold text-slate-900">
-    Disconnect from chain
+  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+    Chain connection
+  </p>
+
+  <h2 className="mt-2 text-2xl font-bold text-slate-900">
+    Disconnect this property from the chain
   </h2>
 
   <p className="mt-4 text-slate-600 max-w-2xl">
-    Use this only after discussions with estate agents or solicitors. Disconnecting affects the MoveLoop connection between properties, not your real-world property transaction. It may impact confidence scoring and overall chain progression.
+    Breaks the MoveLoop link between this property and neighbouring
+    properties. It does not remove you from the property, cancel a
+    real-world sale or purchase, or leave the transaction. Use only
+    after discussing with your estate agent or solicitor. You will
+    choose a reason and confirm before anything changes.
   </p>
 
-  <select
-    value={breakReason}
-    onChange={(event) =>
-      setBreakReason(
-        event.target.value
-      )
-    }
-    className="mt-6 w-full border border-slate-300 text-slate-900 rounded-2xl px-4 py-4"
-  >
-
-    <option value="">
-      Select disconnect reason
-    </option>
-
-    <option value="buyer_side">
-  My buyer’s transaction ended
-</option>
-
-<option value="seller_side">
-  My purchase transaction ended
-</option>
-
-  </select>
-
   <button
-    onClick={() => {
-
-      if (!breakReason || !canEdit) {
-        return;
-      }
-
-      breakChainConnection(
-        currentProperty.id,
-        breakReason
-      );
-    }}
-    className="mt-6 bg-red-600 hover:bg-red-700 text-white px-6 py-4 rounded-2xl font-semibold transition"
+    type="button"
+    onClick={() => setIsDisconnectModalOpen(true)}
+    disabled={!canEdit}
+    className="mt-6 rounded-2xl border border-red-300 bg-white px-6 py-4 font-semibold text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
   >
-
-    Disconnect from chain
-
+    Disconnect from chain…
   </button>
 
 </div>
+
         </>
         )}
+
+        {isDisconnectModalOpen ? (
+          <DisconnectChainConfirmModal
+            key="disconnect-chain-confirm"
+            isOpen
+            onClose={() => setIsDisconnectModalOpen(false)}
+            onConfirm={handleConfirmDisconnectFromChain}
+          />
+        ) : null}
 
         {canEdit &&
           !isEstateAgent({
@@ -1274,6 +1298,7 @@ async function handleReportDelay() {
           </div>
         )}
 
+        {/* Participation — leave transaction / remove EA */}
         <div className="mt-8">
           <ParticipationDelinkPanel
             propertyId={currentProperty.id}

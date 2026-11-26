@@ -118,13 +118,40 @@ Resolver: `resolveAuthConfirmDestination()` in `lib/auth/authConfirm.ts`.
 
 ---
 
-## Future phases (not implemented)
+## Phase 2 — Signup email confirmation (implemented in app code)
 
-### Phase 2 — Signup email confirmation
+App support:
 
-- Extend `/auth/confirm` for `type=signup`
-- Add `emailRedirectTo` on `signUp` calls
-- Update **Confirm signup** Supabase email template
+- `/auth/confirm` accepts `type=signup` via `verifyOtp({ type: "signup" })`
+- Homeowner and EA `signUp` pass `emailRedirectTo` → `/auth/confirm?next=<sanitised>`
+- Successful signup confirmation redirects to `/verify-email?verified=1&next=<sanitised>` so pending legal acceptance (and EA profile) can flush from browser storage
+- Password recovery (`type=recovery`) behaviour is unchanged
+- `next` is revalidated with `resolveLoginNextDestination` / recovery allow-list at each boundary
+
+**Still required in Supabase Dashboard (not changed by app code):**
+
+- Email confirmations enabled for the target environment
+- Confirm signup template uses TokenHash + `/auth/confirm` (not raw `{{ .ConfirmationURL }}`) — see template below
+- `/auth/confirm` present on the Redirect URLs allow-list
+
+### Confirm signup email template
+
+Replace `{{ .ConfirmationURL }}` with:
+
+```html
+<h2>Confirm your email</h2>
+<p>Confirm your MoveLoop email address to finish creating your account.</p>
+<p>
+  <a href="{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=signup">
+    Confirm email
+  </a>
+</p>
+<p>If you didn't create an account, you can safely ignore this email.</p>
+```
+
+`{{ .RedirectTo }}` matches `emailRedirectTo` from `signUp` and from verify-email resend (includes origin and sanitised `next`).
+
+Verify-email resend calls `supabase.auth.resend` with `type: "signup"` and `options.emailRedirectTo` from `buildSignupConfirmationResendRequest` (same `/auth/confirm?next=` URL as sign-up). The Confirm signup template above is what turns that redirect into a token link. Password recovery is unchanged: it still uses `resetPasswordForEmail` and `type=recovery`, not this resend helper.
 
 ### OAuth (future only)
 

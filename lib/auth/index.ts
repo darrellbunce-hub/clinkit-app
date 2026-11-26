@@ -86,3 +86,10 @@ export {
   isEmailVerificationRequiredError,
   mapTransactionParticipationError,
 } from "@/lib/auth/emailVerificationGate";
+
+export {
+  buildSignupConfirmUrl,
+  buildSignupConfirmationResendRequest,
+  buildPostSignupVerifiedPath,
+  buildVerifyEmailPathWithNext,
+} from "@/lib/auth/signupConfirm";

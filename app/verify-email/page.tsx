@@ -7,16 +7,25 @@ import {
   useState,
   type FormEvent,
 } from "react";
-import { useSearchParams } from "next/navigation";
+import {
+  useRouter,
+  useSearchParams,
+} from "next/navigation";
 
 import Navbar from "@/components/Navbar";
+import SignupLegalAcceptanceRecoveryPanel from "@/components/legal/SignupLegalAcceptanceRecoveryPanel";
 import { PAGE_TITLE_INVERTED_CLASS } from "@/components/mobileStandards";
 import {
   EMAIL_VERIFICATION_TRANSACTION_MESSAGE,
 } from "@/lib/auth/emailVerificationGate";
+import { resolveLoginNextDestination } from "@/lib/auth/redirects";
 import { ROUTES } from "@/lib/auth/routes";
+import { buildSignupConfirmationResendRequest } from "@/lib/auth/signupConfirm";
 import { bootstrapAuthenticatedEstateAgentProfile } from "@/lib/estateAgent/flushPendingEstateAgentProfile";
-import { flushPendingSignupLegalAcceptance } from "@/lib/legal/recordSignupLegalAcceptance";
+import {
+  ensurePendingSignupLegalAcceptanceFlushed,
+  type EnsurePendingSignupLegalAcceptanceResult,
+} from "@/lib/legal/recordSignupLegalAcceptance";
 import {
   BTN_ACCENT_CLASS,
   HERO_GLOW_PRIMARY_CLASS,
@@ -26,20 +35,39 @@ import {
 import { supabase } from "@/lib/supabase";
 
 function VerifyEmailContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const blockedForTransaction =
     searchParams.get("reason") ===
     "transaction_participation";
-  const nextDestination =
-    searchParams.get("next");
+  const justVerified =
+    searchParams.get("verified") === "1";
+  const confirmError = searchParams.get("error");
+  const safeNextDestination = resolveLoginNextDestination(
+    searchParams.get("next"),
+    ROUTES.homeownerLogin
+  );
 
   const [email, setEmail] = useState("");
   const [statusMessage, setStatusMessage] =
     useState("");
   const [errorMessage, setErrorMessage] =
-    useState("");
+    useState(
+      confirmError
+        ? "We could not verify that email link. Request a new verification email below, or return to your account."
+        : ""
+    );
   const [isResending, setIsResending] =
     useState(false);
+  const [isFinishingVerification, setIsFinishingVerification] =
+    useState(justVerified);
+  const [legalGate, setLegalGate] = useState<
+    "checking" | "clear" | "blocked"
+  >("checking");
+  const [legalBlock, setLegalBlock] =
+    useState<EnsurePendingSignupLegalAcceptanceResult | null>(
+      null
+    );
 
   useEffect(() => {
     async function loadPendingEmail() {
@@ -56,6 +84,8 @@ function VerifyEmailContent() {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+
     async function flushPendingSignupState() {
       const {
         data: { user },
@@ -67,11 +97,43 @@ function VerifyEmailContent() {
         await bootstrapAuthenticatedEstateAgentProfile(supabase);
       }
 
-      await flushPendingSignupLegalAcceptance(supabase);
+      const legalFlush =
+        await ensurePendingSignupLegalAcceptanceFlushed(
+          supabase
+        );
+
+      if (cancelled) {
+        return;
+      }
+
+      if (!legalFlush.ok) {
+        setLegalGate("blocked");
+        setLegalBlock(legalFlush);
+        setErrorMessage(
+          legalFlush.message ??
+            "We could not save your Terms of Service and Privacy Policy acceptance. Please try again."
+        );
+        setIsFinishingVerification(false);
+        return;
+      }
+
+      setLegalGate("clear");
+      setLegalBlock(null);
+
+      if (justVerified && user) {
+        router.replace(safeNextDestination);
+        return;
+      }
+
+      setIsFinishingVerification(false);
     }
 
     void flushPendingSignupState();
-  }, []);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [justVerified, router, safeNextDestination]);
 
   async function handleResend(
     event: FormEvent<HTMLFormElement>
@@ -93,11 +155,13 @@ function VerifyEmailContent() {
     setIsResending(true);
 
     try {
-      const { error } =
-        await supabase.auth.resend({
-          type: "signup",
-          email: trimmedEmail,
-        });
+      const { error } = await supabase.auth.resend(
+        buildSignupConfirmationResendRequest(
+          window.location.origin,
+          trimmedEmail,
+          searchParams.get("next")
+        )
+      );
 
       if (error) {
         setErrorMessage(
@@ -163,17 +227,25 @@ function VerifyEmailContent() {
           <h1
             className={`mt-10 ${PAGE_TITLE_INVERTED_CLASS} leading-tight`}
           >
-            Verify Your Email
+            {isFinishingVerification
+              ? "Email verified"
+              : "Verify Your Email"}
           </h1>
 
           <p className="mt-6 text-xl text-slate-300 leading-relaxed">
-            We&apos;ve sent a verification email to your inbox.
-            {blockedForTransaction
-              ? " Verify your email before participating in a live property transaction."
-              : " Verify your account to unlock live property transaction features."}
+            {isFinishingVerification
+              ? "Finishing account setup…"
+              : (
+                <>
+                  We&apos;ve sent a verification email to your inbox.
+                  {blockedForTransaction
+                    ? " Verify your email before participating in a live property transaction."
+                    : " Verify your account to unlock live property transaction features."}
+                </>
+              )}
           </p>
 
-          {blockedForTransaction && (
+          {blockedForTransaction && !isFinishingVerification && (
             <p
               role="status"
               className="mt-6 rounded-2xl border border-amber-400/30 bg-amber-500/10 px-5 py-4 text-amber-100"
@@ -182,104 +254,130 @@ function VerifyEmailContent() {
             </p>
           )}
 
-          <div
-            className="
-              mt-10
-              bg-blue-500/10
-              border
-              border-blue-400/20
-              rounded-2xl
-              p-6
-            "
-          >
-            <p className="text-blue-100 text-lg">
-              Once verified, you&apos;ll be able to:
-              <br />
-              • Create property chains
-              <br />
-              • Join existing transactions
-              <br />
-              • Follow your move with live shared updates
-            </p>
-          </div>
-
-          <form
-            onSubmit={handleResend}
-            className="mt-10 max-w-md mx-auto text-left"
-            noValidate
-          >
-            <label
-              htmlFor="verify-email"
-              className="block text-sm font-medium text-slate-200"
+          {!isFinishingVerification && (
+            <div
+              className="
+                mt-10
+                bg-blue-500/10
+                border
+                border-blue-400/20
+                rounded-2xl
+                p-6
+              "
             >
-              Email address
-            </label>
-
-            <input
-              id="verify-email"
-              name="email"
-              type="email"
-              autoComplete="email"
-              inputMode="email"
-              value={email}
-              onChange={(event) =>
-                setEmail(event.target.value)
-              }
-              disabled={isResending}
-              className="mt-2 w-full rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-white placeholder:text-slate-400 disabled:opacity-60"
-            />
-
-            {errorMessage && (
-              <p
-                role="alert"
-                className="mt-4 rounded-2xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-100"
-              >
-                {errorMessage}
+              <p className="text-blue-100 text-lg">
+                Once verified, you&apos;ll be able to:
+                <br />
+                • Create property chains
+                <br />
+                • Join existing transactions
+                <br />
+                • Follow your move with live shared updates
               </p>
-            )}
-
-            {statusMessage && (
-              <p
-                role="status"
-                className="mt-4 rounded-2xl border border-green-400/30 bg-green-500/10 px-4 py-3 text-sm text-green-100"
-              >
-                {statusMessage}
-              </p>
-            )}
-
-            <div className="mt-6 flex flex-col sm:flex-row gap-4 justify-center">
-              <Link
-                href={
-                  nextDestination ?? ROUTES.homeownerLogin
-                }
-                className={`${BTN_ACCENT_CLASS} px-8 py-4 text-center`}
-              >
-                Return To Account
-              </Link>
-
-              <button
-                type="submit"
-                disabled={isResending}
-                className="
-                  border
-                  border-white/20
-                  bg-white/10
-                  text-white
-                  px-8
-                  py-4
-                  rounded-2xl
-                  font-semibold
-                  hover:bg-white/20
-                  transition
-                  disabled:opacity-60
-                "
-              >
-                {isResending
-                  ? "Sending..."
-                  : "Resend Verification"}
-              </button>
             </div>
-          </form>
+          )}
+
+          {!isFinishingVerification && (
+            <form
+              onSubmit={handleResend}
+              className="mt-10 max-w-md mx-auto text-left"
+              noValidate
+            >
+              <label
+                htmlFor="verify-email"
+                className="block text-sm font-medium text-slate-200"
+              >
+                Email address
+              </label>
+
+              <input
+                id="verify-email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                inputMode="email"
+                value={email}
+                onChange={(event) =>
+                  setEmail(event.target.value)
+                }
+                disabled={isResending}
+                className="mt-2 w-full rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-white placeholder:text-slate-400 disabled:opacity-60"
+              />
+
+              {errorMessage && (
+                <p
+                  role="alert"
+                  className="mt-4 rounded-2xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-100"
+                >
+                  {errorMessage}
+                </p>
+              )}
+
+              {statusMessage && (
+                <p
+                  role="status"
+                  className="mt-4 rounded-2xl border border-green-400/30 bg-green-500/10 px-4 py-3 text-sm text-green-100"
+                >
+                  {statusMessage}
+                </p>
+              )}
+
+              {legalGate === "blocked" && legalBlock ? (
+                <div className="mt-6">
+                  <SignupLegalAcceptanceRecoveryPanel
+                    mode={
+                      legalBlock.disposition === "expired"
+                        ? "expired"
+                        : "persist_failed"
+                    }
+                    message={legalBlock.message}
+                    onCleared={() => {
+                      setLegalGate("clear");
+                      setLegalBlock(null);
+                      setErrorMessage("");
+
+                      if (justVerified) {
+                        router.replace(safeNextDestination);
+                      }
+                    }}
+                  />
+                </div>
+              ) : null}
+
+              <div className="mt-6 flex flex-col sm:flex-row gap-4 justify-center">
+                {legalGate === "clear" ? (
+                  <Link
+                    href={safeNextDestination}
+                    className={`${BTN_ACCENT_CLASS} px-8 py-4 text-center`}
+                  >
+                    Return To Account
+                  </Link>
+                ) : null}
+
+                <button
+                  type="submit"
+                  disabled={isResending}
+                  className="
+                    border
+                    border-white/20
+                    bg-white/10
+                    text-white
+                    px-8
+                    py-4
+                    rounded-2xl
+                    font-semibold
+                    hover:bg-white/20
+                    transition
+                    disabled:opacity-60
+                  "
+                >
+                  {isResending
+                    ? "Sending..."
+                    : "Resend Verification"}
+                </button>
+              </div>
+            </form>
+          )}
         </div>
       </section>
     </main>

@@ -12,6 +12,8 @@ export const ROUTES = {
   about: "/about",
   help: "/help",
   homeownerLogin: "/login",
+  /** Homeowner registration entry — opens /login in create-account mode. */
+  homeownerCreateAccount: "/login?mode=create",
   homeownerDashboard: "/dashboard",
   accountSettings: "/account",
   forgotPassword: "/forgot-password",
@@ -35,6 +37,39 @@ export const ROUTES = {
   platformAdminMfaChallenge: "/admin/mfa/challenge",
   platformAdminMfa: "/admin/mfa",
 } as const;
+
+/** Query value that opens the homeowner login page in create-account mode. */
+export const HOMEOWNER_LOGIN_CREATE_MODE = "create";
+
+export function isHomeownerCreateAccountMode(
+  mode: string | null | undefined
+): boolean {
+  return mode === HOMEOWNER_LOGIN_CREATE_MODE;
+}
+
+/**
+ * Build a homeowner /login href while preserving optional next and mode.
+ */
+export function buildHomeownerLoginHref(options?: {
+  mode?: "login" | "create";
+  next?: string | null;
+}): string {
+  const params = new URLSearchParams();
+
+  if (options?.mode === "create") {
+    params.set("mode", HOMEOWNER_LOGIN_CREATE_MODE);
+  }
+
+  const next = options?.next?.trim();
+  if (next) {
+    params.set("next", next);
+  }
+
+  const query = params.toString();
+  return query
+    ? `${ROUTES.homeownerLogin}?${query}`
+    : ROUTES.homeownerLogin;
+}
 
 /** Keynetic platform-admin internal operations (not EA branch admin). */
 export const PLATFORM_ADMIN_PREFIXES = ["/admin"] as const;

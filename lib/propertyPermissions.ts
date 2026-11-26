@@ -10,6 +10,11 @@ import {
   VIEW_ONLY_PURCHASE_MESSAGE,
 } from "@/lib/operationalPosition";
 
+/** Result shape for property-page mutations that must not report false success. */
+export type PropertyMutationResult =
+  | { ok: true }
+  | { ok: false; message: string };
+
 export {
   canMutateBuyerReadyTarget,
   canMutatePropertyTarget,

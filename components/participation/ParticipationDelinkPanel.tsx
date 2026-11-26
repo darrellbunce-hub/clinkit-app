@@ -145,8 +145,12 @@ export default function ParticipationDelinkPanel({
 
   return (
     <>
-      <div className="rounded-3xl border border-red-200 bg-white p-8">
-        <h2 className="text-2xl font-bold text-slate-900">
+      <div className="rounded-3xl border border-slate-200 bg-white p-8">
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+          Participation
+        </p>
+
+        <h2 className="mt-2 text-2xl font-bold text-slate-900">
           {PARTICIPATION_DELINK_PANEL_TITLE}
         </h2>
 

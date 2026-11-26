@@ -24,6 +24,15 @@ import {
   EA_TRIAL_PERIOD_DAYS,
   EA_TRIAL_TERMS_COPY,
 } from "@/lib/billing/eaBranchPricing";
+import {
+  EA_ACCOUNT_SUBSCRIPTION_HREF,
+  EA_CHECKOUT_CONFIRMATION_TIMEOUT_NOTICE,
+  EA_CHECKOUT_CONFIRMING_DETAIL,
+  EA_CHECKOUT_CONFIRMING_TITLE,
+  EA_SOFT_SKIP_BUTTON_LABEL,
+  EA_SOFT_SKIP_CONSEQUENCES_COPY,
+  EA_SOFT_SKIP_START_LATER_COPY,
+} from "@/lib/billing/eaSoftSkipExpectations";
 import type { EaBranchSubscriptionSummary } from "@/lib/billing/eaBranchSubscription";
 import { fetchAuthenticatedProfileAccountFields } from "@/lib/currentUserContext";
 import { loadAgentHomeContext } from "@/lib/estateAgent/loadAgentHomeContext";
@@ -98,11 +107,13 @@ function OnboardingBillingContent() {
   const [errorMessage, setErrorMessage] = useState("");
   const [notice, setNotice] = useState("");
   const [isActing, setIsActing] = useState(false);
+  const [confirmationTimedOut, setConfirmationTimedOut] = useState(false);
   const [trialPeriodDays, setTrialPeriodDays] = useState<number | null>(
     EA_TRIAL_PERIOD_DAYS
   );
   const checkoutReturnRef = useRef<{ branchId: string | null } | null>(null);
   const pollRef = useRef<{ interval: number; timeout: number } | null>(null);
+  const pollingUserIdRef = useRef<string | null>(null);
 
   const clearPoll = useCallback(() => {
     if (!pollRef.current) return;
@@ -175,10 +186,10 @@ function OnboardingBillingContent() {
   const startPolling = useCallback(
     (userId: string, expectedBranchId: string) => {
       clearPoll();
+      pollingUserIdRef.current = userId;
+      setConfirmationTimedOut(false);
       setView("confirming");
-      setNotice(
-        "Checkout complete — we're confirming your free trial with Stripe. This usually takes a few seconds."
-      );
+      setNotice(EA_CHECKOUT_CONFIRMING_DETAIL);
 
       const tick = async () => {
         const loaded = await loadSummary(userId, expectedBranchId);
@@ -188,6 +199,7 @@ function OnboardingBillingContent() {
         if (isCheckoutReturnConfirmed(loaded.summary, expectedBranchId)) {
           clearPoll();
           checkoutReturnRef.current = null;
+          setConfirmationTimedOut(false);
           setConfirmedSummary(loaded.summary);
           setView("confirmed");
           setNotice("");
@@ -205,10 +217,9 @@ function OnboardingBillingContent() {
       const timeout = window.setTimeout(() => {
         window.clearInterval(interval);
         pollRef.current = null;
+        setConfirmationTimedOut(true);
         setView("offer");
-        setNotice(
-          "We're still confirming your subscription with Stripe. You can try again, refresh this page, or continue to the dashboard and check Account → Subscription shortly."
-        );
+        setNotice(EA_CHECKOUT_CONFIRMATION_TIMEOUT_NOTICE);
       }, POLL_TIMEOUT_MS);
       pollRef.current = { interval, timeout };
     },
@@ -326,8 +337,7 @@ function OnboardingBillingContent() {
 
       if (payload.error === "checkout_processing") {
         setNotice(
-          payload.message ??
-            "Your Checkout is complete and we're confirming your subscription with Stripe. This usually takes a few seconds."
+          payload.message ?? EA_CHECKOUT_CONFIRMING_DETAIL
         );
         setIsActing(false);
         const {
@@ -463,35 +473,66 @@ function OnboardingBillingContent() {
           ) : null}
 
           {view === "confirming" ? (
-            <p className="mt-8 text-center text-slate-600">
-              Confirming your trial with Stripe…
-            </p>
+            <div className="mt-8 space-y-3 text-center">
+              <p className="font-semibold text-slate-900">
+                {EA_CHECKOUT_CONFIRMING_TITLE}
+              </p>
+              <p className="text-sm text-slate-600">
+                {EA_CHECKOUT_CONFIRMING_DETAIL}
+              </p>
+            </div>
           ) : (
-            <button
-              type="button"
-              onClick={() => {
-                void startCheckout();
-              }}
-              disabled={isActing || !branchId}
-              className="mt-8 w-full bg-slate-900 text-white rounded-2xl py-4 font-semibold hover:bg-slate-800 disabled:bg-slate-400"
-            >
-              {isActing ? "Starting Checkout…" : "Start my free trial"}
-            </button>
-          )}
+            <>
+              {confirmationTimedOut && branchId ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const userId = pollingUserIdRef.current;
+                    if (!userId || !branchId) return;
+                    startPolling(userId, branchId);
+                  }}
+                  className="mt-8 w-full border border-slate-300 text-slate-900 rounded-2xl py-4 font-semibold hover:bg-slate-50"
+                >
+                  Check confirmation again
+                </button>
+              ) : null}
 
-          <button
-            type="button"
-            onClick={() => {
-              window.location.href = ROUTES.agentHome;
-            }}
-            className="mt-3 w-full border border-slate-300 text-slate-900 rounded-2xl py-4 font-semibold hover:bg-slate-50"
-          >
-            Continue to dashboard without starting a trial
-          </button>
-          <p className="mt-3 text-center text-xs text-slate-500">
-            Optional for now — skipping does not activate billing. You can start
-            the trial later from Account → Subscription.
-          </p>
+              <button
+                type="button"
+                onClick={() => {
+                  void startCheckout();
+                }}
+                disabled={isActing || !branchId}
+                className={`${confirmationTimedOut ? "mt-3" : "mt-8"} w-full bg-slate-900 text-white rounded-2xl py-4 font-semibold hover:bg-slate-800 disabled:bg-slate-400`}
+              >
+                {isActing ? "Starting Checkout…" : "Start my free trial"}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  window.location.href = ROUTES.agentHome;
+                }}
+                className="mt-3 w-full border border-slate-300 text-slate-900 rounded-2xl py-4 font-semibold hover:bg-slate-50"
+              >
+                {EA_SOFT_SKIP_BUTTON_LABEL}
+              </button>
+
+              <p className="mt-3 text-center text-xs text-slate-600">
+                {EA_SOFT_SKIP_CONSEQUENCES_COPY}{" "}
+                {EA_SOFT_SKIP_START_LATER_COPY}
+              </p>
+
+              <p className="mt-2 text-center text-sm">
+                <a
+                  href={EA_ACCOUNT_SUBSCRIPTION_HREF}
+                  className="font-semibold text-slate-900 underline underline-offset-2 hover:text-slate-700"
+                >
+                  Open Account → Subscription
+                </a>
+              </p>
+            </>
+          )}
         </div>
       </section>
     </EaMarketingShell>

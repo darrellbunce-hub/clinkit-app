@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { Suspense } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import HelpLink from "@/components/help/HelpLink";
@@ -42,9 +43,23 @@ import {
   shouldAddCarriedOnwardPurchase,
   type OnwardPurchaseConversionResult,
 } from "@/lib/onboarding/joinOnwardPurchase";
+import {
+  buildJoinChainPartialSuccess,
+  joinChainDashboardHref,
+  joinChainViewHref,
+  mapJoinChainFailureMessage,
+  validateJoinChainInputs,
+  type JoinChainFieldErrors,
+  type JoinChainPartialSuccess,
+} from "@/lib/onboarding/joinChainErrors";
 import { convertSearchingPlaceholder } from "@/lib/searchingPlaceholder";
 import PropertyAddressLookup from "@/components/address/PropertyAddressLookup";
 import { formatUkPostcodeForStorage } from "@/lib/address/normalize";
+import { buildHomeownerLoginHref } from "@/lib/auth/routes";
+import {
+  buildVerifyEmailRedirectPath,
+  isEmailVerificationRequiredError,
+} from "@/lib/auth/emailVerificationGate";
 
 function JoinChainContent() {
   const searchParams =
@@ -74,6 +89,12 @@ function JoinChainContent() {
 
   const [onwardPurchaseRemoved, setOnwardPurchaseRemoved] =
     useState(false);
+
+  const [errorMessage, setErrorMessage] = useState("");
+  const [fieldErrors, setFieldErrors] =
+    useState<JoinChainFieldErrors>({});
+  const [partialSuccess, setPartialSuccess] =
+    useState<JoinChainPartialSuccess | null>(null);
 
   // The ref blocks a second click before the disabled state renders.
   const joinInProgress = useRef(false);
@@ -122,8 +143,34 @@ function JoinChainContent() {
     discardCarriedAddress();
   }
 
+  function showPartialSuccess(input: {
+    chainId: number;
+    propertyId: number;
+    message: string;
+  }) {
+    setPartialSuccess(buildJoinChainPartialSuccess(input));
+    setErrorMessage("");
+  }
+
   async function handleJoinChain() {
-    if (joinInProgress.current) {
+    if (joinInProgress.current || partialSuccess) {
+      return;
+    }
+
+    setErrorMessage("");
+    setFieldErrors({});
+
+    const validation = validateJoinChainInputs({
+      accessCode,
+      address,
+      postcode,
+    });
+
+    if (validation) {
+      setFieldErrors(validation);
+      setErrorMessage(
+        "Enter the access code, address, and postcode before joining."
+      );
       return;
     }
 
@@ -147,7 +194,9 @@ function JoinChainContent() {
     } = await supabase.auth.getUser();
 
     if (!user) {
-      alert("Please log in first");
+      window.location.href = buildHomeownerLoginHref({
+        next: "/join-chain",
+      });
       return;
     }
 
@@ -156,7 +205,7 @@ function JoinChainContent() {
       !isJoinAddressHandoffUsable(carriedAddress, user.id)
     ) {
       discardCarriedAddress();
-      alert("Please select the property address again.");
+      setErrorMessage("Please select the property address again.");
       return;
     }
 
@@ -164,8 +213,8 @@ function JoinChainContent() {
       data: joinResult,
       error: joinError,
     } = await supabase.rpc("join_chain_property", {
-      p_access_code: accessCode,
-      p_address: address,
+      p_access_code: accessCode.trim(),
+      p_address: address.trim(),
       p_postcode: formatUkPostcodeForStorage(postcode),
     });
 
@@ -174,20 +223,24 @@ function JoinChainContent() {
         "[join-chain] join_chain_property failed:",
         joinError.message
       );
-      alert("Could not join this chain.");
+      setErrorMessage(mapJoinChainFailureMessage(joinError.message));
       return;
     }
 
     if (!joinResult?.ok) {
-      // Rate-limited joins intentionally reuse join_details_not_matched (no oracle).
-      if (joinResult?.error === "join_details_not_matched") {
-        alert(
-          "We could not match those details to a property. Check the access code, address, and postcode, then try again."
+      const joinErrorCode =
+        typeof joinResult?.error === "string"
+          ? joinResult.error
+          : null;
+
+      if (isEmailVerificationRequiredError(joinErrorCode)) {
+        window.location.href = buildVerifyEmailRedirectPath(
+          "/join-chain"
         );
         return;
       }
 
-      alert("Could not join this property.");
+      setErrorMessage(mapJoinChainFailureMessage(joinErrorCode));
       return;
     }
 
@@ -235,7 +288,13 @@ function JoinChainContent() {
           "[join-chain] buyer ready create exception:",
           error instanceof Error ? error.message : "unknown_error"
         );
-        throw error;
+        showPartialSuccess({
+          chainId: property.chain_id,
+          propertyId: property.id,
+          message:
+            "You have joined this chain, but Buyer Ready could not be recorded. Open your dashboard or chain to continue.",
+        });
+        return;
       }
 
       if (!buyerReadyResult.ok) {
@@ -243,9 +302,13 @@ function JoinChainContent() {
           "[join-chain] buyer ready create failed:",
           buyerReadyResult.error
         );
-        alert(
-          "Join completed, but Buyer Ready could not be recorded. Check your chain on your dashboard. For what to do next, see Help & FAQs."
-        );
+        showPartialSuccess({
+          chainId: property.chain_id,
+          propertyId: property.id,
+          message:
+            "You have joined this chain, but Buyer Ready could not be recorded. Open your dashboard or chain to continue.",
+        });
+        return;
       }
     }
 
@@ -290,11 +353,13 @@ function JoinChainContent() {
             );
 
           if (!migrationRelinkResult.ok) {
-            alert(
-              formatJoinedPropertyRelinkFailure(
+            showPartialSuccess({
+              chainId: property.chain_id,
+              propertyId: property.id,
+              message: formatJoinedPropertyRelinkFailure(
                 migrationRelinkResult
-              )
-            );
+              ),
+            });
             return;
           }
         }
@@ -337,26 +402,33 @@ function JoinChainContent() {
           intentResult.reason ===
           "downstream_link_exists"
         ) {
-          alert(
-            formatTopologyConflictMessage(
+          showPartialSuccess({
+            chainId: property.chain_id,
+            propertyId: property.id,
+            message: formatTopologyConflictMessage(
               intentResult.existingLinkedPropertyId!
-            )
-          );
+            ),
+          });
         } else if (
           intentResult.reason ===
           "relink_not_applied"
         ) {
-          alert(
-            JOINED_PROPERTY_RELINK_NOT_APPLIED_MESSAGE
-          );
+          showPartialSuccess({
+            chainId: property.chain_id,
+            propertyId: property.id,
+            message: JOINED_PROPERTY_RELINK_NOT_APPLIED_MESSAGE,
+          });
         } else {
-          alert(
-            "Join completed, but we could not set up your next-home search step. Please try again from the chain page. For what to do next, see Help & FAQs."
-          );
           console.error(
             "[join-chain] searching intent failed:",
             intentResult.error
           );
+          showPartialSuccess({
+            chainId: property.chain_id,
+            propertyId: property.id,
+            message:
+              "You have joined this chain, but we could not set up your next-home search step. Open your chain to continue.",
+          });
         }
 
         return;
@@ -397,7 +469,12 @@ function JoinChainContent() {
             "[join-chain] onward purchase not added:",
             onwardPurchaseOutcome
           );
-          alert(onwardPurchaseMessage);
+          showPartialSuccess({
+            chainId: property.chain_id,
+            propertyId: property.id,
+            message: onwardPurchaseMessage,
+          });
+          return;
         }
       }
 
@@ -421,8 +498,7 @@ function JoinChainContent() {
 
       joinCompleted = true;
       leavingAfterJoin.current = true;
-      window.location.href =
-        `/dashboard?refresh=${Date.now()}`;
+      window.location.href = joinChainDashboardHref();
     } catch (error) {
       console.error(
         "[join-chain] join completion failed:",
@@ -430,11 +506,14 @@ function JoinChainContent() {
       );
 
       if (!joinCompleted) {
-        alert(
-          error instanceof SourceChainMigrationError
-            ? SOURCE_CHAIN_MIGRATION_FAILED_MESSAGE
-            : "An error occurred while finishing the join. Your membership may have been created, but setting up your next-home search step did not complete."
-        );
+        showPartialSuccess({
+          chainId: property.chain_id,
+          propertyId: property.id,
+          message:
+            error instanceof SourceChainMigrationError
+              ? SOURCE_CHAIN_MIGRATION_FAILED_MESSAGE
+              : "You have joined this chain, but finishing setup did not complete. Open your dashboard or chain to continue — do not retry the join.",
+        });
       }
     }
   }
@@ -456,107 +535,203 @@ function JoinChainContent() {
           as more participants connect.
         </p>
 
-        <div className={`mt-10 bg-white rounded-3xl border border-slate-200 ${CARD_PADDING_CLASS}`}>
+        {partialSuccess ? (
+          <div
+            role="status"
+            className={`mt-10 bg-white rounded-3xl border border-amber-200 ${CARD_PADDING_CLASS}`}
+          >
+            <h2 className="text-xl font-bold text-slate-900">
+              You&apos;re on this chain
+            </h2>
+            <p className="mt-3 text-slate-700">
+              {partialSuccess.message}
+            </p>
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+              <Link
+                href={joinChainDashboardHref()}
+                className="rounded-2xl bg-slate-900 px-5 py-4 text-center font-semibold text-white"
+              >
+                Go to dashboard
+              </Link>
+              <Link
+                href={joinChainViewHref(partialSuccess.chainId)}
+                className="rounded-2xl border border-slate-300 px-5 py-4 text-center font-semibold text-slate-800"
+              >
+                View chain
+              </Link>
+            </div>
+            <p className="mt-4 text-sm text-slate-600">
+              Need help?{" "}
+              <HelpLink section={HELP_SECTION_IDS.somethingWentWrong} newTab />
+            </p>
+          </div>
+        ) : (
+          <div className={`mt-10 bg-white rounded-3xl border border-slate-200 ${CARD_PADDING_CLASS}`}>
 
-          <input
-            type="text"
-            value={accessCode}
-            onChange={(event) =>
-              setAccessCode(
-                event.target.value
-              )
-            }
-            placeholder="Chain access code"
-            className="w-full border border-slate-300 text-base text-slate-900 rounded-2xl px-4 py-4"
-          />
+            <label
+              htmlFor="join-chain-access-code"
+              className="block text-sm font-medium text-slate-900"
+            >
+              Chain access code
+            </label>
+            <input
+              id="join-chain-access-code"
+              type="text"
+              value={accessCode}
+              onChange={(event) => {
+                setAccessCode(event.target.value);
+                setFieldErrors((previous) => ({
+                  ...previous,
+                  accessCode: undefined,
+                }));
+              }}
+              disabled={isJoining}
+              placeholder="Chain access code"
+              className="mt-2 w-full border border-slate-300 text-base text-slate-900 rounded-2xl px-4 py-4 disabled:opacity-60"
+              aria-invalid={Boolean(fieldErrors.accessCode)}
+            />
+            {fieldErrors.accessCode ? (
+              <p className="mt-2 text-sm text-red-700" role="alert">
+                {fieldErrors.accessCode}
+              </p>
+            ) : null}
 
-          <div className="mt-4">
-            {carriedAddress ? (
-              <div>
-                <p className="block text-sm font-medium text-slate-900">
-                  Property address
-                </p>
-                <div className="mt-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-                  <p className="font-medium text-slate-900">{address}</p>
-                  <p className="mt-1">{postcode}</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleChangeAddress}
-                  className="mt-3 text-sm font-medium text-slate-700 underline underline-offset-2 hover:text-slate-900"
-                >
-                  Change address
-                </button>
+            <div className="mt-4">
+              {carriedAddress ? (
+                <div>
+                  <p className="block text-sm font-medium text-slate-900">
+                    Property address
+                  </p>
+                  <div className="mt-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                    <p className="font-medium text-slate-900">{address}</p>
+                    <p className="mt-1">{postcode}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleChangeAddress}
+                    disabled={isJoining}
+                    className="mt-3 text-sm font-medium text-slate-700 underline underline-offset-2 hover:text-slate-900 disabled:opacity-60"
+                  >
+                    Change address
+                  </button>
 
-                {carriedAddress.onwardPurchase ? (
-                  <div className="mt-6">
-                    <p className="block text-sm font-medium text-slate-900">
-                      Property you are buying
-                    </p>
-                    <div className="mt-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-                      <p className="font-medium text-slate-900">
-                        {carriedAddress.onwardPurchase.address}
+                  {carriedAddress.onwardPurchase ? (
+                    <div className="mt-6">
+                      <p className="block text-sm font-medium text-slate-900">
+                        Property you are buying
                       </p>
-                      <p className="mt-1">
-                        {carriedAddress.onwardPurchase.postcode}
+                      <div className="mt-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                        <p className="font-medium text-slate-900">
+                          {carriedAddress.onwardPurchase.address}
+                        </p>
+                        <p className="mt-1">
+                          {carriedAddress.onwardPurchase.postcode}
+                        </p>
+                      </div>
+                      <p className="mt-2 text-sm text-slate-600">
+                        Once you have joined, we will add this to your
+                        chain as your onward purchase. If you change the
+                        address above, your next home will show as
+                        Searching and you can add it from your chain.
                       </p>
                     </div>
-                    <p className="mt-2 text-sm text-slate-600">
-                      Once you have joined, we will add this to your
-                      chain as your onward purchase. If you change the
-                      address above, your next home will show as
-                      Searching and you can add it from your chain.
+                  ) : null}
+                </div>
+              ) : (
+                <>
+                  <PropertyAddressLookup
+                    idPrefix="join-chain"
+                    address={address}
+                    postcode={postcode}
+                    onAddressChange={(value) => {
+                      setAddress(value);
+                      setFieldErrors((previous) => ({
+                        ...previous,
+                        address: undefined,
+                      }));
+                    }}
+                    onPostcodeChange={(value) => {
+                      setPostcode(value);
+                      setFieldErrors((previous) => ({
+                        ...previous,
+                        postcode: undefined,
+                      }));
+                    }}
+                  />
+                  {(fieldErrors.address || fieldErrors.postcode) && (
+                    <div className="mt-2 space-y-1" role="alert">
+                      {fieldErrors.address ? (
+                        <p className="text-sm text-red-700">
+                          {fieldErrors.address}
+                        </p>
+                      ) : null}
+                      {fieldErrors.postcode ? (
+                        <p className="text-sm text-red-700">
+                          {fieldErrors.postcode}
+                        </p>
+                      ) : null}
+                    </div>
+                  )}
+                  {onwardPurchaseRemoved ? (
+                    <p className="mt-3 text-sm text-slate-600">
+                      After you join, your next home will show as
+                      Searching. You can then add the property you are
+                      buying from your chain.
                     </p>
-                  </div>
-                ) : null}
+                  ) : null}
+                </>
+              )}
+            </div>
+
+            <label className="mt-6 flex items-center gap-3">
+
+              <input
+                type="checkbox"
+                checked={nothingToSell}
+                disabled={isJoining}
+                onChange={() =>
+                  setNothingToSell(
+                    !nothingToSell
+                  )
+                }
+              />
+
+              <span className="text-slate-700">
+                I have nothing to sell
+              </span>
+
+            </label>
+
+            {errorMessage ? (
+              <div
+                role="alert"
+                className="mt-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+              >
+                <p>{errorMessage}</p>
+                <p className="mt-2">
+                  Need help?{" "}
+                  <HelpLink
+                    section={HELP_SECTION_IDS.accessCodes}
+                    newTab
+                    className="font-medium text-red-900 underline underline-offset-2"
+                  />
+                </p>
               </div>
-            ) : (
-              <>
-                <PropertyAddressLookup
-                  idPrefix="join-chain"
-                  address={address}
-                  postcode={postcode}
-                  onAddressChange={setAddress}
-                  onPostcodeChange={setPostcode}
-                />
-                {onwardPurchaseRemoved ? (
-                  <p className="mt-3 text-sm text-slate-600">
-                    After you join, your next home will show as
-                    Searching. You can then add the property you are
-                    buying from your chain.
-                  </p>
-                ) : null}
-              </>
-            )}
+            ) : null}
+
+            <button
+              type="button"
+              onClick={() => {
+                void handleJoinChain();
+              }}
+              disabled={isJoining}
+              className="mt-6 w-full bg-slate-900 text-white rounded-2xl py-5 text-lg font-semibold disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isJoining ? "Joining..." : "Join Chain"}
+            </button>
+
           </div>
-
-          <label className="mt-6 flex items-center gap-3">
-
-            <input
-              type="checkbox"
-              checked={nothingToSell}
-              onChange={() =>
-                setNothingToSell(
-                  !nothingToSell
-                )
-              }
-            />
-
-            <span className="text-slate-700">
-              I have nothing to sell
-            </span>
-
-          </label>
-
-          <button
-            onClick={handleJoinChain}
-            disabled={isJoining}
-            className="mt-6 w-full bg-slate-900 text-white rounded-2xl py-5 text-lg font-semibold disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {isJoining ? "Joining..." : "Join Chain"}
-          </button>
-
-        </div>
+        )}
 
         <p className="mt-6 text-sm text-slate-600">
           Having trouble joining?{" "}
@@ -577,4 +752,3 @@ export default function JoinChainPage() {
     </Suspense>
   );
 }
-

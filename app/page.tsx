@@ -158,8 +158,13 @@ export default function HomePage() {
           </svg>
         </div>
 
-        <div className={HERO_GLOW_PRIMARY_CLASS} />
-        <div className={HERO_GLOW_SECONDARY_CLASS} />
+        <div
+          className="pointer-events-none absolute inset-0 overflow-hidden"
+          aria-hidden="true"
+        >
+          <div className={HERO_GLOW_PRIMARY_CLASS} />
+          <div className={HERO_GLOW_SECONDARY_CLASS} />
+        </div>
 
         <div className="relative mx-auto max-w-6xl px-6 py-16 md:py-24 lg:py-28">
           <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
@@ -657,8 +662,11 @@ export default function HomePage() {
                 Why MoveLoop?
               </Link>
 
-              <Link href="/dashboard" className="hover:text-white transition">
-                Dashboard
+              <Link
+                href={ROUTES.homeownerLogin}
+                className="hover:text-white transition"
+              >
+                Log in
               </Link>
 
               <Link href="/start-move" className="hover:text-white transition">

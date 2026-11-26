@@ -178,7 +178,7 @@ const faqs = [
   },
   {
     title: "When does billing start?",
-    text: `After your branch is registered, an authorised branch owner can start the ${EA_TRIAL_PERIOD_DAYS}-day free trial through Stripe Checkout from the account subscription section. Your first payment of ${EA_STANDARD_MONTHLY_LABEL} is taken when the trial ends, and monthly after that, unless you cancel before the trial ends. MoveLoop may use Stripe test (Sandbox) mode during development and staging before Production charging is enabled.`,
+    text: `After your branch is registered, an authorised branch owner starts the ${EA_TRIAL_PERIOD_DAYS}-day free trial by completing checkout with a payment card — including during onboarding. You won't be charged during the trial. Billing at ${EA_STANDARD_MONTHLY_LABEL} begins when the trial ends, and continues monthly unless you cancel beforehand. Branch owners can manage the subscription later from Account settings.`,
   },
   {
     title: "Does the whole chain need to be connected?",
@@ -284,8 +284,13 @@ export default function EaLandingPage() {
           </svg>
         </div>
 
-        <div className={HERO_GLOW_PRIMARY_CLASS} />
-        <div className={HERO_GLOW_SECONDARY_CLASS} />
+        <div
+          className="pointer-events-none absolute inset-0 overflow-hidden"
+          aria-hidden="true"
+        >
+          <div className={HERO_GLOW_PRIMARY_CLASS} />
+          <div className={HERO_GLOW_SECONDARY_CLASS} />
+        </div>
 
         <div className="relative max-w-6xl mx-auto px-6 py-20 md:py-28">
           <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
@@ -298,7 +303,7 @@ export default function EaLandingPage() {
                 Collaborative property transactions
               </div>
 
-              <h1 className="mt-8 text-4xl md:text-5xl lg:text-6xl font-bold text-white leading-tight tracking-tight">
+              <h1 className="mt-8 text-4xl md:text-5xl lg:text-6xl font-bold text-white leading-tight tracking-tight break-words">
                 One shared chain view —
                 <span className="block text-brand-accent">
                   whether a homeowner or your branch joins first.
@@ -424,7 +429,12 @@ export default function EaLandingPage() {
 
       {/* How it works */}
       <section id="how-it-works" className="relative overflow-hidden">
-        <div className={MARKETING_SECTION_GLOW_CLASS} />
+        <div
+          className="pointer-events-none absolute inset-0 overflow-hidden"
+          aria-hidden="true"
+        >
+          <div className={MARKETING_SECTION_GLOW_CLASS} />
+        </div>
 
         <div className={`${SECTION_CONTENT_CLASS} relative`}>
           <SectionIntro
@@ -733,7 +743,7 @@ export default function EaLandingPage() {
                 href={ROUTES.estateAgentSignup}
                 className="hover:text-white transition"
               >
-                Sign up
+                Create account
               </Link>
             </div>
           </div>

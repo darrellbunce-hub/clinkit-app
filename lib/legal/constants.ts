@@ -27,6 +27,21 @@ export type SignupTermsDocument = "terms_of_use";
 export const SIGNUP_LEGAL_ACCEPTANCE_ERROR =
   "Accept the Terms of Service and Privacy Policy to create your account.";
 
+/** Shown when Auth succeeded but the durable acceptance RPC failed. */
+export const SIGNUP_LEGAL_ACCEPTANCE_PERSIST_FAILED_MESSAGE =
+  "Your account was created, but we could not save your Terms of Service and Privacy Policy acceptance. Sign in to finish — we will retry automatically.";
+
+/** Shown when pending acceptance still cannot be flushed after sign-in. */
+export const SIGNUP_LEGAL_ACCEPTANCE_RETRY_FAILED_MESSAGE =
+  "We still could not save your Terms of Service and Privacy Policy acceptance. Please try again. If this keeps happening, contact support.";
+
+/**
+ * Shown when a stored signup acceptance expired before the durable RPC
+ * succeeded. This is not a recorded acceptance.
+ */
+export const SIGNUP_LEGAL_ACCEPTANCE_EXPIRED_MESSAGE =
+  "Your Terms of Service and Privacy Policy acceptance expired before it could be saved. It has not been recorded. Accept the current terms to continue. If you need help, contact support.";
+
 export const LEGAL_ROUTES = {
   privacy: "/privacy",
   terms: "/terms",

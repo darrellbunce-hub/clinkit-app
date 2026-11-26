@@ -257,6 +257,16 @@ assertIncludes(
   eaLanding,
   "EA_TRIAL_TERMS_COPY"
 );
+assertExcludes(
+  "EA landing has no customer-facing Stripe Sandbox wording",
+  eaLanding,
+  "Sandbox"
+);
+assertExcludes(
+  "EA landing does not claim trial starts only from account subscription section",
+  eaLanding,
+  "account subscription section"
+);
 
 // Chain Intelligence — timing_v1 model (Stage 3.5; penalty-from-85 retired)
 assertTruthy(

@@ -68,6 +68,8 @@ export default function DashboardPage() {
     );
   }
 
+  const hasChains = chains.length > 0;
+
   return (
     <main className={`${PAGE_BG_CLASS} overflow-x-clip`}>
       <Navbar />
@@ -88,42 +90,71 @@ export default function DashboardPage() {
             </p>
           </div>
 
-          <Link
-            href="/start-move"
-            className={`${BTN_PRIMARY_SM_CLASS} px-6 py-4`}
-          >
-            + Create Chain
-          </Link>
+          {hasChains ? (
+            <Link
+              href="/start-move"
+              className={`${BTN_PRIMARY_SM_CLASS} px-6 py-4`}
+            >
+              + Create Chain
+            </Link>
+          ) : null}
         </div>
 
-        <div className="mt-12 grid min-w-0 grid-cols-1 xl:grid-cols-3 gap-8">
-          <div className="min-w-0 xl:col-span-2">
-            <div className="grid min-w-0 gap-6 md:grid-cols-2">
-              {chains.map((chain) => {
-                const chainProperties = properties
-                  .filter(
-                    (property) =>
-                      property.chainId === chain.id
-                  )
-                  .sort(
-                    (a, b) =>
-                      a.chainPosition - b.chainPosition
-                  );
+        {!hasChains ? (
+          <div className={`mt-12 ${CARD_CLASS_NO_PADDING} p-10 sm:p-12 text-center`}>
+            <h2 className={SECTION_TITLE_CLASS}>
+              No Active Moves Yet
+            </h2>
 
-                const operationalPropertyId =
-                  resolveDashboardOperationalPropertyId(
-                    chainProperties
-                  );
+            <p className="mt-3 text-slate-600 max-w-xl mx-auto">
+              Start your first property move, or join a chain you have already
+              been invited to with an access code.
+            </p>
 
-                return (
-                  <div
-                    key={chain.id}
-                    className={`min-w-0 bg-surface-card rounded-3xl shadow-sm border border-surface-card-border ${CARD_PADDING_CLASS}`}
-                  >
-                    <MobilePanelHeader
-                      aside={
-                        <div
-                          className={`
+            <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center">
+              <Link
+                href="/start-move"
+                className={`${BTN_PRIMARY_SM_CLASS} px-6 py-4`}
+              >
+                Start a move
+              </Link>
+              <Link
+                href="/join-chain"
+                className="rounded-2xl border border-slate-300 bg-white px-6 py-4 font-semibold text-slate-800 hover:bg-slate-50"
+              >
+                Join a chain
+              </Link>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-12 grid min-w-0 grid-cols-1 xl:grid-cols-3 gap-8">
+            <div className="min-w-0 xl:col-span-2">
+              <div className="grid min-w-0 gap-6 md:grid-cols-2">
+                {chains.map((chain) => {
+                  const chainProperties = properties
+                    .filter(
+                      (property) =>
+                        property.chainId === chain.id
+                    )
+                    .sort(
+                      (a, b) =>
+                        a.chainPosition - b.chainPosition
+                    );
+
+                  const operationalPropertyId =
+                    resolveDashboardOperationalPropertyId(
+                      chainProperties
+                    );
+
+                  return (
+                    <div
+                      key={chain.id}
+                      className={`min-w-0 bg-surface-card rounded-3xl shadow-sm border border-surface-card-border ${CARD_PADDING_CLASS}`}
+                    >
+                      <MobilePanelHeader
+                        aside={
+                          <div
+                            className={`
                             px-3 py-1.5 rounded-full text-xs font-medium
                             ${statusBadgeClasses(
                               chainProperties.some(
@@ -147,135 +178,120 @@ export default function DashboardPage() {
                                     : "healthy"
                             )}
                           `}
-                        >
-                          {formatChainState(chain.state)}
-                        </div>
-                      }
-                    >
-                      <h2 className={`${SECTION_TITLE_CLASS} break-words`}>
-                        {getDashboardChainTitle(
-                          chain.id,
-                          properties,
-                          operationalPropertyId
-                        )}
-                      </h2>
-
-                      <p className="text-slate-500 mt-1 text-sm break-words">
-                        Access Code: {chain.accessCode}
-                      </p>
-                    </MobilePanelHeader>
-
-                    <div className={`mt-4 ${DASHBOARD_LIST_CLASS}`}>
-                      {chainProperties.map((property) => {
-                        const stageLabel = getStageLabel(
-                          property.stage
-                        );
-                        const statusLabel = formatConnectionStatus(
-                          property.status
-                        );
-
-                        return (
-                          <div
-                            key={property.id}
-                            className={DASHBOARD_LIST_ROW_CLASS}
                           >
-                            <div className="min-w-0">
-                              <h3 className="font-semibold text-slate-900 text-sm leading-snug break-words">
-                                {getParticipantPropertyLabel(
-                                  {
-                                    id: property.id,
-                                    relationship_type:
-                                      property.relationship_type,
-                                    stage: property.stage,
-                                    address: property.address,
-                                    chainPosition:
-                                      property.chainPosition,
-                                    currentUserRole:
-                                      property.currentUserRole,
-                                  },
-                                  operationalPropertyId
-                                )}
-                              </h3>
-
-                              <p className="text-xs text-slate-500 mt-1 break-words">
-                                Position #{property.chainPosition}
-                                {" · "}
-                                {stageLabel}
-                                {" · "}
-                                {statusLabel}
-                              </p>
-                            </div>
+                            {formatChainState(chain.state)}
                           </div>
-                        );
-                      })}
+                        }
+                      >
+                        <h2 className={`${SECTION_TITLE_CLASS} break-words`}>
+                          {getDashboardChainTitle(
+                            chain.id,
+                            properties,
+                            operationalPropertyId
+                          )}
+                        </h2>
+
+                        <p className="text-slate-500 mt-1 text-sm break-words">
+                          Access Code: {chain.accessCode}
+                        </p>
+                      </MobilePanelHeader>
+
+                      <div className={`mt-4 ${DASHBOARD_LIST_CLASS}`}>
+                        {chainProperties.map((property) => {
+                          const stageLabel = getStageLabel(
+                            property.stage
+                          );
+                          const statusLabel = formatConnectionStatus(
+                            property.status
+                          );
+
+                          return (
+                            <div
+                              key={property.id}
+                              className={DASHBOARD_LIST_ROW_CLASS}
+                            >
+                              <div className="min-w-0">
+                                <h3 className="font-semibold text-slate-900 text-sm leading-snug break-words">
+                                  {getParticipantPropertyLabel(
+                                    {
+                                      id: property.id,
+                                      relationship_type:
+                                        property.relationship_type,
+                                      stage: property.stage,
+                                      address: property.address,
+                                      chainPosition:
+                                        property.chainPosition,
+                                      currentUserRole:
+                                        property.currentUserRole,
+                                    },
+                                    operationalPropertyId
+                                  )}
+                                </h3>
+
+                                <p className="text-xs text-slate-500 mt-1 break-words">
+                                  Position #{property.chainPosition}
+                                  {" · "}
+                                  {stageLabel}
+                                  {" · "}
+                                  {statusLabel}
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      <Link
+                        href={`/chain/${chain.id}`}
+                        className={`block mt-6 w-full border border-surface-card-border text-slate-900 py-3 rounded-xl ${SURFACE_PANEL_HOVER_CLASS} text-center text-sm font-medium`}
+                      >
+                        View Chain
+                      </Link>
                     </div>
-
-                    <Link
-                      href={`/chain/${chain.id}`}
-                      className={`block mt-6 w-full border border-surface-card-border text-slate-900 py-3 rounded-xl ${SURFACE_PANEL_HOVER_CLASS} text-center text-sm font-medium`}
-                    >
-                      View Chain
-                    </Link>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
-          </div>
 
-          <div className="min-w-0 space-y-6">
-            <div className={`${CARD_CLASS_NO_PADDING} ${CARD_PADDING_CLASS}`}>
-              <h2 className="text-xl font-bold text-slate-900">
-                Recommended Next Steps
-              </h2>
+            <div className="min-w-0 space-y-6">
+              <div className={`${CARD_CLASS_NO_PADDING} ${CARD_PADDING_CLASS}`}>
+                <h2 className="text-xl font-bold text-slate-900">
+                  Recommended Next Steps
+                </h2>
 
-              <div className="mt-6 space-y-4">
-                <div className={`border border-surface-card-border rounded-2xl p-4 hover:border-brand-primary/30 ${SURFACE_PANEL_HOVER_CLASS} cursor-pointer`}>
-                  <p className="font-semibold text-slate-900">
-                    Compare Home Insurance
-                  </p>
+                <div className="mt-6 space-y-4">
+                  <div className={`border border-surface-card-border rounded-2xl p-4 hover:border-brand-primary/30 ${SURFACE_PANEL_HOVER_CLASS} cursor-pointer`}>
+                    <p className="font-semibold text-slate-900">
+                      Compare Home Insurance
+                    </p>
 
-                  <p className="text-sm text-slate-500 mt-1">
-                    Recommended after searches and mortgage approval.
-                  </p>
-                </div>
+                    <p className="text-sm text-slate-500 mt-1">
+                      Recommended after searches and mortgage approval.
+                    </p>
+                  </div>
 
-                <div className={`border border-surface-card-border rounded-2xl p-4 hover:border-brand-primary/30 ${SURFACE_PANEL_HOVER_CLASS} cursor-pointer`}>
-                  <p className="font-semibold text-slate-900">
-                    Book a Removals Company
-                  </p>
+                  <div className={`border border-surface-card-border rounded-2xl p-4 hover:border-brand-primary/30 ${SURFACE_PANEL_HOVER_CLASS} cursor-pointer`}>
+                    <p className="font-semibold text-slate-900">
+                      Book a Removals Company
+                    </p>
 
-                  <p className="text-sm text-slate-500 mt-1">
-                    Prepare early to secure your preferred moving date.
-                  </p>
-                </div>
+                    <p className="text-sm text-slate-500 mt-1">
+                      Prepare early to secure your preferred moving date.
+                    </p>
+                  </div>
 
-                <div className={`border border-surface-card-border rounded-2xl p-4 hover:border-brand-primary/30 ${SURFACE_PANEL_HOVER_CLASS} cursor-pointer`}>
-                  <p className="font-semibold text-slate-900">
-                    Utilities & Broadband
-                  </p>
+                  <div className={`border border-surface-card-border rounded-2xl p-4 hover:border-brand-primary/30 ${SURFACE_PANEL_HOVER_CLASS} cursor-pointer`}>
+                    <p className="font-semibold text-slate-900">
+                      Utilities & Broadband
+                    </p>
 
-                  <p className="text-sm text-slate-500 mt-1">
-                    Set up your new services before completion day.
-                  </p>
+                    <p className="text-sm text-slate-500 mt-1">
+                      Set up your new services before completion day.
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-
-        {chains.length === 0 && (
-          <div className={`mt-12 ${CARD_CLASS_NO_PADDING} p-12 text-center`}>
-            <h2 className={SECTION_TITLE_CLASS}>
-              No Active Moves Yet
-            </h2>
-
-            <p className="mt-2 text-slate-500">
-              Start a move to get a shared view of your property chain progress.
-            </p>
-
-            <p className="mt-4 text-slate-600">
-              Start your first property move or join an existing chain.
-            </p>
           </div>
         )}
       </div>

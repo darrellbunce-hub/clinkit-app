@@ -52,7 +52,7 @@ export const CHAIN_CONNECTOR_NEUTRAL_CLASS =
   "w-24 h-1 rounded-full bg-chain-connector-neutral";
 
 export const MARKETING_SECTION_GLOW_CLASS =
-  "absolute top-[-150px] right-[-100px] w-[400px] h-[400px] bg-marketing-section-glow rounded-full blur-3xl opacity-60";
+  "pointer-events-none absolute top-0 right-0 h-[400px] w-[min(400px,100%)] -translate-y-1/3 translate-x-1/4 rounded-full bg-marketing-section-glow blur-3xl opacity-60";
 
 export const MARKETING_STEP_CARD_CLASS =
   "relative overflow-hidden bg-marketing-step-bg rounded-3xl p-8 border border-marketing-step-border hover:shadow-2xl hover:shadow-marketing-feature-shadow transition-all duration-300";
@@ -131,13 +131,13 @@ export const HERO_GRADIENT_CLASS =
   "bg-gradient-to-br from-brand-hero-from via-brand-hero-via to-brand-hero-to";
 
 export const HERO_GLOW_PRIMARY_CLASS =
-  "absolute top-[-200px] right-[-100px] w-[500px] h-[500px] bg-brand-glow-primary rounded-full blur-3xl";
+  "pointer-events-none absolute top-0 right-0 h-[500px] w-[min(500px,100%)] -translate-y-1/2 translate-x-1/4 rounded-full bg-brand-glow-primary blur-3xl";
 
 export const HERO_GLOW_SECONDARY_CLASS =
-  "absolute bottom-[-200px] left-[-100px] w-[400px] h-[400px] bg-brand-glow-secondary rounded-full blur-3xl";
+  "pointer-events-none absolute bottom-0 left-0 h-[400px] w-[min(400px,100%)] translate-y-1/2 -translate-x-1/4 rounded-full bg-brand-glow-secondary blur-3xl";
 
 export const HERO_BADGE_CLASS =
-  "inline-flex items-center bg-brand-accent text-text-charcoal px-4 py-2 rounded-full text-sm font-semibold shadow-lg shadow-brand-accent/30";
+  "inline-flex max-w-full items-center bg-brand-accent text-text-charcoal px-4 py-2 rounded-full text-sm font-semibold shadow-lg shadow-brand-accent/30";
 
 /** Marketing hero headline — tighter on very small screens */
 export const HERO_TITLE_CLASS =

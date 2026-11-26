@@ -9,11 +9,11 @@ import {
 import {
   EA_STANDARD_MONTHLY_LABEL,
   EA_TRIAL_HEADLINE,
-  EA_TRIAL_PERIOD_DAYS,
   EA_TRIAL_REPEAT_COPY,
   EA_TRIAL_TERMS_COPY,
   formatGbpMinorAsMonthlyLabel,
 } from "@/lib/billing/eaBranchPricing";
+import { EA_NO_SUBSCRIPTION_DETAIL } from "@/lib/billing/eaSoftSkipExpectations";
 import type { EaBranchSubscriptionSummary } from "@/lib/billing/eaBranchSubscription";
 import { loadAgentHomeContext } from "@/lib/estateAgent/loadAgentHomeContext";
 import {
@@ -124,7 +124,7 @@ export function describeSummary(summary: EaBranchSubscriptionSummary | null): {
   if (!summary?.ok || !summary.has_subscription) {
     return {
       title: "No subscription",
-      detail: `Start your ${EA_TRIAL_PERIOD_DAYS}-day free trial for this Branch when you are ready. Recurring monthly billing is handled through Stripe. This environment may use Stripe test (Sandbox) mode before Production charging is enabled.`,
+      detail: EA_NO_SUBSCRIPTION_DETAIL,
       tone: "neutral",
     };
   }
@@ -306,6 +306,8 @@ export default function SubscriptionSection({
     );
     if (billing === "success") {
       checkoutReturnRef.current = { branchId: returnBranchId };
+      // Checkout return bootstrap: sync confirming UI from the URL once on mount.
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional URL→state hydrate
       setIsConfirmingCheckout(true);
       setNotice(
         "Checkout complete — we're confirming your subscription. This usually takes a few seconds."
